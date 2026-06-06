@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "polyester-sdk"
+version = "0.0.0"
+description = "Python SDK for the Polyester public API."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+  "connectrpc>=0.4.0",
+  "protobuf>=5.27",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/Fabric-Labs/polyester-sdk-python"
+Repository = "https://github.com/Fabric-Labs/polyester-sdk-python"
+Issues = "https://github.com/Fabric-Labs/polyester-sdk-python/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/polyester"]

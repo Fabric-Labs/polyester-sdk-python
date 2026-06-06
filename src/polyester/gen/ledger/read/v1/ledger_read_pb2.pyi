@@ -1,0 +1,286 @@
+from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
+from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
+from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
+from polyester.gen.polyester.api import options_pb2 as _options_pb2
+from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
+from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import message as _message
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
+
+DESCRIPTOR: _descriptor.FileDescriptor
+
+class BalanceRange(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BALANCE_RANGE_UNSPECIFIED: _ClassVar[BalanceRange]
+    DAY_1: _ClassVar[BalanceRange]
+    DAY_7: _ClassVar[BalanceRange]
+    DAY_30: _ClassVar[BalanceRange]
+    DAY_90: _ClassVar[BalanceRange]
+    DAY_180: _ClassVar[BalanceRange]
+    DAY_365: _ClassVar[BalanceRange]
+
+class EquityGroupBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    GROUP_BY_UNSPECIFIED: _ClassVar[EquityGroupBy]
+    GROUP_BY_ACCOUNT: _ClassVar[EquityGroupBy]
+    GROUP_BY_ASSET: _ClassVar[EquityGroupBy]
+
+class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_CODE_UNSPECIFIED: _ClassVar[ErrorCode]
+    ERROR_CODE_BAD_REQUEST: _ClassVar[ErrorCode]
+    ERROR_CODE_UNAUTHENTICATED: _ClassVar[ErrorCode]
+    ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
+    ERROR_CODE_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_MISSING_ACCOUNT_ID: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_ACCOUNT_ID: _ClassVar[ErrorCode]
+    ERROR_CODE_MISSING_WALLET: _ClassVar[ErrorCode]
+    ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_WALLET_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_UPSTREAM_ERROR: _ClassVar[ErrorCode]
+BALANCE_RANGE_UNSPECIFIED: BalanceRange
+DAY_1: BalanceRange
+DAY_7: BalanceRange
+DAY_30: BalanceRange
+DAY_90: BalanceRange
+DAY_180: BalanceRange
+DAY_365: BalanceRange
+GROUP_BY_UNSPECIFIED: EquityGroupBy
+GROUP_BY_ACCOUNT: EquityGroupBy
+GROUP_BY_ASSET: EquityGroupBy
+ERROR_CODE_UNSPECIFIED: ErrorCode
+ERROR_CODE_BAD_REQUEST: ErrorCode
+ERROR_CODE_UNAUTHENTICATED: ErrorCode
+ERROR_CODE_PERMISSION_DENIED: ErrorCode
+ERROR_CODE_NOT_FOUND: ErrorCode
+ERROR_CODE_MISSING_ACCOUNT_ID: ErrorCode
+ERROR_CODE_INVALID_ACCOUNT_ID: ErrorCode
+ERROR_CODE_MISSING_WALLET: ErrorCode
+ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE: ErrorCode
+ERROR_CODE_WALLET_NOT_FOUND: ErrorCode
+ERROR_CODE_UPSTREAM_ERROR: ErrorCode
+
+class GetBalancesRequest(_message.Message):
+    __slots__ = ("subaccount_id",)
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
+
+class AssetBalance(_message.Message):
+    __slots__ = ("asset_id", "trading", "funding", "reserved", "available")
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    TRADING_FIELD_NUMBER: _ClassVar[int]
+    FUNDING_FIELD_NUMBER: _ClassVar[int]
+    RESERVED_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_FIELD_NUMBER: _ClassVar[int]
+    asset_id: int
+    trading: _u128_pb2.U128
+    funding: _u128_pb2.U128
+    reserved: _u128_pb2.U128
+    available: _u128_pb2.U128
+    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ...) -> None: ...
+
+class GetBalancesResponse(_message.Message):
+    __slots__ = ("balances",)
+    BALANCES_FIELD_NUMBER: _ClassVar[int]
+    balances: _containers.RepeatedCompositeFieldContainer[AssetBalance]
+    def __init__(self, balances: _Optional[_Iterable[_Union[AssetBalance, _Mapping]]] = ...) -> None: ...
+
+class GetBalanceHistoryRequest(_message.Message):
+    __slots__ = ("subaccount_id", "range", "ledger", "account_codes")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    RANGE_FIELD_NUMBER: _ClassVar[int]
+    LEDGER_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_CODES_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    range: BalanceRange
+    ledger: int
+    account_codes: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., ledger: _Optional[int] = ..., account_codes: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class BalanceSeries(_message.Message):
+    __slots__ = ("asset_id", "account_code", "balance_q")
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
+    BALANCE_Q_FIELD_NUMBER: _ClassVar[int]
+    asset_id: int
+    account_code: int
+    balance_q: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, asset_id: _Optional[int] = ..., account_code: _Optional[int] = ..., balance_q: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class GetBalanceHistoryResponse(_message.Message):
+    __slots__ = ("range", "bucket", "start_ts_sec", "end_ts_sec", "points", "series")
+    RANGE_FIELD_NUMBER: _ClassVar[int]
+    BUCKET_FIELD_NUMBER: _ClassVar[int]
+    START_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    END_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    POINTS_FIELD_NUMBER: _ClassVar[int]
+    SERIES_FIELD_NUMBER: _ClassVar[int]
+    range: BalanceRange
+    bucket: str
+    start_ts_sec: int
+    end_ts_sec: int
+    points: int
+    series: _containers.RepeatedCompositeFieldContainer[BalanceSeries]
+    def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[BalanceSeries, _Mapping]]] = ...) -> None: ...
+
+class AccountGrouping(_message.Message):
+    __slots__ = ("code", "name")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    code: int
+    name: str
+    def __init__(self, code: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+
+class AssetGrouping(_message.Message):
+    __slots__ = ("id", "symbol")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    id: int
+    symbol: str
+    def __init__(self, id: _Optional[int] = ..., symbol: _Optional[str] = ...) -> None: ...
+
+class GetEquityHistorySeriesRequest(_message.Message):
+    __slots__ = ("subaccount_id", "range", "account_codes", "group_by")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    RANGE_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_CODES_FIELD_NUMBER: _ClassVar[int]
+    GROUP_BY_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    range: BalanceRange
+    account_codes: _containers.RepeatedScalarFieldContainer[int]
+    group_by: EquityGroupBy
+    def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., account_codes: _Optional[_Iterable[int]] = ..., group_by: _Optional[_Union[EquityGroupBy, str]] = ...) -> None: ...
+
+class EquitySeries(_message.Message):
+    __slots__ = ("account", "asset", "equity_q")
+    ACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    ASSET_FIELD_NUMBER: _ClassVar[int]
+    EQUITY_Q_FIELD_NUMBER: _ClassVar[int]
+    account: AccountGrouping
+    asset: AssetGrouping
+    equity_q: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, account: _Optional[_Union[AccountGrouping, _Mapping]] = ..., asset: _Optional[_Union[AssetGrouping, _Mapping]] = ..., equity_q: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class GetEquityHistorySeriesResponse(_message.Message):
+    __slots__ = ("range", "bucket", "start_ts_sec", "end_ts_sec", "quote_asset", "points", "series", "btc_prices_q")
+    RANGE_FIELD_NUMBER: _ClassVar[int]
+    BUCKET_FIELD_NUMBER: _ClassVar[int]
+    START_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    END_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    QUOTE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    POINTS_FIELD_NUMBER: _ClassVar[int]
+    SERIES_FIELD_NUMBER: _ClassVar[int]
+    BTC_PRICES_Q_FIELD_NUMBER: _ClassVar[int]
+    range: BalanceRange
+    bucket: str
+    start_ts_sec: int
+    end_ts_sec: int
+    quote_asset: str
+    points: int
+    series: _containers.RepeatedCompositeFieldContainer[EquitySeries]
+    btc_prices_q: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., quote_asset: _Optional[str] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[EquitySeries, _Mapping]]] = ..., btc_prices_q: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class ListTransfersRequest(_message.Message):
+    __slots__ = ("subaccount_id", "limit", "reversed", "timestamp_min", "timestamp_max", "code", "ledger", "since")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    REVERSED_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MIN_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MAX_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    LEDGER_FIELD_NUMBER: _ClassVar[int]
+    SINCE_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    limit: int
+    reversed: bool
+    timestamp_min: int
+    timestamp_max: int
+    code: int
+    ledger: int
+    since: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., timestamp_min: _Optional[int] = ..., timestamp_max: _Optional[int] = ..., code: _Optional[int] = ..., ledger: _Optional[int] = ..., since: _Optional[int] = ...) -> None: ...
+
+class TransferRow(_message.Message):
+    __slots__ = ("asset_id", "amount", "type", "account_code", "timestamp", "tx_id", "onchain", "balance_after", "is_debit", "link_id", "flow_id")
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
+    TX_ID_FIELD_NUMBER: _ClassVar[int]
+    ONCHAIN_FIELD_NUMBER: _ClassVar[int]
+    BALANCE_AFTER_FIELD_NUMBER: _ClassVar[int]
+    IS_DEBIT_FIELD_NUMBER: _ClassVar[int]
+    LINK_ID_FIELD_NUMBER: _ClassVar[int]
+    FLOW_ID_FIELD_NUMBER: _ClassVar[int]
+    asset_id: int
+    amount: _u128_pb2.U128
+    type: int
+    account_code: int
+    timestamp: int
+    tx_id: str
+    onchain: bool
+    balance_after: _u128_pb2.U128
+    is_debit: bool
+    link_id: int
+    flow_id: str
+    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., type: _Optional[int] = ..., account_code: _Optional[int] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ..., onchain: _Optional[bool] = ..., balance_after: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ...) -> None: ...
+
+class ListTransfersResponse(_message.Message):
+    __slots__ = ("transfers", "next_cursor")
+    TRANSFERS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_CURSOR_FIELD_NUMBER: _ClassVar[int]
+    transfers: _containers.RepeatedCompositeFieldContainer[TransferRow]
+    next_cursor: int
+    def __init__(self, transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., next_cursor: _Optional[int] = ...) -> None: ...
+
+class ListHoldsRequest(_message.Message):
+    __slots__ = ("subaccount_id", "limit", "reversed")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    REVERSED_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    limit: int
+    reversed: bool
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ...) -> None: ...
+
+class HoldRow(_message.Message):
+    __slots__ = ("hold_id", "amount_reserved", "asset_id", "expires_at_ns")
+    HOLD_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_RESERVED_FIELD_NUMBER: _ClassVar[int]
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_NS_FIELD_NUMBER: _ClassVar[int]
+    hold_id: int
+    amount_reserved: _u128_pb2.U128
+    asset_id: int
+    expires_at_ns: int
+    def __init__(self, hold_id: _Optional[int] = ..., amount_reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., asset_id: _Optional[int] = ..., expires_at_ns: _Optional[int] = ...) -> None: ...
+
+class ListHoldsResponse(_message.Message):
+    __slots__ = ("holds",)
+    HOLDS_FIELD_NUMBER: _ClassVar[int]
+    holds: _containers.RepeatedCompositeFieldContainer[HoldRow]
+    def __init__(self, holds: _Optional[_Iterable[_Union[HoldRow, _Mapping]]] = ...) -> None: ...
+
+class GetHealthRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetHealthResponse(_message.Message):
+    __slots__ = ("ok", "version")
+    OK_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    ok: bool
+    version: str
+    def __init__(self, ok: _Optional[bool] = ..., version: _Optional[str] = ...) -> None: ...
+
+class ErrorDetail(_message.Message):
+    __slots__ = ("code",)
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    code: ErrorCode
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...

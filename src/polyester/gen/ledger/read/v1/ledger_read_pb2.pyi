@@ -1,6 +1,7 @@
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
+from polyester.gen.ledger.v1 import catalog_pb2 as _catalog_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
 from google.protobuf.internal import containers as _containers
@@ -98,8 +99,8 @@ class GetBalanceHistoryRequest(_message.Message):
     subaccount_id: int
     range: BalanceRange
     ledger: int
-    account_codes: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., ledger: _Optional[int] = ..., account_codes: _Optional[_Iterable[int]] = ...) -> None: ...
+    account_codes: _containers.RepeatedScalarFieldContainer[_catalog_pb2.AccountCode]
+    def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., ledger: _Optional[int] = ..., account_codes: _Optional[_Iterable[_Union[_catalog_pb2.AccountCode, str]]] = ...) -> None: ...
 
 class BalanceSeries(_message.Message):
     __slots__ = ("asset_id", "account_code", "balance_q")
@@ -107,9 +108,9 @@ class BalanceSeries(_message.Message):
     ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
     BALANCE_Q_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
-    account_code: int
+    account_code: _catalog_pb2.AccountCode
     balance_q: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, asset_id: _Optional[int] = ..., account_code: _Optional[int] = ..., balance_q: _Optional[_Iterable[int]] = ...) -> None: ...
+    def __init__(self, asset_id: _Optional[int] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., balance_q: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class GetBalanceHistoryResponse(_message.Message):
     __slots__ = ("range", "bucket", "start_ts_sec", "end_ts_sec", "points", "series")
@@ -128,12 +129,12 @@ class GetBalanceHistoryResponse(_message.Message):
     def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[BalanceSeries, _Mapping]]] = ...) -> None: ...
 
 class AccountGrouping(_message.Message):
-    __slots__ = ("code", "name")
-    CODE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("account_code", "name")
+    ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
-    code: int
+    account_code: int
     name: str
-    def __init__(self, code: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+    def __init__(self, account_code: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
 
 class AssetGrouping(_message.Message):
     __slots__ = ("id", "symbol")
@@ -151,9 +152,9 @@ class GetEquityHistorySeriesRequest(_message.Message):
     GROUP_BY_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     range: BalanceRange
-    account_codes: _containers.RepeatedScalarFieldContainer[int]
+    account_codes: _containers.RepeatedScalarFieldContainer[_catalog_pb2.AccountCode]
     group_by: EquityGroupBy
-    def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., account_codes: _Optional[_Iterable[int]] = ..., group_by: _Optional[_Union[EquityGroupBy, str]] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., account_codes: _Optional[_Iterable[_Union[_catalog_pb2.AccountCode, str]]] = ..., group_by: _Optional[_Union[EquityGroupBy, str]] = ...) -> None: ...
 
 class EquitySeries(_message.Message):
     __slots__ = ("account", "asset", "equity_q")
@@ -186,13 +187,13 @@ class GetEquityHistorySeriesResponse(_message.Message):
     def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., quote_asset: _Optional[str] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[EquitySeries, _Mapping]]] = ..., btc_prices_q: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class ListTransfersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit", "reversed", "timestamp_min", "timestamp_max", "code", "ledger", "since")
+    __slots__ = ("subaccount_id", "limit", "reversed", "timestamp_min", "timestamp_max", "transfer_code", "ledger", "since")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     REVERSED_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_MIN_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_MAX_FIELD_NUMBER: _ClassVar[int]
-    CODE_FIELD_NUMBER: _ClassVar[int]
+    TRANSFER_CODE_FIELD_NUMBER: _ClassVar[int]
     LEDGER_FIELD_NUMBER: _ClassVar[int]
     SINCE_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
@@ -200,16 +201,16 @@ class ListTransfersRequest(_message.Message):
     reversed: bool
     timestamp_min: int
     timestamp_max: int
-    code: int
+    transfer_code: _catalog_pb2.TransferCode
     ledger: int
     since: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., timestamp_min: _Optional[int] = ..., timestamp_max: _Optional[int] = ..., code: _Optional[int] = ..., ledger: _Optional[int] = ..., since: _Optional[int] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., timestamp_min: _Optional[int] = ..., timestamp_max: _Optional[int] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., ledger: _Optional[int] = ..., since: _Optional[int] = ...) -> None: ...
 
 class TransferRow(_message.Message):
-    __slots__ = ("asset_id", "amount", "type", "account_code", "timestamp", "tx_id", "onchain", "balance_after", "is_debit", "link_id", "flow_id")
+    __slots__ = ("asset_id", "amount", "transfer_code", "account_code", "timestamp", "tx_id", "onchain", "balance_after", "is_debit", "link_id", "flow_id")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    TRANSFER_CODE_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     TX_ID_FIELD_NUMBER: _ClassVar[int]
@@ -220,8 +221,8 @@ class TransferRow(_message.Message):
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     amount: _u128_pb2.U128
-    type: int
-    account_code: int
+    transfer_code: _catalog_pb2.TransferCode
+    account_code: _catalog_pb2.AccountCode
     timestamp: int
     tx_id: str
     onchain: bool
@@ -229,7 +230,7 @@ class TransferRow(_message.Message):
     is_debit: bool
     link_id: int
     flow_id: str
-    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., type: _Optional[int] = ..., account_code: _Optional[int] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ..., onchain: _Optional[bool] = ..., balance_after: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ..., onchain: _Optional[bool] = ..., balance_after: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ...) -> None: ...
 
 class ListTransfersResponse(_message.Message):
     __slots__ = ("transfers", "next_cursor")

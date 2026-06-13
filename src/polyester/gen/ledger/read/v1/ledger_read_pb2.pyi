@@ -187,7 +187,7 @@ class GetEquityHistorySeriesResponse(_message.Message):
     def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., quote_asset: _Optional[str] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[EquitySeries, _Mapping]]] = ..., btc_prices_q: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class ListTransfersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit", "reversed", "timestamp_min", "timestamp_max", "transfer_code", "ledger", "since")
+    __slots__ = ("subaccount_id", "limit", "reversed", "timestamp_min", "timestamp_max", "transfer_code", "ledger", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     REVERSED_FIELD_NUMBER: _ClassVar[int]
@@ -195,7 +195,7 @@ class ListTransfersRequest(_message.Message):
     TIMESTAMP_MAX_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_CODE_FIELD_NUMBER: _ClassVar[int]
     LEDGER_FIELD_NUMBER: _ClassVar[int]
-    SINCE_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     limit: int
     reversed: bool
@@ -203,8 +203,8 @@ class ListTransfersRequest(_message.Message):
     timestamp_max: int
     transfer_code: _catalog_pb2.TransferCode
     ledger: int
-    since: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., timestamp_min: _Optional[int] = ..., timestamp_max: _Optional[int] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., ledger: _Optional[int] = ..., since: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., timestamp_min: _Optional[int] = ..., timestamp_max: _Optional[int] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., ledger: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class TransferRow(_message.Message):
     __slots__ = ("asset_id", "amount", "transfer_code", "account_code", "timestamp", "tx_id", "onchain", "balance_after", "is_debit", "link_id", "flow_id")
@@ -233,22 +233,24 @@ class TransferRow(_message.Message):
     def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ..., onchain: _Optional[bool] = ..., balance_after: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ...) -> None: ...
 
 class ListTransfersResponse(_message.Message):
-    __slots__ = ("transfers", "next_cursor")
+    __slots__ = ("transfers", "next_page_token")
     TRANSFERS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_CURSOR_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     transfers: _containers.RepeatedCompositeFieldContainer[TransferRow]
-    next_cursor: int
-    def __init__(self, transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., next_cursor: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class ListHoldsRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit", "reversed")
+    __slots__ = ("subaccount_id", "limit", "reversed", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     REVERSED_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     limit: int
     reversed: bool
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ...) -> None: ...
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class HoldRow(_message.Message):
     __slots__ = ("hold_id", "amount_reserved", "asset_id", "expires_at_ns")
@@ -263,10 +265,12 @@ class HoldRow(_message.Message):
     def __init__(self, hold_id: _Optional[int] = ..., amount_reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., asset_id: _Optional[int] = ..., expires_at_ns: _Optional[int] = ...) -> None: ...
 
 class ListHoldsResponse(_message.Message):
-    __slots__ = ("holds",)
+    __slots__ = ("holds", "next_page_token")
     HOLDS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     holds: _containers.RepeatedCompositeFieldContainer[HoldRow]
-    def __init__(self, holds: _Optional[_Iterable[_Union[HoldRow, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, holds: _Optional[_Iterable[_Union[HoldRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetHealthRequest(_message.Message):
     __slots__ = ()

@@ -327,8 +327,7 @@ class GetSubaccountResponse(_message.Message):
     def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ..., api_keys: _Optional[_Iterable[_Union[_api_keys_pb2.ApiKey, _Mapping]]] = ..., members: _Optional[_Iterable[_Union[SubaccountMemberView, _Mapping]]] = ..., invites: _Optional[_Iterable[_Union[SubaccountInvite, _Mapping]]] = ..., policy: _Optional[_Union[_policies_pb2.SubaccountPolicyView, _Mapping]] = ..., balances: _Optional[_Union[_ledger_read_pb2.GetBalancesResponse, _Mapping]] = ...) -> None: ...
 
 class ActivityEvent(_message.Message):
-    __slots__ = ("cursor", "created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json")
-    CURSOR_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json")
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     ENTITY_KIND_FIELD_NUMBER: _ClassVar[int]
     EVENT_ACTION_FIELD_NUMBER: _ClassVar[int]
@@ -337,7 +336,6 @@ class ActivityEvent(_message.Message):
     USER_AGENT_FIELD_NUMBER: _ClassVar[int]
     ACTOR_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     PAYLOAD_JSON_FIELD_NUMBER: _ClassVar[int]
-    cursor: str
     created_at: _timestamp_pb2.Timestamp
     entity_kind: str
     event_action: str
@@ -346,22 +344,22 @@ class ActivityEvent(_message.Message):
     user_agent: str
     actor_account_id: int
     payload_json: str
-    def __init__(self, cursor: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[str] = ..., event_action: _Optional[str] = ..., source: _Optional[str] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
+    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[str] = ..., event_action: _Optional[str] = ..., source: _Optional[str] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
 
 class ListSubaccountEventsRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit", "cursor")
+    __slots__ = ("subaccount_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    CURSOR_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     limit: int
-    cursor: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., cursor: _Optional[str] = ...) -> None: ...
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListSubaccountEventsResponse(_message.Message):
-    __slots__ = ("events", "next_cursor")
+    __slots__ = ("events", "next_page_token")
     EVENTS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_CURSOR_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     events: _containers.RepeatedCompositeFieldContainer[ActivityEvent]
-    next_cursor: str
-    def __init__(self, events: _Optional[_Iterable[_Union[ActivityEvent, _Mapping]]] = ..., next_cursor: _Optional[str] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, events: _Optional[_Iterable[_Union[ActivityEvent, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...

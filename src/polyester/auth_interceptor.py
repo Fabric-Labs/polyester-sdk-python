@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+
+from connectrpc.codec import Codec
+from connectrpc.interceptor import UnaryInterceptor
+from connectrpc.request import RequestContext
+from google.protobuf.message import Message
+
+from polyester.auth import ApiKeyCredentials, sign_request
+
+
+class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
+    """Attach Polyester API-key headers to generated Connect unary calls."""
+
+    def __init__(
+        self,
+        credentials: ApiKeyCredentials,
+        *,
+        base_url: str,
+        codec: Codec,
+    ) -> None:
+        self._credentials = credentials
+        self._base_url = base_url.rstrip("/")
+        self._codec = codec
+
+    async def intercept_unary(
+        self,
+        call_next: Callable[[Message, RequestContext], Awaitable[Message]],
+        request: Message,
+        ctx: RequestContext,
+    ) -> Message:
+        info = ctx.method()
+        url = f"{self._base_url}/{info.service_name}/{info.name}"
+        body = self._codec.encode(request)
+        headers = sign_request(
+            self._credentials,
+            method=ctx.http_method(),
+            url=url,
+            body=body,
+        )
+        ctx.request_headers().update(headers)
+        return await call_next(request, ctx)

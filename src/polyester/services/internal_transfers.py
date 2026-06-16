@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+from polyester.catalogs import CatalogManager
+from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.scalars import id_to_int, parse_qty_scaled
+from polyester.codecs.wire_decode import decode_internal_transfer_result
+from polyester.errors import PolyesterValidationError
+from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
+from polyester.gen.transfer.v1.internal_transfer_pb2 import CreateInternalTransferRequest
+from polyester.models import InternalTransferResult
+from polyester.services._base import BaseService
+from polyester.services._generated import unary_auth
+from polyester.services._scope import resolve_sub_account_id
+
+
+class AsyncInternalTransfersService(BaseService):
+    def __init__(
+        self,
+        transport,
+        catalogs: CatalogManager,
+        default_sub_account_id: str | None,
+    ) -> None:
+        super().__init__(transport)
+        self._catalogs = catalogs
+        self._default_sub_account_id = default_sub_account_id
+
+    async def create(
+        self,
+        *,
+        asset_id: int,
+        quantity: str,
+        idempotency_key: str,
+        sub_account_id: str | None = None,
+        destination_account_id: str | int | None = None,
+        destination_subaccount_id: str | int | None = None,
+        destination_smart_account_address: str | None = None,
+        quantity_scale: int | None = None,
+    ) -> InternalTransferResult:
+        if (
+            destination_account_id is None
+            and destination_subaccount_id is None
+            and not destination_smart_account_address
+        ):
+            raise PolyesterValidationError(
+                "create requires destination_account_id, destination_subaccount_id, "
+                "or destination_smart_account_address"
+            )
+        scale = quantity_scale if quantity_scale is not None else 8
+        request = CreateInternalTransferRequest(
+            asset_id=asset_id,
+            quantity_scaled=parse_qty_scaled(quantity, scale, "quantity"),
+            idempotency_key=idempotency_key,
+        )
+        parsed_sub = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(sub_account_id)
+        )
+        if parsed_sub is not None:
+            request.subaccount_id = parsed_sub
+        if destination_account_id is not None:
+            request.destination_account_id = id_to_int(
+                destination_account_id, "destination_account_id"
+            )
+        if destination_subaccount_id is not None:
+            request.destination_subaccount_id = id_to_int(
+                destination_subaccount_id, "destination_subaccount_id"
+            )
+        if destination_smart_account_address:
+            request.destination_smart_account_address = destination_smart_account_address
+        data = await unary_auth(
+            self._transport,
+            InternalTransferServiceClient,
+            lambda client, req: client.create_internal_transfer(req),
+            request,
+        )
+        return decode_internal_transfer_result(data)
+
+    def _resolve_sub_account_id(self, value: str | None) -> str | None:
+        return resolve_sub_account_id(value, self._default_sub_account_id)

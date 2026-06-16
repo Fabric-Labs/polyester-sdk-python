@@ -155,16 +155,22 @@ class GetBoardResponse(_message.Message):
     def __init__(self, board: _Optional[_Union[Board, _Mapping]] = ..., acl_entries: _Optional[_Iterable[_Union[BoardAclEntry, _Mapping]]] = ..., access: _Optional[_Union[BoardAccess, _Mapping]] = ...) -> None: ...
 
 class ListBoardsRequest(_message.Message):
-    __slots__ = ("include_archived",)
+    __slots__ = ("include_archived", "limit", "page_token")
     INCLUDE_ARCHIVED_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     include_archived: bool
-    def __init__(self, include_archived: _Optional[bool] = ...) -> None: ...
+    limit: int
+    page_token: str
+    def __init__(self, include_archived: _Optional[bool] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListBoardsResponse(_message.Message):
-    __slots__ = ("boards",)
+    __slots__ = ("boards", "next_page_token")
     BOARDS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     boards: _containers.RepeatedCompositeFieldContainer[BoardListItem]
-    def __init__(self, boards: _Optional[_Iterable[_Union[BoardListItem, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, boards: _Optional[_Iterable[_Union[BoardListItem, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class UpdateBoardRequest(_message.Message):
     __slots__ = ("board_id", "title", "audience", "default_role", "initial_snapshot")

@@ -1,4 +1,5 @@
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
+from polyester.gen.ledger.v1 import catalog_pb2 as _catalog_pb2
 from polyester.gen.orders.v1 import orders_pb2 as _orders_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -217,13 +218,13 @@ class UserTrade(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., is_maker: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_scaled: _Optional[int] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., referral_share_scaled: _Optional[int] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class OrderTransfer(_message.Message):
-    __slots__ = ("match_id", "asset_id", "amount_hi", "amount_lo", "is_debit", "type", "account_code", "timestamp", "tx_id")
+    __slots__ = ("match_id", "asset_id", "amount_hi", "amount_lo", "is_debit", "transfer_code", "account_code", "timestamp", "tx_id")
     MATCH_ID_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_HI_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_LO_FIELD_NUMBER: _ClassVar[int]
     IS_DEBIT_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
+    TRANSFER_CODE_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     TX_ID_FIELD_NUMBER: _ClassVar[int]
@@ -232,11 +233,11 @@ class OrderTransfer(_message.Message):
     amount_hi: int
     amount_lo: int
     is_debit: bool
-    type: int
-    account_code: int
+    transfer_code: _catalog_pb2.TransferCode
+    account_code: _catalog_pb2.AccountCode
     timestamp: int
     tx_id: str
-    def __init__(self, match_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount_hi: _Optional[int] = ..., amount_lo: _Optional[int] = ..., is_debit: _Optional[bool] = ..., type: _Optional[int] = ..., account_code: _Optional[int] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, match_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount_hi: _Optional[int] = ..., amount_lo: _Optional[int] = ..., is_debit: _Optional[bool] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ...) -> None: ...
 
 class GetOpenOrdersRequest(_message.Message):
     __slots__ = ("subaccount_id", "symbol_id", "side", "limit", "page_token", "include_attached_risk", "include_attached_risk_state")

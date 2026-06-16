@@ -394,18 +394,24 @@ class ListAddressBooksResponse(_message.Message):
     def __init__(self, books: _Optional[_Iterable[_Union[AddressBook, _Mapping]]] = ...) -> None: ...
 
 class ListAddressBookEntriesRequest(_message.Message):
-    __slots__ = ("subaccount_id", "kind")
+    __slots__ = ("subaccount_id", "kind", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     kind: AddressBookEntryKind
-    def __init__(self, subaccount_id: _Optional[int] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ...) -> None: ...
+    limit: int
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListAddressBookEntriesResponse(_message.Message):
-    __slots__ = ("entries",)
+    __slots__ = ("entries", "next_page_token")
     ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     entries: _containers.RepeatedCompositeFieldContainer[AddressBookEntry]
-    def __init__(self, entries: _Optional[_Iterable[_Union[AddressBookEntry, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, entries: _Optional[_Iterable[_Union[AddressBookEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class CreateAddressBookEntryRequest(_message.Message):
     __slots__ = ("subaccount_id", "label", "note", "external", "internal", "tag_ids", "new_tags")
@@ -532,48 +538,62 @@ class DeleteAddressBookTagResponse(_message.Message):
     def __init__(self) -> None: ...
 
 class ListTransferCounterpartiesRequest(_message.Message):
-    __slots__ = ("subaccount_id", "direction", "kind", "page_size")
+    __slots__ = ("subaccount_id", "direction", "kind", "limit")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     DIRECTION_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
-    PAGE_SIZE_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     direction: TransferCounterpartyDirection
     kind: AddressBookEntryKind
-    page_size: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., direction: _Optional[_Union[TransferCounterpartyDirection, str]] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ..., page_size: _Optional[int] = ...) -> None: ...
+    limit: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., direction: _Optional[_Union[TransferCounterpartyDirection, str]] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ..., limit: _Optional[int] = ...) -> None: ...
 
 class ListTransferCounterpartiesResponse(_message.Message):
-    __slots__ = ("counterparties",)
+    __slots__ = ("counterparties", "truncated")
     COUNTERPARTIES_FIELD_NUMBER: _ClassVar[int]
+    TRUNCATED_FIELD_NUMBER: _ClassVar[int]
     counterparties: _containers.RepeatedCompositeFieldContainer[TransferCounterparty]
-    def __init__(self, counterparties: _Optional[_Iterable[_Union[TransferCounterparty, _Mapping]]] = ...) -> None: ...
+    truncated: bool
+    def __init__(self, counterparties: _Optional[_Iterable[_Union[TransferCounterparty, _Mapping]]] = ..., truncated: _Optional[bool] = ...) -> None: ...
 
 class ListTransferDestinationsRequest(_message.Message):
-    __slots__ = ("subaccount_id", "kind")
+    __slots__ = ("subaccount_id", "kind", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     kind: AddressBookEntryKind
-    def __init__(self, subaccount_id: _Optional[int] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ...) -> None: ...
+    limit: int
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListTransferDestinationsResponse(_message.Message):
-    __slots__ = ("destinations",)
+    __slots__ = ("destinations", "next_page_token")
     DESTINATIONS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     destinations: _containers.RepeatedCompositeFieldContainer[TransferDestination]
-    def __init__(self, destinations: _Optional[_Iterable[_Union[TransferDestination, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, destinations: _Optional[_Iterable[_Union[TransferDestination, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class ListInternalTransferWhitelistEntriesRequest(_message.Message):
-    __slots__ = ("subaccount_id",)
+    __slots__ = ("subaccount_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
-    def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
+    limit: int
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListInternalTransferWhitelistEntriesResponse(_message.Message):
-    __slots__ = ("entries",)
+    __slots__ = ("entries", "next_page_token")
     ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     entries: _containers.RepeatedCompositeFieldContainer[InternalTransferWhitelistEntry]
-    def __init__(self, entries: _Optional[_Iterable[_Union[InternalTransferWhitelistEntry, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, entries: _Optional[_Iterable[_Union[InternalTransferWhitelistEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetWithdrawWhitelistViewRequest(_message.Message):
     __slots__ = ("subaccount_id",)
@@ -588,23 +608,25 @@ class GetWithdrawWhitelistViewResponse(_message.Message):
     def __init__(self, view: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ...) -> None: ...
 
 class GetAddressBookViewRequest(_message.Message):
-    __slots__ = ("subaccount_id", "page_size")
+    __slots__ = ("subaccount_id", "limit")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    PAGE_SIZE_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
-    page_size: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., page_size: _Optional[int] = ...) -> None: ...
+    limit: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ...) -> None: ...
 
 class GetAddressBookViewResponse(_message.Message):
-    __slots__ = ("books", "entries", "recent_destinations", "tags", "withdraw_whitelist")
+    __slots__ = ("books", "entries", "recent_destinations", "tags", "withdraw_whitelist", "recent_destinations_truncated")
     BOOKS_FIELD_NUMBER: _ClassVar[int]
     ENTRIES_FIELD_NUMBER: _ClassVar[int]
     RECENT_DESTINATIONS_FIELD_NUMBER: _ClassVar[int]
     TAGS_FIELD_NUMBER: _ClassVar[int]
     WITHDRAW_WHITELIST_FIELD_NUMBER: _ClassVar[int]
+    RECENT_DESTINATIONS_TRUNCATED_FIELD_NUMBER: _ClassVar[int]
     books: _containers.RepeatedCompositeFieldContainer[AddressBook]
     entries: AddressBookEntriesView
     recent_destinations: AddressBookRecentDestinationsView
     tags: _containers.RepeatedCompositeFieldContainer[AddressBookTagSummary]
     withdraw_whitelist: WithdrawWhitelistView
-    def __init__(self, books: _Optional[_Iterable[_Union[AddressBook, _Mapping]]] = ..., entries: _Optional[_Union[AddressBookEntriesView, _Mapping]] = ..., recent_destinations: _Optional[_Union[AddressBookRecentDestinationsView, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTagSummary, _Mapping]]] = ..., withdraw_whitelist: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ...) -> None: ...
+    recent_destinations_truncated: bool
+    def __init__(self, books: _Optional[_Iterable[_Union[AddressBook, _Mapping]]] = ..., entries: _Optional[_Union[AddressBookEntriesView, _Mapping]] = ..., recent_destinations: _Optional[_Union[AddressBookRecentDestinationsView, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTagSummary, _Mapping]]] = ..., withdraw_whitelist: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ..., recent_destinations_truncated: _Optional[bool] = ...) -> None: ...

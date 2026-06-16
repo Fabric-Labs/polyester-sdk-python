@@ -67,7 +67,7 @@ class SubaccountRoleView(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ...) -> None: ...
 
 class Subaccount(_message.Message):
-    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa")
+    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa", "smart_account_salt_nonce")
     ID_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -80,6 +80,7 @@ class Subaccount(_message.Message):
     OWNER_ROOT_SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
     REQUIRE_MEMBER_MFA_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
     id: int
     role: SubaccountRole
     label: str
@@ -92,7 +93,8 @@ class Subaccount(_message.Message):
     owner_root_smart_account_address: str
     subaccount_policy_id: int
     require_member_mfa: bool
-    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ...) -> None: ...
+    smart_account_salt_nonce: int
+    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountsRequest(_message.Message):
     __slots__ = ()
@@ -127,12 +129,14 @@ class CreateSubaccountRequest(_message.Message):
     def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., nonce: _Optional[str] = ..., signature: _Optional[str] = ..., primary_wallet_address: _Optional[str] = ..., wallet_provider: _Optional[str] = ...) -> None: ...
 
 class CreateSubaccountResponse(_message.Message):
-    __slots__ = ("subaccount_id", "total_created")
+    __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     TOTAL_CREATED_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     total_created: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ...) -> None: ...
+    smart_account_salt_nonce: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ...) -> None: ...
 
 class UpdateSubaccountRequest(_message.Message):
     __slots__ = ("subaccount_id", "label", "icon", "color", "status")
@@ -327,8 +331,7 @@ class GetSubaccountResponse(_message.Message):
     def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ..., api_keys: _Optional[_Iterable[_Union[_api_keys_pb2.ApiKey, _Mapping]]] = ..., members: _Optional[_Iterable[_Union[SubaccountMemberView, _Mapping]]] = ..., invites: _Optional[_Iterable[_Union[SubaccountInvite, _Mapping]]] = ..., policy: _Optional[_Union[_policies_pb2.SubaccountPolicyView, _Mapping]] = ..., balances: _Optional[_Union[_ledger_read_pb2.GetBalancesResponse, _Mapping]] = ...) -> None: ...
 
 class ActivityEvent(_message.Message):
-    __slots__ = ("cursor", "created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json")
-    CURSOR_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json")
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     ENTITY_KIND_FIELD_NUMBER: _ClassVar[int]
     EVENT_ACTION_FIELD_NUMBER: _ClassVar[int]
@@ -337,7 +340,6 @@ class ActivityEvent(_message.Message):
     USER_AGENT_FIELD_NUMBER: _ClassVar[int]
     ACTOR_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     PAYLOAD_JSON_FIELD_NUMBER: _ClassVar[int]
-    cursor: str
     created_at: _timestamp_pb2.Timestamp
     entity_kind: str
     event_action: str
@@ -346,22 +348,22 @@ class ActivityEvent(_message.Message):
     user_agent: str
     actor_account_id: int
     payload_json: str
-    def __init__(self, cursor: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[str] = ..., event_action: _Optional[str] = ..., source: _Optional[str] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
+    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[str] = ..., event_action: _Optional[str] = ..., source: _Optional[str] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
 
 class ListSubaccountEventsRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit", "cursor")
+    __slots__ = ("subaccount_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    CURSOR_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     limit: int
-    cursor: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., cursor: _Optional[str] = ...) -> None: ...
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListSubaccountEventsResponse(_message.Message):
-    __slots__ = ("events", "next_cursor")
+    __slots__ = ("events", "next_page_token")
     EVENTS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_CURSOR_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     events: _containers.RepeatedCompositeFieldContainer[ActivityEvent]
-    next_cursor: str
-    def __init__(self, events: _Optional[_Iterable[_Union[ActivityEvent, _Mapping]]] = ..., next_cursor: _Optional[str] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, events: _Optional[_Iterable[_Union[ActivityEvent, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...

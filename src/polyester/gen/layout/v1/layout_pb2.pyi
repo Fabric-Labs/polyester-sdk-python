@@ -94,14 +94,20 @@ class LayerVisibilityOverride(_message.Message):
     def __init__(self, layer: _Optional[_Union[_polychart_pb2.LayerRef, _Mapping]] = ..., visible: _Optional[bool] = ...) -> None: ...
 
 class GetLayoutsRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("limit", "page_token")
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    limit: int
+    page_token: str
+    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class GetLayoutsResponse(_message.Message):
-    __slots__ = ("layouts",)
+    __slots__ = ("layouts", "next_page_token")
     LAYOUTS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     layouts: _containers.RepeatedCompositeFieldContainer[Layout]
-    def __init__(self, layouts: _Optional[_Iterable[_Union[Layout, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, layouts: _Optional[_Iterable[_Union[Layout, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetLayoutRequest(_message.Message):
     __slots__ = ("layout_id",)
@@ -202,44 +208,42 @@ class LayoutTemplateVersionInfo(_message.Message):
     def __init__(self, version: _Optional[int] = ..., changelog: _Optional[str] = ..., created_at_ms: _Optional[int] = ...) -> None: ...
 
 class ListOwnerPublishedLayoutsRequest(_message.Message):
-    __slots__ = ("owner_id", "limit", "after_published_at_ms", "after_layout_id")
+    __slots__ = ("owner_id", "limit", "page_token")
     OWNER_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    AFTER_PUBLISHED_AT_MS_FIELD_NUMBER: _ClassVar[int]
-    AFTER_LAYOUT_ID_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     owner_id: int
     limit: int
-    after_published_at_ms: int
-    after_layout_id: int
-    def __init__(self, owner_id: _Optional[int] = ..., limit: _Optional[int] = ..., after_published_at_ms: _Optional[int] = ..., after_layout_id: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, owner_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListOwnerPublishedLayoutsResponse(_message.Message):
-    __slots__ = ("templates", "next_after_published_at_ms", "next_after_layout_id")
+    __slots__ = ("templates", "next_page_token")
     TEMPLATES_FIELD_NUMBER: _ClassVar[int]
-    NEXT_AFTER_PUBLISHED_AT_MS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_AFTER_LAYOUT_ID_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     templates: _containers.RepeatedCompositeFieldContainer[LayoutTemplate]
-    next_after_published_at_ms: int
-    next_after_layout_id: int
-    def __init__(self, templates: _Optional[_Iterable[_Union[LayoutTemplate, _Mapping]]] = ..., next_after_published_at_ms: _Optional[int] = ..., next_after_layout_id: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, templates: _Optional[_Iterable[_Union[LayoutTemplate, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class ListLayoutTemplateVersionsRequest(_message.Message):
-    __slots__ = ("owner_id", "template_id", "limit", "after_version")
+    __slots__ = ("owner_id", "template_id", "limit", "page_token")
     OWNER_ID_FIELD_NUMBER: _ClassVar[int]
     TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    AFTER_VERSION_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     owner_id: int
     template_id: int
     limit: int
-    after_version: int
-    def __init__(self, owner_id: _Optional[int] = ..., template_id: _Optional[int] = ..., limit: _Optional[int] = ..., after_version: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, owner_id: _Optional[int] = ..., template_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListLayoutTemplateVersionsResponse(_message.Message):
-    __slots__ = ("versions",)
+    __slots__ = ("versions", "next_page_token")
     VERSIONS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     versions: _containers.RepeatedCompositeFieldContainer[LayoutTemplateVersionInfo]
-    def __init__(self, versions: _Optional[_Iterable[_Union[LayoutTemplateVersionInfo, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, versions: _Optional[_Iterable[_Union[LayoutTemplateVersionInfo, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetLayoutTemplateVersionRequest(_message.Message):
     __slots__ = ("owner_id", "template_id", "version")
@@ -342,14 +346,20 @@ class LayoutTemplateSubscription(_message.Message):
     def __init__(self, viewer_id: _Optional[int] = ..., owner_id: _Optional[int] = ..., template_id: _Optional[int] = ..., track_latest: _Optional[bool] = ..., pinned_version: _Optional[int] = ..., updated_at_ms: _Optional[int] = ...) -> None: ...
 
 class ListMyLayoutTemplateSubscriptionsRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("limit", "page_token")
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    limit: int
+    page_token: str
+    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListMyLayoutTemplateSubscriptionsResponse(_message.Message):
-    __slots__ = ("subscriptions",)
+    __slots__ = ("subscriptions", "next_page_token")
     SUBSCRIPTIONS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subscriptions: _containers.RepeatedCompositeFieldContainer[LayoutTemplateSubscription]
-    def __init__(self, subscriptions: _Optional[_Iterable[_Union[LayoutTemplateSubscription, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, subscriptions: _Optional[_Iterable[_Union[LayoutTemplateSubscription, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class UpsertLayoutRequest(_message.Message):
     __slots__ = ("layout",)

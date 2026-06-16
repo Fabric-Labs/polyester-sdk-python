@@ -65,29 +65,23 @@ class HeatmapTimeRange(_message.Message):
     end_time: _timestamp_pb2.Timestamp
     def __init__(self, start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
-class HeatmapCursor(_message.Message):
-    __slots__ = ("from_ts_sec",)
-    FROM_TS_SEC_FIELD_NUMBER: _ClassVar[int]
-    from_ts_sec: int
-    def __init__(self, from_ts_sec: _Optional[int] = ...) -> None: ...
-
 class GetOrderbookHeatmapRequest(_message.Message):
-    __slots__ = ("symbol_id", "interval", "depth", "time_range", "cursor", "limit", "quantity_mode")
+    __slots__ = ("symbol_id", "interval", "depth", "time_range", "page_token", "limit", "quantity_mode")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     INTERVAL_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
     TIME_RANGE_FIELD_NUMBER: _ClassVar[int]
-    CURSOR_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_MODE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     interval: HeatmapInterval
     depth: HeatmapDepth
     time_range: HeatmapTimeRange
-    cursor: HeatmapCursor
+    page_token: str
     limit: int
     quantity_mode: HeatmapQuantityMode
-    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[HeatmapDepth, str]] = ..., time_range: _Optional[_Union[HeatmapTimeRange, _Mapping]] = ..., cursor: _Optional[_Union[HeatmapCursor, _Mapping]] = ..., limit: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[HeatmapDepth, str]] = ..., time_range: _Optional[_Union[HeatmapTimeRange, _Mapping]] = ..., page_token: _Optional[str] = ..., limit: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ...) -> None: ...
 
 class HeatmapLevels(_message.Message):
     __slots__ = ("price_ticks", "qty_scaled")
@@ -174,7 +168,7 @@ class HeatmapDeltaChain(_message.Message):
     def __init__(self, base_keyframe: _Optional[_Union[HeatmapKeyframe, _Mapping]] = ..., deltas: _Optional[_Iterable[_Union[HeatmapDeltaBucket, _Mapping]]] = ...) -> None: ...
 
 class GetOrderbookHeatmapResponse(_message.Message):
-    __slots__ = ("symbol_id", "interval", "depth", "chain", "last_persisted_ts_sec", "live_from_book_seq_end", "has_live_anchor", "has_more", "next_ts_sec", "server_time_sec", "quantity_mode", "live_bucket")
+    __slots__ = ("symbol_id", "interval", "depth", "chain", "last_persisted_ts_sec", "live_from_book_seq_end", "has_live_anchor", "next_page_token", "server_time_sec", "quantity_mode", "live_bucket")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     INTERVAL_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
@@ -182,8 +176,7 @@ class GetOrderbookHeatmapResponse(_message.Message):
     LAST_PERSISTED_TS_SEC_FIELD_NUMBER: _ClassVar[int]
     LIVE_FROM_BOOK_SEQ_END_FIELD_NUMBER: _ClassVar[int]
     HAS_LIVE_ANCHOR_FIELD_NUMBER: _ClassVar[int]
-    HAS_MORE_FIELD_NUMBER: _ClassVar[int]
-    NEXT_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     SERVER_TIME_SEC_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_MODE_FIELD_NUMBER: _ClassVar[int]
     LIVE_BUCKET_FIELD_NUMBER: _ClassVar[int]
@@ -194,9 +187,8 @@ class GetOrderbookHeatmapResponse(_message.Message):
     last_persisted_ts_sec: int
     live_from_book_seq_end: int
     has_live_anchor: bool
-    has_more: bool
-    next_ts_sec: int
+    next_page_token: str
     server_time_sec: int
     quantity_mode: HeatmapQuantityMode
     live_bucket: HeatmapLiveBucket
-    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[HeatmapDepth, str]] = ..., chain: _Optional[_Union[HeatmapDeltaChain, _Mapping]] = ..., last_persisted_ts_sec: _Optional[int] = ..., live_from_book_seq_end: _Optional[int] = ..., has_live_anchor: _Optional[bool] = ..., has_more: _Optional[bool] = ..., next_ts_sec: _Optional[int] = ..., server_time_sec: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ..., live_bucket: _Optional[_Union[HeatmapLiveBucket, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[HeatmapDepth, str]] = ..., chain: _Optional[_Union[HeatmapDeltaChain, _Mapping]] = ..., last_persisted_ts_sec: _Optional[int] = ..., live_from_book_seq_end: _Optional[int] = ..., has_live_anchor: _Optional[bool] = ..., next_page_token: _Optional[str] = ..., server_time_sec: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ..., live_bucket: _Optional[_Union[HeatmapLiveBucket, _Mapping]] = ...) -> None: ...

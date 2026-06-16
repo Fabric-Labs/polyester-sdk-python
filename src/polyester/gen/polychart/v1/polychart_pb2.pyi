@@ -125,28 +125,24 @@ class GetMarketLayersResponse(_message.Message):
     def __init__(self, engine_symbol_id: _Optional[int] = ..., subscriptions: _Optional[_Iterable[_Union[LayerSubscription, _Mapping]]] = ..., layers: _Optional[_Iterable[_Union[Layer, _Mapping]]] = ..., drawings: _Optional[_Iterable[_Union[Drawing, _Mapping]]] = ...) -> None: ...
 
 class ListInboxMarketLayersRequest(_message.Message):
-    __slots__ = ("engine_symbol_id", "limit", "after_owner_id", "after_layer_id")
+    __slots__ = ("engine_symbol_id", "limit", "page_token")
     ENGINE_SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    AFTER_OWNER_ID_FIELD_NUMBER: _ClassVar[int]
-    AFTER_LAYER_ID_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     engine_symbol_id: int
     limit: int
-    after_owner_id: int
-    after_layer_id: int
-    def __init__(self, engine_symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., after_owner_id: _Optional[int] = ..., after_layer_id: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, engine_symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListInboxMarketLayersResponse(_message.Message):
-    __slots__ = ("engine_symbol_id", "layers", "next_after_owner_id", "next_after_layer_id")
+    __slots__ = ("engine_symbol_id", "layers", "next_page_token")
     ENGINE_SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LAYERS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_AFTER_OWNER_ID_FIELD_NUMBER: _ClassVar[int]
-    NEXT_AFTER_LAYER_ID_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     engine_symbol_id: int
     layers: _containers.RepeatedCompositeFieldContainer[Layer]
-    next_after_owner_id: int
-    next_after_layer_id: int
-    def __init__(self, engine_symbol_id: _Optional[int] = ..., layers: _Optional[_Iterable[_Union[Layer, _Mapping]]] = ..., next_after_owner_id: _Optional[int] = ..., next_after_layer_id: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, engine_symbol_id: _Optional[int] = ..., layers: _Optional[_Iterable[_Union[Layer, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetLayerSnapshotRequest(_message.Message):
     __slots__ = ("layer",)
@@ -239,28 +235,24 @@ class PublishedLayer(_message.Message):
     def __init__(self, layer: _Optional[_Union[Layer, _Mapping]] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., tags: _Optional[_Iterable[str]] = ..., published_at_ms: _Optional[int] = ...) -> None: ...
 
 class ListOwnerPublishedLayersRequest(_message.Message):
-    __slots__ = ("owner_id", "engine_symbol_id", "limit", "after_published_at_ms", "after_layer_id")
+    __slots__ = ("owner_id", "engine_symbol_id", "limit", "page_token")
     OWNER_ID_FIELD_NUMBER: _ClassVar[int]
     ENGINE_SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    AFTER_PUBLISHED_AT_MS_FIELD_NUMBER: _ClassVar[int]
-    AFTER_LAYER_ID_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     owner_id: int
     engine_symbol_id: int
     limit: int
-    after_published_at_ms: int
-    after_layer_id: int
-    def __init__(self, owner_id: _Optional[int] = ..., engine_symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., after_published_at_ms: _Optional[int] = ..., after_layer_id: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, owner_id: _Optional[int] = ..., engine_symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListOwnerPublishedLayersResponse(_message.Message):
-    __slots__ = ("layers", "next_after_published_at_ms", "next_after_layer_id")
+    __slots__ = ("layers", "next_page_token")
     LAYERS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_AFTER_PUBLISHED_AT_MS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_AFTER_LAYER_ID_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     layers: _containers.RepeatedCompositeFieldContainer[PublishedLayer]
-    next_after_published_at_ms: int
-    next_after_layer_id: int
-    def __init__(self, layers: _Optional[_Iterable[_Union[PublishedLayer, _Mapping]]] = ..., next_after_published_at_ms: _Optional[int] = ..., next_after_layer_id: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, layers: _Optional[_Iterable[_Union[PublishedLayer, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class PublishLayerRequest(_message.Message):
     __slots__ = ("layer", "title", "description", "tags")

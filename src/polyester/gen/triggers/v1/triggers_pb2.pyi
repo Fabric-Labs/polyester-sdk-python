@@ -154,42 +154,42 @@ class GetTriggerResponse(_message.Message):
     def __init__(self, trigger: _Optional[_Union[Trigger, _Mapping]] = ...) -> None: ...
 
 class ListTriggersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol", "status", "trigger_type", "parent_order_id", "limit", "offset")
+    __slots__ = ("subaccount_id", "symbol", "status", "trigger_type", "parent_order_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_TYPE_FIELD_NUMBER: _ClassVar[int]
     PARENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    OFFSET_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol: str
     status: _containers.RepeatedScalarFieldContainer[TriggerStatus]
     trigger_type: TriggerType
     parent_order_id: int
     limit: int
-    offset: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., status: _Optional[_Iterable[_Union[TriggerStatus, str]]] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., parent_order_id: _Optional[int] = ..., limit: _Optional[int] = ..., offset: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., status: _Optional[_Iterable[_Union[TriggerStatus, str]]] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., parent_order_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListTriggersResponse(_message.Message):
-    __slots__ = ("triggers", "total")
+    __slots__ = ("triggers", "next_page_token")
     TRIGGERS_FIELD_NUMBER: _ClassVar[int]
-    TOTAL_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     triggers: _containers.RepeatedCompositeFieldContainer[Trigger]
-    total: int
-    def __init__(self, triggers: _Optional[_Iterable[_Union[Trigger, _Mapping]]] = ..., total: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, triggers: _Optional[_Iterable[_Union[Trigger, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class ListTriggerEventsRequest(_message.Message):
-    __slots__ = ("trigger_id", "subaccount_id", "limit", "before_ts_ns")
+    __slots__ = ("trigger_id", "subaccount_id", "limit", "page_token")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
-    BEFORE_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     trigger_id: int
     subaccount_id: int
     limit: int
-    before_ts_ns: int
-    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., before_ts_ns: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class TriggerEvent(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_type", "event_type", "ts_ns", "child_seq", "child_order_id", "fire_px_ticks", "reason")
@@ -216,12 +216,12 @@ class TriggerEvent(_message.Message):
     def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_px_ticks: _Optional[int] = ..., reason: _Optional[str] = ...) -> None: ...
 
 class ListTriggerEventsResponse(_message.Message):
-    __slots__ = ("events", "next_before_ts_ns")
+    __slots__ = ("events", "next_page_token")
     EVENTS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_BEFORE_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     events: _containers.RepeatedCompositeFieldContainer[TriggerEvent]
-    next_before_ts_ns: int
-    def __init__(self, events: _Optional[_Iterable[_Union[TriggerEvent, _Mapping]]] = ..., next_before_ts_ns: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, events: _Optional[_Iterable[_Union[TriggerEvent, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class CancelTriggerRequest(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id")

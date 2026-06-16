@@ -49,20 +49,20 @@ WEEK_1: Timeframe
 MONTH_1: Timeframe
 
 class GetTradesRequest(_message.Message):
-    __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "from_match_id")
+    __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "page_token")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     START_TIME_FIELD_NUMBER: _ClassVar[int]
     END_TIME_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
-    FROM_MATCH_ID_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     limit: int
     start_time: _timestamp_pb2.Timestamp
     end_time: _timestamp_pb2.Timestamp
     side: SideFilter
-    from_match_id: int
-    def __init__(self, symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., side: _Optional[_Union[SideFilter, str]] = ..., from_match_id: _Optional[int] = ...) -> None: ...
+    page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., side: _Optional[_Union[SideFilter, str]] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class MarketTrade(_message.Message):
     __slots__ = ("symbol_id", "match_id", "is_buy", "price_ticks", "qty_scaled", "ts_ns")
@@ -81,15 +81,15 @@ class MarketTrade(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., is_buy: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class GetTradesResponse(_message.Message):
-    __slots__ = ("trades", "next_match_id")
+    __slots__ = ("trades", "next_page_token")
     TRADES_FIELD_NUMBER: _ClassVar[int]
-    NEXT_MATCH_ID_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     trades: _containers.RepeatedCompositeFieldContainer[MarketTrade]
-    next_match_id: int
-    def __init__(self, trades: _Optional[_Iterable[_Union[MarketTrade, _Mapping]]] = ..., next_match_id: _Optional[int] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, trades: _Optional[_Iterable[_Union[MarketTrade, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetCandlesRequest(_message.Message):
-    __slots__ = ("symbol_id", "timeframe", "limit", "start_time", "end_time", "include_incomplete", "include_reference")
+    __slots__ = ("symbol_id", "timeframe", "limit", "start_time", "end_time", "include_incomplete", "include_reference", "page_token")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
@@ -97,6 +97,7 @@ class GetCandlesRequest(_message.Message):
     END_TIME_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_INCOMPLETE_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     timeframe: Timeframe
     limit: int
@@ -104,10 +105,11 @@ class GetCandlesRequest(_message.Message):
     end_time: _timestamp_pb2.Timestamp
     include_incomplete: bool
     include_reference: bool
-    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., include_incomplete: _Optional[bool] = ..., include_reference: _Optional[bool] = ...) -> None: ...
+    page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., include_incomplete: _Optional[bool] = ..., include_reference: _Optional[bool] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class GetCandlesColumnsRequest(_message.Message):
-    __slots__ = ("symbol_id", "timeframe", "limit", "start_time", "end_time", "include_incomplete", "include_reference")
+    __slots__ = ("symbol_id", "timeframe", "limit", "start_time", "end_time", "include_incomplete", "include_reference", "page_token")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
@@ -115,6 +117,7 @@ class GetCandlesColumnsRequest(_message.Message):
     END_TIME_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_INCOMPLETE_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     timeframe: Timeframe
     limit: int
@@ -122,7 +125,8 @@ class GetCandlesColumnsRequest(_message.Message):
     end_time: _timestamp_pb2.Timestamp
     include_incomplete: bool
     include_reference: bool
-    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., include_incomplete: _Optional[bool] = ..., include_reference: _Optional[bool] = ...) -> None: ...
+    page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., include_incomplete: _Optional[bool] = ..., include_reference: _Optional[bool] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class CandlePoint(_message.Message):
     __slots__ = ("ts_sec", "open", "high", "low", "close", "volume", "is_closed")
@@ -143,19 +147,21 @@ class CandlePoint(_message.Message):
     def __init__(self, ts_sec: _Optional[int] = ..., open: _Optional[int] = ..., high: _Optional[int] = ..., low: _Optional[int] = ..., close: _Optional[int] = ..., volume: _Optional[int] = ..., is_closed: _Optional[bool] = ...) -> None: ...
 
 class GetCandlesResponse(_message.Message):
-    __slots__ = ("symbol_id", "timeframe", "candles", "reference_candles")
+    __slots__ = ("symbol_id", "timeframe", "candles", "reference_candles", "next_page_token")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
     CANDLES_FIELD_NUMBER: _ClassVar[int]
     REFERENCE_CANDLES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     timeframe: Timeframe
     candles: _containers.RepeatedCompositeFieldContainer[CandlePoint]
     reference_candles: _containers.RepeatedCompositeFieldContainer[CandlePoint]
-    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., candles: _Optional[_Iterable[_Union[CandlePoint, _Mapping]]] = ..., reference_candles: _Optional[_Iterable[_Union[CandlePoint, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., candles: _Optional[_Iterable[_Union[CandlePoint, _Mapping]]] = ..., reference_candles: _Optional[_Iterable[_Union[CandlePoint, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetCandlesColumnsResponse(_message.Message):
-    __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume", "reference_ts_sec", "reference_open", "reference_high", "reference_low", "reference_close", "reference_volume")
+    __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume", "reference_ts_sec", "reference_open", "reference_high", "reference_low", "reference_close", "reference_volume", "next_page_token")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
     TS_SEC_FIELD_NUMBER: _ClassVar[int]
@@ -170,6 +176,7 @@ class GetCandlesColumnsResponse(_message.Message):
     REFERENCE_LOW_FIELD_NUMBER: _ClassVar[int]
     REFERENCE_CLOSE_FIELD_NUMBER: _ClassVar[int]
     REFERENCE_VOLUME_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     timeframe: Timeframe
     ts_sec: _containers.RepeatedScalarFieldContainer[int]
@@ -184,7 +191,8 @@ class GetCandlesColumnsResponse(_message.Message):
     reference_low: _containers.RepeatedScalarFieldContainer[int]
     reference_close: _containers.RepeatedScalarFieldContainer[int]
     reference_volume: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[_Iterable[int]] = ..., open: _Optional[_Iterable[int]] = ..., high: _Optional[_Iterable[int]] = ..., low: _Optional[_Iterable[int]] = ..., close: _Optional[_Iterable[int]] = ..., volume: _Optional[_Iterable[int]] = ..., reference_ts_sec: _Optional[_Iterable[int]] = ..., reference_open: _Optional[_Iterable[int]] = ..., reference_high: _Optional[_Iterable[int]] = ..., reference_low: _Optional[_Iterable[int]] = ..., reference_close: _Optional[_Iterable[int]] = ..., reference_volume: _Optional[_Iterable[int]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[_Iterable[int]] = ..., open: _Optional[_Iterable[int]] = ..., high: _Optional[_Iterable[int]] = ..., low: _Optional[_Iterable[int]] = ..., close: _Optional[_Iterable[int]] = ..., volume: _Optional[_Iterable[int]] = ..., reference_ts_sec: _Optional[_Iterable[int]] = ..., reference_open: _Optional[_Iterable[int]] = ..., reference_high: _Optional[_Iterable[int]] = ..., reference_low: _Optional[_Iterable[int]] = ..., reference_close: _Optional[_Iterable[int]] = ..., reference_volume: _Optional[_Iterable[int]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class Candle(_message.Message):
     __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume")

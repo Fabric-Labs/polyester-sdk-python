@@ -33,6 +33,12 @@ class Sort(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SORT_NEWEST: _ClassVar[Sort]
     SORT_OLDEST: _ClassVar[Sort]
 
+class ListOrderBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ORDER_BY_UNSPECIFIED: _ClassVar[ListOrderBy]
+    ORDER_BY_LAST_ACTIVITY: _ClassVar[ListOrderBy]
+    ORDER_BY_STARTED_AT: _ClassVar[ListOrderBy]
+
 class FlowStep(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     FLOW_STEP_UNSPECIFIED: _ClassVar[FlowStep]
@@ -71,6 +77,9 @@ LIST_TERMINAL_ONLY: ListScope
 SORT_UNSPECIFIED: Sort
 SORT_NEWEST: Sort
 SORT_OLDEST: Sort
+ORDER_BY_UNSPECIFIED: ListOrderBy
+ORDER_BY_LAST_ACTIVITY: ListOrderBy
+ORDER_BY_STARTED_AT: ListOrderBy
 FLOW_STEP_UNSPECIFIED: FlowStep
 FLOW_STEP_SOURCE: FlowStep
 FLOW_STEP_TRANSFER: FlowStep
@@ -117,7 +126,7 @@ class ListFlowsByTxRequest(_message.Message):
     def __init__(self, tx_hash: _Optional[str] = ..., lookup_kind: _Optional[_Union[TxLookupKind, str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListFlowsRequest(_message.Message):
-    __slots__ = ("limit", "sort", "flow_kind", "flow_state", "tx_ref", "scope", "owner_account_id", "smart_account_address", "polyester_chain_ids", "zipped_asset_ids", "unified_asset_ids", "page_token")
+    __slots__ = ("limit", "sort", "flow_kind", "flow_state", "tx_ref", "scope", "owner_account_id", "smart_account_address", "polyester_chain_ids", "zipped_asset_ids", "unified_asset_ids", "page_token", "order_by")
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     SORT_FIELD_NUMBER: _ClassVar[int]
     FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
@@ -130,6 +139,7 @@ class ListFlowsRequest(_message.Message):
     ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
     UNIFIED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    ORDER_BY_FIELD_NUMBER: _ClassVar[int]
     limit: int
     sort: Sort
     flow_kind: _types_pb2.FlowKind
@@ -142,7 +152,8 @@ class ListFlowsRequest(_message.Message):
     zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
     unified_asset_ids: _containers.RepeatedScalarFieldContainer[int]
     page_token: str
-    def __init__(self, limit: _Optional[int] = ..., sort: _Optional[_Union[Sort, str]] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., flow_state: _Optional[_Union[_types_pb2.FlowState, str]] = ..., tx_ref: _Optional[str] = ..., scope: _Optional[_Union[ListScope, str]] = ..., owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., polyester_chain_ids: _Optional[_Iterable[int]] = ..., zipped_asset_ids: _Optional[_Iterable[int]] = ..., unified_asset_ids: _Optional[_Iterable[int]] = ..., page_token: _Optional[str] = ...) -> None: ...
+    order_by: ListOrderBy
+    def __init__(self, limit: _Optional[int] = ..., sort: _Optional[_Union[Sort, str]] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., flow_state: _Optional[_Union[_types_pb2.FlowState, str]] = ..., tx_ref: _Optional[str] = ..., scope: _Optional[_Union[ListScope, str]] = ..., owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., polyester_chain_ids: _Optional[_Iterable[int]] = ..., zipped_asset_ids: _Optional[_Iterable[int]] = ..., unified_asset_ids: _Optional[_Iterable[int]] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[ListOrderBy, str]] = ...) -> None: ...
 
 class ListFlowsResponse(_message.Message):
     __slots__ = ("flows", "next_page_token")

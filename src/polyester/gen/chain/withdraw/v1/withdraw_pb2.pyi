@@ -32,11 +32,11 @@ class CreateWalletTradingWithdrawResponse(_message.Message):
     def __init__(self, intent_id: _Optional[str] = ...) -> None: ...
 
 class TradingWithdrawIntentPayload(_message.Message):
-    __slots__ = ("action", "asset_id", "destination_chain_id", "amount_q", "deadline_ts_sec", "nonce", "destination_address", "idempotency_key")
+    __slots__ = ("action", "asset_id", "destination_chain_id", "amount_e18", "deadline_ts_sec", "nonce", "destination_address", "idempotency_key")
     ACTION_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
-    AMOUNT_Q_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     DEADLINE_TS_SEC_FIELD_NUMBER: _ClassVar[int]
     NONCE_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
@@ -44,12 +44,12 @@ class TradingWithdrawIntentPayload(_message.Message):
     action: TradingWithdrawAction
     asset_id: int
     destination_chain_id: int
-    amount_q: _u128_pb2.U128
+    amount_e18: _u128_pb2.U128
     deadline_ts_sec: int
     nonce: _u128_pb2.U128
     destination_address: str
     idempotency_key: str
-    def __init__(self, action: _Optional[_Union[TradingWithdrawAction, str]] = ..., asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., amount_q: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., deadline_ts_sec: _Optional[int] = ..., nonce: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination_address: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+    def __init__(self, action: _Optional[_Union[TradingWithdrawAction, str]] = ..., asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., deadline_ts_sec: _Optional[int] = ..., nonce: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination_address: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class CreateTradingWithdrawRequest(_message.Message):
     __slots__ = ("payload", "payload_signature")

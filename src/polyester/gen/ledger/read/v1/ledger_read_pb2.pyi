@@ -234,14 +234,12 @@ class TransferSide(_message.Message):
     def __init__(self, kind: _Optional[_Union[TransferSideKind, str]] = ..., account_id: _Optional[int] = ..., address: _Optional[str] = ...) -> None: ...
 
 class TransferRow(_message.Message):
-    __slots__ = ("asset_id", "amount", "transfer_code", "account_code", "timestamp", "tx_id", "onchain", "balance_after", "is_debit", "link_id", "flow_id", "source", "destination")
+    __slots__ = ("asset_id", "amount", "transfer_code", "account_code", "timestamp", "balance_after", "is_debit", "link_id", "flow_id", "source", "destination")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_CODE_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
-    TX_ID_FIELD_NUMBER: _ClassVar[int]
-    ONCHAIN_FIELD_NUMBER: _ClassVar[int]
     BALANCE_AFTER_FIELD_NUMBER: _ClassVar[int]
     IS_DEBIT_FIELD_NUMBER: _ClassVar[int]
     LINK_ID_FIELD_NUMBER: _ClassVar[int]
@@ -253,15 +251,13 @@ class TransferRow(_message.Message):
     transfer_code: _catalog_pb2.TransferCode
     account_code: _catalog_pb2.AccountCode
     timestamp: int
-    tx_id: str
-    onchain: bool
     balance_after: _u128_pb2.U128
     is_debit: bool
     link_id: int
     flow_id: str
     source: TransferSide
     destination: TransferSide
-    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., timestamp: _Optional[int] = ..., tx_id: _Optional[str] = ..., onchain: _Optional[bool] = ..., balance_after: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ..., source: _Optional[_Union[TransferSide, _Mapping]] = ..., destination: _Optional[_Union[TransferSide, _Mapping]] = ...) -> None: ...
+    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., timestamp: _Optional[int] = ..., balance_after: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ..., source: _Optional[_Union[TransferSide, _Mapping]] = ..., destination: _Optional[_Union[TransferSide, _Mapping]] = ...) -> None: ...
 
 class ListTransfersResponse(_message.Message):
     __slots__ = ("transfers", "next_page_token")

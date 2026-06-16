@@ -67,7 +67,7 @@ class SubaccountRoleView(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ...) -> None: ...
 
 class Subaccount(_message.Message):
-    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa")
+    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa", "smart_account_salt_nonce")
     ID_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -80,6 +80,7 @@ class Subaccount(_message.Message):
     OWNER_ROOT_SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
     REQUIRE_MEMBER_MFA_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
     id: int
     role: SubaccountRole
     label: str
@@ -92,7 +93,8 @@ class Subaccount(_message.Message):
     owner_root_smart_account_address: str
     subaccount_policy_id: int
     require_member_mfa: bool
-    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ...) -> None: ...
+    smart_account_salt_nonce: int
+    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountsRequest(_message.Message):
     __slots__ = ()
@@ -127,12 +129,14 @@ class CreateSubaccountRequest(_message.Message):
     def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., nonce: _Optional[str] = ..., signature: _Optional[str] = ..., primary_wallet_address: _Optional[str] = ..., wallet_provider: _Optional[str] = ...) -> None: ...
 
 class CreateSubaccountResponse(_message.Message):
-    __slots__ = ("subaccount_id", "total_created")
+    __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     TOTAL_CREATED_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     total_created: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ...) -> None: ...
+    smart_account_salt_nonce: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ...) -> None: ...
 
 class UpdateSubaccountRequest(_message.Message):
     __slots__ = ("subaccount_id", "label", "icon", "color", "status")

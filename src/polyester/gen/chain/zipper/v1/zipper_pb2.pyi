@@ -38,8 +38,8 @@ class ChainConfig(_message.Message):
     def __init__(self, chain_id: _Optional[int] = ..., code: _Optional[str] = ..., name: _Optional[str] = ..., native_chain_id: _Optional[str] = ..., native_currency_symbol: _Optional[str] = ..., explorer_url: _Optional[str] = ..., icon: _Optional[str] = ..., required_confirmations: _Optional[int] = ..., confirmation_time_seconds: _Optional[int] = ..., is_case_sensitive: _Optional[bool] = ..., min_address_length: _Optional[int] = ..., max_address_length: _Optional[int] = ...) -> None: ...
 
 class AssetChainVariant(_message.Message):
-    __slots__ = ("chain_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount")
-    CHAIN_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("zipped_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount", "supply_q")
+    ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     IS_NATIVE_ASSET_FIELD_NUMBER: _ClassVar[int]
     NETWORK_FEE_FIELD_NUMBER: _ClassVar[int]
@@ -49,7 +49,8 @@ class AssetChainVariant(_message.Message):
     ZTOKEN_DECIMALS_FIELD_NUMBER: _ClassVar[int]
     DEPOSIT_MIN_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     WITHDRAW_MIN_AMOUNT_FIELD_NUMBER: _ClassVar[int]
-    chain_asset_id: int
+    SUPPLY_Q_FIELD_NUMBER: _ClassVar[int]
+    zipped_asset_id: int
     chain_id: int
     is_native_asset: bool
     network_fee: str
@@ -59,7 +60,22 @@ class AssetChainVariant(_message.Message):
     ztoken_decimals: int
     deposit_min_amount: str
     withdraw_min_amount: str
-    def __init__(self, chain_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., is_native_asset: _Optional[bool] = ..., network_fee: _Optional[str] = ..., ztoken_address: _Optional[str] = ..., source_address: _Optional[str] = ..., source_decimals: _Optional[int] = ..., ztoken_decimals: _Optional[int] = ..., deposit_min_amount: _Optional[str] = ..., withdraw_min_amount: _Optional[str] = ...) -> None: ...
+    supply_q: int
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., is_native_asset: _Optional[bool] = ..., network_fee: _Optional[str] = ..., ztoken_address: _Optional[str] = ..., source_address: _Optional[str] = ..., source_decimals: _Optional[int] = ..., ztoken_decimals: _Optional[int] = ..., deposit_min_amount: _Optional[str] = ..., withdraw_min_amount: _Optional[str] = ..., supply_q: _Optional[int] = ...) -> None: ...
+
+class ZippedAssetSupplyUpdate(_message.Message):
+    __slots__ = ("zipped_asset_id", "supply_q")
+    ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    SUPPLY_Q_FIELD_NUMBER: _ClassVar[int]
+    zipped_asset_id: int
+    supply_q: int
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., supply_q: _Optional[int] = ...) -> None: ...
+
+class ZippedAssetSupplyBatch(_message.Message):
+    __slots__ = ("updates",)
+    UPDATES_FIELD_NUMBER: _ClassVar[int]
+    updates: _containers.RepeatedCompositeFieldContainer[ZippedAssetSupplyUpdate]
+    def __init__(self, updates: _Optional[_Iterable[_Union[ZippedAssetSupplyUpdate, _Mapping]]] = ...) -> None: ...
 
 class AssetConfig(_message.Message):
     __slots__ = ("asset", "ledger_id", "name", "icon", "quantity_scale", "quantity_display_decimals", "variants", "u_asset_id")

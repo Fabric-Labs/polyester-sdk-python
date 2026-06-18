@@ -212,8 +212,9 @@ class ListFlowsByTxResponse(_message.Message):
     def __init__(self, tx_hash: _Optional[str] = ..., matches: _Optional[_Iterable[_Union[FlowTxMatchView, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class FlowSummaryView(_message.Message):
-    __slots__ = ("owner_account_id", "flow_id", "flow_kind", "current_step", "asset_ids", "polyester_chain_id", "amount_e18", "request_fee", "source_tx_hash", "tx_occurrence_index", "source_address", "destination_address", "latest_tx_ref", "source_domain", "destination_domain", "latest_lifecycle_source", "reason_code", "started_at_unix_ms", "updated_at_unix_ms", "terminal_at_unix_ms", "last_activity_at_unix_ms", "is_open", "is_terminal", "current_step_sequence", "current_progress", "progress_timeline", "estimated_completion_unix_ms")
+    __slots__ = ("owner_account_id", "smart_account_address", "flow_id", "flow_kind", "current_step", "asset_ids", "polyester_chain_id", "amount_e18", "request_fee", "source_tx_hash", "tx_occurrence_index", "source_address", "destination_address", "latest_tx_ref", "source_domain", "destination_domain", "latest_lifecycle_source", "reason_code", "started_at_unix_ms", "updated_at_unix_ms", "terminal_at_unix_ms", "last_activity_at_unix_ms", "is_open", "is_terminal", "current_step_sequence", "current_progress", "progress_timeline", "estimated_completion_unix_ms")
     OWNER_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
     CURRENT_STEP_FIELD_NUMBER: _ClassVar[int]
@@ -241,6 +242,7 @@ class FlowSummaryView(_message.Message):
     PROGRESS_TIMELINE_FIELD_NUMBER: _ClassVar[int]
     ESTIMATED_COMPLETION_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     owner_account_id: int
+    smart_account_address: str
     flow_id: str
     flow_kind: _types_pb2.FlowKind
     current_step: FlowStep
@@ -267,7 +269,7 @@ class FlowSummaryView(_message.Message):
     current_progress: FlowSummaryProgressView
     progress_timeline: _containers.RepeatedCompositeFieldContainer[FlowTimelineItemView]
     estimated_completion_unix_ms: int
-    def __init__(self, owner_account_id: _Optional[int] = ..., flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., request_fee: _Optional[_Union[_types_pb2.RequestFee, _Mapping]] = ..., source_tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., latest_lifecycle_source: _Optional[_Union[_types_pb2.LifecycleSource, str]] = ..., reason_code: _Optional[_Union[_types_pb2.FlowReason, str]] = ..., started_at_unix_ms: _Optional[int] = ..., updated_at_unix_ms: _Optional[int] = ..., terminal_at_unix_ms: _Optional[int] = ..., last_activity_at_unix_ms: _Optional[int] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., current_step_sequence: _Optional[int] = ..., current_progress: _Optional[_Union[FlowSummaryProgressView, _Mapping]] = ..., progress_timeline: _Optional[_Iterable[_Union[FlowTimelineItemView, _Mapping]]] = ..., estimated_completion_unix_ms: _Optional[int] = ...) -> None: ...
+    def __init__(self, owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., request_fee: _Optional[_Union[_types_pb2.RequestFee, _Mapping]] = ..., source_tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., latest_lifecycle_source: _Optional[_Union[_types_pb2.LifecycleSource, str]] = ..., reason_code: _Optional[_Union[_types_pb2.FlowReason, str]] = ..., started_at_unix_ms: _Optional[int] = ..., updated_at_unix_ms: _Optional[int] = ..., terminal_at_unix_ms: _Optional[int] = ..., last_activity_at_unix_ms: _Optional[int] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., current_step_sequence: _Optional[int] = ..., current_progress: _Optional[_Union[FlowSummaryProgressView, _Mapping]] = ..., progress_timeline: _Optional[_Iterable[_Union[FlowTimelineItemView, _Mapping]]] = ..., estimated_completion_unix_ms: _Optional[int] = ...) -> None: ...
 
 class FlowSummaryProgressView(_message.Message):
     __slots__ = ("current_step_started_at_unix_ms", "current_step_expected_duration_ms", "current_confirmations", "required_confirmations", "approve_count", "reject_count", "validator_count", "required_approvals", "required_rejections")

@@ -100,22 +100,22 @@ class HeatmapDeltaLevels(_message.Message):
     def __init__(self, price_ticks: _Optional[_Iterable[int]] = ..., qty_scaled: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class HeatmapKeyframe(_message.Message):
-    __slots__ = ("ts_sec", "best_bid_tick", "best_ask_tick", "mid_tick", "bids", "asks", "book_seq")
+    __slots__ = ("ts_sec", "best_bid_ticks", "best_ask_ticks", "mid_ticks", "bids", "asks", "book_seq")
     TS_SEC_FIELD_NUMBER: _ClassVar[int]
-    BEST_BID_TICK_FIELD_NUMBER: _ClassVar[int]
-    BEST_ASK_TICK_FIELD_NUMBER: _ClassVar[int]
-    MID_TICK_FIELD_NUMBER: _ClassVar[int]
+    BEST_BID_TICKS_FIELD_NUMBER: _ClassVar[int]
+    BEST_ASK_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MID_TICKS_FIELD_NUMBER: _ClassVar[int]
     BIDS_FIELD_NUMBER: _ClassVar[int]
     ASKS_FIELD_NUMBER: _ClassVar[int]
     BOOK_SEQ_FIELD_NUMBER: _ClassVar[int]
     ts_sec: int
-    best_bid_tick: int
-    best_ask_tick: int
-    mid_tick: int
+    best_bid_ticks: int
+    best_ask_ticks: int
+    mid_ticks: int
     bids: HeatmapLevels
     asks: HeatmapLevels
     book_seq: int
-    def __init__(self, ts_sec: _Optional[int] = ..., best_bid_tick: _Optional[int] = ..., best_ask_tick: _Optional[int] = ..., mid_tick: _Optional[int] = ..., bids: _Optional[_Union[HeatmapLevels, _Mapping]] = ..., asks: _Optional[_Union[HeatmapLevels, _Mapping]] = ..., book_seq: _Optional[int] = ...) -> None: ...
+    def __init__(self, ts_sec: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., mid_ticks: _Optional[int] = ..., bids: _Optional[_Union[HeatmapLevels, _Mapping]] = ..., asks: _Optional[_Union[HeatmapLevels, _Mapping]] = ..., book_seq: _Optional[int] = ...) -> None: ...
 
 class HeatmapDeltaBucket(_message.Message):
     __slots__ = ("ts_sec", "bids", "asks", "updates_in_bucket", "book_seq_start", "book_seq_end")

@@ -21,22 +21,22 @@ INTERNAL_TRANSFER_STATUS_REJECTED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_FAILED: InternalTransferStatus
 
 class CreateInternalTransferRequest(_message.Message):
-    __slots__ = ("subaccount_id", "destination_account_id", "destination_subaccount_id", "destination_smart_account_address", "asset_id", "quantity_scaled", "idempotency_key")
+    __slots__ = ("subaccount_id", "destination_account_id", "destination_subaccount_id", "destination_smart_account_address", "asset_id", "qty_scaled", "idempotency_key")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    QUANTITY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     destination_account_id: int
     destination_subaccount_id: int
     destination_smart_account_address: str
     asset_id: int
-    quantity_scaled: int
+    qty_scaled: int
     idempotency_key: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., destination_account_id: _Optional[int] = ..., destination_subaccount_id: _Optional[int] = ..., destination_smart_account_address: _Optional[str] = ..., asset_id: _Optional[int] = ..., quantity_scaled: _Optional[int] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., destination_account_id: _Optional[int] = ..., destination_subaccount_id: _Optional[int] = ..., destination_smart_account_address: _Optional[str] = ..., asset_id: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class ResolvedDestination(_message.Message):
     __slots__ = ("root_account_public_id", "subaccount_public_id", "smart_account_address")
@@ -49,23 +49,23 @@ class ResolvedDestination(_message.Message):
     def __init__(self, root_account_public_id: _Optional[str] = ..., subaccount_public_id: _Optional[str] = ..., smart_account_address: _Optional[str] = ...) -> None: ...
 
 class CreateInternalTransferResponse(_message.Message):
-    __slots__ = ("request_id", "transfer_id", "accepted_at_unix_ns", "asset_id", "asset_code", "u_asset_id", "quantity_scaled", "destination", "status")
+    __slots__ = ("request_id", "transfer_id", "accepted_at_ts_ns", "asset_id", "asset_code", "u_asset_id", "qty_scaled", "destination", "status")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_ID_FIELD_NUMBER: _ClassVar[int]
-    ACCEPTED_AT_UNIX_NS_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     ASSET_CODE_FIELD_NUMBER: _ClassVar[int]
     U_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    QUANTITY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     transfer_id: str
-    accepted_at_unix_ns: int
+    accepted_at_ts_ns: int
     asset_id: int
     asset_code: str
     u_asset_id: str
-    quantity_scaled: int
+    qty_scaled: int
     destination: ResolvedDestination
     status: InternalTransferStatus
-    def __init__(self, request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ..., accepted_at_unix_ns: _Optional[int] = ..., asset_id: _Optional[int] = ..., asset_code: _Optional[str] = ..., u_asset_id: _Optional[str] = ..., quantity_scaled: _Optional[int] = ..., destination: _Optional[_Union[ResolvedDestination, _Mapping]] = ..., status: _Optional[_Union[InternalTransferStatus, str]] = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ..., accepted_at_ts_ns: _Optional[int] = ..., asset_id: _Optional[int] = ..., asset_code: _Optional[str] = ..., u_asset_id: _Optional[str] = ..., qty_scaled: _Optional[int] = ..., destination: _Optional[_Union[ResolvedDestination, _Mapping]] = ..., status: _Optional[_Union[InternalTransferStatus, str]] = ...) -> None: ...

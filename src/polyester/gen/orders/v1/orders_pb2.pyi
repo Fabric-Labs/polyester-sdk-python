@@ -25,12 +25,12 @@ class OrderType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     LIMIT: _ClassVar[OrderType]
     MARKET: _ClassVar[OrderType]
 
-class TIF(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+class TimeInForce(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
-    TIF_UNSPECIFIED: _ClassVar[TIF]
-    GTC: _ClassVar[TIF]
-    IOC: _ClassVar[TIF]
-    FOK: _ClassVar[TIF]
+    TIME_IN_FORCE_UNSPECIFIED: _ClassVar[TimeInForce]
+    GTC: _ClassVar[TimeInForce]
+    IOC: _ClassVar[TimeInForce]
+    FOK: _ClassVar[TimeInForce]
 
 class FeeSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -38,12 +38,12 @@ class FeeSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     QUOTE: _ClassVar[FeeSource]
     RECEIVED: _ClassVar[FeeSource]
 
-class STPMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+class SelfTradePreventionMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
-    STP_UNSPECIFIED: _ClassVar[STPMode]
-    EXPIRE_MAKER: _ClassVar[STPMode]
-    EXPIRE_TAKER: _ClassVar[STPMode]
-    EXPIRE_BOTH: _ClassVar[STPMode]
+    SELF_TRADE_PREVENTION_MODE_UNSPECIFIED: _ClassVar[SelfTradePreventionMode]
+    EXPIRE_MAKER: _ClassVar[SelfTradePreventionMode]
+    EXPIRE_TAKER: _ClassVar[SelfTradePreventionMode]
+    EXPIRE_BOTH: _ClassVar[SelfTradePreventionMode]
 
 class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -142,17 +142,17 @@ SELL: Side
 ORDER_TYPE_UNSPECIFIED: OrderType
 LIMIT: OrderType
 MARKET: OrderType
-TIF_UNSPECIFIED: TIF
-GTC: TIF
-IOC: TIF
-FOK: TIF
+TIME_IN_FORCE_UNSPECIFIED: TimeInForce
+GTC: TimeInForce
+IOC: TimeInForce
+FOK: TimeInForce
 FEE_SOURCE_UNSPECIFIED: FeeSource
 QUOTE: FeeSource
 RECEIVED: FeeSource
-STP_UNSPECIFIED: STPMode
-EXPIRE_MAKER: STPMode
-EXPIRE_TAKER: STPMode
-EXPIRE_BOTH: STPMode
+SELF_TRADE_PREVENTION_MODE_UNSPECIFIED: SelfTradePreventionMode
+EXPIRE_MAKER: SelfTradePreventionMode
+EXPIRE_TAKER: SelfTradePreventionMode
+EXPIRE_BOTH: SelfTradePreventionMode
 ERROR_CODE_UNSPECIFIED: ErrorCode
 ERROR_CODE_BAD_REQUEST: ErrorCode
 ERROR_CODE_INVALID_ARGUMENT: ErrorCode
@@ -232,12 +232,12 @@ AMENDED: ModifyActionTaken
 REPLACED: ModifyActionTaken
 
 class CreateOrderRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol", "side", "order_type", "tif", "qty_scaled", "price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "market_client_ref_price_ticks", "post_only", "client_order_id", "fee_source", "stp_mode", "attached_risk")
+    __slots__ = ("subaccount_id", "symbol", "side", "order_type", "time_in_force", "qty_scaled", "price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "market_client_ref_price_ticks", "post_only", "client_order_id", "fee_source", "self_trade_prevention_mode", "attached_risk")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    TIF_FIELD_NUMBER: _ClassVar[int]
+    TIME_IN_FORCE_FIELD_NUMBER: _ClassVar[int]
     QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MARKET_MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
@@ -246,13 +246,13 @@ class CreateOrderRequest(_message.Message):
     POST_ONLY_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     FEE_SOURCE_FIELD_NUMBER: _ClassVar[int]
-    STP_MODE_FIELD_NUMBER: _ClassVar[int]
+    SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
     ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol: str
     side: Side
     order_type: OrderType
-    tif: TIF
+    time_in_force: TimeInForce
     qty_scaled: int
     price_ticks: int
     market_max_slippage_ticks: int
@@ -261,9 +261,9 @@ class CreateOrderRequest(_message.Message):
     post_only: bool
     client_order_id: str
     fee_source: FeeSource
-    stp_mode: STPMode
+    self_trade_prevention_mode: SelfTradePreventionMode
     attached_risk: RiskPolicy
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., order_type: _Optional[_Union[OrderType, str]] = ..., tif: _Optional[_Union[TIF, str]] = ..., qty_scaled: _Optional[int] = ..., price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., market_client_ref_price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ..., client_order_id: _Optional[str] = ..., fee_source: _Optional[_Union[FeeSource, str]] = ..., stp_mode: _Optional[_Union[STPMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., order_type: _Optional[_Union[OrderType, str]] = ..., time_in_force: _Optional[_Union[TimeInForce, str]] = ..., qty_scaled: _Optional[int] = ..., price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., market_client_ref_price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ..., client_order_id: _Optional[str] = ..., fee_source: _Optional[_Union[FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
 
 class CreateOrderResponse(_message.Message):
     __slots__ = ("status", "order_id", "client_order_id", "ts", "ts_ns", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")

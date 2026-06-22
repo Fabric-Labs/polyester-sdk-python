@@ -78,12 +78,35 @@ python scripts/smoke_test.py
 | `POLYESTER_TEST_MAKER_API_PRIVATE_KEY` | Optional maker account private key for deterministic spot fill e2e |
 | `POLYESTER_TEST_TRADE_PRICE` | Optional cross price override when using maker credentials |
 | `POLYESTER_TEST_TRADE_QTY` | Optional base quantity override for spot fill e2e |
+| `POLYESTER_ACCOUNT_ID` | Base58 account id for resolve integration tests |
+| `POLYESTER_TEST_LEDGER_WRITE_SMOKE=1` | Opt-in ledger_write mutation smoke |
 
-## API key policies
+## What each tier validates
 
-- **Read integration:** read policies on the API key (balances, orders list, market data).
-- **Mutation:** trade policy + trading balance on the smoke symbol's quote asset.
-- **Admin services** (policies CRUD, api key create): may need elevated policies.
+| Tier | Purpose | Fails when |
+|------|---------|------------|
+| **Unit** (`tests/unit`) | Proto codecs, request builders, client wiring, mocked unary calls | Decode regressions, wrong enum mapping, broken service request shape |
+| **Integration** (`tests/integration`) | One real devnet RPC per test with field-level assertions | Auth, routing, proto drift, API contract changes |
+| **E2E** (`tests/e2e`) | Multi-step flows across services | Cross-service identity/balance inconsistencies |
+
+`@pytest.mark.optional` skips when a route is not mounted on devnet. Tests **without** `optional` fail loudly if the route 404s — use that for services that must work on devnet (auth, balances, api keys).
+
+### Coverage map (integration files)
+
+| File | Services / focus |
+|------|------------------|
+| `test_auth_and_analytics.py` | `auth.me`, `profile`, username history |
+| `test_account_services.py` | `resolve`, `api_keys`, `deposit` |
+| `test_app_services.py` | `whiteboard`, `layout`, `social_verification`, `polychart` |
+| `test_market_public.py` | `market_overview`, `heatmap`, `zipper`, `chain_analytics` |
+| `test_balances.py` | balances, history, holds |
+| `test_market_data.py` | spot config, trades, candles |
+| `test_orders.py`, `test_trades.py`, `test_triggers.py` | trading reads |
+| `test_sub_accounts.py`, `test_policies.py`, `test_address_book.py` | account admin |
+| `test_ledger_write.py` | ledger write (opt-in mutation) |
+| `test_lifecycle.py`, `test_guard_signer.py`, `test_transfers.py` | chain / treasury reads |
+
+E2E: `test_account_identity.py` cross-checks `auth.me`, profile, api keys, and balances in one flow.
 
 ## Adding a test for a new RPC
 
@@ -91,6 +114,10 @@ python scripts/smoke_test.py
 2. Add `@pytest.mark.integration` test in `tests/integration/test_<service>.py` calling one SDK method.
 3. For writes, use `@pytest.mark.mutation` or `@pytest.mark.funded` and gate with env flags.
 4. Use `@pytest.mark.optional` when devnet may not mount the route; skip on `PolyesterRouteNotFoundError`.
+
+### Unit coverage expectations
+
+Every service should have at least one unit test that asserts the **protobuf request shape** sent to `unary_*_decoded` (see `tests/unit/test_services_unary.py`, `test_ledger_write_service.py`, `test_withdraw_service.py`, `test_polychart_layout_services.py`). Codec-only paths belong in dedicated codec tests; service-layer tests catch wiring regressions when method signatures or field names change.
 
 ## Layout
 

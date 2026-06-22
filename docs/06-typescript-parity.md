@@ -19,7 +19,7 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 | Service | Status | Implemented | Missing |
 | --- | --- | --- | --- |
 | `marketData` / `market_data` | Partial | `get_spot_config`, `get_trades`, `get_candles`, `get_candles_columns`, `subscribe_trades` | Private streams, maintained catalog models. |
-| `candles` (TS service) | Partial | Methods on `market_data` | Separate `client.candles` alias optional. |
+| `candles` (TS service) | Partial | `client.candles` alias → `market_data` candle methods | `subscribe` stream. |
 | `orderbook` | Partial | `get` (generated) | Delta stream, local book. |
 | `orders` | Partial | `list_open`, `list_history`, `get`, `create`, `cancel`, `modify`, `cancel_all` | Streams, batch modify. |
 | `trades` | Partial | `list` (user trades) | Private trade stream. |
@@ -33,7 +33,8 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 | `marketOverview` / `market_overview` | Partial | `list` (typed) | `subscribe` stream. |
 | `heatmap` | Partial | `get` | `subscribe_live`. |
 | `lifecycle` | Partial | `list_flows`, `get_flow`, `get_flow_by_tx` | Public lifecycle streams. |
-| `zipper` | Partial | `get_deposit_withdraw_config` | Typed asset/chain models. |
+| `zipper` | Partial | `get_deposit_withdraw_config` | Typed asset/chain models; supply stream. |
+| `chainAnalytics` / `chain_analytics` | Done | `get_zipped_asset_supply`, `get_zipped_asset_supply_group`, `get_unified_asset_balances` | |
 | `echo` | Partial | `echo` | Devnet may not mount service. |
 
 ## Realtime
@@ -48,19 +49,23 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 
 | Service | Status | Notes |
 | --- | --- | --- |
-| `accounts` | Planned | Confirm API-key access. |
-| `api_keys` | Planned | May need step-up. |
-| `policies.*` | Planned | |
-| `sub_accounts` | Planned | |
-| `address_book` | Planned | |
-| `guard_signer` | Planned | |
-| `mfa` | Blocked | Unless API keys support step-up. |
+| `accounts` | Done | `client.accounts` → `resolve.resolve_account` |
+| `auth` / `profile` | Partial | `auth.me`, `auth.profile.get/update/get_username_history` | `subscribeIdentity` stream |
+| `api_keys` | Partial | Full CRUD + `generate_keypair` | `subscribe` stream; create may need step-up |
+| `policies.*` | Done | Subaccount + API key policy CRUD |
+| `sub_accounts` | Partial | Full CRUD incl. `delete` | `subscribe` streams |
+| `address_book` | Done | Full CRUD + views |
+| `guard_signer` | Done | Wallet lifecycle + signing |
+| `socialVerification` / `social_verification` | Done | `start`, `mark_ready`, `get` |
+| `whiteboard` | Done | CRUD, ACL, archive, join token |
+| `polychart` | Done | Layers, drawings, publish/share |
+| `layout` | Done | Layouts, templates, subscriptions |
+| `mfa` | Blocked | Unless API keys support step-up |
 
 ## Deferred Or Omitted
 
 | Area | Status | Rationale |
 | --- | --- | --- |
-| `socialVerification`, `whiteboard`, `profile` | Deferred | Not bot-core. |
 | `bridge` | Deferred | Product confirmation. |
 | Browser/wallet/mock | Omitted | |
 

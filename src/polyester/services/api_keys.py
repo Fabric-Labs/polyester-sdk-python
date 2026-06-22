@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
+from polyester.auth import generate_ed25519_keypair
 from polyester.codecs.decode.api_keys import (
     api_key_from_create_proto,
     api_key_from_get_proto,
@@ -22,6 +23,7 @@ from polyester.gen.auth.v1.api_keys_pb2 import (
     UpdateApiKeyRequest,
 )
 from polyester.models import ApiKeysList, ApiKeySummary
+from polyester.models.auth import Ed25519Keypair
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import resolve_sub_account_id
@@ -131,6 +133,16 @@ class AsyncApiKeysService(BaseService):
             lambda client, req: client.delete_api_key(req),
             DeleteApiKeyRequest(key_id=key_id),
             lambda _msg: None,
+        )
+
+    def generate_keypair(self) -> Ed25519Keypair:
+        """Generate a local Ed25519 keypair for API key creation (secret never sent to API)."""
+        public_key, secret_key = generate_ed25519_keypair()
+        return Ed25519Keypair(
+            public_key_hex=public_key.hex(),
+            public_key=public_key,
+            secret_key_hex=secret_key.hex(),
+            secret_key=secret_key,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

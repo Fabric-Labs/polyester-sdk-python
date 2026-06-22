@@ -52,6 +52,13 @@ def normalize_private_key(value: str | bytes) -> bytes:
     return private
 
 
+def generate_ed25519_keypair() -> tuple[bytes, bytes]:
+    """Generate a new Ed25519 keypair (public, secret), each 32 bytes."""
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key()
+    return public_key.public_bytes_raw(), private_key.private_bytes_raw()
+
+
 def sha256_hex(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
 

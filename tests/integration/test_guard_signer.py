@@ -1,6 +1,6 @@
 import pytest
 
-from polyester.errors import PolyesterApiError, PolyesterServerError
+from polyester.errors import PolyesterApiError
 from polyester.models.guard_signer import GuardSignerStatus
 
 

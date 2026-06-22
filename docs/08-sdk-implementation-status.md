@@ -30,16 +30,24 @@ Living snapshot of what `polyester-sdk` exposes today.
 | `deposit` | Done | `list_addresses`, `create_address` |
 | `withdraw` / `trading_withdraws` | Done | `create_to_funding`, `create_to_external_chain`, `create_wallet_trading_withdraw` |
 | `ledger_write` | Done | `transfer_trading_to_trading`, `create_funding_user_transfer`, `reserve_trading_withdraw`, `release_trading_withdraw_reserve` |
-| `api_keys` | Done | `list`, `get`, `create`, `update`, `delete` |
+| `api_keys` | Done | `list`, `get`, `create`, `update`, `delete`, `generate_keypair` |
 | `resolve` | Done | `resolve_account` |
 | `address_book` | Done | Full CRUD + views + transfer destinations |
 | `policies` | Done | Subaccount + API key policy CRUD and assignment |
 | `sub_accounts` | Done | List/create/members/invites + view service |
 | `guard_signer` | Done | Wallet lifecycle + protected action signing |
+| `auth` / `profile` | Done | `me`, `profile.get` / `update` / `get_username_history` |
+| `chain_analytics` | Done | zipped supply, supply group, unified balances |
+| `social_verification` | Done | `start`, `mark_ready`, `get` |
+| `whiteboard` | Done | CRUD, ACL, archive, join token |
+| `polychart` | Done | layers, drawings, publish/share/subscribe |
+| `layout` | Done | layouts, templates, publish/share/subscriptions |
 
 ## Not in current gen / SDK
 
 - Funding → trading bucket move — on-chain via TradingGateway deposit (UI / wallet), not an API-key RPC
+- MFA service — session/step-up oriented; omit until API-key step-up is confirmed
+- Realtime private channels — in progress (see Planned next)
 - `echo` — no proto in `gen/`
 - JWT / browser client flows — out of scope for API-key SDK
 - `polychart`, `layout`, `whiteboard`, `mfa`, `profile`, `social_verification` — deferred (app-oriented)

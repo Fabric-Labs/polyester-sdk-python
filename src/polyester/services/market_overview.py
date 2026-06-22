@@ -14,12 +14,12 @@ class AsyncMarketOverviewService(BaseService):
         *,
         symbols: list[str] | None = None,
         limit: int = 50,
-        page: int = 0,
+        page_token: str = "",
         include_sparklines: bool = False,
     ) -> MarketOverviewList:
         request = ListMarketOverviewRequest(
             limit=limit,
-            page=page,
+            page_token=page_token,
             include_sparklines=include_sparklines,
         )
         if symbols:

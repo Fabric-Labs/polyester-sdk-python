@@ -177,6 +177,10 @@ class AsyncSubAccountsService(BaseService):
             lambda _msg: None,
         )
 
+    async def delete(self, *, sub_account_id: str | None = None) -> None:
+        """Soft-delete a subaccount by setting status to deleted."""
+        await self.update(sub_account_id=sub_account_id, status="deleted")
+
     async def set_member_mfa_requirement(
         self,
         *,

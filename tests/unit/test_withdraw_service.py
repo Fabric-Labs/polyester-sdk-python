@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterValidationError
+from polyester.gen.chain.withdraw.v1 import withdraw_pb2
+from polyester.services.withdraw import AsyncWithdrawService
+from tests.unit.support import CaptureUnary
+
+_WITHDRAW_RESPONSE = withdraw_pb2.CreateTradingWithdrawResponse(intent_id="intent-99")
+
+
+@pytest.mark.asyncio
+async def test_create_to_funding_builds_signed_request() -> None:
+    capture = CaptureUnary(_WITHDRAW_RESPONSE)
+    with patch("polyester.services.withdraw.unary_auth_decoded", capture):
+        service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+        result = await service.create_to_funding(
+            asset_id=3,
+            quantity="10",
+            payload_signature=b"\x01\x02",
+            idempotency_key="idem-1",
+        )
+    assert isinstance(capture.request, withdraw_pb2.CreateTradingWithdrawRequest)
+    assert capture.request.payload.action == withdraw_pb2.TO_FUNDING
+    assert capture.request.payload.asset_id == 3
+    assert capture.request.payload.idempotency_key == "idem-1"
+    assert capture.request.payload_signature == b"\x01\x02"
+    assert result.intent_id == "intent-99"
+
+
+@pytest.mark.asyncio
+async def test_create_to_funding_rejects_missing_signature() -> None:
+    service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+    with pytest.raises(PolyesterValidationError, match="payload_signature is required"):
+        await service.create_to_funding(asset_id=1, quantity="1", payload_signature=b"")
+
+
+@pytest.mark.asyncio
+async def test_create_to_external_chain_requires_destination() -> None:
+    service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+    with pytest.raises(PolyesterValidationError, match="destination_address is required"):
+        await service.create_to_external_chain(
+            asset_id=1,
+            quantity="1",
+            payload_signature=b"\xaa",
+            destination_chain_id=1,
+            destination_address="",
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_to_external_chain_builds_payload() -> None:
+    capture = CaptureUnary(_WITHDRAW_RESPONSE)
+    with patch("polyester.services.withdraw.unary_auth_decoded", capture):
+        service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+        await service.create_to_external_chain(
+            asset_id=5,
+            quantity="0.1",
+            payload_signature=b"\xbb",
+            destination_chain_id=42161,
+            destination_address="0xabc",
+            idempotency_key="ext-1",
+        )
+    assert capture.request.payload.action == withdraw_pb2.TO_EXTERNAL_CHAIN
+    assert capture.request.payload.destination_chain_id == 42161
+    assert capture.request.payload.destination_address == "0xabc"
+
+
+@pytest.mark.asyncio
+async def test_create_wallet_trading_withdraw_sets_subaccount_id() -> None:
+    capture = CaptureUnary(_WITHDRAW_RESPONSE)
+    with patch("polyester.services.withdraw.unary_auth_decoded", capture):
+        service = AsyncWithdrawService(
+            transport=MagicMock(),
+            default_sub_account_id=format_id(12),
+        )
+        await service.create_wallet_trading_withdraw(
+            action="to_funding",
+            asset_id=1,
+            amount="1",
+            idempotency_key="wallet-1",
+            payload_signature=b"\xcc",
+            signer_wallet="0xsigner",
+        )
+    assert isinstance(capture.request, withdraw_pb2.CreateWalletTradingWithdrawRequest)
+    assert capture.request.signer_wallet == "0xsigner"
+    assert capture.request.subaccount_id == 12

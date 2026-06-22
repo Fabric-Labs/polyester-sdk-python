@@ -24,6 +24,13 @@ from polyester.models.address_book import (
     TransferCounterparty,
     WithdrawWhitelistView,
 )
+from polyester.models.auth import (
+    Ed25519Keypair,
+    MeResult,
+    UsernameHistoryEntry,
+    UsernameHistoryList,
+    UserProfile,
+)
 from polyester.models.common import (
     ApiData,
     CreateOrderRequest,
@@ -156,6 +163,7 @@ __all__ = [
     "CreateSubaccountResult",
     "DepositAddress",
     "DepositAddressesList",
+    "Ed25519Keypair",
     "EquityHistory",
     "EquityHistorySeries",
     "ExportGuardSignerWalletResult",
@@ -184,6 +192,7 @@ __all__ = [
     "MarketOverviewList",
     "MarketTrade",
     "MarketTradesResult",
+    "MeResult",
     "MirroredWithdrawWhitelistEntry",
     "ModifyOrderResult",
     "OpenOrdersResult",
@@ -220,6 +229,9 @@ __all__ = [
     "TriggersList",
     "UserTrade",
     "UserTradesList",
+    "UserProfile",
+    "UsernameHistoryEntry",
+    "UsernameHistoryList",
     "WithdrawIntentResult",
     "WithdrawWhitelistView",
 ]

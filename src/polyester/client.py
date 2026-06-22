@@ -10,11 +10,14 @@ from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
     AsyncApiKeysService,
+    AsyncAuthService,
     AsyncBalancesService,
+    AsyncChainAnalyticsService,
     AsyncDepositService,
     AsyncGuardSignerService,
     AsyncHeatmapService,
     AsyncInternalTransfersService,
+    AsyncLayoutService,
     AsyncLedgerWriteService,
     AsyncLifecycleService,
     AsyncMarketDataService,
@@ -22,11 +25,14 @@ from polyester.services import (
     AsyncOrderbookService,
     AsyncOrdersService,
     AsyncPoliciesService,
+    AsyncPolychartService,
     AsyncResolveService,
+    AsyncSocialVerificationService,
     AsyncSubAccountsService,
     AsyncTradesService,
     AsyncTransfersService,
     AsyncTriggersService,
+    AsyncWhiteboardService,
     AsyncWithdrawService,
     AsyncZipperService,
 )
@@ -70,11 +76,14 @@ class AsyncPolyester:
             credentials=credentials,
         )
         self.realtime = AsyncRealtimeClient(ws_url)
+        self.auth = AsyncAuthService(self._transport)
+        self.chain_analytics = AsyncChainAnalyticsService(self._transport)
         self.market_data = AsyncMarketDataService(
             self._transport,
             self.catalogs,
             realtime=self.realtime,
         )
+        self.candles = self.market_data
         self.market_overview = AsyncMarketOverviewService(self._transport)
         self.zipper = AsyncZipperService(self._transport)
         self.heatmap = AsyncHeatmapService(self._transport, self.catalogs)
@@ -100,7 +109,12 @@ class AsyncPolyester:
         self.policies = AsyncPoliciesService(self._transport, default_sub_account_id)
         self.sub_accounts = AsyncSubAccountsService(self._transport, default_sub_account_id)
         self.resolve = AsyncResolveService(self._transport)
+        self.accounts = self.resolve
         self.address_book = AsyncAddressBookService(self._transport, default_sub_account_id)
+        self.social_verification = AsyncSocialVerificationService(self._transport)
+        self.whiteboard = AsyncWhiteboardService(self._transport)
+        self.polychart = AsyncPolychartService(self._transport)
+        self.layout = AsyncLayoutService(self._transport)
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
         self.ledger_write = AsyncLedgerWriteService(
             self._transport,
@@ -152,7 +166,10 @@ class Polyester:
         self._loop = asyncio.new_event_loop()
         self._client = self._loop.run_until_complete(self._create_client(config))
         self.realtime = _SyncService(self._loop, self._client.realtime)
+        self.auth = _SyncService(self._loop, self._client.auth)
+        self.chain_analytics = _SyncService(self._loop, self._client.chain_analytics)
         self.market_data = _SyncService(self._loop, self._client.market_data)
+        self.candles = self.market_data
         self.market_overview = _SyncService(self._loop, self._client.market_overview)
         self.zipper = _SyncService(self._loop, self._client.zipper)
         self.heatmap = _SyncService(self._loop, self._client.heatmap)
@@ -169,7 +186,12 @@ class Polyester:
         self.policies = _SyncService(self._loop, self._client.policies)
         self.sub_accounts = _SyncService(self._loop, self._client.sub_accounts)
         self.resolve = _SyncService(self._loop, self._client.resolve)
+        self.accounts = self.resolve
         self.address_book = _SyncService(self._loop, self._client.address_book)
+        self.social_verification = _SyncService(self._loop, self._client.social_verification)
+        self.whiteboard = _SyncService(self._loop, self._client.whiteboard)
+        self.polychart = _SyncService(self._loop, self._client.polychart)
+        self.layout = _SyncService(self._loop, self._client.layout)
         self.guard_signer = _SyncService(self._loop, self._client.guard_signer)
         self.ledger_write = _SyncService(self._loop, self._client.ledger_write)
         self.withdraw = _SyncService(self._loop, self._client.withdraw)

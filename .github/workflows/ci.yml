@@ -30,7 +30,7 @@ jobs:
         run: python -m compileall src/polyester
 
       - name: Pytest
-        run: pytest tests -q
+        run: pytest tests/unit -q --cov=polyester --cov-report=term-missing
 
       - name: Build wheel
         run: python -m build

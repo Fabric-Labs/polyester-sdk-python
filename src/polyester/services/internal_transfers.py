@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.internal_transfers import internal_transfer_from_proto
+from polyester.codecs.ledger_amounts import LEDGER_SCALE
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import id_to_int, parse_qty_scaled
-from polyester.codecs.wire_decode import decode_internal_transfer_result
 from polyester.errors import PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import CreateInternalTransferRequest
 from polyester.models import InternalTransferResult
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_auth
+from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -45,10 +46,10 @@ class AsyncInternalTransfersService(BaseService):
                 "create requires destination_account_id, destination_subaccount_id, "
                 "or destination_smart_account_address"
             )
-        scale = quantity_scale if quantity_scale is not None else 8
+        scale = quantity_scale if quantity_scale is not None else LEDGER_SCALE
         request = CreateInternalTransferRequest(
             asset_id=asset_id,
-            quantity_scaled=parse_qty_scaled(quantity, scale, "quantity"),
+            qty_scaled=parse_qty_scaled(quantity, scale, "quantity"),
             idempotency_key=idempotency_key,
         )
         parsed_sub = parse_optional_subaccount_id(
@@ -66,13 +67,13 @@ class AsyncInternalTransfersService(BaseService):
             )
         if destination_smart_account_address:
             request.destination_smart_account_address = destination_smart_account_address
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             InternalTransferServiceClient,
             lambda client, req: client.create_internal_transfer(req),
             request,
+            internal_transfer_from_proto,
         )
-        return decode_internal_transfer_result(data)
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:
         return resolve_sub_account_id(value, self._default_sub_account_id)

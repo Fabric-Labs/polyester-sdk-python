@@ -65,11 +65,11 @@ def create_trigger_to_proto(
             orders_pb2, TRIGGER_PRICE_SOURCE_TO_PROTO[source_key]
         )
     if tif.lower() == "gtc":
-        proto.tif = orders_pb2.GTC
+        proto.time_in_force = orders_pb2.GTC
     elif tif.lower() == "ioc":
-        proto.tif = orders_pb2.IOC
+        proto.time_in_force = orders_pb2.IOC
     elif tif.lower() == "fok":
-        proto.tif = orders_pb2.FOK
+        proto.time_in_force = orders_pb2.FOK
     if limit_price is not None:
         proto.limit_price_ticks = parse_price_ticks(limit_price, "limit_price")
     if sub_account_id is not None:

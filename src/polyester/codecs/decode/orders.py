@@ -11,8 +11,13 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     UserTrade,
 )
 from polyester.models import (
+    BatchCancelOrdersResult,
+    BatchCancelResultItem,
+    BatchCreateOrdersResult,
+    BatchCreateResultItem,
     BatchModifyOrdersResult,
     BatchModifyResultItem,
+    CancelAllAfterResult,
     CancelAllOrdersResult,
     GetOrderResult,
     ModifyOrderResult,
@@ -37,12 +42,12 @@ def order_from_proto(msg: Order) -> PublicOrder:
         side=proto_enum_name(orders_pb2.Side, msg.side),
         status=status,
         order_type=proto_enum_name(orders_pb2.OrderType, msg.order_type),
-        tif=proto_enum_name(orders_pb2.TIF, msg.tif),
-        orig_qty=str(msg.orig_qty),
-        cum_qty=str(msg.cum_qty),
-        leaves_qty=str(msg.leaves_qty),
+        tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force),
+        orig_qty=str(msg.orig_qty_scaled),
+        cum_qty=str(msg.cum_qty_scaled),
+        leaves_qty=str(msg.leaves_qty_scaled),
         price_ticks=str(msg.price_ticks),
-        avg_px_ticks=str(msg.avg_px_ticks),
+        avg_px_ticks=str(msg.avg_price_ticks),
         created_ts_ns=str(msg.created_ts_ns),
     )
 
@@ -121,4 +126,46 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
         amended_count=int(msg.amended_count),
         replaced_count=int(msg.replaced_count),
         rejected_count=int(msg.rejected_count),
+    )
+
+
+def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchCreateOrdersResult:
+    results = [
+        BatchCreateResultItem(
+            status=item.status,
+            order_id=format_uint64_id(item.order_id) if item.order_id else "",
+            client_order_id=item.client_order_id,
+            code=item.code,
+        )
+        for item in msg.results
+    ]
+    return BatchCreateOrdersResult(
+        results=results,
+        accepted_count=int(msg.accepted_count),
+        rejected_count=int(msg.rejected_count),
+    )
+
+
+def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchCancelOrdersResult:
+    results = [
+        BatchCancelResultItem(
+            status=item.status,
+            order_id=format_uint64_id(item.order_id) if item.order_id else "",
+            client_order_id=item.client_order_id,
+            code=item.code,
+        )
+        for item in msg.results
+    ]
+    return BatchCancelOrdersResult(
+        results=results,
+        accepted_count=int(msg.accepted_count),
+        rejected_count=int(msg.rejected_count),
+    )
+
+
+def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> CancelAllAfterResult:
+    return CancelAllAfterResult(
+        status=msg.status,
+        effective_timeout_sec=int(msg.effective_timeout_sec),
+        expires_at_ts_ns=str(msg.expires_at_ts_ns),
     )

@@ -23,7 +23,9 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 | `orderbook` | Partial | `get` (generated) | Delta stream, local book. |
 | `orders` | Partial | `list_open`, `list_history`, `get`, `create`, `cancel`, `modify`, `cancel_all` | Streams, batch modify. |
 | `trades` | Partial | `list` (user trades) | Private trade stream. |
-| `balances` | Partial | `list`, `get_balance_history`, `get_equity_history`, `list_holds`, `transfer_funding_to_unified` | Unified→funding not in proto yet; private stream. |
+| `balances` | Partial | `list`, `get_balance_history`, `get_equity_history`, `list_holds` | Funding→trading is on-chain (not SDK); trading→funding via `trading_withdraws`; private stream. |
+| `tradingWithdraws` / `trading_withdraws` | Partial | `create_to_funding`, `create_to_external_chain` | Requires signed intent payload; no wallet helper in API-key SDK. |
+| `ledger_write` | Partial | `transfer_trading_to_trading`, funding-user transfer, withdraw reserve/release | Devnet route may be unmounted. |
 | `triggers` | Partial | `list`, `get`, `create`, `cancel`, `modify`, `pause`, `resume`, `list_events` | Streams. |
 | `transfers` | Partial | `list` (ledger transfers) | Private stream. |
 | `internal_transfers` | Partial | `create` | |

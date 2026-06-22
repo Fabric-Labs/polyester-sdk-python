@@ -74,8 +74,11 @@ Use **decimal strings** for `qty` and `price`. Do not pass floats.
 
 Ledger balances expose separate **funding** and **trading** buckets per asset. Spot
 orders spend **trading** balance. Deposits land in **funding** until you move them
-(Funding → Unified Trading in the UI). There is no funding→trading RPC in the
-current generated ledger write proto; use the dashboard until it is added back.
+(Funding → Unified Trading in the UI or on-chain via the funding wallet).
+
+- **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
+- **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a signed intent payload.
+- **Trading → trading (another account):** `client.internal_transfers.create(...)` or `client.ledger_write.transfer_trading_to_trading(...)`.
 
 Format u128 wire amounts with the public helper (18-decimal scale):
 

@@ -263,5 +263,42 @@ class BatchModifyOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     rejected_count: int = 0
 
 
+class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    status: str = ""
+    order_id: str = ""
+    client_order_id: str = ""
+    code: str = ""
+
+
+class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    results: list[BatchCreateResultItem]
+    accepted_count: int = 0
+    rejected_count: int = 0
+
+
+class BatchCancelResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    status: str = ""
+    order_id: str = ""
+    client_order_id: str = ""
+    code: str = ""
+
+
+class BatchCancelOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    results: list[BatchCancelResultItem]
+    accepted_count: int = 0
+    rejected_count: int = 0
+
+
+class CancelAllAfterResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    status: str = ""
+    effective_timeout_sec: int = 0
+    expires_at_ts_ns: str = "0"
+
+
 class WithdrawIntentResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     intent_id: str = ""
+
+
+class LedgerWriteTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    transfer_id: str = ""
+    timestamp: int = 0

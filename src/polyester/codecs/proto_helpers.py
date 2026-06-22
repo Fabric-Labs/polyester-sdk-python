@@ -15,6 +15,20 @@ _ENUM_PREFIXES = (
     "KIND_",
     "MODIFY_ACTION_",
     "API_KEY_STATUS_",
+    "TRIGGER_TYPE_",
+    "TRIGGER_STATUS_",
+    "TRIGGER_EVENT_TYPE_",
+    "STATUS_",
+    "EVENT_",
+    "TIME_IN_FORCE_",
+    "SELF_TRADE_PREVENTION_MODE_",
+    "BALANCE_RANGE_",
+    "PROTECTED_ACTION_",
+    "SCOPE_",
+    "ENTRY_KIND_",
+    "DESTINATION_",
+    "INTERNAL_WHITELIST_",
+    "TRANSFER_COUNTERPARTY_",
 )
 
 
@@ -48,3 +62,19 @@ def has_field(message: Message, field_name: str) -> bool:
         return message.HasField(field_name)
     except ValueError:
         return False
+
+
+def timestamp_to_ms(msg: Message | None) -> int:
+    if msg is None:
+        return 0
+    seconds = int(getattr(msg, "seconds", 0) or 0)
+    nanos = int(getattr(msg, "nanos", 0) or 0)
+    if seconds == 0 and nanos == 0:
+        return 0
+    return seconds * 1000 + nanos // 1_000_000
+
+
+def bytes_to_hex(value: bytes | None) -> str:
+    if not value:
+        return ""
+    return f"0x{value.hex()}"

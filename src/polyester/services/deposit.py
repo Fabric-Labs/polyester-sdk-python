@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.deposit import (
+    create_deposit_address_from_proto,
+    deposit_addresses_list_from_proto,
+)
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.wire_decode import decode_deposit_address, decode_deposit_addresses_list
 from polyester.gen.chain.deposit.v1.deposit_connect import DepositAddressServiceClient
 from polyester.gen.chain.deposit.v1.deposit_pb2 import (
     CreateDepositAddressRequest,
@@ -9,7 +12,7 @@ from polyester.gen.chain.deposit.v1.deposit_pb2 import (
 )
 from polyester.models import DepositAddress, DepositAddressesList
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_auth
+from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -30,13 +33,13 @@ class AsyncDepositService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             DepositAddressServiceClient,
             lambda client, req: client.list_deposit_addresses(req),
             request,
+            deposit_addresses_list_from_proto,
         )
-        return decode_deposit_addresses_list(data)
 
     async def create_address(
         self,
@@ -50,15 +53,15 @@ class AsyncDepositService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        result = await unary_auth_decoded(
             self._transport,
             DepositAddressServiceClient,
             lambda client, req: client.create_deposit_address(req),
             request,
+            create_deposit_address_from_proto,
         )
-        address_raw = data.get("depositAddress") or data.get("deposit_address")
-        if isinstance(address_raw, dict):
-            return decode_deposit_address(address_raw)
+        if result.deposit_address:
+            return result
         return DepositAddress(chain_id=chain_id)
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

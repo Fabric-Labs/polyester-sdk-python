@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.heatmap import heatmap_from_proto
 from polyester.codecs.heatmap import (
     INTERVAL_ALIASES,
     QTY_MODE_ALIASES,
@@ -18,7 +19,7 @@ from polyester.gen.marketdata.v1.heatmap_pb2 import (
 )
 from polyester.models import ApiData
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_public
+from polyester.services._generated import unary_public_decoded
 from polyester.services._symbols import resolve_symbol_id
 
 
@@ -96,13 +97,13 @@ class AsyncHeatmapService(BaseService):
             time_range.end_time.CopyFrom(_datetime_to_timestamp(end))
             request.time_range.CopyFrom(time_range)
 
-        data = await unary_public(
+        return await unary_public_decoded(
             self._transport,
             HeatmapServiceClient,
             lambda client, req: client.get_orderbook_heatmap(req),
             request,
+            heatmap_from_proto,
         )
-        return ApiData(raw=data)
 
 
 def _datetime_to_timestamp(value: datetime) -> Timestamp:

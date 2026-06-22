@@ -23,12 +23,12 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
         side=orders_pb2.BUY,
         status=OrderStatus.WORKING,
         order_type=orders_pb2.LIMIT,
-        tif=orders_pb2.GTC,
-        orig_qty=100,
-        cum_qty=10,
-        leaves_qty=90,
+        time_in_force=orders_pb2.GTC,
+        orig_qty_scaled=100,
+        cum_qty_scaled=10,
+        leaves_qty_scaled=90,
         price_ticks=5000,
-        avg_px_ticks=4990,
+        avg_price_ticks=4990,
         created_ts_ns=1_700_000_000_000,
     )
     order = order_from_proto(msg)

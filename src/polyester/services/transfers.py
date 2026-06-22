@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.transfers import transfers_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.wire_decode import decode_transfers_list
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import ListTransfersRequest
 from polyester.models import TransfersList
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_auth
+from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -31,13 +31,13 @@ class AsyncTransfersService(BaseService):
             request.subaccount_id = parsed_sub
         if since is not None:
             request.since = since
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,
             lambda client, req: client.list_transfers(req),
             request,
+            transfers_list_from_proto,
         )
-        return decode_transfers_list(data)
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:
         return resolve_sub_account_id(value, self._default_sub_account_id)

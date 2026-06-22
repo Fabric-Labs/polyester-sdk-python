@@ -1,6 +1,6 @@
 # Python SDK implementation status
 
-Living snapshot of what `polyester-sdk` exposes today. For the original TypeScript parity plan, see `06-typescript-parity.md` (read-only).
+Living snapshot of what `polyester-sdk` exposes today.
 
 ## Client
 
@@ -11,42 +11,46 @@ Living snapshot of what `polyester-sdk` exposes today. For the original TypeScri
 | `format_ledger_u128` / `LEDGER_SCALE` | Done |
 | API-key Ed25519 auth | Done |
 
-## Services (high level)
+## Services (bot-core)
 
 | Service | Status | Notes |
 | --- | --- | --- |
-| `market_data` | Partial | `get_spot_config`, trades, candles, columns, `get_current_candle`, `subscribe_trades` |
-| `market_overview` | Partial | `list` |
-| `orderbook` | Partial | `get` |
-| `heatmap` | Partial | `get` |
-| `zipper` | Partial | `get_deposit_withdraw_config` |
-| `lifecycle` | Partial | `list_flows`, `get_flow`, `get_flow_by_tx` |
-| `echo` | Partial | Devnet may 404 |
-| `balances` | Partial | `list`, history, equity, holds, `get_health` |
-| `orders` | Partial | CRUD, `cancel_all`, `batch_modify`, attached-risk flags |
-| `trades` | Partial | `list` |
-| `triggers` | Partial | Full CRUD + events |
-| `transfers` | Partial | `list` |
-| `internal_transfers` | Partial | `create` |
-| `deposit` | Partial | `list_addresses`, `create_address` |
-| `api_keys` | Partial | `list`, `get` |
-| `resolve` | Partial | `resolve_account` |
-| `address_book` | Partial | `list_transfer_destinations` |
-| `withdraw` | Partial | `create_trading_withdraw` |
+| `market_data` | Done | spot config, trades, candles, columns, `get_current_candle`, `subscribe_trades` |
+| `market_overview` | Done | `list` |
+| `orderbook` | Done | `get` |
+| `heatmap` | Done | `get` |
+| `zipper` | Done | `get_deposit_withdraw_config` |
+| `lifecycle` | Done | `list_flows`, `get_flow`, `get_flow_by_tx`, `list_flows_by_tx` |
+| `balances` | Done | list, history, equity, holds, `get_health` |
+| `orders` | Done | CRUD, `cancel_all`, `batch_modify`, `batch_create`, `batch_cancel`, `cancel_all_after` |
+| `trades` | Done | `list` |
+| `triggers` | Done | Full CRUD + events |
+| `transfers` | Done | `list` |
+| `internal_transfers` | Done | `create` |
+| `deposit` | Done | `list_addresses`, `create_address` |
+| `withdraw` / `trading_withdraws` | Done | `create_to_funding`, `create_to_external_chain`, `create_wallet_trading_withdraw` |
+| `ledger_write` | Done | `transfer_trading_to_trading`, `create_funding_user_transfer`, `reserve_trading_withdraw`, `release_trading_withdraw_reserve` |
+| `api_keys` | Done | `list`, `get`, `create`, `update`, `delete` |
+| `resolve` | Done | `resolve_account` |
+| `address_book` | Done | Full CRUD + views + transfer destinations |
+| `policies` | Done | Subaccount + API key policy CRUD and assignment |
+| `sub_accounts` | Done | List/create/members/invites + view service |
+| `guard_signer` | Done | Wallet lifecycle + protected action signing |
 
-## Not in current proto / SDK
+## Not in current gen / SDK
 
-- `transfer_funding_to_unified` — no `TransferFundToUnified` in generated `ledger_write` at this revision
+- Funding → trading bucket move — on-chain via TradingGateway deposit (UI / wallet), not an API-key RPC
+- `echo` — no proto in `gen/`
 - JWT / browser client flows — out of scope for API-key SDK
+- `polychart`, `layout`, `whiteboard`, `mfa`, `profile`, `social_verification` — deferred (app-oriented)
 
-## Planned next (SDK-only)
+## Testing
 
-- `auth.policies`, `auth.sub_accounts`, `chain.guard_signer`
+- CI: `pytest tests/unit` + ruff
+- Local: integration + e2e against devnet — see `docs/10-testing.md`
+
+## Planned next
+
 - Private realtime (orders, balances, transfers)
 - Default binary Connect wire
 - `market_overview.subscribe`, `heatmap.subscribe_live`
-
-## Blockers outside SDK
-
-- Devnet routes not mounted (`echo`, `get_current_candle`, some ledger writes)
-- Trading balance required for order/trigger mutations after funding-only deposits

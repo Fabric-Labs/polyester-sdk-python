@@ -5,9 +5,10 @@ from datetime import datetime
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.wire_decode import (
-    decode_candles_list,
-    decode_market_trades_list,
+from polyester.codecs.decode.market_data import (
+    candles_columns_from_proto,
+    candles_from_proto,
+    market_trades_from_proto,
 )
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
@@ -19,7 +20,7 @@ from polyester.gen.marketdata.v1.marketdata_pb2 import (
 from polyester.models import Candle, CandlesResult, MarketTradesResult, SpotConfig
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_public
+from polyester.services._generated import unary_public, unary_public_decoded
 from polyester.services._symbols import resolve_symbol_id
 
 TIMEFRAME_ALIASES: dict[str, str] = {
@@ -75,13 +76,13 @@ class AsyncMarketDataService(BaseService):
         request = GetTradesRequest(symbol_id=resolved_symbol_id, limit=limit)
         if from_match_id is not None:
             request.from_match_id = from_match_id
-        data = await unary_public(
+        return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_trades(req),
             request,
+            market_trades_from_proto,
         )
-        return decode_market_trades_list(data)
 
     async def get_current_candle(
         self,
@@ -122,13 +123,13 @@ class AsyncMarketDataService(BaseService):
             end_time=end_time,
             include_incomplete=include_incomplete,
         )
-        data = await unary_public(
+        return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_candles(req),
             request,
+            candles_from_proto,
         )
-        return decode_candles_list(data)
 
     async def get_candles_columns(
         self,
@@ -151,13 +152,13 @@ class AsyncMarketDataService(BaseService):
             end_time=end_time,
             include_incomplete=include_incomplete,
         )
-        data = await unary_public(
+        return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_candles_columns(req),
             request,
+            candles_columns_from_proto,
         )
-        return decode_candles_list(data)
 
     def subscribe_trades(
         self,

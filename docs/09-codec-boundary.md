@@ -20,27 +20,26 @@ Service method
   → msgspec model returned to caller
 ```
 
-Helpers:
-
-- `unary_auth_decoded` / `unary_public_decoded` — pass a `Callable[[TResponse], R]` decoder.
-- `proto_helpers` — uint64 base58 ids, u128 strings, enum name normalization.
-
 ## Migrated services (proto decode)
 
-- **orders** — list/get/create/cancel/modify/cancel_all/batch_modify
+- **orders** — full write/read including batch create/cancel/modify and cancel_all_after
 - **trades** — list user trades
-- **balances** — `list`, `get_health` (history/equity/holds still use `wire_decode`)
+- **balances** — list, health, history, equity, holds
 - **lifecycle** — list/get/get_by_tx
+- **triggers** — full CRUD + events
+- **transfers**, **internal_transfers**, **deposit**, **withdraw**
+- **api_keys**, **resolve**
+- **address_book**, **policies**, **sub_accounts**, **guard_signer**
+- **market_data** — trades, candles (spot config still dict bridge for `SpotConfig.raw`)
+- **market_overview**, **orderbook**, **heatmap**, **zipper**
 
 ## Still on legacy dict bridge
 
-All other services use `unary_auth` / `unary_public` → `protobuf_to_public_dict` → `wire_decode`.
-
-Migrate when touching a service: add `codecs/decode/<domain>.py`, switch the service to `unary_*_decoded`, add unit tests building protobuf messages directly.
+- `market_data.get_spot_config` — returns `SpotConfig(raw=dict)` escape hatch
 
 ## Rules
 
-1. **Proto is source of truth** — no RPCs or fields not in `polyester-python-proto`.
+1. **Proto is source of truth** — use `src/polyester/gen` as wire contract.
 2. Do not use `MessageToDict` as the hot path for migrated services.
-3. Match TS client field naming in public models (camelCase in JSON wire is already normalized in models).
-4. Order/trigger ids on the wire are uint64; public API exposes base58 via `format_id` / `format_uint64_id`.
+3. Match TS client field naming in public models.
+4. Order/trigger ids on the wire are uint64; public API exposes base58 via `format_uint64_id`.

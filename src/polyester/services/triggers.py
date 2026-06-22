@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.triggers import (
+    get_trigger_from_proto,
+    trigger_events_list_from_proto,
+    trigger_mutation_from_proto,
+    triggers_list_from_proto,
+)
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import id_to_int, parse_required_uint64_decimal
 from polyester.codecs.triggers import (
     create_trigger_to_proto,
     modify_trigger_to_proto,
     quantity_scale_for_symbol,
-)
-from polyester.codecs.wire_decode import (
-    decode_trigger,
-    decode_trigger_events_list,
-    decode_trigger_mutation,
-    decode_triggers_list,
 )
 from polyester.gen.triggers.v1.triggers_connect import TriggersServiceClient
 from polyester.gen.triggers.v1.triggers_pb2 import (
@@ -25,7 +25,7 @@ from polyester.gen.triggers.v1.triggers_pb2 import (
 )
 from polyester.models import Trigger, TriggerEventsList, TriggerMutationResult, TriggersList
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_auth
+from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -46,9 +46,11 @@ class AsyncTriggersService(BaseService):
         sub_account_id: str | None = None,
         symbol: str | None = None,
         limit: int = 50,
-        offset: int = 0,
+        page_token: str | None = None,
     ) -> TriggersList:
-        request = ListTriggersRequest(limit=limit, offset=offset)
+        request = ListTriggersRequest(limit=limit)
+        if page_token:
+            request.page_token = page_token
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id)
         )
@@ -56,13 +58,13 @@ class AsyncTriggersService(BaseService):
             request.subaccount_id = parsed_sub
         if symbol:
             request.symbol = symbol
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.list_triggers(req),
             request,
+            triggers_list_from_proto,
         )
-        return decode_triggers_list(data)
 
     async def get(
         self,
@@ -76,16 +78,13 @@ class AsyncTriggersService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.get_trigger(req),
             request,
+            get_trigger_from_proto,
         )
-        trigger_raw = data.get("trigger")
-        if not isinstance(trigger_raw, dict):
-            return None
-        return decode_trigger(trigger_raw)
 
     async def create(
         self,
@@ -119,13 +118,13 @@ class AsyncTriggersService(BaseService):
             post_only=post_only,
             quantity_scale=scale,
         )
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.create_trigger(req),
             request,
+            trigger_mutation_from_proto,
         )
-        return decode_trigger_mutation(data)
 
     async def cancel(
         self,
@@ -139,13 +138,13 @@ class AsyncTriggersService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.cancel_trigger(req),
             request,
+            trigger_mutation_from_proto,
         )
-        return decode_trigger_mutation(data)
 
     async def modify(
         self,
@@ -171,13 +170,13 @@ class AsyncTriggersService(BaseService):
             max_slippage_ticks=max_slippage_ticks,
             max_slippage_bps=max_slippage_bps,
         )
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.modify_trigger(req),
             request,
+            trigger_mutation_from_proto,
         )
-        return decode_trigger_mutation(data)
 
     async def pause(
         self,
@@ -191,13 +190,13 @@ class AsyncTriggersService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.pause_trigger(req),
             request,
+            trigger_mutation_from_proto,
         )
-        return decode_trigger_mutation(data)
 
     async def resume(
         self,
@@ -211,13 +210,13 @@ class AsyncTriggersService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.resume_trigger(req),
             request,
+            trigger_mutation_from_proto,
         )
-        return decode_trigger_mutation(data)
 
     async def list_events(
         self,
@@ -243,13 +242,13 @@ class AsyncTriggersService(BaseService):
                 )
             else:
                 request.before_ts_ns = int(before_ts_ns)
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.list_trigger_events(req),
             request,
+            trigger_events_list_from_proto,
         )
-        return decode_trigger_events_list(data)
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:
         return resolve_sub_account_id(value, self._default_sub_account_id)

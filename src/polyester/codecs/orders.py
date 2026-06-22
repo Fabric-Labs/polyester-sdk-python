@@ -54,7 +54,7 @@ def create_order_to_wire(
         "symbol_id": request.symbol_id,
         "side": ORDER_SIDE_TO_PROTO[request.side],
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
-        "tif": TIF_TO_PROTO.get(request.tif) if request.tif else None,
+        "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
         "qty_scaled": parse_qty_scaled(request.qty, quantity_scale),
         "limit_price_ticks": parse_price_ticks(request.price, "price") if request.price else None,
         "sub_account_id": request.sub_account_id or None,
@@ -88,7 +88,7 @@ def create_order_to_proto(
     if request.price is not None:
         proto.price_ticks = parse_price_ticks(request.price, "price")
     if request.tif:
-        proto.tif = getattr(orders_pb2, TIF_TO_PROTO[request.tif])
+        proto.time_in_force = getattr(orders_pb2, TIF_TO_PROTO[request.tif])
     if request.sub_account_id:
         proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
     if request.client_order_id:
@@ -152,6 +152,93 @@ def batch_modify_item_to_proto(
         proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
     if item.get("new_client_order_id"):
         proto.new_client_order_id = str(item["new_client_order_id"])
+    return proto
+
+
+def batch_create_orders_to_proto(
+    *,
+    items: list[CreateOrderRequest | dict[str, Any]],
+    sub_account_id: str | int | None = None,
+    request_id: str | None = None,
+    allow_partial: bool = False,
+    quantity_scale: int = 8,
+) -> orders_pb2.BatchCreateOrdersRequest:
+    if not items:
+        raise PolyesterValidationError("batch_create requires at least one item")
+    proto = orders_pb2.BatchCreateOrdersRequest(
+        request_id=request_id or f"batch-create-{uuid.uuid4().hex[:12]}",
+        allow_partial=allow_partial,
+    )
+    if sub_account_id is not None:
+        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+    for item in items:
+        if isinstance(item, CreateOrderRequest):
+            normalized = item
+        else:
+            normalized = normalize_create_order_request(item)
+        proto.items.append(create_order_to_proto(normalized, quantity_scale=quantity_scale))
+    return proto
+
+
+def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelItem:
+    order_id = item.get("order_id")
+    client_order_id = item.get("client_order_id")
+    symbol_id = item.get("symbol_id")
+    has_order_id = order_id is not None
+    has_client_order_id = bool(client_order_id)
+    if has_order_id == has_client_order_id:
+        raise PolyesterValidationError(
+            "each batch cancel item requires exactly one of order_id or client_order_id"
+        )
+    proto = orders_pb2.BatchCancelItem()
+    if order_id is not None:
+        proto.order_id = id_to_int(order_id, "order_id")
+    if client_order_id:
+        proto.client_order_id = str(client_order_id)
+    if symbol_id is not None:
+        proto.symbol_id = int(symbol_id)
+    return proto
+
+
+def batch_cancel_orders_to_proto(
+    *,
+    items: list[dict[str, Any]],
+    sub_account_id: str | int | None = None,
+    request_id: str | None = None,
+) -> orders_pb2.BatchCancelOrdersRequest:
+    if not items:
+        raise PolyesterValidationError("batch_cancel requires at least one item")
+    proto = orders_pb2.BatchCancelOrdersRequest(
+        request_id=request_id or f"batch-cancel-{uuid.uuid4().hex[:12]}",
+    )
+    if sub_account_id is not None:
+        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+    for item in items:
+        proto.items.append(batch_cancel_item_to_proto(item))
+    return proto
+
+
+def cancel_all_after_to_proto(
+    *,
+    sub_account_id: str | int | None = None,
+    timeout_sec: int,
+    symbol: str | None = None,
+    side: str | None = None,
+    request_id: str | None = None,
+) -> orders_pb2.CancelAllAfterRequest:
+    proto = orders_pb2.CancelAllAfterRequest(
+        request_id=request_id or f"cancel-after-{uuid.uuid4().hex[:12]}",
+        timeout_sec=timeout_sec,
+    )
+    if sub_account_id is not None:
+        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+    if symbol:
+        proto.symbol = symbol
+    if side:
+        key = side.lower()
+        if key not in ORDER_SIDE_TO_PROTO:
+            raise PolyesterValidationError("side must be buy or sell")
+        proto.side = getattr(orders_pb2, ORDER_SIDE_TO_PROTO[key])
     return proto
 
 

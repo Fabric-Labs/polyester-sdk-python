@@ -12,14 +12,18 @@ from polyester.services import (
     AsyncApiKeysService,
     AsyncBalancesService,
     AsyncDepositService,
+    AsyncGuardSignerService,
     AsyncHeatmapService,
     AsyncInternalTransfersService,
+    AsyncLedgerWriteService,
     AsyncLifecycleService,
     AsyncMarketDataService,
     AsyncMarketOverviewService,
     AsyncOrderbookService,
     AsyncOrdersService,
+    AsyncPoliciesService,
     AsyncResolveService,
+    AsyncSubAccountsService,
     AsyncTradesService,
     AsyncTransfersService,
     AsyncTriggersService,
@@ -93,9 +97,18 @@ class AsyncPolyester:
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
         self.api_keys = AsyncApiKeysService(self._transport, default_sub_account_id)
+        self.policies = AsyncPoliciesService(self._transport, default_sub_account_id)
+        self.sub_accounts = AsyncSubAccountsService(self._transport, default_sub_account_id)
         self.resolve = AsyncResolveService(self._transport)
         self.address_book = AsyncAddressBookService(self._transport, default_sub_account_id)
+        self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
+        self.ledger_write = AsyncLedgerWriteService(
+            self._transport,
+            default_sub_account_id,
+            default_account_id,
+        )
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
+        self.trading_withdraws = self.withdraw
         if hydrate_catalogs:
             self._catalog_task = asyncio.create_task(self._hydrate_catalogs_best_effort())
         else:
@@ -153,9 +166,14 @@ class Polyester:
         self.internal_transfers = _SyncService(self._loop, self._client.internal_transfers)
         self.deposit = _SyncService(self._loop, self._client.deposit)
         self.api_keys = _SyncService(self._loop, self._client.api_keys)
+        self.policies = _SyncService(self._loop, self._client.policies)
+        self.sub_accounts = _SyncService(self._loop, self._client.sub_accounts)
         self.resolve = _SyncService(self._loop, self._client.resolve)
         self.address_book = _SyncService(self._loop, self._client.address_book)
+        self.guard_signer = _SyncService(self._loop, self._client.guard_signer)
+        self.ledger_write = _SyncService(self._loop, self._client.ledger_write)
         self.withdraw = _SyncService(self._loop, self._client.withdraw)
+        self.trading_withdraws = self.withdraw
 
     @classmethod
     def from_env(cls, **overrides) -> Polyester:

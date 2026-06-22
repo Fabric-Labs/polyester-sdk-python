@@ -4,7 +4,10 @@ from typing import Any
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import (
+    batch_cancel_from_proto,
+    batch_create_from_proto,
     batch_modify_from_proto,
+    cancel_all_after_from_proto,
     cancel_all_from_proto,
     get_order_from_proto,
     modify_order_from_proto,
@@ -12,7 +15,10 @@ from polyester.codecs.decode.orders import (
     orders_list_from_proto,
 )
 from polyester.codecs.orders import (
+    batch_cancel_orders_to_proto,
+    batch_create_orders_to_proto,
     batch_modify_orders_to_proto,
+    cancel_all_after_to_proto,
     cancel_all_orders_to_proto,
     create_order_to_proto,
     modify_order_to_proto,
@@ -30,7 +36,10 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOrderRequest,
 )
 from polyester.models import (
+    BatchCancelOrdersResult,
+    BatchCreateOrdersResult,
     BatchModifyOrdersResult,
+    CancelAllAfterResult,
     CancelAllOrdersResult,
     CreateOrderRequest,
     GetOrderResult,
@@ -305,6 +314,75 @@ class AsyncOrdersService(BaseService):
             lambda client, req: client.batch_modify_orders(req),
             proto_request,
             batch_modify_from_proto,
+        )
+
+    async def batch_create(
+        self,
+        *,
+        items: list[CreateOrderRequest | dict],
+        sub_account_id: str | None = None,
+        symbol: str | None = None,
+        request_id: str | None = None,
+        allow_partial: bool = False,
+    ) -> BatchCreateOrdersResult:
+        scale = quantity_scale_for_symbol(self._catalogs, symbol) if symbol else 8
+        proto_request = batch_create_orders_to_proto(
+            items=items,
+            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            request_id=request_id,
+            allow_partial=allow_partial,
+            quantity_scale=scale,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            OrdersServiceClient,
+            lambda client, req: client.batch_create_orders(req),
+            proto_request,
+            batch_create_from_proto,
+        )
+
+    async def batch_cancel(
+        self,
+        *,
+        items: list[dict],
+        sub_account_id: str | None = None,
+        request_id: str | None = None,
+    ) -> BatchCancelOrdersResult:
+        proto_request = batch_cancel_orders_to_proto(
+            items=items,
+            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            request_id=request_id,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            OrdersServiceClient,
+            lambda client, req: client.batch_cancel_orders(req),
+            proto_request,
+            batch_cancel_from_proto,
+        )
+
+    async def cancel_all_after(
+        self,
+        *,
+        timeout_sec: int,
+        sub_account_id: str | None = None,
+        symbol: str | None = None,
+        side: str | None = None,
+        request_id: str | None = None,
+    ) -> CancelAllAfterResult:
+        proto_request = cancel_all_after_to_proto(
+            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            timeout_sec=timeout_sec,
+            symbol=symbol,
+            side=side,
+            request_id=request_id,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            OrdersServiceClient,
+            lambda client, req: client.cancel_all_after(req),
+            proto_request,
+            cancel_all_after_from_proto,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

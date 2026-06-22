@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.decode.balances import balances_list_from_proto, ledger_health_from_proto
+from polyester.codecs.decode.balances import (
+    balance_history_from_proto,
+    balances_list_from_proto,
+    equity_history_from_proto,
+    holds_list_from_proto,
+    ledger_health_from_proto,
+)
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.wire_decode import (
-    decode_balance_history,
-    decode_equity_history,
-    decode_holds_list,
-)
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
@@ -25,7 +26,7 @@ from polyester.models import (
     LedgerHealth,
 )
 from polyester.services._base import BaseService
-from polyester.services._generated import unary_auth, unary_auth_decoded
+from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -89,13 +90,13 @@ class AsyncBalancesService(BaseService):
             request.subaccount_id = parsed_sub
         if account_codes:
             request.account_codes.extend(account_codes)
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,
             lambda client, req: client.get_balance_history(req),
             request,
+            balance_history_from_proto,
         )
-        return decode_balance_history(data)
 
     async def get_equity_history(
         self,
@@ -116,13 +117,13 @@ class AsyncBalancesService(BaseService):
             request.subaccount_id = parsed_sub
         if account_codes:
             request.account_codes.extend(account_codes)
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,
             lambda client, req: client.get_equity_history_series(req),
             request,
+            equity_history_from_proto,
         )
-        return decode_equity_history(data)
 
     async def list_holds(
         self,
@@ -137,13 +138,13 @@ class AsyncBalancesService(BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        data = await unary_auth(
+        return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,
             lambda client, req: client.list_holds(req),
             request,
+            holds_list_from_proto,
         )
-        return decode_holds_list(data)
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:
         return resolve_sub_account_id(value, self._default_sub_account_id)

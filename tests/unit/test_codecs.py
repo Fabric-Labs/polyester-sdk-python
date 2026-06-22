@@ -82,7 +82,7 @@ def test_create_order_to_wire_maps_public_strings() -> None:
         "symbol": "BTC-USD",
         "side": "BUY",
         "order_type": "LIMIT",
-        "tif": "GTC",
+        "timeInForce": "GTC",
         "qty_scaled": 10_000_000,
         "limit_price_ticks": 50_000_000_000,
     }

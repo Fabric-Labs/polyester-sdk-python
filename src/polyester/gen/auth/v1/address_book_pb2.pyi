@@ -630,3 +630,11 @@ class GetAddressBookViewResponse(_message.Message):
     withdraw_whitelist: WithdrawWhitelistView
     recent_destinations_truncated: bool
     def __init__(self, books: _Optional[_Iterable[_Union[AddressBook, _Mapping]]] = ..., entries: _Optional[_Union[AddressBookEntriesView, _Mapping]] = ..., recent_destinations: _Optional[_Union[AddressBookRecentDestinationsView, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTagSummary, _Mapping]]] = ..., withdraw_whitelist: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ..., recent_destinations_truncated: _Optional[bool] = ...) -> None: ...
+
+class AddressBookViewInvalidated(_message.Message):
+    __slots__ = ("scope", "invalidated_at")
+    SCOPE_FIELD_NUMBER: _ClassVar[int]
+    INVALIDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    scope: AccountScopeRef
+    invalidated_at: _timestamp_pb2.Timestamp
+    def __init__(self, scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., invalidated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...

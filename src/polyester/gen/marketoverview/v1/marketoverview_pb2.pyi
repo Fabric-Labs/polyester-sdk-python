@@ -22,7 +22,7 @@ class SparklineInterval(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
 class MarketOrderBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     MARKET_ORDER_BY_UNSPECIFIED: _ClassVar[MarketOrderBy]
-    ORDER_BY_CHANGE_24H_BP: _ClassVar[MarketOrderBy]
+    ORDER_BY_CHANGE_24H_BPS: _ClassVar[MarketOrderBy]
     ORDER_BY_VOLUME_24H_QUOTE: _ClassVar[MarketOrderBy]
     ORDER_BY_LAST_PRICE: _ClassVar[MarketOrderBy]
     ORDER_BY_DATE_ADDED: _ClassVar[MarketOrderBy]
@@ -47,7 +47,7 @@ SPARKLINE_24H: SparklineInterval
 SPARKLINE_1W: SparklineInterval
 SPARKLINE_1M: SparklineInterval
 MARKET_ORDER_BY_UNSPECIFIED: MarketOrderBy
-ORDER_BY_CHANGE_24H_BP: MarketOrderBy
+ORDER_BY_CHANGE_24H_BPS: MarketOrderBy
 ORDER_BY_VOLUME_24H_QUOTE: MarketOrderBy
 ORDER_BY_LAST_PRICE: MarketOrderBy
 ORDER_BY_DATE_ADDED: MarketOrderBy
@@ -76,12 +76,12 @@ class Sparkline(_message.Message):
     def __init__(self, interval: _Optional[_Union[SparklineInterval, str]] = ..., close_ticks: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class MarketOverview(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "last_price_ticks", "last_trade_ts_ns", "change_24h_bp", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines")
+    __slots__ = ("symbol_id", "symbol", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     LAST_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     LAST_TRADE_TS_NS_FIELD_NUMBER: _ClassVar[int]
-    CHANGE_24H_BP_FIELD_NUMBER: _ClassVar[int]
+    CHANGE_24H_BPS_FIELD_NUMBER: _ClassVar[int]
     HIGH_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
     LOW_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
     VOLUME_24H_BASE_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -96,7 +96,7 @@ class MarketOverview(_message.Message):
     symbol: str
     last_price_ticks: int
     last_trade_ts_ns: int
-    change_24h_bp: int
+    change_24h_bps: int
     high_24h_ticks: int
     low_24h_ticks: int
     volume_24h_base_scaled: int
@@ -107,7 +107,7 @@ class MarketOverview(_message.Message):
     best_ask_ticks: int
     best_ask_qty_scaled: int
     sparklines: _containers.RepeatedCompositeFieldContainer[Sparkline]
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bp: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ...) -> None: ...
 
 class ListMarketOverviewRequest(_message.Message):
     __slots__ = ("symbols", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals")

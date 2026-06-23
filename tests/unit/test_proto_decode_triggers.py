@@ -58,6 +58,15 @@ def test_trigger_mutation_from_proto() -> None:
     assert result.status == "created"
 
 
+def test_trigger_status_cancelled_matches_typescript() -> None:
+    msg = triggers_pb2.CancelTriggerResponse(
+        trigger_id=9,
+        status=triggers_pb2.STATUS_CANCELED,
+    )
+    result = trigger_mutation_from_proto(msg)
+    assert result.status == "cancelled"
+
+
 def test_trigger_events_list_from_proto() -> None:
     msg = triggers_pb2.ListTriggerEventsResponse(
         events=[

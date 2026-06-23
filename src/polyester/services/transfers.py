@@ -2,18 +2,30 @@ from __future__ import annotations
 
 from polyester.codecs.decode.transfers import transfers_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_ledger_transfer_bytes
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import ListTransfersRequest
-from polyester.models import TransfersList
+from polyester.models import LedgerTransfer, TransfersList
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
 class AsyncTransfersService(BaseService):
-    def __init__(self, transport, default_sub_account_id: str | None) -> None:
+    def __init__(
+        self,
+        transport,
+        default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list(
         self,
@@ -37,6 +49,19 @@ class AsyncTransfersService(BaseService):
             lambda client, req: client.list_transfers(req),
             request,
             transfers_list_from_proto,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[LedgerTransfer]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:ledger:transfers:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_ledger_transfer_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

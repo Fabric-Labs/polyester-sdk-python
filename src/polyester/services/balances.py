@@ -10,6 +10,7 @@ from polyester.codecs.decode.balances import (
 )
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_asset_balance_bytes
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
@@ -19,14 +20,17 @@ from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     ListHoldsRequest,
 )
 from polyester.models import (
+    AssetBalance,
     BalanceHistory,
     BalancesList,
     EquityHistory,
     HoldsList,
     LedgerHealth,
 )
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -37,11 +41,14 @@ class AsyncBalancesService(BaseService):
         catalogs: CatalogManager | None = None,
         default_sub_account_id: str | None = None,
         default_account_id: str | int | None = None,
+        *,
+        realtime: AsyncRealtimeClient | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs or CatalogManager()
         self._default_sub_account_id = default_sub_account_id
         self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def get_health(self) -> LedgerHealth:
         return await unary_auth_decoded(
@@ -144,6 +151,19 @@ class AsyncBalancesService(BaseService):
             lambda client, req: client.list_holds(req),
             request,
             holds_list_from_proto,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[AssetBalance]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:ledger:balances:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_asset_balance_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

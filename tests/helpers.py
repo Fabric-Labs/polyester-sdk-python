@@ -189,3 +189,14 @@ def devnet_order_skip_message() -> str:
         "Devnet order placement returned INTERNAL_ERROR for ETH-USDT USDT-funded buys; "
         "check OMS on devnet"
     )
+
+
+def devnet_order_read_index_skip_message() -> str:
+    return (
+        "Devnet order create returned accepted but orders read APIs never indexed the "
+        "order (get/list_open); check OMS read path on devnet"
+    )
+
+
+class DevnetOrderNotIndexedError(AssertionError):
+    """Create accepted but orders read never returned the order within the wait window."""

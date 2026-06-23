@@ -22,6 +22,7 @@ from polyester.codecs.decode.address_book import (
     withdraw_whitelist_view_from_get_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_address_book_invalidation_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.gen.auth.v1.address_book_connect import AddressBookServiceClient
 from polyester.gen.auth.v1.address_book_pb2 import (
@@ -51,15 +52,27 @@ from polyester.models.address_book import (
     TransferCounterpartiesList,
     WithdrawWhitelistView,
 )
+from polyester.models.realtime import AddressBookViewInvalidation
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
 class AsyncAddressBookService(BaseService):
-    def __init__(self, transport, default_sub_account_id: str | None) -> None:
+    def __init__(
+        self,
+        transport,
+        default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list_books(self) -> AddressBooksList:
         return await unary_auth_decoded(
@@ -384,6 +397,19 @@ class AsyncAddressBookService(BaseService):
             lambda client, req: client.get_address_book_view(req),
             request,
             address_book_view_from_proto,
+        )
+
+    async def subscribe_view_invalidations(
+        self,
+        *,
+        root_account_public_id: str | int | None = None,
+    ) -> AsyncSubscription[AddressBookViewInvalidation]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:auth:address-books:{account_id}:proto",
+            account_id=root_account_public_id,
+            default_account_id=self._default_account_id,
+            decode=decode_address_book_invalidation_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

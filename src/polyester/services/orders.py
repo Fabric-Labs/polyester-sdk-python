@@ -26,6 +26,7 @@ from polyester.codecs.orders import (
     parse_optional_subaccount_id,
     quantity_scale_for_symbol,
 )
+from polyester.codecs.realtime_decode import decode_order_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
@@ -44,11 +45,14 @@ from polyester.models import (
     CreateOrderRequest,
     GetOrderResult,
     ModifyOrderResult,
+    Order,
     OrderMutationResult,
     OrdersList,
 )
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 from polyester.services._symbols import resolve_symbol_id
 
@@ -59,10 +63,15 @@ class AsyncOrdersService(BaseService):
         transport,
         catalogs: CatalogManager,
         default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list_open(
         self,
@@ -383,6 +392,20 @@ class AsyncOrdersService(BaseService):
             lambda client, req: client.cancel_all_after(req),
             proto_request,
             cancel_all_after_from_proto,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[Order]:
+        """Subscribe to private order updates for an account."""
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:spot:orders:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_order_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

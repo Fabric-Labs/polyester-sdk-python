@@ -8,7 +8,7 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 
 | TypeScript | Python | Status | Notes |
 | --- | --- | --- | --- |
-| `PolyesterClient` | `AsyncPolyester` | Partial | Service tree + generated Connect clients; realtime v0 (public trades). |
+| `PolyesterClient` | `AsyncPolyester` | Partial | Full service tree + realtime subscribe surface; orderbook book builder TBD. |
 | `PolyesterServerClient` | `Polyester` | Partial | Sync facade over async client. |
 | `PolyesterBrowserClient` | — | Omitted | API-key-only Python SDK. |
 | JWT/session auth | — | Omitted | |
@@ -18,43 +18,45 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 
 | Service | Status | Implemented | Missing |
 | --- | --- | --- | --- |
-| `marketData` / `market_data` | Partial | `get_spot_config`, `get_trades`, `get_candles`, `get_candles_columns`, `subscribe_trades` | Private streams, maintained catalog models. |
-| `candles` (TS service) | Partial | `client.candles` alias → `market_data` candle methods | `subscribe` stream. |
-| `orderbook` | Partial | `get` (generated) | Delta stream, local book. |
-| `orders` | Partial | `list_open`, `list_history`, `get`, `create`, `cancel`, `modify`, `cancel_all` | Streams, batch modify. |
-| `trades` | Partial | `list` (user trades) | Private trade stream. |
-| `balances` | Partial | `list`, `get_balance_history`, `get_equity_history`, `list_holds` | Funding→trading is on-chain (not SDK); trading→funding via `trading_withdraws`; private stream. |
-| `tradingWithdraws` / `trading_withdraws` | Partial | `create_to_funding`, `create_to_external_chain` | Requires signed intent payload; no wallet helper in API-key SDK. |
-| `ledger_write` | Partial | `transfer_trading_to_trading`, funding-user transfer, withdraw reserve/release | Devnet route may be unmounted. |
-| `triggers` | Partial | `list`, `get`, `create`, `cancel`, `modify`, `pause`, `resume`, `list_events` | Streams. |
-| `transfers` | Partial | `list` (ledger transfers) | Private stream. |
+| `market_data` / `candles` | Partial | spot config, trades, candles, `subscribe_trades`, `subscribe_candles` | Snapshot-then-stream market overview merge helper |
+| `orderbook` | Partial | `get`, `subscribe_deltas` | Stateful local book (`createSubscription`) |
+| `orders` | Partial | CRUD, batch, `subscribe` | |
+| `trades` | Partial | `list`, `subscribe` | |
+| `balances` | Partial | list/history/equity/holds, `subscribe` | Funding→trading on-chain only |
+| `triggers` | Partial | CRUD, `subscribe`, `subscribe_events` | |
+| `transfers` | Partial | `list`, `subscribe` | |
+| `market_overview` | Partial | `list`, `subscribe` | TS snapshot-then-stream merge on subscribe |
+| `heatmap` | Partial | `get`, `subscribe_live` | |
+| `lifecycle` | Partial | list/get, `subscribe_open_flows`, `subscribe_flow_detail` | |
+| `zipper` | Partial | config, `subscribe_zipped_asset_supply` | Typed catalog models |
+| `chain_analytics` | Done | supply + unified balances RPCs | |
+| `trading_withdraws` | Partial | signed intent withdraws | Wallet helper in API-key SDK |
+| `ledger_write` | Partial | four transfer/reserve RPCs | Devnet route may be unmounted |
 | `internal_transfers` | Partial | `create` | |
-| `deposit` | Partial | `list_addresses`, `create_address` | Withdraw service. |
-| `marketOverview` / `market_overview` | Partial | `list` (typed) | `subscribe` stream. |
-| `heatmap` | Partial | `get` | `subscribe_live`. |
-| `lifecycle` | Partial | `list_flows`, `get_flow`, `get_flow_by_tx` | Public lifecycle streams. |
-| `zipper` | Partial | `get_deposit_withdraw_config` | Typed asset/chain models; supply stream. |
-| `chainAnalytics` / `chain_analytics` | Done | `get_zipped_asset_supply`, `get_zipped_asset_supply_group`, `get_unified_asset_balances` | |
-| `echo` | Partial | `echo` | Devnet may not mount service. |
+| `deposit` | Partial | `list_addresses`, `create_address` | |
 
 ## Realtime
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Public market trades | Partial | `market_data.subscribe_trades` via Centrifugo JSON + protobuf decode. |
-| Private orders/balances | Planned | Needs API-key RT token endpoints confirmed. |
-| Orderbook deltas | Planned | |
+| API-key RT auth | Done | `/v1/rt/token` + `/v1/rt/subscribe` signed GET |
+| Private trading streams | Partial | orders, balances, trades, transfers, triggers (+ events) |
+| Private admin streams | Partial | api_keys, sub_accounts, policies, address_book invalidations |
+| Public market streams | Partial | trades, candles, heatmap, market_overview, orderbook deltas |
+| Public chain streams | Partial | lifecycle flows, zipper supply, identity updates |
+| Orderbook local book | Planned | TS `createSubscription` snapshot+delta merge |
+| Market overview merge | Planned | TS snapshot-then-stream on subscribe |
 
 ## Account And Admin
 
 | Service | Status | Notes |
 | --- | --- | --- |
-| `accounts` | Done | `client.accounts` → `resolve.resolve_account` |
-| `auth` / `profile` | Partial | `auth.me`, `auth.profile.get/update/get_username_history` | `subscribeIdentity` stream |
-| `api_keys` | Partial | Full CRUD + `generate_keypair` | `subscribe` stream; create may need step-up |
-| `policies.*` | Done | Subaccount + API key policy CRUD |
-| `sub_accounts` | Partial | Full CRUD incl. `delete` | `subscribe` streams |
-| `address_book` | Done | Full CRUD + views |
+| `accounts` / `resolve` | Done | `client.accounts` alias |
+| `auth` / `profile` | Partial | `me`, profile CRUD, `subscribe_identity` |
+| `api_keys` | Partial | CRUD, `generate_keypair`, `subscribe` |
+| `sub_accounts` | Partial | CRUD, `subscribe`, `subscribe_api_keys` |
+| `policies` | Partial | CRUD, `subscribe_subaccount_policies` |
+| `address_book` | Partial | CRUD, `subscribe_view_invalidations` |
 | `guard_signer` | Done | Wallet lifecycle + signing |
 | `socialVerification` / `social_verification` | Done | `start`, `mark_ready`, `get` |
 | `whiteboard` | Done | CRUD, ACL, archive, join token |
@@ -79,7 +81,6 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 
 ## Current Blockers
 
-- Default wire format is still JSON; flip to binary protobuf for production parity with TS.
-- Expand smoke coverage as new authenticated services land.
-- Orderbook snapshot availability per symbol on devnet.
-- Realtime private channels need API-key token endpoint confirmation.
+- Orderbook stateful subscription (snapshot + gap recovery) not yet ported from TS.
+- Market overview `subscribe` emits raw batches; TS merges into a live map with snapshot prefetch.
+- MFA service blocked on API-key step-up.

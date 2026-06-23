@@ -8,6 +8,7 @@ from polyester.codecs.decode.triggers import (
     triggers_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_bytes
 from polyester.codecs.scalars import id_to_int, parse_required_uint64_decimal
 from polyester.codecs.triggers import (
     create_trigger_to_proto,
@@ -23,9 +24,17 @@ from polyester.gen.triggers.v1.triggers_pb2 import (
     PauseTriggerRequest,
     ResumeTriggerRequest,
 )
-from polyester.models import Trigger, TriggerEventsList, TriggerMutationResult, TriggersList
+from polyester.models import (
+    Trigger,
+    TriggerEvent,
+    TriggerEventsList,
+    TriggerMutationResult,
+    TriggersList,
+)
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -35,10 +44,15 @@ class AsyncTriggersService(BaseService):
         transport,
         catalogs: CatalogManager,
         default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list(
         self,
@@ -248,6 +262,32 @@ class AsyncTriggersService(BaseService):
             lambda client, req: client.list_trigger_events(req),
             request,
             trigger_events_list_from_proto,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[Trigger]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:spot:triggers:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_trigger_bytes,
+        )
+
+    async def subscribe_events(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[TriggerEvent]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:spot:triggers:events:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_trigger_event_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

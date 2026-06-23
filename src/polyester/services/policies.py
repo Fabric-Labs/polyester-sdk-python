@@ -14,6 +14,7 @@ from polyester.codecs.decode.policies import (
     update_subaccount_policy_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_subaccount_policy_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import policies_pb2
@@ -40,8 +41,10 @@ from polyester.models.policies import (
     SubaccountPoliciesList,
     SubaccountPolicy,
 )
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -97,9 +100,18 @@ def _perp_markets_to_proto(values: list[dict[str, Any]] | None) -> list[PerpMark
 
 
 class AsyncPoliciesService(BaseService):
-    def __init__(self, transport, default_sub_account_id: str | None) -> None:
+    def __init__(
+        self,
+        transport,
+        default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list_subaccount_policies(self) -> SubaccountPoliciesList:
         return await unary_auth_decoded(
@@ -420,6 +432,19 @@ class AsyncPoliciesService(BaseService):
                 policy_id=id_to_int(policy_id, "policy_id"),
             ),
             lambda _msg: None,
+        )
+
+    async def subscribe_subaccount_policies(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[SubaccountPolicy]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:auth:subaccount-policies:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_subaccount_policy_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

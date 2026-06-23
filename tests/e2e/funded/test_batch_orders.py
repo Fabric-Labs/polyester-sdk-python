@@ -6,7 +6,12 @@ from tests.e2e.helpers import (
     wait_for_no_open_order,
     wait_for_open_order,
 )
-from tests.helpers import batch_results_are_all_internal_error, devnet_order_skip_message
+from tests.helpers import (
+    DevnetOrderNotIndexedError,
+    batch_results_are_all_internal_error,
+    devnet_order_read_index_skip_message,
+    devnet_order_skip_message,
+)
 
 
 @pytest.mark.integration
@@ -53,8 +58,11 @@ async def test_batch_create_and_cancel(
     assert not results_by_cid[cid1].code
     assert not results_by_cid[cid2].code
 
-    await wait_for_open_order(live_client, cid1)
-    await wait_for_open_order(live_client, cid2)
+    try:
+        await wait_for_open_order(live_client, cid1)
+        await wait_for_open_order(live_client, cid2)
+    except DevnetOrderNotIndexedError:
+        pytest.skip(devnet_order_read_index_skip_message())
 
     symbol_id = live_client.catalogs.symbol_id_for_symbol(smoke_symbol)
     try:

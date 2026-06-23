@@ -11,6 +11,7 @@ from polyester.codecs.decode.sub_accounts import (
     subaccounts_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_api_key_bytes, decode_subaccount_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import subaccounts_pb2
@@ -35,14 +36,18 @@ from polyester.gen.auth.v1.subaccounts_pb2 import (
 from polyester.models.sub_accounts import (
     CreateSubaccountResult,
     GetSubaccountResult,
+    SubAccount,
     SubAccountActivityList,
     SubAccountInvite,
     SubAccountInvitesList,
     SubAccountMembersList,
     SubAccountsList,
 )
+from polyester.models.trading import ApiKeySummary
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
@@ -74,9 +79,18 @@ def _invite_action_to_proto(value: str) -> int:
 
 
 class AsyncSubAccountsService(BaseService):
-    def __init__(self, transport, default_sub_account_id: str | None) -> None:
+    def __init__(
+        self,
+        transport,
+        default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list(self) -> SubAccountsList:
         return await unary_auth_decoded(
@@ -338,6 +352,32 @@ class AsyncSubAccountsService(BaseService):
             lambda client, req: client.list_subaccount_activity(req),
             request,
             subaccount_activity_list_from_proto,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[SubAccount]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:auth:subaccounts:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_subaccount_bytes,
+        )
+
+    async def subscribe_api_keys(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[ApiKeySummary]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:auth:api-keys:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_api_key_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

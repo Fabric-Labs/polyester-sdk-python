@@ -11,6 +11,7 @@ from polyester.codecs.heatmap import (
     QTY_MODE_ALIASES,
     depth_to_proto_name,
 )
+from polyester.codecs.realtime_decode import decode_heatmap_live_bucket_bytes
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1.heatmap_connect import HeatmapServiceClient
 from polyester.gen.marketdata.v1.heatmap_pb2 import (
@@ -18,15 +19,24 @@ from polyester.gen.marketdata.v1.heatmap_pb2 import (
     HeatmapTimeRange,
 )
 from polyester.models import ApiData
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
+from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
 
 
 class AsyncHeatmapService(BaseService):
-    def __init__(self, transport, catalogs: CatalogManager | None = None) -> None:
+    def __init__(
+        self,
+        transport,
+        catalogs: CatalogManager | None = None,
+        *,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
+        self._realtime = realtime
 
     async def get(
         self,
@@ -103,6 +113,27 @@ class AsyncHeatmapService(BaseService):
             lambda client, req: client.get_orderbook_heatmap(req),
             request,
             heatmap_from_proto,
+        )
+
+    async def subscribe_live(
+        self,
+        *,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
+        interval: str = "1s",
+    ) -> AsyncSubscription[ApiData]:
+        resolved_symbol_id = resolve_symbol_id(
+            self._catalogs,
+            symbol=symbol,
+            symbol_id=symbol_id,
+            label="heatmap.subscribe_live",
+        )
+        interval_name = INTERVAL_ALIASES.get(interval, interval.lower())
+        channel = f"public:spot:market:heatmap:{interval_name}:{resolved_symbol_id}:proto"
+        return await subscribe_public_proto(
+            self._realtime,
+            channel=channel,
+            decode=decode_heatmap_live_bucket_bytes,
         )
 
 

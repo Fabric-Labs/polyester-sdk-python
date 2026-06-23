@@ -31,7 +31,7 @@ class TransportConfig:
     api_url: str
     timeout: float = 10.0
     max_retries: int = 2
-    wire_format: WireFormat = "json"
+    wire_format: WireFormat = "binary"
 
 
 class TransportFactory:

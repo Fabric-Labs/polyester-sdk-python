@@ -6,7 +6,12 @@ from tests.e2e.helpers import (
     wait_for_no_open_order,
     wait_for_open_order,
 )
-from tests.helpers import devnet_order_skip_message, is_devnet_order_internal_error
+from tests.helpers import (
+    DevnetOrderNotIndexedError,
+    devnet_order_read_index_skip_message,
+    devnet_order_skip_message,
+    is_devnet_order_internal_error,
+)
 
 
 @pytest.mark.integration
@@ -36,7 +41,10 @@ async def test_order_round_trip(
     assert created.client_order_id == client_order_id
     assert created.order_id
 
-    open_order = await wait_for_open_order(live_client, client_order_id)
+    try:
+        open_order = await wait_for_open_order(live_client, client_order_id)
+    except DevnetOrderNotIndexedError:
+        pytest.skip(devnet_order_read_index_skip_message())
     assert open_order.client_order_id == client_order_id
     assert open_order.order_id == created.order_id
     assert open_order.status

@@ -11,6 +11,40 @@ from polyester.models import (
     TriggersList,
 )
 
+# Match TypeScript TriggerStatusCodec.protoToOutput (British "cancelled" for status).
+_TRIGGER_STATUS_LABELS: dict[int, str] = {
+    triggers_pb2.STATUS_CREATED: "created",
+    triggers_pb2.STATUS_ARMED: "armed",
+    triggers_pb2.STATUS_RUNNING: "running",
+    triggers_pb2.STATUS_COMPLETED: "completed",
+    triggers_pb2.STATUS_CANCELED: "cancelled",
+    triggers_pb2.STATUS_FAILED: "failed",
+    triggers_pb2.STATUS_PAUSED: "paused",
+}
+
+# Match TypeScript TriggerEventTypeCodec.protoToOutput (American "canceled" for events).
+_TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
+    triggers_pb2.EVENT_FIRED: "fired",
+    triggers_pb2.EVENT_CANCELED: "canceled",
+    triggers_pb2.EVENT_UPDATED: "updated",
+}
+
+
+def _trigger_status_label(value: int) -> str:
+    if value == 0:
+        return ""
+    return _TRIGGER_STATUS_LABELS.get(
+        value, proto_enum_name(triggers_pb2.TriggerStatus, value)
+    )
+
+
+def _trigger_event_type_label(value: int) -> str:
+    if value == 0:
+        return ""
+    return _TRIGGER_EVENT_TYPE_LABELS.get(
+        value, proto_enum_name(triggers_pb2.TriggerEventType, value)
+    )
+
 
 def _trigger_price_ticks(msg: triggers_pb2.Trigger) -> str:
     if has_field(msg, "stop") and msg.stop.trigger_price_ticks:
@@ -24,7 +58,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger) -> Trigger:
         symbol_id=int(msg.symbol_id),
         symbol=msg.symbol,
         trigger_type=proto_enum_name(triggers_pb2.TriggerType, msg.trigger_type),
-        status=proto_enum_name(triggers_pb2.TriggerStatus, msg.status),
+        status=_trigger_status_label(msg.status),
         side=proto_enum_name(orders_pb2.Side, msg.side),
         qty_scaled=str(msg.qty_scaled),
         trigger_price_ticks=_trigger_price_ticks(msg),
@@ -52,7 +86,7 @@ def trigger_mutation_from_proto(
 ) -> TriggerMutationResult:
     return TriggerMutationResult(
         trigger_id=format_uint64_id(msg.trigger_id),
-        status=proto_enum_name(triggers_pb2.TriggerStatus, msg.status),
+        status=_trigger_status_label(msg.status),
     )
 
 
@@ -61,7 +95,7 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
         trigger_id=format_uint64_id(msg.trigger_id),
         symbol_id=int(msg.symbol_id),
         trigger_type=proto_enum_name(triggers_pb2.TriggerType, msg.trigger_type),
-        event_type=proto_enum_name(triggers_pb2.TriggerEventType, msg.event_type),
+        event_type=_trigger_event_type_label(msg.event_type),
         ts_ns=str(msg.ts_ns),
         fire_px_ticks=str(msg.fire_price_ticks),
         reason=msg.reason,

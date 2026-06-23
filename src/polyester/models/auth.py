@@ -38,6 +38,13 @@ class UsernameHistoryList(msgspec.Struct, kw_only=True, omit_defaults=True):
     history: list[UsernameHistoryEntry] = msgspec.field(default_factory=list)
 
 
+class AccountIdentity(msgspec.Struct, kw_only=True, omit_defaults=True):
+    account_id: str = ""
+    username: str = ""
+    avatar_url: str = ""
+    root_smart_account_address: str = ""
+
+
 class Ed25519Keypair(msgspec.Struct, kw_only=True):
     public_key_hex: str
     public_key: bytes

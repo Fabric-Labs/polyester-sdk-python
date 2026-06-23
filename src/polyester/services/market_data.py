@@ -10,6 +10,7 @@ from polyester.codecs.decode.market_data import (
     candles_from_proto,
     market_trades_from_proto,
 )
+from polyester.codecs.realtime_decode import decode_candle_point_bytes
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import (
@@ -18,9 +19,10 @@ from polyester.gen.marketdata.v1.marketdata_pb2 import (
     GetTradesRequest,
 )
 from polyester.models import Candle, CandlesResult, MarketTradesResult, SpotConfig
-from polyester.realtime.client import AsyncRealtimeClient
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public, unary_public_decoded
+from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
 
 TIMEFRAME_ALIASES: dict[str, str] = {
@@ -179,6 +181,29 @@ class AsyncMarketDataService(BaseService):
             label="subscribe_trades",
         )
         return self._realtime.subscribe_market_trades(resolved_symbol_id)
+
+    async def subscribe_candles(
+        self,
+        *,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
+        timeframe: str = "1m",
+    ) -> AsyncSubscription[Candle]:
+        resolved_symbol_id = resolve_symbol_id(
+            self._catalogs,
+            symbol=symbol,
+            symbol_id=symbol_id,
+            label="subscribe_candles",
+        )
+        channel = f"public:spot:market:candles:{timeframe}:{resolved_symbol_id}:proto"
+        return await subscribe_public_proto(
+            self._realtime,
+            channel=channel,
+            decode=decode_candle_point_bytes(
+                symbol_id=resolved_symbol_id,
+                timeframe=timeframe,
+            ),
+        )
 
 
 def _build_candles_request(

@@ -22,7 +22,7 @@ Living snapshot of what `polyester-sdk` exposes today.
 | `zipper` | Done | `get_deposit_withdraw_config` |
 | `lifecycle` | Done | `list_flows`, `get_flow`, `get_flow_by_tx`, `list_flows_by_tx` |
 | `balances` | Done | list, history, equity, holds, `get_health` |
-| `orders` | Done | CRUD, `cancel_all`, `batch_modify`, `batch_create`, `batch_cancel`, `cancel_all_after` |
+| `orders` | Done | CRUD, `cancel_all`, `batch_modify`, `batch_create`, `batch_cancel`, `cancel_all_after`, `subscribe` |
 | `trades` | Done | `list` |
 | `triggers` | Done | Full CRUD + events |
 | `transfers` | Done | `list` |
@@ -59,6 +59,6 @@ Living snapshot of what `polyester-sdk` exposes today.
 
 ## Planned next
 
-- Private realtime (orders, balances, transfers)
-- Default binary Connect wire
-- `market_overview.subscribe`, `heatmap.subscribe_live`
+- Orderbook `create_subscription` with snapshot + delta merge (TS parity)
+- Market overview snapshot-then-stream merge on `subscribe`
+- MFA (blocked on API-key step-up)

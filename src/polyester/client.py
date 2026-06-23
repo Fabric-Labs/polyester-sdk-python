@@ -54,7 +54,7 @@ class AsyncPolyester:
         default_account_id: str | int | None = None,
         timeout: float = 10.0,
         max_retries: int = 2,
-        wire_format: Literal["binary", "json"] = "json",
+        wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
     ) -> None:
         self.api_url = api_url
@@ -75,8 +75,13 @@ class AsyncPolyester:
             ),
             credentials=credentials,
         )
-        self.realtime = AsyncRealtimeClient(ws_url)
-        self.auth = AsyncAuthService(self._transport)
+        self.realtime = AsyncRealtimeClient(
+            ws_url,
+            api_url=api_url,
+            credentials=credentials,
+            http=self._transport.public_http,
+        )
+        self.auth = AsyncAuthService(self._transport, realtime=self.realtime)
         self.chain_analytics = AsyncChainAnalyticsService(self._transport)
         self.market_data = AsyncMarketDataService(
             self._transport,
@@ -84,33 +89,82 @@ class AsyncPolyester:
             realtime=self.realtime,
         )
         self.candles = self.market_data
-        self.market_overview = AsyncMarketOverviewService(self._transport)
-        self.zipper = AsyncZipperService(self._transport)
-        self.heatmap = AsyncHeatmapService(self._transport, self.catalogs)
-        self.lifecycle = AsyncLifecycleService(self._transport)
+        self.market_overview = AsyncMarketOverviewService(
+            self._transport,
+            realtime=self.realtime,
+        )
+        self.zipper = AsyncZipperService(self._transport, realtime=self.realtime)
+        self.heatmap = AsyncHeatmapService(
+            self._transport,
+            self.catalogs,
+            realtime=self.realtime,
+        )
+        self.lifecycle = AsyncLifecycleService(self._transport, realtime=self.realtime)
         self.balances = AsyncBalancesService(
             self._transport,
             self.catalogs,
             default_sub_account_id,
             default_account_id,
+            realtime=self.realtime,
         )
-        self.orderbook = AsyncOrderbookService(self._transport)
-        self.orders = AsyncOrdersService(self._transport, self.catalogs, default_sub_account_id)
-        self.trades = AsyncTradesService(self._transport, self.catalogs, default_sub_account_id)
+        self.orderbook = AsyncOrderbookService(self._transport, realtime=self.realtime)
+        self.orders = AsyncOrdersService(
+            self._transport,
+            self.catalogs,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
+        self.trades = AsyncTradesService(
+            self._transport,
+            self.catalogs,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
         self.triggers = AsyncTriggersService(
-            self._transport, self.catalogs, default_sub_account_id
+            self._transport,
+            self.catalogs,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
         )
-        self.transfers = AsyncTransfersService(self._transport, default_sub_account_id)
+        self.transfers = AsyncTransfersService(
+            self._transport,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
         self.internal_transfers = AsyncInternalTransfersService(
             self._transport, self.catalogs, default_sub_account_id
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
-        self.api_keys = AsyncApiKeysService(self._transport, default_sub_account_id)
-        self.policies = AsyncPoliciesService(self._transport, default_sub_account_id)
-        self.sub_accounts = AsyncSubAccountsService(self._transport, default_sub_account_id)
+        self.api_keys = AsyncApiKeysService(
+            self._transport,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
+        self.policies = AsyncPoliciesService(
+            self._transport,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
+        self.sub_accounts = AsyncSubAccountsService(
+            self._transport,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
         self.resolve = AsyncResolveService(self._transport)
         self.accounts = self.resolve
-        self.address_book = AsyncAddressBookService(self._transport, default_sub_account_id)
+        self.address_book = AsyncAddressBookService(
+            self._transport,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+        )
         self.social_verification = AsyncSocialVerificationService(self._transport)
         self.whiteboard = AsyncWhiteboardService(self._transport)
         self.polychart = AsyncPolychartService(self._transport)

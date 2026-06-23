@@ -6,6 +6,7 @@ from polyester.codecs.decode.lifecycle import (
     flows_by_tx_list_from_proto,
     flows_list_from_proto,
 )
+from polyester.codecs.realtime_decode import decode_flow_detail_bytes, decode_flow_summary_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.lifecycle.v1.lifecycle_read_connect import LifecycleReadServiceClient
@@ -15,11 +16,17 @@ from polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2 import (
     ListFlowsRequest,
 )
 from polyester.models import LifecycleFlowsList, LifecycleFlowSummary
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto, subscribe_public_proto
 
 
 class AsyncLifecycleService(BaseService):
+    def __init__(self, transport, *, realtime: AsyncRealtimeClient | None = None) -> None:
+        super().__init__(transport)
+        self._realtime = realtime
+
     async def list_flows(
         self,
         *,
@@ -123,4 +130,37 @@ class AsyncLifecycleService(BaseService):
             lambda client, req: client.list_flows_by_tx(req),
             request,
             flows_by_tx_list_from_proto,
+        )
+
+    async def subscribe_open_flows(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[LifecycleFlowSummary]:
+        if account_id is not None and str(account_id).strip():
+            return await subscribe_account_proto(
+                self._realtime,
+                channel_template="private:chain:lifecycle:flows:{account_id}:proto",
+                account_id=account_id,
+                default_account_id=None,
+                decode=decode_flow_summary_bytes,
+            )
+        return await subscribe_public_proto(
+            self._realtime,
+            channel="public:chain:lifecycle:flows:proto",
+            decode=decode_flow_summary_bytes,
+        )
+
+    async def subscribe_flow_detail(
+        self,
+        *,
+        flow_id: str,
+    ) -> AsyncSubscription[LifecycleFlowSummary]:
+        if not flow_id.strip():
+            raise PolyesterValidationError("flow_id is required")
+        channel = f"public:chain:lifecycle:flow:{flow_id}:proto"
+        return await subscribe_public_proto(
+            self._realtime,
+            channel=channel,
+            decode=decode_flow_detail_bytes,
         )

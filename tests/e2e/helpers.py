@@ -4,7 +4,9 @@ import asyncio
 import os
 import uuid
 
+from polyester.errors import PolyesterApiError
 from tests.helpers import (
+    DevnetOrderNotIndexedError,
     FAR_ABOVE_BUY_STOP_PRICE_HINTS,
     FAR_BELOW_BUY_PRICE_HINTS,
     min_base_qty_for_pair,
@@ -57,17 +59,43 @@ def unique_client_order_id(prefix: str = "test") -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
+_OPEN_ORDER_STATUSES = frozenset({"pending", "working", "pending_cancel"})
+_TERMINAL_ORDER_STATUSES = frozenset({"canceled", "rejected", "filled"})
+
+
 async def wait_for_open_order(
-    client, client_order_id: str, *, limit: int = 50, timeout: float = 10
+    client, client_order_id: str, *, limit: int = 50, timeout: float = 15
 ):
+    """Wait until an order is open; poll get first (devnet list_open can lag)."""
     attempts = max(1, int(timeout / 0.5))
+    last_status: str | None = None
     for _ in range(attempts):
+        try:
+            detail = await client.orders.get(client_order_id=client_order_id)
+        except PolyesterApiError as exc:
+            if str(exc.code or "").lower() != "not_found":
+                raise
+        else:
+            if detail.order is not None and detail.order.client_order_id == client_order_id:
+                order = detail.order
+                if not order.status or order.status in _OPEN_ORDER_STATUSES:
+                    return order
+                last_status = order.status
+                if order.status in _TERMINAL_ORDER_STATUSES:
+                    raise AssertionError(
+                        f"Order {client_order_id} reached terminal status "
+                        f"{order.status!r} instead of staying open"
+                    )
         open_orders = await client.orders.list_open(limit=limit)
         for order in open_orders.orders:
             if order.client_order_id == client_order_id:
                 return order
         await asyncio.sleep(0.5)
-    raise AssertionError(f"Open order {client_order_id} was not visible within {timeout}s")
+    message = f"Open order {client_order_id} was not visible within {timeout}s"
+    if last_status is not None:
+        message += f" (last get status: {last_status!r})"
+        raise AssertionError(message)
+    raise DevnetOrderNotIndexedError(message)
 
 
 async def wait_for_no_open_order(

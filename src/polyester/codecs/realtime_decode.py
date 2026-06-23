@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import TypeVar
+
+from polyester.codecs.decode.api_keys import api_key_from_proto
+from polyester.codecs.decode.balances import asset_balance_from_proto
+from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
+from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
+from polyester.codecs.decode.orders import order_from_proto, user_trade_from_proto
+from polyester.codecs.decode.policies import subaccount_policy_from_proto
+from polyester.codecs.decode.sub_accounts import subaccount_from_proto
+from polyester.codecs.decode.transfers import ledger_transfer_from_proto
+from polyester.codecs.decode.triggers import trigger_event_from_proto, trigger_from_proto
+from polyester.codecs.scalars import format_id
+from polyester.codecs.wire_decode import decode_candle
+from polyester.models import ApiData, AssetBalance, LedgerTransfer, Order, UserTrade
+from polyester.models.auth import AccountIdentity
+from polyester.models.market import Candle, MarketOverviewList
+from polyester.models.policies import SubaccountPolicy
+from polyester.models.realtime import AddressBookViewInvalidation, OrderBookDeltaUpdate
+from polyester.models.sub_accounts import SubAccount
+from polyester.models.trading import ApiKeySummary, LifecycleFlowSummary, Trigger, TriggerEvent
+
+T = TypeVar("T")
+
+
+def _parse_proto(payload: bytes, message_cls):
+    message = message_cls()
+    message.ParseFromString(payload)
+    return message
+
+
+def decode_asset_balance_bytes(payload: bytes) -> AssetBalance:
+    from polyester.gen.ledger.read.v1.ledger_read_pb2 import AssetBalance as AssetBalancePb
+
+    return asset_balance_from_proto(_parse_proto(payload, AssetBalancePb))
+
+
+def decode_user_trade_bytes(payload: bytes) -> UserTrade:
+    from polyester.gen.orders.v1.orders_read_pb2 import UserTrade as UserTradePb
+
+    return user_trade_from_proto(_parse_proto(payload, UserTradePb))
+
+
+def decode_ledger_transfer_bytes(payload: bytes) -> LedgerTransfer:
+    from polyester.gen.ledger.read.v1.ledger_read_pb2 import TransferRow
+
+    return ledger_transfer_from_proto(_parse_proto(payload, TransferRow))
+
+
+def decode_trigger_bytes(payload: bytes) -> Trigger:
+    from polyester.gen.triggers.v1.triggers_pb2 import Trigger as TriggerPb
+
+    return trigger_from_proto(_parse_proto(payload, TriggerPb))
+
+
+def decode_trigger_event_bytes(payload: bytes) -> TriggerEvent:
+    from polyester.gen.triggers.v1.triggers_pb2 import TriggerEvent as TriggerEventPb
+
+    return trigger_event_from_proto(_parse_proto(payload, TriggerEventPb))
+
+
+def decode_order_bytes(payload: bytes) -> Order:
+    from polyester.gen.orders.v1.orders_read_pb2 import Order as OrderPb
+
+    return order_from_proto(_parse_proto(payload, OrderPb))
+
+
+def decode_api_key_bytes(payload: bytes) -> ApiKeySummary:
+    from polyester.gen.auth.v1.api_keys_pb2 import ApiKey
+
+    return api_key_from_proto(_parse_proto(payload, ApiKey))
+
+
+def decode_subaccount_bytes(payload: bytes) -> SubAccount:
+    from polyester.gen.auth.v1.subaccounts_pb2 import Subaccount
+
+    return subaccount_from_proto(_parse_proto(payload, Subaccount))
+
+
+def decode_subaccount_policy_bytes(payload: bytes) -> SubaccountPolicy:
+    from polyester.gen.auth.v1.policies_pb2 import SubaccountPolicyView
+
+    return subaccount_policy_from_proto(_parse_proto(payload, SubaccountPolicyView))
+
+
+def decode_flow_summary_bytes(payload: bytes) -> LifecycleFlowSummary:
+    from polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2 import FlowSummaryView
+
+    return flow_summary_from_proto(_parse_proto(payload, FlowSummaryView))
+
+
+def decode_flow_detail_bytes(payload: bytes) -> LifecycleFlowSummary:
+    from polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2 import FlowDetailView
+
+    return flow_detail_from_proto(_parse_proto(payload, FlowDetailView))
+
+
+def decode_market_overview_batch_bytes(payload: bytes) -> MarketOverviewList:
+    from polyester.gen.marketoverview.v1.marketoverview_pb2 import MarketOverviewBatch
+
+    batch = _parse_proto(payload, MarketOverviewBatch)
+    markets = [market_overview_entry_from_proto(item) for item in batch.markets]
+    return MarketOverviewList(markets=markets, total=len(markets))
+
+
+def decode_account_identity_bytes(payload: bytes) -> AccountIdentity:
+    from polyester.gen.auth.v1.profile_pb2 import AccountIdentity as AccountIdentityPb
+
+    msg = _parse_proto(payload, AccountIdentityPb)
+    return AccountIdentity(
+        account_id=format_id(int(msg.account_id)),
+        username=msg.username,
+        avatar_url=msg.avatar_url,
+        root_smart_account_address=msg.root_smart_account_address,
+    )
+
+
+def decode_address_book_invalidation_bytes(payload: bytes) -> AddressBookViewInvalidation:
+    from polyester.gen.auth.v1.address_book_pb2 import AddressBookViewInvalidated
+
+    msg = _parse_proto(payload, AddressBookViewInvalidated)
+    scope = ""
+    if msg.HasField("scope"):
+        scope = format_id(int(msg.scope.root_account_id)) if msg.scope.root_account_id else ""
+    invalidated_at = ""
+    if msg.HasField("invalidated_at"):
+        invalidated_at = msg.invalidated_at.ToJsonString()
+    return AddressBookViewInvalidation(scope=scope, invalidated_at=invalidated_at)
+
+
+def decode_orderbook_delta_bytes(payload: bytes) -> OrderBookDeltaUpdate:
+    from polyester.gen.orderbook.v1.orderbook_pb2 import OrderBookDelta
+
+    msg = _parse_proto(payload, OrderBookDelta)
+    return OrderBookDeltaUpdate(
+        symbol_id=int(msg.symbol_id),
+        book_seq_start=str(msg.book_seq_start),
+        book_seq_end=str(msg.book_seq_end),
+        reset=bool(msg.reset),
+        bids=[(str(level.price_ticks), str(level.qty_scaled)) for level in msg.bids],
+        asks=[(str(level.price_ticks), str(level.qty_scaled)) for level in msg.asks],
+    )
+
+
+def decode_candle_point_bytes(
+    *,
+    symbol_id: int,
+    timeframe: str,
+) -> Callable[[bytes], Candle]:
+    from polyester._wire import protobuf_to_public_dict
+    from polyester.gen.marketdata.v1.marketdata_pb2 import CandlePoint
+
+    def decode(payload: bytes) -> Candle:
+        point = _parse_proto(payload, CandlePoint)
+        raw = protobuf_to_public_dict(point)
+        candle = decode_candle(raw)
+        return Candle(
+            ts_sec=candle.ts_sec,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+            is_closed=candle.is_closed,
+        )
+
+    _ = (symbol_id, timeframe)
+    return decode
+
+
+def decode_heatmap_live_bucket_bytes(payload: bytes) -> ApiData:
+    from polyester._wire import protobuf_to_public_dict
+    from polyester.gen.marketdata.v1.heatmap_pb2 import HeatmapLiveBucket
+
+    msg = _parse_proto(payload, HeatmapLiveBucket)
+    return ApiData(protobuf_to_public_dict(msg))
+
+
+def decode_zipped_asset_supply_batch_bytes(payload: bytes) -> ApiData:
+    from polyester._wire import protobuf_to_public_dict
+    from polyester.gen.chain.zipper.v1.zipper_pb2 import ZippedAssetSupplyBatch
+
+    msg = _parse_proto(payload, ZippedAssetSupplyBatch)
+    return ApiData(protobuf_to_public_dict(msg))

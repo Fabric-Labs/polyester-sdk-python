@@ -13,6 +13,7 @@ from polyester.codecs.decode.api_keys import (
     api_keys_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.realtime_decode import decode_api_key_bytes
 from polyester.gen.auth.v1.api_keys_connect import ApiKeyServiceClient
 from polyester.gen.auth.v1.api_keys_pb2 import (
     CreateApiKeyRequest,
@@ -24,15 +25,26 @@ from polyester.gen.auth.v1.api_keys_pb2 import (
 )
 from polyester.models import ApiKeysList, ApiKeySummary
 from polyester.models.auth import Ed25519Keypair
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import resolve_sub_account_id
 
 
 class AsyncApiKeysService(BaseService):
-    def __init__(self, transport, default_sub_account_id: str | None) -> None:
+    def __init__(
+        self,
+        transport,
+        default_sub_account_id: str | None,
+        *,
+        default_account_id: str | int | None = None,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
+        self._default_account_id = default_account_id
+        self._realtime = realtime
 
     async def list(
         self,
@@ -143,6 +155,19 @@ class AsyncApiKeysService(BaseService):
             public_key=public_key,
             secret_key_hex=secret_key.hex(),
             secret_key=secret_key,
+        )
+
+    async def subscribe(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[ApiKeySummary]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:auth:api-keys:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_api_key_bytes,
         )
 
     def _resolve_sub_account_id(self, value: str | None) -> str | None:

@@ -36,16 +36,16 @@ async def _wait_for_trigger_events(client, trigger_id: str, *, timeout: float = 
 @pytest.mark.integration
 @pytest.mark.mutation
 async def test_trigger_pause_resume_cancel(
-    live_client, smoke_symbol, mutation_enabled, require_trading_balance
+    live_client, trade_symbol, mutation_enabled, require_trade_trading_balance
 ):
-    """USDT-funded buy stop on ETH-USDT (limit child order reserves quote balance)."""
+    """USDT-funded buy stop on the trade symbol (limit child reserves quote balance)."""
     trigger_price, limit_price, qty = await usdt_funded_buy_stop_params(
-        live_client, smoke_symbol
+        live_client, trade_symbol
     )
     client_trigger_id = unique_client_order_id("trg")
 
     created = await live_client.triggers.create(
-        symbol=smoke_symbol,
+        symbol=trade_symbol,
         trigger_type="stop_loss",
         side="buy",
         qty=qty,

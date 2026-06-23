@@ -72,6 +72,7 @@ markers = [
   "treasury: withdraw/guard ops",
   "realtime: Centrifugo subscriptions",
   "optional: may skip when route unavailable",
+  "smoke: shallow live RPC check (shape only; empty results OK)",
 ]
 
 [tool.coverage.run]

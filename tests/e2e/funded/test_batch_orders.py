@@ -17,17 +17,17 @@ from tests.helpers import (
 @pytest.mark.integration
 @pytest.mark.funded
 async def test_batch_create_and_cancel(
-    live_client, smoke_symbol, funded_enabled, require_trading_balance
+    live_client, trade_symbol, funded_enabled, require_trade_trading_balance
 ):
-    price, qty = await usdt_funded_buy_limit_params(live_client, smoke_symbol)
+    price, qty = await usdt_funded_buy_limit_params(live_client, trade_symbol)
     cid1 = unique_client_order_id("b1")
     cid2 = unique_client_order_id("b2")
 
     created = await live_client.orders.batch_create(
-        symbol=smoke_symbol,
+        symbol=trade_symbol,
         items=[
             {
-                "symbol": smoke_symbol,
+                "symbol": trade_symbol,
                 "side": "buy",
                 "order_type": "limit",
                 "tif": "gtc",
@@ -37,7 +37,7 @@ async def test_batch_create_and_cancel(
                 "client_order_id": cid1,
             },
             {
-                "symbol": smoke_symbol,
+                "symbol": trade_symbol,
                 "side": "buy",
                 "order_type": "limit",
                 "tif": "gtc",
@@ -64,7 +64,7 @@ async def test_batch_create_and_cancel(
     except DevnetOrderNotIndexedError:
         pytest.skip(devnet_order_read_index_skip_message())
 
-    symbol_id = live_client.catalogs.symbol_id_for_symbol(smoke_symbol)
+    symbol_id = live_client.catalogs.symbol_id_for_symbol(trade_symbol)
     try:
         cancelled = await live_client.orders.batch_cancel(
             items=[
@@ -80,4 +80,4 @@ async def test_batch_create_and_cancel(
         await wait_for_no_open_order(live_client, cid1)
         await wait_for_no_open_order(live_client, cid2)
     finally:
-        await live_client.orders.cancel_all(symbol=smoke_symbol, dry_run=False)
+        await live_client.orders.cancel_all(symbol=trade_symbol, dry_run=False)

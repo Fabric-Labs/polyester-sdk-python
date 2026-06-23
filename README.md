@@ -107,40 +107,51 @@ async with client.market_data.subscribe_trades(symbol="BNB-USDT") as sub:
 
 Realtime requires `pip install polyester-sdk[realtime]` (websockets).
 
-## Testing
+Merged market overview stream (snapshot + live updates):
 
-### Unit tests (CI)
-
-```bash
-pytest tests -q
-ruff check src tests scripts
+```python
+sub = await client.market_overview.create_subscription()
+async for markets in sub:
+    print(len(markets), "rows")
+    break
+await sub.aclose()
 ```
 
-### Live smoke (devnet)
+## Testing
+
+**CI (no network):** `pytest tests/unit -q` — 161 tests, ruff, ~58% coverage on hand-written code.
+
+**Full local suite (devnet + `.env`):** as of last run — **198 passed, 16 skipped**, 0 failed.
 
 ```bash
 cp .env.example .env
-# POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY
+# POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY, POLYESTER_ACCOUNT_ID
 
-.venv/bin/python scripts/smoke_test.py
+pip install -e ".[dev,realtime]"
+
+./scripts/test_all.sh          # unit + tiered live (reads .env flags)
+# or
+pytest tests/unit -q           # CI-equivalent
+pytest tests/ -v               # full suite
+python scripts/smoke_test.py   # backwards-compatible read/mutation wrapper
 ```
 
-Optional authenticated mutation check (far-from-market limit + cancel):
+See [docs/10-testing.md](docs/10-testing.md) for markers (`smoke`, `mutation`, `funded`, `optional`) and env vars.
 
-```bash
-export POLYESTER_SMOKE_MUTATION=1
-export POLYESTER_SMOKE_SYMBOL=BTC-USDT
-export POLYESTER_SMOKE_CHAIN_ID=1          # optional: deposit.list_addresses
-export POLYESTER_SMOKE_TX_HASH=0x...       # optional: lifecycle.get_flow_by_tx
-export POLYESTER_SMOKE_RESOLVE_QUERY=alice # optional: resolve.resolve_account
-.venv/bin/python scripts/smoke_test.py
-```
+### Known devnet skips (not SDK failures)
 
-Attach a **read/trade policy** to your API key in the Polyester UI if authenticated steps fail.
+| Skip reason | Tests affected |
+|-------------|----------------|
+| OMS read never indexes after `orders.create` | `test_order_round_trip`, `test_batch_create_and_cancel` |
+| No open orders on book | `test_orders_get_round_trips_list_open` |
+| `list_holds` unmounted | balance holds tests |
+| JWT/session-only routes | profile, whiteboard, resolve, etc. |
+| Guard signer not on account | `test_guard_signer_get_status` |
+| No BTC-USDT asks / `POLYESTER_TEST_TRADE_E2E` | `test_spot_fill` |
 
-Some RPCs return plain HTTP 404 on devnet (not mounted on the gateway). The SDK raises
-`PolyesterRouteNotFoundError` with a clearer message than `[unimplemented]: Not Found`.
-Examples: `orderbook`, `balances.list_holds`.
+Attach a **read/trade policy** to your API key. Spot orders need **USDT in unified trading** (not BTC).
+
+Some RPCs return HTTP 404 on devnet. The SDK raises `PolyesterRouteNotFoundError` with a clearer message than `[unimplemented]: Not Found`.
 
 ## Changelog
 
@@ -149,4 +160,12 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Transport
 
 Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
-defaults to JSON for debugging; binary protobuf is the production target.
+defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
+
+## Docs
+
+| Doc | Purpose |
+|-----|---------|
+| [docs/08-sdk-implementation-status.md](docs/08-sdk-implementation-status.md) | What's implemented and what's left |
+| [docs/10-testing.md](docs/10-testing.md) | Local test tiers and env vars |
+| [docs/06-typescript-parity.md](docs/06-typescript-parity.md) | TS SDK parity tracker |

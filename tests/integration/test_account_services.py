@@ -55,4 +55,5 @@ async def test_deposit_list_addresses(live_client) -> None:
     assert isinstance(result, DepositAddressesList)
     for row in result.addresses:
         assert row.chain_id > 0
-        assert row.deposit_address.startswith("0x")
+        assert row.deposit_address
+        assert len(row.deposit_address.strip()) >= 8

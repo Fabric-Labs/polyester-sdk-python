@@ -9,6 +9,7 @@ from polyester.errors import PolyesterApiError, PolyesterRouteNotFoundError
 from tests.helpers import (
     min_trading_quote_required,
     pick_smoke_symbol,
+    pick_trade_symbol,
     quote_asset_id_for_symbol,
     skip_funding_check,
     trading_balance_decimal,
@@ -36,6 +37,10 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "treasury: withdraw/guard ops (POLYESTER_TEST_TREASURY=1)")
     config.addinivalue_line("markers", "realtime: Centrifugo subscriptions")
     config.addinivalue_line("markers", "optional: may skip when route unavailable on devnet")
+    config.addinivalue_line(
+        "markers",
+        "smoke: shallow live RPC check (shape only; empty results OK)",
+    )
 
 
 def _env_truthy(name: str) -> bool:
@@ -101,6 +106,14 @@ async def smoke_symbol(live_client) -> str:
 
 
 @pytest.fixture(scope="session")
+async def trade_symbol(live_client) -> str:
+    spot = await live_client.market_data.get_spot_config()
+    live_client.catalogs.hydrate_spot_config(spot.raw)
+    await _ensure_zipper_catalog(live_client)
+    return pick_trade_symbol(spot.raw)
+
+
+@pytest.fixture(scope="session")
 async def account_balances(live_client):
     return await live_client.balances.list()
 
@@ -129,19 +142,18 @@ async def capabilities(live_client, smoke_symbol):
     return caps
 
 
-@pytest.fixture
-async def require_trading_balance(live_client, smoke_symbol):
+async def _require_trading_balance_for_symbol(live_client, symbol: str) -> None:
     if skip_funding_check():
         return
     await _ensure_zipper_catalog(live_client)
     spot = await live_client.market_data.get_spot_config()
     quote_asset_id = quote_asset_id_for_symbol(
         spot.raw,
-        smoke_symbol,
+        symbol,
         zipper_raw=live_client.catalogs.zipper_config,
     )
     if quote_asset_id is None:
-        pytest.skip(f"Cannot resolve quote asset for {smoke_symbol}")
+        pytest.skip(f"Cannot resolve quote asset for {symbol}")
     account_balances = await live_client.balances.list()
     balance = trading_balance_decimal(account_balances, quote_asset_id)
     minimum = min_trading_quote_required()
@@ -150,3 +162,13 @@ async def require_trading_balance(live_client, smoke_symbol):
             f"Trading balance {balance} below minimum {minimum} for asset {quote_asset_id}; "
             "fund trading ledger on devnet or set POLYESTER_TEST_SKIP_FUNDING_CHECK=1"
         )
+
+
+@pytest.fixture
+async def require_trading_balance(live_client, smoke_symbol):
+    await _require_trading_balance_for_symbol(live_client, smoke_symbol)
+
+
+@pytest.fixture
+async def require_trade_trading_balance(live_client, trade_symbol):
+    await _require_trading_balance_for_symbol(live_client, trade_symbol)

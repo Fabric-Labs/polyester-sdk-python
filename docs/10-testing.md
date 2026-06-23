@@ -38,16 +38,49 @@ Trading → funding uses `client.trading_withdraws.create_to_funding(...)` with 
 
 Single-account self-match is not a valid fill test because spot matching enforces self-trade prevention. The fill e2e is therefore gated behind `POLYESTER_TEST_TRADE_E2E=1`. Without maker credentials it attempts a passive taker buy against the best visible devnet ask. If no ask is visible, it skips before placing an order.
 
-Set `POLYESTER_TEST_TRADE_SYMBOL=BTC-USDT` to test USDT → BTC. The passive flow buys at the current best ask, then verifies `orders.get(...).trades`, `trades.list(...)`, and taker balance direction. For deterministic coverage, also set `POLYESTER_TEST_MAKER_API_KEY_ID` and `POLYESTER_TEST_MAKER_API_PRIVATE_KEY`; then the test posts a maker sell from the second account and verifies both sides. It will still skip while devnet OMS returns the known order-create `INTERNAL_ERROR`.
+Set `POLYESTER_TEST_TRADE_SYMBOL=BTC-USDT` for order/trigger mutation and fill e2e (USDT → BTC). Read-only smoke defaults to `ETH-USDT` via `POLYESTER_TEST_SMOKE_SYMBOL` when unset.
+
+### Mutation order prices
+
+E2e buy limits use **post-only** orders priced far below spot so they rest on the book without filling.
+
+By default the SDK tests derive price from **`market_overview.list`** (~2% of last trade, tick-aligned). Static hints in `tests/helpers.py` apply only when overview is unavailable. Override with `POLYESTER_TEST_PRICE` / `POLYESTER_TEST_QTY`.
+
+These orders reserve a small amount of USDT and are cancelled in cleanup — they are not meant to move the market.
+
+### Test markers
+
+| Marker | Meaning |
+|--------|---------|
+| `integration` | Live devnet RPC |
+| `smoke` | Shallow check — empty lists OK |
+| `mutation` / `funded` / `treasury` | Env-gated write tiers |
+| `optional` | Skip when route/auth unavailable |
+
+Run proof-style order tests (not smoke): include tests without `smoke`, e.g. `test_orders_get_round_trips_list_open`.
+
+### Known devnet limitations
+
+- **Order read-after-create:** `orders.create` may return `accepted` while `orders.get` / `list_open` return `not_found` for 15s+ (OMS read index — see team if reproducing).
+- **`list_holds`:** route may be unmounted.
+- **JWT-only routes:** profile, whiteboard, layout, etc. skip under API-key auth.
 
 ## Commands
 
+Full suite (typical devnet account): **214 collected**, **~198 passed / ~16 skipped**, 0 failed.
+
 ```bash
+# Unit + live tiers (reads .env)
+./scripts/test_all.sh
+
 # CI (no network)
 pytest tests/unit -q
 
 # Read-only live validation
 pytest tests/integration tests/e2e -m "integration and not mutation and not funded" -v
+
+# Shallow smoke only
+pytest tests/ -m "integration and smoke" -v
 
 # Safe mutations (post-only orders)
 POLYESTER_TEST_MUTATION=1 pytest tests/ -m mutation -v
@@ -68,12 +101,12 @@ python scripts/smoke_test.py
 | `POLYESTER_TEST_MUTATION=1` | Enable mutation tests |
 | `POLYESTER_TEST_FUNDED=1` | Enable funded e2e |
 | `POLYESTER_TEST_TREASURY=1` | Enable withdraw/guard wallet tests |
-| `POLYESTER_TEST_SMOKE_SYMBOL` | Override trading pair |
+| `POLYESTER_TEST_SMOKE_SYMBOL` | Override pair for read-only smoke (default `ETH-USDT`) |
 | `POLYESTER_TEST_MIN_TRADING_QUOTE` | Min trading balance for order tests |
 | `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Destination account for internal transfer e2e |
 | `POLYESTER_TEST_SKIP_FUNDING_CHECK=1` | Skip trading balance preflight |
 | `POLYESTER_TEST_TRADE_E2E=1` | Enable two-account spot fill e2e |
-| `POLYESTER_TEST_TRADE_SYMBOL` | Spot pair for fill e2e, for example `BTC-USDT` |
+| `POLYESTER_TEST_TRADE_SYMBOL` | Pair for order/trigger mutation and fill e2e (default: smoke symbol), for example `BTC-USDT` |
 | `POLYESTER_TEST_MAKER_API_KEY_ID` | Optional maker account API key for deterministic spot fill e2e |
 | `POLYESTER_TEST_MAKER_API_PRIVATE_KEY` | Optional maker account private key for deterministic spot fill e2e |
 | `POLYESTER_TEST_TRADE_PRICE` | Optional cross price override when using maker credentials |
@@ -86,8 +119,9 @@ python scripts/smoke_test.py
 | Tier | Purpose | Fails when |
 |------|---------|------------|
 | **Unit** (`tests/unit`) | Proto codecs, request builders, client wiring, mocked unary calls | Decode regressions, wrong enum mapping, broken service request shape |
-| **Integration** (`tests/integration`) | One real devnet RPC per test with field-level assertions | Auth, routing, proto drift, API contract changes |
-| **E2E** (`tests/e2e`) | Multi-step flows across services | Cross-service identity/balance inconsistencies |
+| **Smoke** (`@pytest.mark.smoke`) | Live RPC returns decodable shape; empty data OK | Auth, routing, decode errors |
+| **Integration** (`tests/integration`) | Field-level assertions; round-trips when data exists | Contract drift, wrong field mapping |
+| **E2E** (`tests/e2e`) | Multi-step flows across services | Cross-service inconsistencies |
 
 `@pytest.mark.optional` skips when a route is not mounted on devnet. Tests **without** `optional` fail loudly if the route 404s — use that for services that must work on devnet (auth, balances, api keys).
 

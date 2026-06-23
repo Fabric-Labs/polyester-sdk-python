@@ -2,6 +2,7 @@ from polyester.codecs.decode.orders import (
     get_order_from_proto,
     modify_order_from_proto,
     order_from_proto,
+    order_mutation_from_proto,
     orders_list_from_proto,
 )
 from polyester.codecs.scalars import format_id
@@ -73,3 +74,23 @@ def test_modify_order_from_proto_action_taken_enum() -> None:
     assert result.action_taken == "amended"
     assert result.old_order_id == format_id(10)
     assert result.final_order_id == format_id(11)
+
+
+def test_order_mutation_from_proto_create_includes_client_order_id() -> None:
+    msg = orders_pb2.CreateOrderResponse(
+        status="accepted",
+        order_id=42,
+        client_order_id="coid-1",
+    )
+    result = order_mutation_from_proto(msg)
+    assert result.status == "accepted"
+    assert result.order_id == format_id(42)
+    assert result.client_order_id == "coid-1"
+
+
+def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:
+    msg = orders_pb2.CancelOrderResponse(status="cancelled", order_id=42)
+    result = order_mutation_from_proto(msg)
+    assert result.status == "cancelled"
+    assert result.order_id == format_id(42)
+    assert result.client_order_id == ""

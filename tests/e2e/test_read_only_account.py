@@ -2,6 +2,7 @@ import pytest
 
 
 @pytest.mark.integration
+@pytest.mark.smoke
 async def test_account_read_snapshot(live_client, smoke_symbol):
     spot = await live_client.market_data.get_spot_config()
     assert spot.raw

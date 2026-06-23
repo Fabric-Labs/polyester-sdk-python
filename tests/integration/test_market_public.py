@@ -5,6 +5,7 @@ from tests.integration.support import assert_api_data_shape, call_optional, call
 
 
 @pytest.mark.integration
+@pytest.mark.smoke
 async def test_market_overview_list_has_markets(live_client) -> None:
     result = await call_required(
         live_client.market_overview.list(limit=10),

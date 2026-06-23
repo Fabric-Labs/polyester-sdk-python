@@ -211,11 +211,14 @@ class AsyncOrdersService(BaseService):
         *,
         order_id: str | int | None = None,
         client_order_id: str | None = None,
+        symbol: str | None = None,
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
     ) -> OrderMutationResult:
         if order_id is None and client_order_id is None:
             raise ValueError("cancel requires order_id or client_order_id")
+        if symbol_id is None and symbol:
+            symbol_id = self._catalogs.symbol_id_for_symbol(symbol)
         request = CancelOrderRequest()
         if order_id is not None:
             request.order_id = id_to_int(order_id, "order_id")

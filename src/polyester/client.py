@@ -107,7 +107,11 @@ class AsyncPolyester:
             default_account_id,
             realtime=self.realtime,
         )
-        self.orderbook = AsyncOrderbookService(self._transport, realtime=self.realtime)
+        self.orderbook = AsyncOrderbookService(
+            self._transport,
+            catalogs=self.catalogs,
+            realtime=self.realtime,
+        )
         self.orders = AsyncOrdersService(
             self._transport,
             self.catalogs,

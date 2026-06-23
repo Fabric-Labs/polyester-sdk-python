@@ -17,14 +17,14 @@ from tests.helpers import (
 @pytest.mark.integration
 @pytest.mark.mutation
 async def test_order_round_trip(
-    live_client, smoke_symbol, mutation_enabled, require_trading_balance
+    live_client, trade_symbol, mutation_enabled, require_trade_trading_balance
 ):
-    price, qty = await usdt_funded_buy_limit_params(live_client, smoke_symbol)
+    price, qty = await usdt_funded_buy_limit_params(live_client, trade_symbol)
     client_order_id = unique_client_order_id("e2e")
 
     try:
         created = await live_client.orders.create(
-            symbol=smoke_symbol,
+            symbol=trade_symbol,
             side="buy",
             order_type="limit",
             tif="gtc",
@@ -57,7 +57,7 @@ async def test_order_round_trip(
     try:
         cancelled = await live_client.orders.cancel(
             client_order_id=client_order_id,
-            symbol=smoke_symbol,
+            symbol=trade_symbol,
         )
         assert cancelled.status
         assert (
@@ -66,4 +66,4 @@ async def test_order_round_trip(
         )
         await wait_for_no_open_order(live_client, client_order_id)
     finally:
-        await live_client.orders.cancel_all(symbol=smoke_symbol, dry_run=False)
+        await live_client.orders.cancel_all(symbol=trade_symbol, dry_run=False)

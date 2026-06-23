@@ -87,10 +87,11 @@ def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
 
 
 def order_mutation_from_proto(msg) -> OrderMutationResult:
+    client_order_id = getattr(msg, "client_order_id", "") or ""
     return OrderMutationResult(
         status=msg.status,
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
-        client_order_id=msg.client_order_id,
+        client_order_id=client_order_id,
     )
 
 

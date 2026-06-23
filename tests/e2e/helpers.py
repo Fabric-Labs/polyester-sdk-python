@@ -7,9 +7,9 @@ import uuid
 from polyester.errors import PolyesterApiError
 from tests.helpers import (
     DevnetOrderNotIndexedError,
-    FAR_ABOVE_BUY_STOP_PRICE_HINTS,
-    FAR_BELOW_BUY_PRICE_HINTS,
     min_base_qty_for_pair,
+    resolve_far_above_buy_stop_price,
+    resolve_far_below_buy_limit_price,
 )
 
 
@@ -22,12 +22,7 @@ async def usdt_funded_buy_limit_params(client, symbol: str) -> tuple[str, str]:
     spot = await client.market_data.get_spot_config()
     pair = next((p for p in spot.raw.get("pairs") or [] if p.get("symbol") == symbol), {})
 
-    price = (
-        os.getenv("POLYESTER_TEST_PRICE")
-        or os.getenv("POLYESTER_SMOKE_PRICE")
-        or FAR_BELOW_BUY_PRICE_HINTS.get(symbol)
-        or "100"
-    )
+    price = await resolve_far_below_buy_limit_price(client, symbol, pair)
     qty = os.getenv("POLYESTER_TEST_QTY") or os.getenv("POLYESTER_SMOKE_QTY")
     if qty is None:
         qty = min_base_qty_for_pair(pair, price)
@@ -43,11 +38,7 @@ async def usdt_funded_buy_stop_params(client, symbol: str) -> tuple[str, str, st
     spot = await client.market_data.get_spot_config()
     pair = next((p for p in spot.raw.get("pairs") or [] if p.get("symbol") == symbol), {})
 
-    trigger_price = (
-        os.getenv("POLYESTER_TEST_TRIGGER_PRICE")
-        or FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(symbol)
-        or "50000"
-    )
+    trigger_price = await resolve_far_above_buy_stop_price(client, symbol, pair)
     limit_price = os.getenv("POLYESTER_TEST_TRIGGER_LIMIT_PRICE") or trigger_price
     qty = os.getenv("POLYESTER_TEST_QTY") or os.getenv("POLYESTER_SMOKE_QTY")
     if qty is None:

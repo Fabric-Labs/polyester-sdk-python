@@ -4,6 +4,7 @@ from polyester.models import OrdersList
 
 
 @pytest.mark.integration
+@pytest.mark.smoke
 async def test_orders_list_open(live_client):
     result = await live_client.orders.list_open(limit=10)
     assert isinstance(result, OrdersList)
@@ -15,6 +16,24 @@ async def test_orders_list_open(live_client):
 
 
 @pytest.mark.integration
+async def test_orders_get_round_trips_list_open(live_client):
+    """When devnet has open orders, get must return the same order by id."""
+    listed = await live_client.orders.list_open(limit=10)
+    if not listed.orders:
+        pytest.skip("no open orders on devnet; cannot round-trip orders.get")
+    sample = listed.orders[0]
+    by_order_id = await live_client.orders.get(order_id=sample.order_id)
+    assert by_order_id.order is not None
+    assert by_order_id.order.order_id == sample.order_id
+    assert by_order_id.order.symbol_id == sample.symbol_id
+    if sample.client_order_id:
+        by_client_id = await live_client.orders.get(client_order_id=sample.client_order_id)
+        assert by_client_id.order is not None
+        assert by_client_id.order.client_order_id == sample.client_order_id
+
+
+@pytest.mark.integration
+@pytest.mark.smoke
 async def test_orders_list_history(live_client, smoke_symbol):
     result = await live_client.orders.list_history(symbol=smoke_symbol, limit=5)
     assert isinstance(result, OrdersList)

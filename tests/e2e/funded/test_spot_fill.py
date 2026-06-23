@@ -97,7 +97,7 @@ async def _best_ask_params(client, symbol: str, pair: dict) -> tuple[str, str]:
 @pytest.mark.integration
 @pytest.mark.funded
 async def test_spot_fill(
-    live_client, smoke_symbol, funded_enabled, require_trading_balance
+    live_client, trade_symbol, funded_enabled, require_trade_trading_balance
 ):
     if not _trade_e2e_enabled():
         pytest.skip("Set POLYESTER_TEST_TRADE_E2E=1 to run spot fill e2e")
@@ -121,7 +121,6 @@ async def test_spot_fill(
         spot_raw, zipper_raw = await _hydrate_test_catalogs(live_client)
         if maker is not None:
             await _hydrate_test_catalogs(maker)
-        trade_symbol = os.getenv("POLYESTER_TEST_TRADE_SYMBOL") or smoke_symbol
         pair = next(
             (p for p in spot_raw.get("pairs") or [] if p.get("symbol") == trade_symbol), {}
         )

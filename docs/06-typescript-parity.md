@@ -18,14 +18,14 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 
 | Service | Status | Implemented | Missing |
 | --- | --- | --- | --- |
-| `market_data` / `candles` | Partial | spot config, trades, candles, `subscribe_trades`, `subscribe_candles` | Snapshot-then-stream market overview merge helper |
-| `orderbook` | Partial | `get`, `subscribe_deltas` | Stateful local book (`createSubscription`) |
+| `market_data` / `candles` | Partial | spot config, trades, candles, `subscribe_trades`, `subscribe_candles` | |
+| `orderbook` | Partial | `get`, `subscribe_deltas`, `create_subscription` / `subscribe` | Bucket UX polish only |
 | `orders` | Partial | CRUD, batch, `subscribe` | |
 | `trades` | Partial | `list`, `subscribe` | |
 | `balances` | Partial | list/history/equity/holds, `subscribe` | Funding→trading on-chain only |
 | `triggers` | Partial | CRUD, `subscribe`, `subscribe_events` | |
 | `transfers` | Partial | `list`, `subscribe` | |
-| `market_overview` | Partial | `list`, `subscribe` | TS snapshot-then-stream merge on subscribe |
+| `market_overview` | Partial | `list`, `subscribe`, `create_subscription` (snapshot merge) | |
 | `heatmap` | Partial | `get`, `subscribe_live` | |
 | `lifecycle` | Partial | list/get, `subscribe_open_flows`, `subscribe_flow_detail` | |
 | `zipper` | Partial | config, `subscribe_zipped_asset_supply` | Typed catalog models |
@@ -44,8 +44,8 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 | Private admin streams | Partial | api_keys, sub_accounts, policies, address_book invalidations |
 | Public market streams | Partial | trades, candles, heatmap, market_overview, orderbook deltas |
 | Public chain streams | Partial | lifecycle flows, zipper supply, identity updates |
-| Orderbook local book | Planned | TS `createSubscription` snapshot+delta merge |
-| Market overview merge | Planned | TS snapshot-then-stream on subscribe |
+| Orderbook local book | Done | `create_subscription` snapshot + seq-checked deltas + gap refresh |
+| Market overview merge | Done | `create_subscription` snapshot-then-stream |
 
 ## Account And Admin
 
@@ -81,6 +81,6 @@ Legend: **Done** · **Partial** · **Planned** · **Deferred** · **Omitted** ·
 
 ## Current Blockers
 
-- Orderbook stateful subscription (snapshot + gap recovery) not yet ported from TS.
-- Market overview `subscribe` emits raw batches; TS merges into a live map with snapshot prefetch.
 - MFA service blocked on API-key step-up.
+- Devnet OMS read path may not index accepted orders (order lifecycle e2e skips).
+- Full devnet suite (typical account): **214 collected**, **~198 passed / ~16 skipped**.

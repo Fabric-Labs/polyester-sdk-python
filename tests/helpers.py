@@ -32,6 +32,10 @@ def env_smoke_symbol() -> str | None:
     return os.getenv("POLYESTER_TEST_SMOKE_SYMBOL") or os.getenv("POLYESTER_SMOKE_SYMBOL")
 
 
+def env_trade_symbol() -> str | None:
+    return os.getenv("POLYESTER_TEST_TRADE_SYMBOL")
+
+
 def pick_smoke_symbol(spot_raw: dict) -> str:
     override = env_smoke_symbol()
     if override:
@@ -44,6 +48,13 @@ def pick_smoke_symbol(spot_raw: dict) -> str:
     if pairs:
         return str(pairs[0].get("symbol") or DEFAULT_SMOKE_SYMBOL)
     return DEFAULT_SMOKE_SYMBOL
+
+
+def pick_trade_symbol(spot_raw: dict) -> str:
+    override = env_trade_symbol()
+    if override:
+        return override
+    return pick_smoke_symbol(spot_raw)
 
 
 def pair_for_symbol(spot_raw: dict, symbol: str) -> dict | None:
@@ -156,6 +167,69 @@ def _min_base_qty_for_notional(
     return format(qty_units * step_size, "f")
 
 
+def pair_tick_size(pair: dict) -> str:
+    return str(pair.get("tickSize") or pair.get("tick_size") or "0.01")
+
+
+def far_below_price_from_last_ticks(
+    last_price_ticks: int,
+    *,
+    tick_size: str,
+    symbol: str,
+) -> str:
+    """Return a post-only buy price ~2% of last trade, tick-aligned."""
+    from polyester.codecs.scalars import align_price_ticks, format_price_ticks
+
+    if last_price_ticks <= 0:
+        return FAR_BELOW_BUY_PRICE_HINTS.get(symbol, "100")
+    target_ticks = align_price_ticks(max(last_price_ticks // 50, 1), tick_size)
+    return format_price_ticks(target_ticks)
+
+
+async def resolve_far_below_buy_limit_price(client, symbol: str, pair: dict) -> str:
+    """Market-aware far-below buy price with static hint fallback."""
+    override = os.getenv("POLYESTER_TEST_PRICE") or os.getenv("POLYESTER_SMOKE_PRICE")
+    if override:
+        return override
+
+    tick_size = pair_tick_size(pair)
+    try:
+        overview = await client.market_overview.list(symbols=[symbol], limit=5)
+        for row in overview.markets:
+            if row.symbol != symbol or not row.last_price_ticks:
+                continue
+            return far_below_price_from_last_ticks(
+                int(row.last_price_ticks),
+                tick_size=tick_size,
+                symbol=symbol,
+            )
+    except Exception:
+        pass
+    return FAR_BELOW_BUY_PRICE_HINTS.get(symbol, "100")
+
+
+async def resolve_far_above_buy_stop_price(client, symbol: str, pair: dict) -> str:
+    """Market-aware far-above stop trigger price with static hint fallback."""
+    override = os.getenv("POLYESTER_TEST_TRIGGER_PRICE")
+    if override:
+        return override
+
+    tick_size = pair_tick_size(pair)
+    try:
+        overview = await client.market_overview.list(symbols=[symbol], limit=5)
+        for row in overview.markets:
+            if row.symbol != symbol or not row.last_price_ticks:
+                continue
+            last = int(row.last_price_ticks)
+            from polyester.codecs.scalars import align_price_ticks, format_price_ticks
+
+            target_ticks = align_price_ticks(max(last * 2, last + 1), tick_size)
+            return format_price_ticks(target_ticks)
+    except Exception:
+        pass
+    return FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(symbol, "50000")
+
+
 def min_base_qty_for_pair(pair: dict, price: str) -> str:
     step_size = Decimal(pair.get("stepSize") or pair.get("step_size") or "0.001")
     min_qty_base = Decimal(pair.get("minQtyBase") or pair.get("min_qty_base") or step_size)
@@ -186,7 +260,7 @@ def batch_results_are_all_internal_error(results) -> bool:
 
 def devnet_order_skip_message() -> str:
     return (
-        "Devnet order placement returned INTERNAL_ERROR for ETH-USDT USDT-funded buys; "
+        "Devnet order placement returned INTERNAL_ERROR for USDT-funded buys; "
         "check OMS on devnet"
     )
 

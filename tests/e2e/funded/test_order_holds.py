@@ -15,17 +15,17 @@ from tests.helpers import (
 @pytest.mark.integration
 @pytest.mark.funded
 async def test_order_hold_visible_while_open(
-    live_client, smoke_symbol, funded_enabled, require_trading_balance, capabilities
+    live_client, trade_symbol, funded_enabled, require_trade_trading_balance, capabilities
 ):
     if not capabilities["list_holds"]:
         pytest.skip("list_holds unavailable on devnet")
 
-    price, qty = await usdt_funded_buy_limit_params(live_client, smoke_symbol)
+    price, qty = await usdt_funded_buy_limit_params(live_client, trade_symbol)
     client_order_id = unique_client_order_id("hold")
 
     try:
         created = await live_client.orders.create(
-            symbol=smoke_symbol,
+            symbol=trade_symbol,
             side="buy",
             order_type="limit",
             tif="gtc",
@@ -49,7 +49,7 @@ async def test_order_hold_visible_while_open(
         spot = await live_client.market_data.get_spot_config()
         quote_asset_id = quote_asset_id_for_symbol(
             spot.raw,
-            smoke_symbol,
+            trade_symbol,
             zipper_raw=live_client.catalogs.zipper_config,
         )
         assert quote_asset_id is not None
@@ -59,4 +59,7 @@ async def test_order_hold_visible_while_open(
             for hold in holds.holds
         )
     finally:
-        await live_client.orders.cancel(client_order_id=client_order_id, symbol=smoke_symbol)
+        await live_client.orders.cancel(
+            client_order_id=client_order_id,
+            symbol=trade_symbol,
+        )

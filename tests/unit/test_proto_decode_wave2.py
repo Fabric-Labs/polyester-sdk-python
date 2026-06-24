@@ -149,7 +149,9 @@ def test_orderbook_from_proto() -> None:
         bids=[orderbook_pb2.PriceLevel(price_ticks=100, qty_scaled=50)],
         asks=[orderbook_pb2.PriceLevel(price_ticks=101, qty_scaled=25)],
     )
-    result = orderbook_from_proto(msg, symbol="BTC-USD", depth=50)
+    result = orderbook_from_proto(msg, symbol="BTC-USD", depth=50, quantity_scale=8)
     assert result.book_seq == "42"
     assert len(result.bids) == 1
+    assert result.bids[0].price == "0.0001"
+    assert result.bids[0].qty == "0.0000005"
     assert result.bids[0].price_ticks == "100"

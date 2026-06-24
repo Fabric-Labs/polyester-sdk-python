@@ -23,9 +23,9 @@ async def test_internal_transfer_tiny(
 
     spot = await live_client.market_data.get_spot_config()
     live_client.catalogs.hydrate_spot_config(spot.raw)
-    if not live_client.catalogs.zipper_config:
+    if not live_client.catalogs.zipper:
         zipper = await live_client.zipper.get_deposit_withdraw_config()
-        live_client.catalogs.hydrate_zipper_config(zipper.raw)
+        live_client.catalogs.hydrate_zipper_config(zipper)
 
     asset_id = quote_asset_id_for_symbol(
         spot.raw,

@@ -1,6 +1,7 @@
 import pytest
 
 from polyester.models import ApiData, MarketOverviewList
+from polyester.models.zipper import DepositWithdrawConfig
 from tests.integration.support import assert_api_data_shape, call_optional, call_required
 
 
@@ -35,8 +36,9 @@ async def test_zipper_get_deposit_withdraw_config(live_client) -> None:
         live_client.zipper.get_deposit_withdraw_config(),
         label="zipper.get_deposit_withdraw_config",
     )
-    assert isinstance(result, ApiData)
-    assert_api_data_shape(result.raw, "assets", "chains")
+    assert isinstance(result, DepositWithdrawConfig)
+    assert isinstance(result.assets, list)
+    assert isinstance(result.chains, list)
 
 
 @pytest.mark.integration
@@ -46,10 +48,10 @@ async def test_chain_analytics_unified_balances_series_shape(live_client) -> Non
         live_client.zipper.get_deposit_withdraw_config(),
         label="zipper.get_deposit_withdraw_config",
     )
-    assets = zipper.raw.get("assets") or []
+    assets = zipper.assets if zipper is not None else []
     if not assets:
         pytest.skip("zipper config missing assets")
-    asset_id = int(assets[0].get("ledgerId") or assets[0].get("ledger_id") or 0)
+    asset_id = int(assets[0].ledger_id or 0)
     if asset_id <= 0:
         pytest.skip("cannot resolve asset id for chain analytics")
     result = await call_optional(

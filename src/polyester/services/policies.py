@@ -45,7 +45,7 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
 def _market_scope_to_proto(value: str | None) -> int:
@@ -99,7 +99,7 @@ def _perp_markets_to_proto(values: list[dict[str, Any]] | None) -> list[PerpMark
     return rules
 
 
-class AsyncPoliciesService(BaseService):
+class AsyncPoliciesService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -136,6 +136,7 @@ class AsyncPoliciesService(BaseService):
         *,
         name: str,
         description: str = "",
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         spot_markets: list[dict[str, Any]] | None = None,
         perp_markets: list[dict[str, Any]] | None = None,
@@ -174,7 +175,7 @@ class AsyncPoliciesService(BaseService):
             locked=locked,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -293,11 +294,12 @@ class AsyncPoliciesService(BaseService):
     async def set_subaccount_policy(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         policy_id: str,
     ) -> None:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -446,6 +448,3 @@ class AsyncPoliciesService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_subaccount_policy_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

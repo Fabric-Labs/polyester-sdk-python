@@ -61,10 +61,14 @@ exclude = ["src/polyester/gen"]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
+addopts = ["-ra"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = [
+  "ignore:SelectableGroups dict interface is deprecated\\. Use select\\.:DeprecationWarning:opentelemetry\\.util\\._importlib_metadata",
+]
 markers = [
   "integration: live devnet (requires POLYESTER_* env)",
   "mutation: writes state on devnet",
@@ -72,6 +76,7 @@ markers = [
   "treasury: withdraw/guard ops",
   "realtime: Centrifugo subscriptions",
   "optional: may skip when route unavailable",
+  "jwt_session: JWT/session or app-user route; not part of API-key SDK acceptance",
   "smoke: shallow live RPC check (shape only; empty results OK)",
 ]
 

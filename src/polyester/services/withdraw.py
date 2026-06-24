@@ -12,10 +12,10 @@ from polyester.gen.chain.withdraw.v1.withdraw_connect import WithdrawServiceClie
 from polyester.models import WithdrawIntentResult
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncWithdrawService(BaseService):
+class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
     """Trading withdraw intents (trading → funding or external chain)."""
 
     def __init__(self, transport, default_sub_account_id: str | None) -> None:
@@ -29,6 +29,7 @@ class AsyncWithdrawService(BaseService):
         quantity: str,
         payload_signature: bytes,
         idempotency_key: str | None = None,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         destination_address: str = "",
         amount_scale: int = 18,
@@ -59,6 +60,7 @@ class AsyncWithdrawService(BaseService):
         destination_chain_id: int,
         destination_address: str,
         idempotency_key: str | None = None,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         amount_scale: int = 18,
     ) -> WithdrawIntentResult:
@@ -92,6 +94,7 @@ class AsyncWithdrawService(BaseService):
         idempotency_key: str,
         payload_signature: bytes,
         signer_wallet: str,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         destination_chain_id: int = 0,
         deadline_ts_sec: int | None = None,
@@ -116,7 +119,7 @@ class AsyncWithdrawService(BaseService):
             payload_signature=payload_signature,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -139,6 +142,3 @@ class AsyncWithdrawService(BaseService):
             request,
             withdraw_intent_from_proto,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

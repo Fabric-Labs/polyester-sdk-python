@@ -34,9 +34,9 @@ def _maker_credentials() -> tuple[str, str] | None:
 async def _hydrate_test_catalogs(client) -> tuple[dict, dict]:
     spot = await client.market_data.get_spot_config()
     client.catalogs.hydrate_spot_config(spot.raw)
-    if not client.catalogs.zipper_config:
+    if not client.catalogs.zipper:
         zipper = await client.zipper.get_deposit_withdraw_config()
-        client.catalogs.hydrate_zipper_config(zipper.raw)
+        client.catalogs.hydrate_zipper_config(zipper)
     return spot.raw, client.catalogs.zipper_config
 
 

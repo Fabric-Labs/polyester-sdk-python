@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from polyester.codecs.scalars import parse_price_ticks
+from polyester.codecs.scalars import format_price_ticks, format_qty_scaled, parse_price_ticks
 from polyester.models import OrderbookData, OrderbookLevel
 from polyester.models.realtime import OrderBookDeltaUpdate
 
@@ -55,12 +55,31 @@ def bucket_side(book: BookSide, bucket_ticks: int | None) -> BookSide:
     return aggregated
 
 
+def format_orderbook_level(
+    *,
+    price_ticks: int,
+    qty_scaled: int,
+    quantity_scale: int,
+) -> OrderbookLevel:
+    price = format_price_ticks(price_ticks)
+    qty = format_qty_scaled(qty_scaled, quantity_scale)
+    return OrderbookLevel(
+        price=price,
+        qty=qty,
+        price_ticks=str(price_ticks),
+        qty_scaled=str(qty_scaled),
+        price_display=price,
+        qty_display=qty,
+    )
+
+
 def side_to_levels(
     book: BookSide,
     *,
     side: str,
     limit: int,
     bucket_ticks: int | None = None,
+    quantity_scale: int = 8,
 ) -> list[OrderbookLevel]:
     view = bucket_side(book, bucket_ticks)
     entries = list(view.items())
@@ -69,7 +88,11 @@ def side_to_levels(
         reverse=side == "bids",
     )
     return [
-        OrderbookLevel(price_ticks=str(price), qty_scaled=str(qty))
+        format_orderbook_level(
+            price_ticks=price,
+            qty_scaled=qty,
+            quantity_scale=quantity_scale,
+        )
         for price, qty in entries[:limit]
     ]
 
@@ -82,13 +105,26 @@ def build_orderbook_data(
     bids: BookSide,
     asks: BookSide,
     bucket_ticks: int | None = None,
+    quantity_scale: int = 8,
 ) -> OrderbookData:
     return OrderbookData(
         symbol=symbol,
         depth=depth,
         book_seq=str(book_seq),
-        bids=side_to_levels(bids, side="bids", limit=depth, bucket_ticks=bucket_ticks),
-        asks=side_to_levels(asks, side="asks", limit=depth, bucket_ticks=bucket_ticks),
+        bids=side_to_levels(
+            bids,
+            side="bids",
+            limit=depth,
+            bucket_ticks=bucket_ticks,
+            quantity_scale=quantity_scale,
+        ),
+        asks=side_to_levels(
+            asks,
+            side="asks",
+            limit=depth,
+            bucket_ticks=bucket_ticks,
+            quantity_scale=quantity_scale,
+        ),
     )
 
 

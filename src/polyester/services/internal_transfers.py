@@ -11,10 +11,10 @@ from polyester.gen.transfer.v1.internal_transfer_pb2 import CreateInternalTransf
 from polyester.models import InternalTransferResult
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncInternalTransfersService(BaseService):
+class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -31,6 +31,7 @@ class AsyncInternalTransfersService(BaseService):
         asset_id: int,
         quantity: str,
         idempotency_key: str,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         destination_account_id: str | int | None = None,
         destination_subaccount_id: str | int | None = None,
@@ -53,7 +54,7 @@ class AsyncInternalTransfersService(BaseService):
             idempotency_key=idempotency_key,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -74,6 +75,3 @@ class AsyncInternalTransfersService(BaseService):
             request,
             internal_transfer_from_proto,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

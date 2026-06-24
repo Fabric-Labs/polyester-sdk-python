@@ -13,10 +13,10 @@ from polyester.gen.chain.deposit.v1.deposit_pb2 import (
 from polyester.models import DepositAddress, DepositAddressesList
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncDepositService(BaseService):
+class AsyncDepositService(ScopedSubAccountMixin, BaseService):
     def __init__(self, transport, default_sub_account_id: str | None) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
@@ -25,11 +25,12 @@ class AsyncDepositService(BaseService):
         self,
         *,
         chain_id: int,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> DepositAddressesList:
         request = ListDepositAddressesRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -45,11 +46,12 @@ class AsyncDepositService(BaseService):
         self,
         *,
         chain_id: int,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> DepositAddress:
         request = CreateDepositAddressRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -63,6 +65,3 @@ class AsyncDepositService(BaseService):
         if result.deposit_address:
             return result
         return DepositAddress(chain_id=chain_id)
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

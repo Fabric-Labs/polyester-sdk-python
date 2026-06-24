@@ -57,10 +57,10 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncAddressBookService(BaseService):
+class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -86,6 +86,7 @@ class AsyncAddressBookService(BaseService):
     async def list_entries(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         kind: str | None = None,
         limit: int = 50,
@@ -93,7 +94,7 @@ class AsyncAddressBookService(BaseService):
     ) -> AddressBookEntriesList:
         request = ListAddressBookEntriesRequest(limit=limit)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -113,6 +114,7 @@ class AsyncAddressBookService(BaseService):
         self,
         *,
         label: str,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         note: str = "",
         kind: str,
@@ -124,7 +126,7 @@ class AsyncAddressBookService(BaseService):
     ) -> AddressBookEntry:
         request = CreateAddressBookEntryRequest(label=label, note=note)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -219,12 +221,15 @@ class AsyncAddressBookService(BaseService):
         self,
         *,
         address_book_entry_id: str,
+        account: AccountScope | None = None,
         target_sub_account_id: str | None = None,
     ) -> AddressBookEntry:
         request = CopyAddressBookEntryRequest(
             address_book_entry_id=id_to_int(address_book_entry_id, "address_book_entry_id")
         )
-        parsed_target = parse_optional_subaccount_id(target_sub_account_id)
+        parsed_target = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(target_sub_account_id, account=account)
+        )
         if parsed_target is not None:
             request.target_subaccount_id = parsed_target
         return await unary_auth_decoded(
@@ -239,12 +244,13 @@ class AsyncAddressBookService(BaseService):
         self,
         *,
         name: str,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         color: str = "",
     ) -> AddressBookTag:
         request = CreateAddressBookTagRequest(name=name, color=color)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -287,6 +293,7 @@ class AsyncAddressBookService(BaseService):
     async def list_transfer_counterparties(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         direction: str | None = None,
         kind: str | None = None,
@@ -294,7 +301,7 @@ class AsyncAddressBookService(BaseService):
     ) -> TransferCounterpartiesList:
         request = ListTransferCounterpartiesRequest(limit=limit)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -313,6 +320,7 @@ class AsyncAddressBookService(BaseService):
     async def list_transfer_destinations(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         kind: str = "internal_account",
         limit: int = 50,
@@ -323,7 +331,7 @@ class AsyncAddressBookService(BaseService):
             limit=limit,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -340,13 +348,14 @@ class AsyncAddressBookService(BaseService):
     async def list_internal_transfer_whitelist_entries(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         limit: int = 50,
         page_token: str | None = None,
     ) -> InternalTransferWhitelistEntriesList:
         request = ListInternalTransferWhitelistEntriesRequest(limit=limit)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -363,11 +372,12 @@ class AsyncAddressBookService(BaseService):
     async def get_withdraw_whitelist_view(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> WithdrawWhitelistView | None:
         request = GetWithdrawWhitelistViewRequest()
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -382,12 +392,13 @@ class AsyncAddressBookService(BaseService):
     async def get_view(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         limit: int = 50,
     ) -> AddressBookView:
         request = GetAddressBookViewRequest(limit=limit)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -411,6 +422,3 @@ class AsyncAddressBookService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_address_book_invalidation_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

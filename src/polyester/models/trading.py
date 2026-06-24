@@ -70,6 +70,8 @@ class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     latest_step: str = ""
     is_open: bool = False
     is_terminal: bool = False
+    owner_account_id: str = ""
+    smart_account_address: str = ""
 
 
 class LifecycleFlowsList(msgspec.Struct, kw_only=True, omit_defaults=True):

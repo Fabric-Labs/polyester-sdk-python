@@ -31,10 +31,10 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncBalancesService(BaseService):
+class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -62,11 +62,12 @@ class AsyncBalancesService(BaseService):
     async def list(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> BalancesList:
         request = GetBalancesRequest()
         resolved = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if resolved is not None:
             request.subaccount_id = resolved
@@ -81,6 +82,7 @@ class AsyncBalancesService(BaseService):
     async def get_balance_history(
         self,
         *,
+        account: AccountScope | None = None,
         range: str = "7d",
         sub_account_id: str | None = None,
         ledger: int = 0,
@@ -91,7 +93,7 @@ class AsyncBalancesService(BaseService):
             ledger=ledger,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -108,6 +110,7 @@ class AsyncBalancesService(BaseService):
     async def get_equity_history(
         self,
         *,
+        account: AccountScope | None = None,
         range: str = "7d",
         sub_account_id: str | None = None,
         account_codes: list[int] | None = None,
@@ -118,7 +121,7 @@ class AsyncBalancesService(BaseService):
             group_by=resolve_equity_group_by(group_by),
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -135,13 +138,14 @@ class AsyncBalancesService(BaseService):
     async def list_holds(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         limit: int = 50,
         reversed: bool = False,
     ) -> HoldsList:
         request = ListHoldsRequest(limit=limit, reversed=reversed)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -165,6 +169,3 @@ class AsyncBalancesService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_asset_balance_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

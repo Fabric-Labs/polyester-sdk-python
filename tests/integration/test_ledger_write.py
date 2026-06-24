@@ -16,10 +16,10 @@ async def test_ledger_write_transfer_trading_to_trading_route(live_client) -> No
     if not to_account:
         pytest.skip("POLYESTER_TEST_INTERNAL_TRANSFER_DEST required for ledger_write smoke")
     zipper = await live_client.zipper.get_deposit_withdraw_config()
-    assets = zipper.raw.get("assets") or []
+    assets = zipper.assets
     if not assets:
         pytest.skip("zipper config missing assets")
-    ledger_id = int(assets[0].get("ledgerId") or assets[0].get("ledger_id") or 0)
+    ledger_id = int(assets[0].ledger_id or 0)
     if ledger_id <= 0:
         pytest.skip("cannot resolve ledger id")
     result = await call_optional(

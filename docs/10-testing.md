@@ -53,11 +53,24 @@ These orders reserve a small amount of USDT and are cancelled in cleanup — the
 | Marker | Meaning |
 |--------|---------|
 | `integration` | Live devnet RPC |
-| `smoke` | Shallow check — empty lists OK |
+| `smoke` | Shallow route/decode check — empty lists OK |
 | `mutation` / `funded` / `treasury` | Env-gated write tiers |
 | `optional` | Skip when route/auth unavailable |
+| `jwt_session` | JWT/session or app-user route — not part of API-key acceptance |
 
-Run proof-style order tests (not smoke): include tests without `smoke`, e.g. `test_orders_get_round_trips_list_open`.
+Smoke tests are useful health checks, but they are not proof of end-to-end behavior. A
+smoke test may pass with an empty list if it verified auth, routing, decoding, and
+response shape. Representative SDK health comes from unit request/codec assertions,
+non-smoke integrations that validate fields or round-trip existing records, and e2e
+mutation/funded tests when devnet prerequisites are available.
+
+The SDK is API-key-first. JWT/session app routes can stay as compatibility surfaces
+when the generated/client code exists, but they should not be part of API-key release
+acceptance unless API-key auth is supported by the backend route. Mark those tests
+`jwt_session` and keep them optional under API-key devnet credentials.
+
+Run proof-style order tests (not smoke): include tests without `smoke`, e.g.
+`test_orders_get_round_trips_list_open`.
 
 ### Known devnet limitations
 
@@ -67,7 +80,10 @@ Run proof-style order tests (not smoke): include tests without `smoke`, e.g. `te
 
 ## Commands
 
-Full suite (typical devnet account): **214 collected**, **~198 passed / ~16 skipped**, 0 failed.
+Full suite (typical devnet account): **226 collected**, **~210 passed / ~16 skipped**, 0 failed.
+
+Pytest is configured with `-ra` so skipped tests are listed with reasons at the end of
+each run. Treat new or unexplained skips as failures in practice.
 
 ```bash
 # Unit + live tiers (reads .env)
@@ -76,8 +92,11 @@ Full suite (typical devnet account): **214 collected**, **~198 passed / ~16 skip
 # CI (no network)
 pytest tests/unit -q
 
-# Read-only live validation
-pytest tests/integration tests/e2e -m "integration and not mutation and not funded" -v
+# API-key read-only live validation
+pytest tests/integration tests/e2e -m "integration and not mutation and not funded and not jwt_session" -v
+
+# Optional JWT/session/app compatibility probes
+pytest tests/integration tests/e2e -m "jwt_session" -v
 
 # Shallow smoke only
 pytest tests/ -m "integration and smoke" -v
@@ -124,6 +143,16 @@ python scripts/smoke_test.py
 | **E2E** (`tests/e2e`) | Multi-step flows across services | Cross-service inconsistencies |
 
 `@pytest.mark.optional` skips when a route is not mounted on devnet. Tests **without** `optional` fail loudly if the route 404s — use that for services that must work on devnet (auth, balances, api keys).
+
+### Representative-test checklist
+
+- Prefer unit tests that assert exact protobuf request fields and decode behavior.
+- Mark live shape-only checks as `smoke`; do not rely on them as proof of business behavior.
+- Mark JWT/session or app-user routes as `jwt_session`; they are compatibility probes,
+  not API-key SDK acceptance.
+- Add a non-smoke integration whenever a devnet account can provide real data to validate.
+- For list endpoints, assert item fields when rows exist and add a separate round-trip/proof test when emptiness would make the check vacuous.
+- Skip only for explicit environment prerequisites, known devnet/backend gaps, or optional routes; unexpected auth, decode, validation, or mounted-route failures should fail.
 
 ### Coverage map (integration files)
 

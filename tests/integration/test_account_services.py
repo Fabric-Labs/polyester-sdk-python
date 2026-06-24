@@ -8,6 +8,7 @@ from tests.integration.support import call_optional, call_required
 
 @pytest.mark.integration
 @pytest.mark.optional
+@pytest.mark.jwt_session
 async def test_resolve_account_by_env_account_id(live_client) -> None:
     account_id = os.getenv("POLYESTER_ACCOUNT_ID")
     if not account_id:

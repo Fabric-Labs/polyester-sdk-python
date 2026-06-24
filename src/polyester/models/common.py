@@ -12,8 +12,10 @@ CreateOrderResult = OrderMutationResult
 
 
 class OrderbookLevel(msgspec.Struct, kw_only=True, omit_defaults=True):
-    price_ticks: str
-    qty_scaled: str
+    price: str = ""
+    qty: str = ""
+    price_ticks: str = ""
+    qty_scaled: str = ""
     price_display: str | None = None
     qty_display: str | None = None
 

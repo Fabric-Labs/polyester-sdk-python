@@ -10,10 +10,10 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncTransfersService(BaseService):
+class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -30,6 +30,7 @@ class AsyncTransfersService(BaseService):
     async def list(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         limit: int = 50,
         reversed: bool = False,
@@ -37,7 +38,7 @@ class AsyncTransfersService(BaseService):
     ) -> TransfersList:
         request = ListTransfersRequest(limit=limit, reversed=reversed)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -63,6 +64,3 @@ class AsyncTransfersService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_ledger_transfer_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

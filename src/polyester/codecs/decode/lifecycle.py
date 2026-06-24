@@ -3,6 +3,7 @@ from __future__ import annotations
 from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
 from polyester.models import LifecycleFlowsList, LifecycleFlowSummary
+from polyester.services._scope import lifecycle_account_fields
 
 FlowDetailView = lifecycle_read_pb2.FlowDetailView
 FlowSummaryView = lifecycle_read_pb2.FlowSummaryView
@@ -22,6 +23,7 @@ def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> Lifecycl
         latest_step=proto_enum_name(lifecycle_read_pb2.FlowStep, msg.current_step),
         is_open=bool(msg.is_open),
         is_terminal=bool(msg.is_terminal),
+        **lifecycle_account_fields(msg),
     )
 
 
@@ -32,6 +34,7 @@ def flow_tx_match_from_proto(msg: FlowTxMatchView) -> LifecycleFlowSummary:
         latest_step=proto_enum_name(lifecycle_read_pb2.FlowStep, msg.current_step),
         is_open=bool(msg.is_open),
         is_terminal=bool(msg.is_terminal),
+        **lifecycle_account_fields(msg),
     )
 
 

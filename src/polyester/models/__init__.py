@@ -77,6 +77,16 @@ from polyester.models.sub_accounts import (
     SubAccountMembersList,
     SubAccountsList,
 )
+from polyester.models.zipper import (
+    DepositWithdrawConfig,
+    ZipperAssetConfig,
+    ZipperCatalogData,
+    ZipperChainConfig,
+    ZipperEnrichedAssetChain,
+    ZipperEnrichedAssetConfig,
+    ZippedAssetSupplyBatch,
+    ZippedAssetSupplyUpdate,
+)
 from polyester.models.trading import (
     ApiKeysList,
     ApiKeySummary,
@@ -161,7 +171,7 @@ __all__ = [
     "CreateOrderRequest",
     "CreateOrderResult",
     "CreateSubaccountResult",
-    "DepositAddress",
+    "DepositWithdrawConfig",
     "DepositAddressesList",
     "Ed25519Keypair",
     "EquityHistory",
@@ -234,4 +244,11 @@ __all__ = [
     "UsernameHistoryList",
     "WithdrawIntentResult",
     "WithdrawWhitelistView",
+    "ZipperAssetConfig",
+    "ZipperCatalogData",
+    "ZipperChainConfig",
+    "ZipperEnrichedAssetChain",
+    "ZipperEnrichedAssetConfig",
+    "ZippedAssetSupplyBatch",
+    "ZippedAssetSupplyUpdate",
 ]

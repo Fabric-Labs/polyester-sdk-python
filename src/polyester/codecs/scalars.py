@@ -43,6 +43,20 @@ def format_price_ticks(ticks: int) -> str:
     return f"-{trimmed}" if neg else trimmed
 
 
+def format_qty_scaled(qty_scaled: int, scale: int) -> str:
+    """Convert scaled integer quantity to a decimal string."""
+    if scale <= 0:
+        return str(int(qty_scaled))
+    neg = qty_scaled < 0
+    digits = str(abs(int(qty_scaled)))
+    padded = digits.zfill(scale + 1)
+    head = padded[:-scale]
+    tail = padded[-scale:]
+    raw = f"{head}.{tail}"
+    trimmed = raw.rstrip("0").rstrip(".") or "0"
+    return f"-{trimmed}" if neg else trimmed
+
+
 def align_price_ticks(price_ticks: int, tick_size: str) -> int:
     step = parse_price_ticks(tick_size, "tick_size")
     if step <= 0:

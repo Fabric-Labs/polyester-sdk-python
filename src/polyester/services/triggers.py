@@ -35,10 +35,10 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncTriggersService(BaseService):
+class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -57,6 +57,7 @@ class AsyncTriggersService(BaseService):
     async def list(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         symbol: str | None = None,
         limit: int = 50,
@@ -66,7 +67,7 @@ class AsyncTriggersService(BaseService):
         if page_token:
             request.page_token = page_token
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -83,12 +84,13 @@ class AsyncTriggersService(BaseService):
     async def get(
         self,
         *,
+        account: AccountScope | None = None,
         trigger_id: str | int,
         sub_account_id: str | None = None,
     ) -> Trigger | None:
         request = GetTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -103,6 +105,7 @@ class AsyncTriggersService(BaseService):
     async def create(
         self,
         *,
+        account: AccountScope | None = None,
         symbol: str,
         trigger_type: str,
         trigger_price: str,
@@ -127,7 +130,7 @@ class AsyncTriggersService(BaseService):
             limit_price=limit_price,
             trigger_price_source=trigger_price_source,
             tif=tif,
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             client_trigger_id=client_trigger_id,
             post_only=post_only,
             quantity_scale=scale,
@@ -143,12 +146,13 @@ class AsyncTriggersService(BaseService):
     async def cancel(
         self,
         *,
+        account: AccountScope | None = None,
         trigger_id: str | int,
         sub_account_id: str | None = None,
     ) -> TriggerMutationResult:
         request = CancelTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -163,6 +167,7 @@ class AsyncTriggersService(BaseService):
     async def modify(
         self,
         *,
+        account: AccountScope | None = None,
         trigger_id: str | int,
         sub_account_id: str | None = None,
         trigger_price: str | None = None,
@@ -175,7 +180,7 @@ class AsyncTriggersService(BaseService):
     ) -> TriggerMutationResult:
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             trigger_price=trigger_price,
             limit_price=limit_price,
             trailing_distance_ticks=trailing_distance_ticks,
@@ -195,12 +200,13 @@ class AsyncTriggersService(BaseService):
     async def pause(
         self,
         *,
+        account: AccountScope | None = None,
         trigger_id: str | int,
         sub_account_id: str | None = None,
     ) -> TriggerMutationResult:
         request = PauseTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -215,12 +221,13 @@ class AsyncTriggersService(BaseService):
     async def resume(
         self,
         *,
+        account: AccountScope | None = None,
         trigger_id: str | int,
         sub_account_id: str | None = None,
     ) -> TriggerMutationResult:
         request = ResumeTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -235,6 +242,7 @@ class AsyncTriggersService(BaseService):
     async def list_events(
         self,
         *,
+        account: AccountScope | None = None,
         trigger_id: str | int,
         sub_account_id: str | None = None,
         limit: int = 50,
@@ -245,7 +253,7 @@ class AsyncTriggersService(BaseService):
             limit=limit,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -289,6 +297,3 @@ class AsyncTriggersService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_trigger_event_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

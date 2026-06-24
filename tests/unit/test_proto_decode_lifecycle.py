@@ -13,12 +13,16 @@ def test_flow_summary_from_proto() -> None:
         current_step=lifecycle_read_pb2.FLOW_STEP_SETTLEMENT,
         is_open=False,
         is_terminal=True,
+        owner_account_id=99,
+        smart_account_address="0xabc",
     )
     flow = flow_summary_from_proto(msg)
     assert flow.intent_id == "flow-abc"
     assert flow.flow_kind == "deposit"
     assert flow.latest_step == "settlement"
     assert flow.is_terminal is True
+    assert flow.owner_account_id
+    assert flow.smart_account_address == "0xabc"
 
 
 def test_flow_from_get_response_unwraps_detail_summary() -> None:

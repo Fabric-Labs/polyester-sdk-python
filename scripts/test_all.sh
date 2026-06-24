@@ -18,8 +18,8 @@ if [[ -z "${POLYESTER_API_KEY_ID:-}" || -z "${POLYESTER_API_PRIVATE_KEY:-}" ]]; 
   exit 0
 fi
 
-echo "==> integration (read-only)"
-pytest tests/integration tests/e2e -m "integration and not mutation and not funded" -v
+echo "==> integration (API-key read-only)"
+pytest tests/integration tests/e2e -m "integration and not mutation and not funded and not jwt_session" -v
 
 if [[ "${POLYESTER_TEST_MUTATION:-}" =~ ^(1|true|yes)$ ]]; then
   echo "==> mutation"

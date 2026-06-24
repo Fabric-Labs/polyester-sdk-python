@@ -13,6 +13,7 @@ async def test_auth_me_returns_identity_fields(live_client) -> None:
 
 @pytest.mark.integration
 @pytest.mark.optional
+@pytest.mark.jwt_session
 async def test_profile_get_matches_me_username_when_present(live_client) -> None:
     me = await call_required(live_client.auth.me(), label="auth.me")
     profile = await call_optional(live_client.auth.profile.get(), label="profile.get")
@@ -23,6 +24,7 @@ async def test_profile_get_matches_me_username_when_present(live_client) -> None
 
 @pytest.mark.integration
 @pytest.mark.optional
+@pytest.mark.jwt_session
 async def test_profile_username_history_is_list(live_client) -> None:
     result = await call_optional(
         live_client.auth.profile.get_username_history(),

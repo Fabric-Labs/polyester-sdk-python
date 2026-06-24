@@ -48,7 +48,7 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
 def _subaccount_role_to_proto(value: str) -> int:
@@ -78,7 +78,7 @@ def _invite_action_to_proto(value: str) -> int:
     return action
 
 
-class AsyncSubAccountsService(BaseService):
+class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -104,6 +104,7 @@ class AsyncSubAccountsService(BaseService):
     async def get(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         include_api_keys: bool = False,
         include_members: bool = False,
@@ -113,7 +114,7 @@ class AsyncSubAccountsService(BaseService):
         invites_direction: str = "",
     ) -> GetSubaccountResult:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -166,6 +167,7 @@ class AsyncSubAccountsService(BaseService):
     async def update(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         label: str = "",
         icon: str = "",
@@ -173,7 +175,7 @@ class AsyncSubAccountsService(BaseService):
         status: str = "",
     ) -> None:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -191,18 +193,28 @@ class AsyncSubAccountsService(BaseService):
             lambda _msg: None,
         )
 
-    async def delete(self, *, sub_account_id: str | None = None) -> None:
+    async def delete(
+        self,
+        *,
+        account: AccountScope | None = None,
+        sub_account_id: str | None = None,
+    ) -> None:
         """Soft-delete a subaccount by setting status to deleted."""
-        await self.update(sub_account_id=sub_account_id, status="deleted")
+        await self.update(
+            account=account,
+            sub_account_id=sub_account_id,
+            status="deleted",
+        )
 
     async def set_member_mfa_requirement(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         require_member_mfa: bool,
     ) -> None:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -220,10 +232,11 @@ class AsyncSubAccountsService(BaseService):
     async def list_members(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> SubAccountMembersList:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -238,11 +251,12 @@ class AsyncSubAccountsService(BaseService):
     async def remove_member(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         grantee_account_id: str,
     ) -> None:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -260,12 +274,13 @@ class AsyncSubAccountsService(BaseService):
     async def update_member_role(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         grantee_account_id: str,
         role: str,
     ) -> None:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -284,12 +299,13 @@ class AsyncSubAccountsService(BaseService):
     async def invite_member(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         grantee_account_id: str,
         role: str,
     ) -> SubAccountInvite | None:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -334,12 +350,13 @@ class AsyncSubAccountsService(BaseService):
     async def list_activity(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         limit: int = 50,
         page_token: str | None = None,
     ) -> SubAccountActivityList:
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
@@ -379,6 +396,3 @@ class AsyncSubAccountsService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_api_key_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

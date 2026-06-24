@@ -39,6 +39,10 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "optional: may skip when route unavailable on devnet")
     config.addinivalue_line(
         "markers",
+        "jwt_session: JWT/session or app-user route; not part of API-key SDK acceptance",
+    )
+    config.addinivalue_line(
+        "markers",
         "smoke: shallow live RPC check (shape only; empty results OK)",
     )
 
@@ -91,10 +95,10 @@ async def live_client(live_credentials):
 
 
 async def _ensure_zipper_catalog(live_client) -> None:
-    if live_client.catalogs.zipper_config:
+    if live_client.catalogs.zipper is not None:
         return
     zipper = await live_client.zipper.get_deposit_withdraw_config()
-    live_client.catalogs.hydrate_zipper_config(zipper.raw)
+    live_client.catalogs.hydrate_zipper_config(zipper)
 
 
 @pytest.fixture(scope="session")

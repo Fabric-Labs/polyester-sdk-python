@@ -35,10 +35,10 @@ from polyester.models.guard_signer import (
 )
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncGuardSignerService(BaseService):
+class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
     def __init__(self, transport, default_sub_account_id: str | None) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
@@ -46,11 +46,12 @@ class AsyncGuardSignerService(BaseService):
     async def create_wallet(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> CreateGuardSignerWalletResult:
         request = CreateGuardSignerWalletRequest()
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -65,11 +66,12 @@ class AsyncGuardSignerService(BaseService):
     async def get_status(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> GuardSignerStatus | None:
         request = GetGuardSignerStatusRequest()
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -85,6 +87,7 @@ class AsyncGuardSignerService(BaseService):
         self,
         *,
         action: str,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         external_polychain_chain_id: int | None = None,
         external_addresses: list[str] | None = None,
@@ -101,7 +104,7 @@ class AsyncGuardSignerService(BaseService):
             ),
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -117,6 +120,7 @@ class AsyncGuardSignerService(BaseService):
         self,
         *,
         actions: list[dict[str, Any]],
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> BatchSignProtectedActionsResult:
         items = []
@@ -134,7 +138,7 @@ class AsyncGuardSignerService(BaseService):
             )
         request = BatchSignProtectedActionsRequest(actions=items)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -149,11 +153,12 @@ class AsyncGuardSignerService(BaseService):
     async def rotate_wallet(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> RotateGuardSignerWalletResult:
         request = RotateGuardSignerWalletRequest()
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -168,11 +173,12 @@ class AsyncGuardSignerService(BaseService):
     async def export_wallet(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> ExportGuardSignerWalletResult:
         request = ExportGuardSignerWalletRequest()
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -183,6 +189,3 @@ class AsyncGuardSignerService(BaseService):
             request,
             export_wallet_from_proto,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

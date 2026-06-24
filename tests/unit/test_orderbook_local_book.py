@@ -89,11 +89,18 @@ def test_build_orderbook_data_sorts_sides() -> None:
     assert [level.price_ticks for level in data.asks] == ["110", "120"]
 
 
-def test_bucket_aggregation() -> None:
-    bids = {100_000_000: 10, 100_500_000: 25}
-    levels = side_to_levels(bids, side="bids", limit=10, bucket_ticks=1_000_000)
-    prices = {level.price_ticks for level in levels}
-    assert "100000000" in prices
+def test_bucket_aggregation_formats_decimal_levels() -> None:
+    bids = {100_000_000: 100_000_000}
+    levels = side_to_levels(
+        bids,
+        side="bids",
+        limit=10,
+        bucket_ticks=1_000_000,
+        quantity_scale=8,
+    )
+    assert levels[0].price == "100"
+    assert levels[0].qty == "1"
+    assert levels[0].price_ticks == "100000000"
 
 
 def test_parse_bucket_ticks() -> None:

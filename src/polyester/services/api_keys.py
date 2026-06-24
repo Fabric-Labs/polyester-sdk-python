@@ -29,10 +29,10 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
-class AsyncApiKeysService(BaseService):
+class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -49,11 +49,12 @@ class AsyncApiKeysService(BaseService):
     async def list(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> ApiKeysList:
         request = ListApiKeysRequest()
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -78,6 +79,7 @@ class AsyncApiKeysService(BaseService):
         self,
         *,
         label: str,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         icon: str = "",
         color: str = "",
@@ -86,7 +88,7 @@ class AsyncApiKeysService(BaseService):
     ) -> ApiKeySummary | None:
         request = CreateApiKeyRequest(label=label, icon=icon, color=color)
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -169,6 +171,3 @@ class AsyncApiKeysService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_api_key_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

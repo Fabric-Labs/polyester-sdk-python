@@ -19,9 +19,9 @@ Living snapshot of what `polyester-sdk` exposes today. Last full devnet run: **1
 | --- | --- | --- |
 | `market_data` | Done | spot config, trades, candles, columns, `get_current_candle`, `subscribe_trades`, `subscribe_candles` |
 | `market_overview` | Done | `list`, raw `subscribe`, `create_subscription` (snapshot merge) |
-| `orderbook` | Done | `get`, `subscribe_deltas`, `create_subscription` (snapshot + delta merge) |
+| `orderbook` | Done | `get`, `subscribe_deltas`, `create_subscription` (decimal levels + buckets) |
 | `heatmap` | Done | `get`, `subscribe_live` |
-| `zipper` | Partial | `get_deposit_withdraw_config`, `subscribe_zipped_asset_supply`; raw dict catalog |
+| `zipper` | Partial | typed `get_deposit_withdraw_config`, enriched `catalogs.zipper`, `subscribe_zipped_asset_supply` | Supply stream catalog patching |
 | `lifecycle` | Done | list/get + `subscribe_open_flows`, `subscribe_flow_detail` |
 | `balances` | Done | list, history, equity, holds, `get_health`, `subscribe` |
 | `orders` | Done | CRUD, batch, `cancel(symbol=…)`, `subscribe` |
@@ -56,7 +56,7 @@ Living snapshot of what `polyester-sdk` exposes today. Last full devnet run: **1
 
 | Tier | Count | Role |
 | --- | --- | --- |
-| Unit (`tests/unit`) | 161 | CI gate; codecs, auth, service wiring |
+| Unit (`tests/unit`) | 174+ | CI gate; codecs, auth, service wiring |
 | Integration + e2e (live) | 53 | Real devnet RPCs and multi-step flows |
 | **Full suite** | 214 collected | 198 pass + 16 skip on typical devnet account |
 
@@ -87,15 +87,14 @@ Commands: `docs/10-testing.md`, `./scripts/test_all.sh`, `pytest tests/unit -q` 
 1. **Order read-after-create** — `orders.create` returns `accepted` but `get` / `list_open` empty for 15s+ (Yvan/OMS).
 2. **`list_holds`** — mount on devnet gateway.
 3. **Spot fill e2e** — needs visible asks or second maker account + liquidity.
+4. **JWT/session routes** — profile, whiteboard, layout, polychart on API-key devnet.
 
-### SDK parity (not blocked)
+### SDK parity
 
-1. **Zipper typed catalog models** — replace raw `zipper_config` dict hydration.
-2. **`Polyester` sync facade** — broader coverage / ergonomics vs `AsyncPolyester`.
-3. **Orderbook bucket UX** — polish only; core snapshot+delta done.
+Done for bot-core scope: all services, `account=` on subaccount-scoped RPCs, sync `subscribe_sync` on all realtime surfaces.
 
-### Deferred
+### Deferred / ship
 
 - MFA (API-key step-up TBD)
-- `bridge` service
+- `bridge` / `tradews/v1` service wrappers
 - PyPI publish + pin `polyester-python-proto` per release

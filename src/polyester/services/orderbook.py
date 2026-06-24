@@ -48,7 +48,12 @@ class AsyncOrderbookService(BaseService):
             OrderbookServiceClient,
             lambda client, req: client.get_order_book(req),
             request,
-            lambda msg: orderbook_from_proto(msg, symbol=symbol, depth=depth),
+            lambda msg: orderbook_from_proto(
+                msg,
+                symbol=symbol,
+                depth=depth,
+                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol),
+            ),
         )
 
     async def subscribe_deltas(
@@ -112,6 +117,7 @@ class AsyncOrderbookService(BaseService):
                 bids=bids_map,
                 asks=asks_map,
                 bucket_ticks=bucket_ticks,
+                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol),
             )
             if on_event is not None:
                 on_event(data)

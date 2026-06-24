@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
+import threading
 from typing import Literal
 
 from polyester.auth import ACCOUNT_ID_ENV, load_api_key_credentials
@@ -35,6 +37,10 @@ from polyester.services import (
     AsyncWhiteboardService,
     AsyncWithdrawService,
     AsyncZipperService,
+)
+from polyester.sync_subscribe import (
+    SyncSubscription,
+    subscribe_sync as _subscribe_sync_impl,
 )
 from polyester.transport import TransportConfig, TransportFactory
 
@@ -93,7 +99,11 @@ class AsyncPolyester:
             self._transport,
             realtime=self.realtime,
         )
-        self.zipper = AsyncZipperService(self._transport, realtime=self.realtime)
+        self.zipper = AsyncZipperService(
+            self._transport,
+            catalogs=self.catalogs,
+            realtime=self.realtime,
+        )
         self.heatmap = AsyncHeatmapService(
             self._transport,
             self.catalogs,
@@ -203,9 +213,15 @@ class AsyncPolyester:
             pass
         try:
             zipper_config = await self.zipper.get_deposit_withdraw_config()
-            self.catalogs.hydrate_zipper_config(zipper_config.raw)
+            self.catalogs.hydrate_zipper_config(zipper_config)
         except Exception:
             pass
+
+    async def wait_for_catalogs(self) -> None:
+        if self._catalog_task is None:
+            return
+        with contextlib.suppress(asyncio.CancelledError):
+            await self._catalog_task
 
     async def __aenter__(self) -> AsyncPolyester:
         return self
@@ -222,30 +238,127 @@ class AsyncPolyester:
 class Polyester:
     def __init__(self, **config) -> None:
         self._loop = asyncio.new_event_loop()
-        self._client = self._loop.run_until_complete(self._create_client(config))
+        self._loop_thread = threading.Thread(
+            target=self._loop.run_forever,
+            name="polyester-sync-loop",
+            daemon=True,
+        )
+        self._loop_thread.start()
+        hydrate = config.get("hydrate_catalogs", True)
+        self._active_sync_subscriptions: list[SyncSubscription] = []
+
+        async def _bootstrap() -> AsyncPolyester:
+            client = AsyncPolyester(**config)
+            if hydrate:
+                await client.wait_for_catalogs()
+            return client
+
+        self._client = asyncio.run_coroutine_threadsafe(_bootstrap(), self._loop).result(
+            timeout=60
+        )
+        self.catalogs = self._client.catalogs
+        self.catalog = self.catalogs
         self.realtime = _SyncService(self._loop, self._client.realtime)
         self.auth = _SyncService(self._loop, self._client.auth)
+        self.auth.profile = _SyncSubscribeService(
+            self._loop,
+            self._client.auth.profile,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "subscribe_identity"},
+        )
         self.chain_analytics = _SyncService(self._loop, self._client.chain_analytics)
-        self.market_data = _SyncService(self._loop, self._client.market_data)
+        self.market_data = _SyncSubscribeService(
+            self._loop,
+            self._client.market_data,
+            self._active_sync_subscriptions,
+            subscribe_methods={
+                "subscribe_trades_sync": "subscribe_trades",
+                "subscribe_candles_sync": "subscribe_candles",
+            },
+        )
         self.candles = self.market_data
-        self.market_overview = _SyncService(self._loop, self._client.market_overview)
-        self.zipper = _SyncService(self._loop, self._client.zipper)
-        self.heatmap = _SyncService(self._loop, self._client.heatmap)
-        self.lifecycle = _SyncService(self._loop, self._client.lifecycle)
-        self.balances = _SyncService(self._loop, self._client.balances)
-        self.orderbook = _SyncService(self._loop, self._client.orderbook)
-        self.orders = _SyncService(self._loop, self._client.orders)
-        self.trades = _SyncService(self._loop, self._client.trades)
-        self.triggers = _SyncService(self._loop, self._client.triggers)
-        self.transfers = _SyncService(self._loop, self._client.transfers)
+        self.market_overview = _SyncSubscribeService(
+            self._loop,
+            self._client.market_overview,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "create_subscription"},
+        )
+        self.zipper = _SyncSubscribeService(
+            self._loop,
+            self._client.zipper,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "subscribe_zipped_asset_supply"},
+        )
+        self.heatmap = _SyncSubscribeService(
+            self._loop,
+            self._client.heatmap,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "subscribe_live"},
+        )
+        self.lifecycle = _SyncSubscribeService(
+            self._loop,
+            self._client.lifecycle,
+            self._active_sync_subscriptions,
+            subscribe_methods={
+                "subscribe_open_flows_sync": "subscribe_open_flows",
+                "subscribe_flow_detail_sync": "subscribe_flow_detail",
+            },
+        )
+        self.balances = _SyncSubscribeService(
+            self._loop, self._client.balances, self._active_sync_subscriptions
+        )
+        self.orderbook = _SyncSubscribeService(
+            self._loop,
+            self._client.orderbook,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "create_subscription"},
+        )
+        self.orders = _SyncSubscribeService(
+            self._loop, self._client.orders, self._active_sync_subscriptions
+        )
+        self.trades = _SyncSubscribeService(
+            self._loop, self._client.trades, self._active_sync_subscriptions
+        )
+        self.triggers = _SyncSubscribeService(
+            self._loop,
+            self._client.triggers,
+            self._active_sync_subscriptions,
+            subscribe_methods={
+                "subscribe_sync": "subscribe",
+                "subscribe_events_sync": "subscribe_events",
+            },
+        )
+        self.transfers = _SyncSubscribeService(
+            self._loop, self._client.transfers, self._active_sync_subscriptions
+        )
         self.internal_transfers = _SyncService(self._loop, self._client.internal_transfers)
         self.deposit = _SyncService(self._loop, self._client.deposit)
-        self.api_keys = _SyncService(self._loop, self._client.api_keys)
-        self.policies = _SyncService(self._loop, self._client.policies)
-        self.sub_accounts = _SyncService(self._loop, self._client.sub_accounts)
+        self.api_keys = _SyncSubscribeService(
+            self._loop, self._client.api_keys, self._active_sync_subscriptions
+        )
+        self.policies = _SyncSubscribeService(
+            self._loop,
+            self._client.policies,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "subscribe_subaccount_policies"},
+        )
+        self.sub_accounts = _SyncSubscribeService(
+            self._loop,
+            self._client.sub_accounts,
+            self._active_sync_subscriptions,
+            subscribe_methods={
+                "subscribe_sync": "subscribe",
+                "subscribe_api_keys_sync": "subscribe_api_keys",
+            },
+        )
         self.resolve = _SyncService(self._loop, self._client.resolve)
         self.accounts = self.resolve
-        self.address_book = _SyncService(self._loop, self._client.address_book)
+        self.address_book = _SyncSubscribeService(
+            self._loop,
+            self._client.address_book,
+            self._active_sync_subscriptions,
+            subscribe_methods={"subscribe_sync": "subscribe_view_invalidations"},
+        )
         self.social_verification = _SyncService(self._loop, self._client.social_verification)
         self.whiteboard = _SyncService(self._loop, self._client.whiteboard)
         self.polychart = _SyncService(self._loop, self._client.polychart)
@@ -260,12 +373,19 @@ class Polyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
         return cls(**overrides)
 
-    async def _create_client(self, config: dict) -> AsyncPolyester:
-        return AsyncPolyester(**config)
-
     def close(self) -> None:
-        self._loop.run_until_complete(self._client.aclose())
-        self._loop.close()
+        for subscription in list(self._active_sync_subscriptions):
+            subscription.close()
+        self._active_sync_subscriptions.clear()
+
+        async def _shutdown() -> None:
+            await self._client.aclose()
+
+        future = asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
+        with contextlib.suppress(Exception):
+            future.result(timeout=10)
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._loop_thread.join(timeout=5)
 
     def __enter__(self) -> Polyester:
         return self
@@ -281,10 +401,58 @@ class _SyncService:
 
     def __getattr__(self, name: str):
         attr = getattr(self._service, name)
-        if not asyncio.iscoroutinefunction(attr):
+        if isinstance(attr, _SyncService):
             return attr
+        if not callable(attr) and type(attr).__name__.endswith("Service"):
+            return _SyncService(self._loop, attr)
+        if asyncio.iscoroutinefunction(attr):
+            def async_call(*args, **kwargs):
+                future = asyncio.run_coroutine_threadsafe(attr(*args, **kwargs), self._loop)
+                return future.result(timeout=60)
 
-        def call(*args, **kwargs):
-            return self._loop.run_until_complete(attr(*args, **kwargs))
+            return async_call
 
-        return call
+        if callable(attr):
+            def call(*args, **kwargs):
+                result = attr(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    future = asyncio.run_coroutine_threadsafe(result, self._loop)
+                    return future.result(timeout=60)
+                return result
+
+            return call
+        return attr
+
+
+class _SyncSubscribeService(_SyncService):
+    def __init__(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        service: object,
+        active_subscriptions: list[SyncSubscription],
+        *,
+        subscribe_methods: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(loop, service)
+        self._active_subscriptions = active_subscriptions
+        for sync_name, async_attr in (subscribe_methods or {"subscribe_sync": "subscribe"}).items():
+            setattr(self, sync_name, self._make_subscribe_sync(async_attr))
+
+    def _make_subscribe_sync(self, async_attr: str):
+        def subscribe_sync(
+            *,
+            on_event,
+            on_error=None,
+            **kwargs,
+        ) -> SyncSubscription:
+            subscribe_fn = getattr(self._service, async_attr)
+            handle = _subscribe_sync_impl(
+                self._loop,
+                lambda: subscribe_fn(**kwargs),
+                on_event=on_event,
+                on_error=on_error,
+            )
+            self._active_subscriptions.append(handle)
+            return handle
+
+        return subscribe_sync

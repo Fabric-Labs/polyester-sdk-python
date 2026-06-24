@@ -53,11 +53,11 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import resolve_sub_account_id
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_symbol_id
 
 
-class AsyncOrdersService(BaseService):
+class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     def __init__(
         self,
         transport,
@@ -76,6 +76,7 @@ class AsyncOrdersService(BaseService):
     async def list_open(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         page_token: str | None = None,
         limit: int | None = None,
@@ -87,7 +88,7 @@ class AsyncOrdersService(BaseService):
             include_attached_risk_state=include_attached_risk_state,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -106,6 +107,7 @@ class AsyncOrdersService(BaseService):
     async def list_history(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         symbol: str | None = None,
         symbol_id: int | None = None,
@@ -120,7 +122,7 @@ class AsyncOrdersService(BaseService):
             include_attached_risk_state=include_attached_risk_state,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -144,6 +146,7 @@ class AsyncOrdersService(BaseService):
     async def get(
         self,
         *,
+        account: AccountScope | None = None,
         order_id: str | int | None = None,
         client_order_id: str | None = None,
         sub_account_id: str | None = None,
@@ -157,7 +160,7 @@ class AsyncOrdersService(BaseService):
             include_attached_risk_state=include_attached_risk_state,
         )
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -176,8 +179,15 @@ class AsyncOrdersService(BaseService):
     async def create(
         self,
         request: CreateOrderRequest | None = None,
+        *,
+        account: str | dict[str, str] | None = None,
         **kwargs: Any,
     ) -> OrderMutationResult:
+        if account is not None:
+            kwargs = {
+                **kwargs,
+                "sub_account_id": self._resolve_sub_account_id(account=account),
+            }
         normalized = normalize_create_order_request(request, **kwargs)
         if normalized.sub_account_id is None:
             normalized = CreateOrderRequest(
@@ -209,6 +219,7 @@ class AsyncOrdersService(BaseService):
     async def cancel(
         self,
         *,
+        account: AccountScope | None = None,
         order_id: str | int | None = None,
         client_order_id: str | None = None,
         symbol: str | None = None,
@@ -227,7 +238,7 @@ class AsyncOrdersService(BaseService):
         if symbol_id is not None:
             request.symbol_id = symbol_id
         parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id)
+            self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
@@ -242,6 +253,7 @@ class AsyncOrdersService(BaseService):
     async def modify(
         self,
         *,
+        account: AccountScope | None = None,
         symbol: str,
         order_id: str | int | None = None,
         client_order_id: str | None = None,
@@ -258,7 +270,7 @@ class AsyncOrdersService(BaseService):
             symbol=symbol,
             order_id=order_id,
             client_order_id=client_order_id,
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             new_price=new_price,
             new_qty=new_qty,
@@ -278,6 +290,7 @@ class AsyncOrdersService(BaseService):
     async def cancel_all(
         self,
         *,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         symbol: str | None = None,
         side: str | None = None,
@@ -286,7 +299,7 @@ class AsyncOrdersService(BaseService):
         request_id: str | None = None,
     ) -> CancelAllOrdersResult:
         proto_request = cancel_all_orders_to_proto(
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             symbol=symbol,
             side=side,
             dry_run=dry_run,
@@ -304,6 +317,7 @@ class AsyncOrdersService(BaseService):
     async def batch_modify(
         self,
         *,
+        account: AccountScope | None = None,
         items: list[dict],
         sub_account_id: str | None = None,
         symbol: str | None = None,
@@ -314,7 +328,7 @@ class AsyncOrdersService(BaseService):
         scale = quantity_scale_for_symbol(self._catalogs, symbol) if symbol else 8
         proto_request = batch_modify_orders_to_proto(
             items=items,
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             behavior_default=behavior_default,
             allow_partial=allow_partial,
@@ -331,6 +345,7 @@ class AsyncOrdersService(BaseService):
     async def batch_create(
         self,
         *,
+        account: AccountScope | None = None,
         items: list[CreateOrderRequest | dict],
         sub_account_id: str | None = None,
         symbol: str | None = None,
@@ -340,7 +355,7 @@ class AsyncOrdersService(BaseService):
         scale = quantity_scale_for_symbol(self._catalogs, symbol) if symbol else 8
         proto_request = batch_create_orders_to_proto(
             items=items,
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             allow_partial=allow_partial,
             quantity_scale=scale,
@@ -356,13 +371,14 @@ class AsyncOrdersService(BaseService):
     async def batch_cancel(
         self,
         *,
+        account: AccountScope | None = None,
         items: list[dict],
         sub_account_id: str | None = None,
         request_id: str | None = None,
     ) -> BatchCancelOrdersResult:
         proto_request = batch_cancel_orders_to_proto(
             items=items,
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
         )
         return await unary_auth_decoded(
@@ -376,6 +392,7 @@ class AsyncOrdersService(BaseService):
     async def cancel_all_after(
         self,
         *,
+        account: AccountScope | None = None,
         timeout_sec: int,
         sub_account_id: str | None = None,
         symbol: str | None = None,
@@ -383,7 +400,7 @@ class AsyncOrdersService(BaseService):
         request_id: str | None = None,
     ) -> CancelAllAfterResult:
         proto_request = cancel_all_after_to_proto(
-            sub_account_id=self._resolve_sub_account_id(sub_account_id),
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             timeout_sec=timeout_sec,
             symbol=symbol,
             side=side,
@@ -410,6 +427,3 @@ class AsyncOrdersService(BaseService):
             default_account_id=self._default_account_id,
             decode=decode_order_bytes,
         )
-
-    def _resolve_sub_account_id(self, value: str | None) -> str | None:
-        return resolve_sub_account_id(value, self._default_sub_account_id)

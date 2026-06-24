@@ -164,7 +164,7 @@ class ListFlowsResponse(_message.Message):
     def __init__(self, flows: _Optional[_Iterable[_Union[FlowSummaryView, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class FlowTxMatchView(_message.Message):
-    __slots__ = ("flow_id", "flow_kind", "source_tx_hash", "latest_tx_ref", "tx_occurrence_index", "source_domain", "destination_domain", "current_step", "is_open", "is_terminal", "asset_ids", "polyester_chain_id", "amount_e18", "source_address", "destination_address", "reason_code", "last_activity_at_unix_ms")
+    __slots__ = ("flow_id", "flow_kind", "source_tx_hash", "latest_tx_ref", "tx_occurrence_index", "source_domain", "destination_domain", "current_step", "is_open", "is_terminal", "asset_ids", "polyester_chain_id", "amount_e18", "source_address", "destination_address", "reason_code", "last_activity_at_unix_ms", "owner_account_id", "smart_account_address")
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
     SOURCE_TX_HASH_FIELD_NUMBER: _ClassVar[int]
@@ -182,6 +182,8 @@ class FlowTxMatchView(_message.Message):
     DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     REASON_CODE_FIELD_NUMBER: _ClassVar[int]
     LAST_ACTIVITY_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    OWNER_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     flow_id: str
     flow_kind: _types_pb2.FlowKind
     source_tx_hash: str
@@ -199,7 +201,9 @@ class FlowTxMatchView(_message.Message):
     destination_address: str
     reason_code: _types_pb2.FlowReason
     last_activity_at_unix_ms: int
-    def __init__(self, flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., source_tx_hash: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., reason_code: _Optional[_Union[_types_pb2.FlowReason, str]] = ..., last_activity_at_unix_ms: _Optional[int] = ...) -> None: ...
+    owner_account_id: int
+    smart_account_address: str
+    def __init__(self, flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., source_tx_hash: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., reason_code: _Optional[_Union[_types_pb2.FlowReason, str]] = ..., last_activity_at_unix_ms: _Optional[int] = ..., owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ...) -> None: ...
 
 class ListFlowsByTxResponse(_message.Message):
     __slots__ = ("tx_hash", "matches", "next_page_token")

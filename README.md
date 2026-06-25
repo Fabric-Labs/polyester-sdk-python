@@ -3,45 +3,96 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a0`). The repo is **public** (visible on GitHub) under a
-**proprietary** license — not open source. API-key-only; no browser or JWT flows.
+**Status:** Alpha (`0.1.0a0`). Proprietary license (not open source). API-key only —
+no browser login or JWT flows.
 
-Generated protobuf types and ConnectRPC clients live in `src/polyester/gen/` and are
-updated automatically when public API protos change. Hand-written SDK code (client,
-services, models, codecs) lives alongside them under `src/polyester/`.
+Requires **Python 3.11+**.
 
 ## Install
 
-Install the SDK from PyPI:
+PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
 pip install "polyester-sdk[realtime]"
 ```
 
-For local development from a checkout:
+The `[realtime]` extra installs `websockets` for live market data and private
+streams. Omit it if you only need REST/Connect RPC calls.
+
+For development from a git checkout:
 
 ```bash
+git clone https://github.com/Fabric-Labs/polyester-sdk-python.git
 cd polyester-sdk-python
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev,realtime]"
 ```
 
-## Authentication
+## Quickstart
 
-Pass credentials to the client from your app's config or secrets manager:
+Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
+and private key when shown — the private key is only displayed once.
+
+```python
+import asyncio
+
+from polyester import AsyncPolyester
+
+async def main() -> None:
+    async with AsyncPolyester(
+        api_key_id="ak_...",           # from API key creation
+        api_private_key="...",       # 64-char hex secret from API key creation
+        default_account_id="...",    # Profile → Account ID (see below)
+    ) as client:
+        overview = await client.market_overview.list(limit=5)
+        for market in overview.markets:
+            print(market.symbol, market.last_price_ticks)
+
+        open_orders = await client.orders.list_open()
+        print(f"{len(open_orders.orders)} open orders")
+
+asyncio.run(main())
+```
+
+## Credentials
+
+| Value | Where to find it | Constructor parameter |
+| --- | --- | --- |
+| API key id | **API** → create or view key | `api_key_id` |
+| API private key | Shown once when the key is created | `api_private_key` |
+| Account ID | **Profile** → **Account ID** (e.g. `RLxqJGUDg92`) | `default_account_id` |
+
+Pass all credentials as **constructor parameters**. The SDK does not read
+environment variables unless you pass them in yourself (or use `from_env()` in
+scripts — see below).
+
+`api_private_key` accepts the 64-character hex Ed25519 secret from key creation,
+or raw 32-byte key material.
+
+`default_account_id` is the **Account ID** string from your Profile page. Use the
+value exactly as shown in the app. Do not use an internal numeric id.
+
+`default_account_id` is optional for public market-data calls. It is required for
+account-scoped operations such as private realtime channels, bucket transfers, and
+some ledger writes.
+
+## Authentication patterns
+
+**Recommended — explicit parameters:**
 
 ```python
 from polyester import AsyncPolyester
 
 client = AsyncPolyester(
     api_key_id="ak_...",
-    api_private_key="...",  # 64-char hex Ed25519 secret or raw 32-byte key
+    api_private_key="...",
+    default_account_id="RLxqJGUDg92",
 )
 ```
 
-If your app uses environment variables, read them in your application code and pass
-them explicitly:
+**If your deployment stores secrets in environment variables**, read them in your
+application and pass them to the constructor:
 
 ```python
 import os
@@ -51,32 +102,19 @@ from polyester import AsyncPolyester
 client = AsyncPolyester(
     api_key_id=os.environ["POLYESTER_API_KEY_ID"],
     api_private_key=os.environ["POLYESTER_API_PRIVATE_KEY"],
-    default_account_id=os.getenv("POLYESTER_ACCOUNT_ID"),
+    default_account_id=os.environ["POLYESTER_ACCOUNT_ID"],
 )
 ```
 
-For scripts and local tests, `AsyncPolyester.from_env()` and `Polyester.from_env()`
-are convenience helpers that read `POLYESTER_*` from `os.environ`. The plain
-constructor does not implicitly read environment variables.
+The plain `AsyncPolyester(...)` / `Polyester(...)` constructors never implicitly
+read `os.environ`.
 
-## Quickstart
+**Scripts and local tests only** — `AsyncPolyester.from_env()` and
+`Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,
+and `POLYESTER_ACCOUNT_ID` from the process environment. This is a convenience
+helper, not the primary integration pattern.
 
-```python
-from polyester import AsyncPolyester
-
-async with AsyncPolyester(
-    api_key_id="ak_...",
-    api_private_key="...",
-) as client:
-    overview = await client.market_overview.list(limit=5)
-    for market in overview.markets:
-        print(market.symbol, market.last_price_ticks)
-
-    open_orders = await client.orders.list_open()
-    print(f"{len(open_orders.orders)} open orders")
-```
-
-## Create And Cancel
+## Create and cancel orders
 
 ```python
 from polyester import AsyncPolyester
@@ -84,7 +122,8 @@ from polyester import AsyncPolyester
 async with AsyncPolyester(
     api_key_id="ak_...",
     api_private_key="...",
-    default_sub_account_id="",
+    default_account_id="RLxqJGUDg92",
+    default_sub_account_id="",  # main account; omit subaccount scoping
 ) as client:
     result = await client.orders.create(
         symbol="BNB-USDT",
@@ -103,15 +142,28 @@ async with AsyncPolyester(
 
 Use **decimal strings** for `qty` and `price`. Do not pass floats.
 
+Your API key needs a policy that allows trading. Spot orders spend **trading**
+balance (see below).
+
 ## Balances: funding vs trading
 
-Ledger balances expose separate **funding** and **trading** buckets per asset. Spot
-orders spend **trading** balance. Deposits land in **funding** until you move them
-(Funding → Unified Trading in the UI or on-chain via the funding wallet).
+Ledger balances have separate **funding** and **trading** buckets per asset.
+
+- Deposits land in **funding**.
+- Spot orders spend **trading** balance.
+- Move funds funding → trading in the Polyester UI (**Funding → Unified Trading**)
+  or on-chain via the funding wallet.
+
+SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
-- **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a signed intent payload.
-- **Trading → trading (another account):** `client.internal_transfers.create(...)` or `client.ledger_write.transfer_trading_to_trading(...)`.
+- **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a
+  signed intent payload.
+- **Trading → trading (another account):** `client.internal_transfers.create(...)`
+  or `client.ledger_write.transfer_trading_to_trading(...)`.
+
+Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
+transfers and other account-scoped ledger operations.
 
 Format u128 wire amounts with the public helper (18-decimal scale):
 
@@ -121,24 +173,21 @@ from polyester import format_ledger_u128
 print(format_ledger_u128(balance.funding), format_ledger_u128(balance.trading))
 ```
 
-Set `POLYESTER_ACCOUNT_ID` to your profile base58 id (not a raw decimal uint64) for
-bucket transfers.
+## Public market data
 
-## Public Market Data
+Public endpoints do not require an API key. Authenticated endpoints use the
+credentials above.
 
 ```python
 candles = await client.market_data.get_candles(symbol="BTC-USDT", timeframe="1m", limit=50)
 current = await client.market_data.get_current_candle(symbol="BTC-USDT", timeframe="1m")
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
-health = await client.balances.get_health()
 
 async with client.market_data.subscribe_trades(symbol="BNB-USDT") as sub:
     async for trade in sub:
         print(trade.price_ticks, trade.qty_scaled)
         break
 ```
-
-Realtime requires `pip install polyester-sdk[realtime]` (websockets).
 
 Merged market overview stream (snapshot + live updates):
 
@@ -150,41 +199,41 @@ async for markets in sub:
 await sub.aclose()
 ```
 
-## Testing
+## Sync client
 
-**CI (no network):** `pytest tests/unit -q`, plus ruff and package build.
+The sync `Polyester` client exposes the same service tree and constructor
+parameters:
 
-**Full local suite:** devnet integration/e2e tests read `.env` in the test harness and pass credentials to the client as explicit constructor parameters.
+```python
+from polyester import Polyester
+
+with Polyester(
+    api_key_id="ak_...",
+    api_private_key="...",
+    default_account_id="RLxqJGUDg92",
+) as client:
+    balances = client.balances.list()
+```
+
+Realtime subscriptions are available via `subscribe_sync` helpers on the sync
+client.
+
+## Testing (contributors)
+
+**CI (no network):** `pytest tests/unit -q`
+
+**Live devnet tests** use a local `.env` file in the test harness only. Fixtures
+load values from env and pass them as explicit constructor parameters — the same
+pattern application code should use.
 
 ```bash
 cp .env.example .env
-# POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY, POLYESTER_ACCOUNT_ID
+# fill in POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY, POLYESTER_ACCOUNT_ID
 
 pip install -e ".[dev,realtime]"
-
-./scripts/test_all.sh          # unit + tiered live (reads .env flags)
-# or
-pytest tests/unit -q           # CI-equivalent
-pytest tests/ -v               # full suite
-python scripts/smoke_test.py   # backwards-compatible read/mutation wrapper
+pytest tests/unit -q
+./scripts/test_all.sh   # optional: unit + live tiers
 ```
-
-Useful markers include `smoke`, `mutation`, `funded`, `treasury`, `optional`, `realtime`, and `jwt_session`.
-
-### Known devnet skips (not SDK failures)
-
-| Skip reason | Tests affected |
-|-------------|----------------|
-| OMS read never indexes after `orders.create` | `test_order_round_trip`, `test_batch_create_and_cancel` |
-| No open orders on book | `test_orders_get_round_trips_list_open` |
-| `list_holds` unmounted | balance holds tests |
-| JWT/session-only routes | profile, whiteboard, resolve, etc. |
-| Guard signer not on account | `test_guard_signer_get_status` |
-| No BTC-USDT asks / `POLYESTER_TEST_TRADE_E2E` | `test_spot_fill` |
-
-Attach a **read/trade policy** to your API key. Spot orders need **USDT in unified trading** (not BTC).
-
-Some RPCs return HTTP 404 on devnet. The SDK raises `PolyesterRouteNotFoundError` with a clearer message than `[unimplemented]: Not Found`.
 
 ## Changelog
 
@@ -195,3 +244,5 @@ See [CHANGELOG.md](CHANGELOG.md).
 Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
 defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
 
+Some RPCs may return HTTP 404 on devnet. The SDK raises `PolyesterRouteNotFoundError`
+with a clearer message than `[unimplemented]: Not Found`.

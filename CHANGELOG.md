@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0a1
+
 ### SDK surface
 - Orders: `batch_create`, `batch_cancel`, `cancel_all_after`; `cancel(symbol=…)` resolves `symbol_id`
 - API keys: `create`, `update`, `delete`

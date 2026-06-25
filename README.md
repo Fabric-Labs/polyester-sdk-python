@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a0`). Proprietary license (not open source). API-key only —
+**Status:** Alpha. Proprietary license (not open source). API-key only —
 no browser login or JWT flows.
 
 Requires **Python 3.11+**.

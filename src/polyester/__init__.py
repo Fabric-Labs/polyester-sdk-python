@@ -12,7 +12,7 @@ from polyester.errors import (
     PolyesterValidationError,
 )
 
-__version__ = "0.1.0a0"
+__version__ = "0.1.0a2"
 
 __all__ = [
     "AsyncPolyester",

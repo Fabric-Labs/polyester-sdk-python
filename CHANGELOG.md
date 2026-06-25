@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.0a2
+
+### Documentation
+- README: remove stale hardcoded alpha version from PyPI project description
+- Align `polyester.__version__` with package metadata
+
 ## 0.1.0a1
 
 ### SDK surface

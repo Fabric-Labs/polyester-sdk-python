@@ -21,9 +21,8 @@
 - Dynamic mutation pricing from `market_overview` (~2% of last trade)
 - `test_orders_get_round_trips_list_open` — proof-style when open orders exist
 - `scripts/test_all.sh` and `scripts/smoke_test.py` (pytest wrapper)
-- `docs/10-testing.md` — local devnet testing guide
 - CI: `pytest tests/unit` with coverage on non-`gen/` code
-- Full devnet suite: **214 collected**, **~198 passed / ~16 skipped** (honest skips for OMS read lag, JWT routes, optional mounts)
+- Full devnet suite documents honest skips for OMS read lag, JWT routes, optional mounts, and account-specific prerequisites
 
 ## 0.1.0a0
 

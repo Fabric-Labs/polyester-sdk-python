@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 
 from polyester.catalogs import CatalogManager
@@ -122,10 +123,8 @@ class AsyncOrderbookService(BaseService):
             if on_event is not None:
                 on_event(data)
             if not close.is_set():
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(data)
-                except asyncio.QueueFull:
-                    pass
 
         def set_bucket(value: str | None) -> None:
             nonlocal bucket_ticks

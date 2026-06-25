@@ -1,3 +1,4 @@
+from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.local_book import (
     apply_delta,
     build_orderbook_data,
@@ -5,7 +6,6 @@ from polyester.orderbook.local_book import (
     parse_bucket_ticks,
     side_to_levels,
 )
-from polyester.models.realtime import OrderBookDeltaUpdate
 
 
 def test_levels_to_map_skips_zero_qty() -> None:
@@ -40,7 +40,12 @@ def test_apply_delta_reset_clears_book() -> None:
         bids=bids,
         asks=asks,
         current_book_seq=5,
-        delta=OrderBookDeltaUpdate(reset=True, book_seq_start="0", book_seq_end="1", bids=[("50", "1")]),
+        delta=OrderBookDeltaUpdate(
+            reset=True,
+            book_seq_start="0",
+            book_seq_end="1",
+            bids=[("50", "1")],
+        ),
     )
     assert refresh is False
     assert seq == 1

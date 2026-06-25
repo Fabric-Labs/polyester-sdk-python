@@ -28,6 +28,27 @@ FAR_ABOVE_BUY_STOP_PRICE_HINTS: dict[str, str] = {
 }
 
 
+def live_client_kwargs_from_env(**overrides) -> dict | None:
+    """Load devnet credentials from env; return ``AsyncPolyester`` constructor kwargs."""
+    from polyester.auth import ACCOUNT_ID_ENV, load_api_key_credentials
+
+    creds = load_api_key_credentials()
+    if creds is None:
+        return None
+    kwargs: dict = {
+        "api_key_id": creds.key_id,
+        "api_private_key": creds.private_key,
+        **overrides,
+    }
+    account_id = os.getenv(ACCOUNT_ID_ENV)
+    if account_id:
+        kwargs["default_account_id"] = account_id.strip()
+    api_url = os.getenv("POLYESTER_API_URL")
+    if api_url:
+        kwargs["api_url"] = api_url.strip()
+    return kwargs
+
+
 def env_smoke_symbol() -> str | None:
     return os.getenv("POLYESTER_TEST_SMOKE_SYMBOL") or os.getenv("POLYESTER_SMOKE_SYMBOL")
 

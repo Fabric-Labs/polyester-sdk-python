@@ -12,8 +12,13 @@ services, models, codecs) lives alongside them under `src/polyester/`.
 
 ## Install
 
-Package publishing is not enabled yet. Until the first release, consume this
-repository from GitHub or a local checkout:
+Install the SDK from PyPI:
+
+```bash
+pip install "polyester-sdk[realtime]"
+```
+
+For local development from a checkout:
 
 ```bash
 cd polyester-sdk-python
@@ -24,21 +29,45 @@ pip install -e ".[dev,realtime]"
 
 ## Authentication
 
-Set in the process environment (never commit keys):
+Pass credentials to the client from your app's config or secrets manager:
 
-```bash
-export POLYESTER_API_KEY_ID="..."
-export POLYESTER_API_PRIVATE_KEY="..."   # 64-char hex Ed25519 secret
+```python
+from polyester import AsyncPolyester
+
+client = AsyncPolyester(
+    api_key_id="ak_...",
+    api_private_key="...",  # 64-char hex Ed25519 secret or raw 32-byte key
+)
 ```
 
-`AsyncPolyester.from_env()` reads `os.environ` only (no `.env` inside the library).
+If your app uses environment variables, read them in your application code and pass
+them explicitly:
+
+```python
+import os
+
+from polyester import AsyncPolyester
+
+client = AsyncPolyester(
+    api_key_id=os.environ["POLYESTER_API_KEY_ID"],
+    api_private_key=os.environ["POLYESTER_API_PRIVATE_KEY"],
+    default_account_id=os.getenv("POLYESTER_ACCOUNT_ID"),
+)
+```
+
+For scripts and local tests, `AsyncPolyester.from_env()` and `Polyester.from_env()`
+are convenience helpers that read `POLYESTER_*` from `os.environ`. The plain
+constructor does not implicitly read environment variables.
 
 ## Quickstart
 
 ```python
 from polyester import AsyncPolyester
 
-async with AsyncPolyester.from_env() as client:
+async with AsyncPolyester(
+    api_key_id="ak_...",
+    api_private_key="...",
+) as client:
     overview = await client.market_overview.list(limit=5)
     for market in overview.markets:
         print(market.symbol, market.last_price_ticks)
@@ -52,7 +81,11 @@ async with AsyncPolyester.from_env() as client:
 ```python
 from polyester import AsyncPolyester
 
-async with AsyncPolyester.from_env(default_sub_account_id="") as client:
+async with AsyncPolyester(
+    api_key_id="ak_...",
+    api_private_key="...",
+    default_sub_account_id="",
+) as client:
     result = await client.orders.create(
         symbol="BNB-USDT",
         side="buy",
@@ -119,9 +152,9 @@ await sub.aclose()
 
 ## Testing
 
-**CI (no network):** `pytest tests/unit -q` — 161 tests, ruff, ~58% coverage on hand-written code.
+**CI (no network):** `pytest tests/unit -q`, plus ruff and package build.
 
-**Full local suite (devnet + `.env`):** as of last run — **198 passed, 16 skipped**, 0 failed.
+**Full local suite:** devnet integration/e2e tests read `.env` in the test harness and pass credentials to the client as explicit constructor parameters.
 
 ```bash
 cp .env.example .env
@@ -136,7 +169,7 @@ pytest tests/ -v               # full suite
 python scripts/smoke_test.py   # backwards-compatible read/mutation wrapper
 ```
 
-See [docs/10-testing.md](docs/10-testing.md) for markers (`smoke`, `mutation`, `funded`, `optional`) and env vars.
+Useful markers include `smoke`, `mutation`, `funded`, `treasury`, `optional`, `realtime`, and `jwt_session`.
 
 ### Known devnet skips (not SDK failures)
 
@@ -162,10 +195,3 @@ See [CHANGELOG.md](CHANGELOG.md).
 Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
 defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
 
-## Docs
-
-| Doc | Purpose |
-|-----|---------|
-| [docs/08-sdk-implementation-status.md](docs/08-sdk-implementation-status.md) | What's implemented and what's left |
-| [docs/10-testing.md](docs/10-testing.md) | Local test tiers and env vars |
-| [docs/06-typescript-parity.md](docs/06-typescript-parity.md) | TS SDK parity tracker |

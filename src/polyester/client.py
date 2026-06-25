@@ -6,7 +6,12 @@ import os
 import threading
 from typing import Literal
 
-from polyester.auth import ACCOUNT_ID_ENV, load_api_key_credentials
+from polyester.auth import (
+    ACCOUNT_ID_ENV,
+    API_KEY_ID_ENV,
+    API_PRIVATE_KEY_ENV,
+    load_api_key_credentials,
+)
 from polyester.catalogs import CatalogManager
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
@@ -40,6 +45,8 @@ from polyester.services import (
 )
 from polyester.sync_subscribe import (
     SyncSubscription,
+)
+from polyester.sync_subscribe import (
     subscribe_sync as _subscribe_sync_impl,
 )
 from polyester.transport import TransportConfig, TransportFactory
@@ -71,6 +78,7 @@ class AsyncPolyester:
         credentials = load_api_key_credentials(
             api_key_id=api_key_id,
             api_private_key=api_private_key,
+            from_env=False,
         )
         self._transport = TransportFactory(
             TransportConfig(
@@ -199,6 +207,14 @@ class AsyncPolyester:
     @classmethod
     def from_env(cls, **overrides) -> AsyncPolyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
+        if "api_key_id" not in overrides:
+            api_key_id = os.getenv(API_KEY_ID_ENV)
+            if api_key_id:
+                overrides["api_key_id"] = api_key_id.strip()
+        if "api_private_key" not in overrides:
+            api_private_key = os.getenv(API_PRIVATE_KEY_ENV)
+            if api_private_key:
+                overrides["api_private_key"] = api_private_key.strip()
         if "default_account_id" not in overrides:
             account_id = os.getenv(ACCOUNT_ID_ENV)
             if account_id:
@@ -371,6 +387,18 @@ class Polyester:
     @classmethod
     def from_env(cls, **overrides) -> Polyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
+        if "api_key_id" not in overrides:
+            api_key_id = os.getenv(API_KEY_ID_ENV)
+            if api_key_id:
+                overrides["api_key_id"] = api_key_id.strip()
+        if "api_private_key" not in overrides:
+            api_private_key = os.getenv(API_PRIVATE_KEY_ENV)
+            if api_private_key:
+                overrides["api_private_key"] = api_private_key.strip()
+        if "default_account_id" not in overrides:
+            account_id = os.getenv(ACCOUNT_ID_ENV)
+            if account_id:
+                overrides["default_account_id"] = account_id.strip()
         return cls(**overrides)
 
     def close(self) -> None:

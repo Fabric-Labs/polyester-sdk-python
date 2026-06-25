@@ -79,7 +79,7 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
         patch("polyester.realtime.client.websockets.connect", return_value=FakeWS()),
     ):
         subscription = await client.subscribe_proto(
-            "private:spot:orders:RLxqJGUDg92:proto",
+            "private:spot:orders:acct_test:proto",
             decode=lambda payload: payload,
         )
         await asyncio.sleep(0.05)
@@ -88,4 +88,4 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
 
     fetch_conn.assert_awaited_once()
     fetch_sub.assert_awaited_once()
-    assert fetch_sub.await_args.kwargs["channel"] == "private:spot:orders:RLxqJGUDg92:proto"
+    assert fetch_sub.await_args.kwargs["channel"] == "private:spot:orders:acct_test:proto"

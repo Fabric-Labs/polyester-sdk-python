@@ -10,9 +10,9 @@ def test_connection_token_url() -> None:
 
 
 def test_subscription_token_url_encodes_channel() -> None:
-    channel = "private:spot:orders:RLxqJGUDg92:proto"
+    channel = "private:spot:orders:acct_test:proto"
     url = subscription_token_url("https://api-devnet.polyester.ai", channel)
-    assert url.endswith("channel=private%3Aspot%3Aorders%3ARLxqJGUDg92%3Aproto")
+    assert url.endswith("channel=private%3Aspot%3Aorders%3Aacct_test%3Aproto")
 
 
 def test_realtime_token_signing_uses_get_with_empty_body_hash() -> None:

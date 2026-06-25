@@ -16,7 +16,7 @@ async def test_orders_subscribe_builds_private_channel() -> None:
         transport=MagicMock(),
         catalogs=MagicMock(),
         default_sub_account_id=None,
-        default_account_id="RLxqJGUDg92",
+        default_account_id="acct_test",
         realtime=realtime,
     )
 
@@ -24,7 +24,7 @@ async def test_orders_subscribe_builds_private_channel() -> None:
 
     assert result == "subscription"
     channel = realtime.subscribe_proto.await_args.args[0]
-    assert channel == "private:spot:orders:RLxqJGUDg92:proto"
+    assert channel == "private:spot:orders:acct_test:proto"
 
 
 @pytest.mark.asyncio

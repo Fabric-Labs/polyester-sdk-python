@@ -25,14 +25,22 @@ def load_api_key_credentials(
     *,
     api_key_id: str | None = None,
     api_private_key: str | bytes | None = None,
+    from_env: bool = True,
 ) -> ApiKeyCredentials | None:
-    key_id = api_key_id or os.getenv(API_KEY_ID_ENV)
-    private = api_private_key if api_private_key is not None else os.getenv(API_PRIVATE_KEY_ENV)
+    key_id = api_key_id
+    private = api_private_key
+    if from_env:
+        key_id = key_id or os.getenv(API_KEY_ID_ENV)
+        private = private if private is not None else os.getenv(API_PRIVATE_KEY_ENV)
     if not key_id and not private:
         return None
     if not key_id or private is None:
+        if from_env:
+            message = "Both POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY are required"
+        else:
+            message = "Both api_key_id and api_private_key are required"
         raise PolyesterAuthError(
-            "Both POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY are required"
+            message
         )
     return ApiKeyCredentials(key_id=key_id, private_key=normalize_private_key(private))
 

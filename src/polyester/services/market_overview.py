@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 
 from polyester.codecs.decode.market_overview import market_overview_list_from_proto
@@ -77,10 +78,8 @@ class AsyncMarketOverviewService(BaseService):
             if on_event is not None:
                 on_event(snapshot)
             if not close.is_set():
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(snapshot)
-                except asyncio.QueueFull:
-                    pass
 
         def apply_rows(rows: list[MarketOverviewEntry]) -> None:
             for row in rows:
@@ -93,7 +92,10 @@ class AsyncMarketOverviewService(BaseService):
                 include_sparklines=include_sparklines,
             )
 
-        def apply_snapshot(snapshot: MarketOverviewList, buffered: list[MarketOverviewEntry]) -> None:
+        def apply_snapshot(
+            snapshot: MarketOverviewList,
+            buffered: list[MarketOverviewEntry],
+        ) -> None:
             by_symbol_id.clear()
             apply_rows(snapshot.markets)
             apply_rows(buffered)

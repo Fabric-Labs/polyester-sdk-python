@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from polyester import AsyncPolyester
+from tests.helpers import live_client_kwargs_from_env
 from tests.integration.support import call_optional
 
 
@@ -11,7 +12,9 @@ from tests.integration.support import call_optional
 @pytest.mark.optional
 async def test_orders_subscribe_receives_connection(live_credentials) -> None:
     """Validate private orders RT wiring with a function-scoped client (clean WS teardown)."""
-    client = AsyncPolyester.from_env(hydrate_catalogs=False)
+    kwargs = live_client_kwargs_from_env(hydrate_catalogs=False)
+    assert kwargs is not None
+    client = AsyncPolyester(**kwargs)
     if not client.default_account_id:
         await client.aclose()
         pytest.skip("POLYESTER_ACCOUNT_ID required for private orders realtime")

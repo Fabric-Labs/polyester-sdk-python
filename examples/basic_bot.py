@@ -1,10 +1,16 @@
 import asyncio
+import os
 
 from polyester import AsyncPolyester
 
 
 async def main() -> None:
-    async with AsyncPolyester.from_env(default_sub_account_id="") as client:
+    async with AsyncPolyester(
+        api_key_id=os.environ["POLYESTER_API_KEY_ID"],
+        api_private_key=os.environ["POLYESTER_API_PRIVATE_KEY"],
+        default_account_id=os.getenv("POLYESTER_ACCOUNT_ID"),
+        default_sub_account_id="",
+    ) as client:
         overview = await client.market_overview.list(limit=3)
         for row in overview.markets:
             print(row.symbol, row.last_price_ticks)

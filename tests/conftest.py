@@ -7,6 +7,7 @@ import pytest
 from polyester import AsyncPolyester
 from polyester.errors import PolyesterApiError, PolyesterRouteNotFoundError
 from tests.helpers import (
+    live_client_kwargs_from_env,
     min_trading_quote_required,
     pick_smoke_symbol,
     pick_trade_symbol,
@@ -61,9 +62,9 @@ def _optional_route_unavailable(exc: Exception) -> bool:
 
 @pytest.fixture(scope="session")
 def live_credentials() -> None:
-    from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV, load_api_key_credentials
+    from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV
 
-    if load_api_key_credentials() is None:
+    if live_client_kwargs_from_env() is None:
         pytest.skip(f"Set {API_KEY_ID_ENV} and {API_PRIVATE_KEY_ENV} in .env for live tests")
 
 
@@ -87,7 +88,9 @@ def treasury_enabled() -> None:
 
 @pytest.fixture(scope="session")
 async def live_client(live_credentials):
-    client = AsyncPolyester.from_env(hydrate_catalogs=True)
+    kwargs = live_client_kwargs_from_env(hydrate_catalogs=True)
+    assert kwargs is not None
+    client = AsyncPolyester(**kwargs)
     try:
         yield client
     finally:

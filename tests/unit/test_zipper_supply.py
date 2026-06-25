@@ -2,10 +2,10 @@ from polyester.catalogs.zipper import build_zipper_catalog_data
 from polyester.catalogs.zipper_supply import patch_zipper_catalog_supply
 from polyester.models.zipper import (
     DepositWithdrawConfig,
-    ZipperAssetConfig,
-    ZipperAssetChainVariant,
-    ZipperChainConfig,
     ZippedAssetSupplyUpdate,
+    ZipperAssetChainVariant,
+    ZipperAssetConfig,
+    ZipperChainConfig,
 )
 
 

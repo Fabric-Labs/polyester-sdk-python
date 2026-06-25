@@ -3,6 +3,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck disable=SC1091
+source "$(dirname "$0")/lib.sh"
+resolve_pytest
+
 if [[ -f .env ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -10,8 +14,8 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-echo "==> unit"
-pytest tests/unit -q
+echo "==> unit (${PYTEST[*]})"
+"${PYTEST[@]}" tests/unit -q
 
 if [[ -z "${POLYESTER_API_KEY_ID:-}" || -z "${POLYESTER_API_PRIVATE_KEY:-}" ]]; then
   echo "Skipping live tests (set POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY in .env)"
@@ -19,19 +23,24 @@ if [[ -z "${POLYESTER_API_KEY_ID:-}" || -z "${POLYESTER_API_PRIVATE_KEY:-}" ]]; 
 fi
 
 echo "==> integration (API-key read-only)"
-pytest tests/integration tests/e2e -m "integration and not mutation and not funded and not jwt_session" -v
+"${PYTEST[@]}" tests/integration tests/e2e -m "integration and not mutation and not funded and not jwt_session" -v
+
+if [[ "${POLYESTER_TEST_REALTIME:-1}" =~ ^(1|true|yes)$ ]]; then
+  echo "==> realtime heartbeat (public trades, ~35s)"
+  "${PYTEST[@]}" tests/integration/test_realtime.py::test_public_trades_subscription_survives_centrifugo_ping -v
+fi
 
 if [[ "${POLYESTER_TEST_MUTATION:-}" =~ ^(1|true|yes)$ ]]; then
   echo "==> mutation"
-  pytest tests/ -m mutation -v
+  "${PYTEST[@]}" tests/ -m mutation -v
 fi
 
 if [[ "${POLYESTER_TEST_FUNDED:-}" =~ ^(1|true|yes)$ ]]; then
   echo "==> funded"
-  pytest tests/e2e/funded tests/integration -m "integration or funded" -v
+  "${PYTEST[@]}" tests/e2e/funded tests/integration -m "integration or funded" -v
 fi
 
 if [[ "${POLYESTER_TEST_TREASURY:-}" =~ ^(1|true|yes)$ ]]; then
   echo "==> treasury"
-  pytest tests/ -m treasury -v
+  "${PYTEST[@]}" tests/ -m treasury -v
 fi

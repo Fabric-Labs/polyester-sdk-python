@@ -138,17 +138,28 @@ class AsyncRealtimeClient:
                             continue
                         except asyncio.CancelledError:
                             break
-                        for item in self._parse_publications(raw, decode=decode):
+                        except Exception:
+                            break
+                        for frame in self._split_centrifugo_frames(raw):
                             if close.is_set():
                                 break
-                            await queue.put(item)
+                            publications = await self._handle_centrifugo_frame(
+                                ws,
+                                frame,
+                                decode=decode,
+                            )
+                            for item in publications:
+                                if close.is_set():
+                                    break
+                                await queue.put(item)
             except asyncio.CancelledError:
                 pass
             except Exception as exc:
                 if not close.is_set():
                     raise PolyesterRealtimeError(str(exc)) from exc
             finally:
-                await queue.put(None)
+                with contextlib.suppress(Exception):
+                    await queue.put(None)
 
         task = asyncio.create_task(runner())
         subscription = AsyncSubscription[T](queue=queue, close=close, task=task)
@@ -214,21 +225,47 @@ class AsyncRealtimeClient:
         if payload.get("error"):
             raise PolyesterRealtimeError(str(payload["error"]))
 
-    def _parse_publications(self, raw: str | bytes, *, decode) -> list[Any]:
+    @staticmethod
+    def _split_centrifugo_frames(raw: str | bytes) -> list[str]:
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
-        message = json.loads(raw)
-        publications: list[Any] = []
-        push = message.get("push") or {}
-        pub = push.get("pub") or {}
-        data = pub.get("data")
-        if data is None:
-            return publications
+        text = raw.strip()
+        if not text:
+            return []
+        return [frame for frame in text.split("\n") if frame.strip()]
+
+    async def _handle_centrifugo_frame(
+        self,
+        ws: ClientConnection,
+        frame: str,
+        *,
+        decode: Callable[[bytes], T],
+    ) -> list[T]:
+        message = json.loads(frame)
+        if not message:
+            await ws.send("{}")
+            return []
+
+        push = message.get("push")
+        if isinstance(push, dict):
+            if push.get("ping") is not None:
+                await ws.send("{}")
+                return []
+            pub = push.get("pub") or {}
+            data = pub.get("data")
+            if data is not None:
+                return [decode(self._decode_publication_data(data))]
+
+        if message.get("ping") is not None and not message.get("id"):
+            await ws.send("{}")
+            return []
+
+        return []
+
+    @staticmethod
+    def _decode_publication_data(data: Any) -> bytes:
         if isinstance(data, str):
-            payload = base64.b64decode(data)
-        elif isinstance(data, list):
-            payload = bytes(data)
-        else:
-            payload = bytes(data)
-        publications.append(decode(payload))
-        return publications
+            return base64.b64decode(data)
+        if isinstance(data, list):
+            return bytes(data)
+        return bytes(data)

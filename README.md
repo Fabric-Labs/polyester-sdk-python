@@ -183,10 +183,13 @@ candles = await client.market_data.get_candles(symbol="BTC-USDT", timeframe="1m"
 current = await client.market_data.get_current_candle(symbol="BTC-USDT", timeframe="1m")
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 
-async with client.market_data.subscribe_trades(symbol="BNB-USDT") as sub:
-    async for trade in sub:
+subscription = await client.market_data.subscribe_trades(symbol="BNB-USDT")
+try:
+    async for trade in subscription:
         print(trade.price_ticks, trade.qty_scaled)
         break
+finally:
+    await subscription.aclose()
 ```
 
 Merged market overview stream (snapshot + live updates):
@@ -220,7 +223,7 @@ client.
 
 ## Testing (contributors)
 
-**CI (no network):** `pytest tests/unit -q`
+**CI (no network):** `python -m pytest tests/unit -q`
 
 **Live devnet tests** use a local `.env` file in the test harness only. Fixtures
 load values from env and pass them as explicit constructor parameters — the same
@@ -231,9 +234,30 @@ cp .env.example .env
 # fill in POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY, POLYESTER_ACCOUNT_ID
 
 pip install -e ".[dev,realtime]"
-pytest tests/unit -q
+python -m pytest tests/unit -q
 ./scripts/test_all.sh   # optional: unit + live tiers
+./scripts/smoke_realtime.sh   # realtime unit + live heartbeat before release
 ```
+
+Use `python -m pytest` (not bare `pytest`) so tests run in the same venv as `pip install`.
+
+**Pre-release checklist (realtime changes):**
+
+```bash
+cd polyester-sdk-python
+python -m venv /tmp/polyester-pypi-test && source /tmp/polyester-pypi-test/bin/activate
+pip install -e ".[dev,realtime]"
+python -m pytest tests/unit -q
+./scripts/smoke_realtime.sh
+
+cd ../polyester-examples-python
+pip install -e "../polyester-sdk-python[realtime]"
+python -m pytest -q
+python3 examples/04_public_realtime_trades.py
+python3 examples/05_public_orderbook_stream.py
+```
+
+Then bump the version, update `CHANGELOG.md`, build, and publish to PyPI. Install from the new wheel (not editable) and rerun `smoke_realtime.sh` once to confirm the published artifact.
 
 ## Changelog
 

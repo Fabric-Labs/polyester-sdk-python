@@ -6,6 +6,7 @@ from typing import TypeVar
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.balances import asset_balance_from_proto
 from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
+from polyester.codecs.decode.market_data import candle_point_from_proto
 from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
 from polyester.codecs.decode.orders import order_from_proto, user_trade_from_proto
 from polyester.codecs.decode.policies import subaccount_policy_from_proto
@@ -13,7 +14,6 @@ from polyester.codecs.decode.sub_accounts import subaccount_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto
 from polyester.codecs.decode.triggers import trigger_event_from_proto, trigger_from_proto
 from polyester.codecs.scalars import format_id
-from polyester.codecs.wire_decode import decode_candle
 from polyester.models import ApiData, AssetBalance, LedgerTransfer, Order, UserTrade
 from polyester.models.auth import AccountIdentity
 from polyester.models.market import Candle, MarketOverviewList
@@ -148,23 +148,13 @@ def decode_candle_point_bytes(
     *,
     symbol_id: int,
     timeframe: str,
+    volume_scale: int = 8,
 ) -> Callable[[bytes], Candle]:
-    from polyester._wire import protobuf_to_public_dict
     from polyester.gen.marketdata.v1.marketdata_pb2 import CandlePoint
 
     def decode(payload: bytes) -> Candle:
         point = _parse_proto(payload, CandlePoint)
-        raw = protobuf_to_public_dict(point)
-        candle = decode_candle(raw)
-        return Candle(
-            ts_sec=candle.ts_sec,
-            open=candle.open,
-            high=candle.high,
-            low=candle.low,
-            close=candle.close,
-            volume=candle.volume,
-            is_closed=candle.is_closed,
-        )
+        return candle_point_from_proto(point, volume_scale=volume_scale)
 
     _ = (symbol_id, timeframe)
     return decode

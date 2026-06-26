@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
 from polyester.models.market import (
     Candle,
@@ -178,26 +179,30 @@ def decode_market_trades_list(data: dict[str, Any]) -> MarketTradesResult:
     )
 
 
-def decode_candle(data: dict[str, Any]) -> Candle:
+
+def decode_candle(data: dict[str, Any], *, volume_scale: int = 8) -> Candle:
     return Candle(
         ts_sec=int(_field(data, "tsSec", "ts_sec", default=0) or 0),
-        open=str(_field(data, "open", default="") or ""),
-        high=str(_field(data, "high", default="") or ""),
-        low=str(_field(data, "low", default="") or ""),
-        close=str(_field(data, "close", default="") or ""),
-        volume=str(_field(data, "volume", default="") or ""),
+        open=_decode_price_field(_field(data, "open", default="") or ""),
+        high=_decode_price_field(_field(data, "high", default="") or ""),
+        low=_decode_price_field(_field(data, "low", default="") or ""),
+        close=_decode_price_field(_field(data, "close", default="") or ""),
+        volume=_decode_volume_field(
+            _field(data, "volume", default="") or "",
+            scale=volume_scale,
+        ),
         is_closed=bool(_field(data, "isClosed", "is_closed", default=False)),
     )
 
 
-def decode_candles_list(data: dict[str, Any]) -> CandlesResult:
+def decode_candles_list(data: dict[str, Any], *, volume_scale: int = 8) -> CandlesResult:
     candles = [
-        decode_candle(item)
+        decode_candle(item, volume_scale=volume_scale)
         for item in _field(data, "candles", default=[]) or []
         if isinstance(item, dict)
     ]
     if not candles:
-        candles = _decode_columnar_candles(data)
+        candles = _decode_columnar_candles(data, volume_scale=volume_scale)
     return CandlesResult(
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
         timeframe=str(_field(data, "timeframe", default="") or ""),
@@ -205,7 +210,7 @@ def decode_candles_list(data: dict[str, Any]) -> CandlesResult:
     )
 
 
-def _decode_columnar_candles(data: dict[str, Any]) -> list[Candle]:
+def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int = 8) -> list[Candle]:
     ts_list = _field(data, "tsSec", "ts_sec", default=[]) or []
     opens = _field(data, "open", default=[]) or []
     highs = _field(data, "high", default=[]) or []
@@ -217,11 +222,14 @@ def _decode_columnar_candles(data: dict[str, Any]) -> list[Candle]:
         candles.append(
             Candle(
                 ts_sec=int(ts),
-                open=str(opens[index]) if index < len(opens) else "",
-                high=str(highs[index]) if index < len(highs) else "",
-                low=str(lows[index]) if index < len(lows) else "",
-                close=str(closes[index]) if index < len(closes) else "",
-                volume=str(volumes[index]) if index < len(volumes) else "",
+                open=_decode_price_field(opens[index]) if index < len(opens) else "",
+                high=_decode_price_field(highs[index]) if index < len(highs) else "",
+                low=_decode_price_field(lows[index]) if index < len(lows) else "",
+                close=_decode_price_field(closes[index]) if index < len(closes) else "",
+                volume=_decode_volume_field(
+                    volumes[index] if index < len(volumes) else "",
+                    scale=volume_scale,
+                ),
             )
         )
     return candles

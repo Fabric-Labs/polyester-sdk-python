@@ -125,12 +125,13 @@ class AsyncMarketDataService(BaseService):
             end_time=end_time,
             include_incomplete=include_incomplete,
         )
+        volume_scale = _volume_scale_for_symbol_id(self._catalogs, request.symbol_id)
         return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_candles(req),
             request,
-            candles_from_proto,
+            lambda msg: candles_from_proto(msg, volume_scale=volume_scale),
         )
 
     async def get_candles_columns(
@@ -154,12 +155,13 @@ class AsyncMarketDataService(BaseService):
             end_time=end_time,
             include_incomplete=include_incomplete,
         )
+        volume_scale = _volume_scale_for_symbol_id(self._catalogs, request.symbol_id)
         return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_candles_columns(req),
             request,
-            candles_columns_from_proto,
+            lambda msg: candles_columns_from_proto(msg, volume_scale=volume_scale),
         )
 
     def subscribe_trades(
@@ -196,12 +198,14 @@ class AsyncMarketDataService(BaseService):
             label="subscribe_candles",
         )
         channel = f"public:spot:market:candles:{timeframe}:{resolved_symbol_id}:proto"
+        volume_scale = _volume_scale_for_symbol_id(self._catalogs, resolved_symbol_id)
         return await subscribe_public_proto(
             self._realtime,
             channel=channel,
             decode=decode_candle_point_bytes(
                 symbol_id=resolved_symbol_id,
                 timeframe=timeframe,
+                volume_scale=volume_scale,
             ),
         )
 
@@ -249,3 +253,9 @@ def _datetime_to_timestamp(value: datetime) -> Timestamp:
     ts = Timestamp()
     ts.FromDatetime(value)
     return ts
+
+
+def _volume_scale_for_symbol_id(catalogs: CatalogManager | None, symbol_id: int) -> int:
+    if catalogs is None:
+        return 8
+    return catalogs.base_quantity_scale_for_symbol_id(symbol_id)

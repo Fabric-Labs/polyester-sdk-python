@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.0a3
+
+### Codecs
+- Decode candle OHLC from wire price ticks (1e6) to decimal strings, matching the TypeScript SDK surface
+- Decode candle volume using the pair's `base_quantity_scale` from spot config when catalogs are loaded
+
 ## 0.1.0a2
 
 ### Documentation

@@ -75,6 +75,16 @@ class CatalogManager:
                 return int(value) if value is not None else 8
         return 8
 
+    def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int:
+        for pair in self._pairs():
+            value = pair.get("symbol_id") or pair.get("symbolId")
+            if value is not None and int(value) == int(symbol_id):
+                symbol = pair.get("symbol")
+                if symbol:
+                    return self.base_quantity_scale_for_symbol(str(symbol))
+                break
+        return 8
+
     def orderbook_price_buckets_for_symbol(self, symbol: str) -> list[str]:
         pair = self._pair_for_symbol(symbol)
         if pair is None:

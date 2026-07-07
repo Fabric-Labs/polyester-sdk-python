@@ -22,6 +22,10 @@ except ImportError:  # pragma: no cover - optional extra
     websockets = None
     ClientConnection = Any
 
+# Match Go: long read deadline so Centrifugo ping/pong completes without reconnect churn.
+CENTRIFUGO_READ_TIMEOUT = 30.0
+CENTRIFUGO_RECONNECT_DELAY = 1.0
+
 
 def normalize_ws_url(ws_url: str) -> str:
     url = ws_url.rstrip("/")
@@ -102,68 +106,93 @@ class AsyncRealtimeClient:
             self._require_private_auth(channel)
         queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self._max_queue_size)
         close = asyncio.Event()
-        subscription = AsyncSubscription[T](queue=queue, close=close)
 
         async def runner() -> None:
             try:
-                async with websockets.connect(self._ws_url, open_timeout=10) as ws:
-                    if is_private_channel(channel):
-                        http = self._require_http()
-                        credentials = self._require_credentials()
-                        api_url = self._require_api_url()
-                        connection_token = await fetch_connection_token(
-                            http,
-                            credentials,
-                            api_url=api_url,
-                        )
-                        await self._centrifugo_connect(ws, token=connection_token)
-                        subscription_token = await fetch_subscription_token(
-                            http,
-                            credentials,
-                            api_url=api_url,
+                while not close.is_set():
+                    try:
+                        await self._run_subscription_once(
                             channel=channel,
+                            decode=decode,
+                            queue=queue,
+                            close=close,
                         )
-                        await self._centrifugo_subscribe(
-                            ws,
-                            channel,
-                            token=subscription_token,
-                        )
+                    except asyncio.CancelledError:
+                        break
+                    except Exception:
+                        if close.is_set():
+                            break
                     else:
-                        await self._centrifugo_connect(ws)
-                        await self._centrifugo_subscribe(ws, channel)
-                    while not close.is_set():
-                        try:
-                            raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
-                        except TimeoutError:
-                            continue
-                        except asyncio.CancelledError:
+                        if close.is_set():
                             break
-                        except Exception:
-                            break
-                        for frame in self._split_centrifugo_frames(raw):
-                            if close.is_set():
-                                break
-                            publications = await self._handle_centrifugo_frame(
-                                ws,
-                                frame,
-                                decode=decode,
-                            )
-                            for item in publications:
-                                if close.is_set():
-                                    break
-                                await queue.put(item)
-            except asyncio.CancelledError:
-                pass
-            except Exception as exc:
-                if not close.is_set():
-                    raise PolyesterRealtimeError(str(exc)) from exc
+                    if close.is_set():
+                        break
+                    await asyncio.sleep(CENTRIFUGO_RECONNECT_DELAY)
             finally:
                 with contextlib.suppress(Exception):
                     await queue.put(None)
 
         task = asyncio.create_task(runner())
-        subscription = AsyncSubscription[T](queue=queue, close=close, task=task)
-        return subscription
+        return AsyncSubscription[T](queue=queue, close=close, task=task)
+
+    async def _run_subscription_once(
+        self,
+        *,
+        channel: str,
+        decode: Callable[[bytes], T],
+        queue: asyncio.Queue[Any],
+        close: asyncio.Event,
+    ) -> None:
+        async with websockets.connect(
+            self._ws_url,
+            open_timeout=10,
+            max_size=None,
+        ) as ws:
+            if is_private_channel(channel):
+                http = self._require_http()
+                credentials = self._require_credentials()
+                api_url = self._require_api_url()
+                connection_token = await fetch_connection_token(
+                    http,
+                    credentials,
+                    api_url=api_url,
+                )
+                await self._centrifugo_connect(ws, token=connection_token)
+                subscription_token = await fetch_subscription_token(
+                    http,
+                    credentials,
+                    api_url=api_url,
+                    channel=channel,
+                )
+                await self._centrifugo_subscribe(
+                    ws,
+                    channel,
+                    token=subscription_token,
+                )
+            else:
+                await self._centrifugo_connect(ws)
+                await self._centrifugo_subscribe(ws, channel)
+            while not close.is_set():
+                try:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=CENTRIFUGO_READ_TIMEOUT)
+                except TimeoutError:
+                    continue
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    raise PolyesterRealtimeError(str(exc)) from exc
+                for frame in self._split_centrifugo_frames(raw):
+                    if close.is_set():
+                        return
+                    publications = await self._handle_centrifugo_frame(
+                        ws,
+                        frame,
+                        decode=decode,
+                    )
+                    for item in publications:
+                        if close.is_set():
+                            return
+                        await queue.put(item)
 
     def _require_private_auth(self, channel: str) -> None:
         if self._credentials is None:
@@ -205,7 +234,7 @@ class AsyncRealtimeClient:
             connect_payload["token"] = token
         await ws.send(json.dumps({"id": 1, "connect": connect_payload}))
         reply = await asyncio.wait_for(ws.recv(), timeout=10)
-        payload = json.loads(reply)
+        payload = json.loads(self._coerce_frame_text(reply))
         if payload.get("error"):
             raise PolyesterRealtimeError(str(payload["error"]))
 
@@ -221,15 +250,19 @@ class AsyncRealtimeClient:
             subscribe_payload["token"] = token
         await ws.send(json.dumps({"id": 2, "subscribe": subscribe_payload}))
         reply = await asyncio.wait_for(ws.recv(), timeout=10)
-        payload = json.loads(reply)
+        payload = json.loads(self._coerce_frame_text(reply))
         if payload.get("error"):
             raise PolyesterRealtimeError(str(payload["error"]))
 
     @staticmethod
-    def _split_centrifugo_frames(raw: str | bytes) -> list[str]:
+    def _coerce_frame_text(raw: str | bytes) -> str:
         if isinstance(raw, bytes):
-            raw = raw.decode("utf-8")
-        text = raw.strip()
+            return raw.decode("utf-8")
+        return raw
+
+    @staticmethod
+    def _split_centrifugo_frames(raw: str | bytes) -> list[str]:
+        text = AsyncRealtimeClient._coerce_frame_text(raw).strip()
         if not text:
             return []
         return [frame for frame in text.split("\n") if frame.strip()]
@@ -241,7 +274,10 @@ class AsyncRealtimeClient:
         *,
         decode: Callable[[bytes], T],
     ) -> list[T]:
-        message = json.loads(frame)
+        try:
+            message = json.loads(frame)
+        except json.JSONDecodeError:
+            return []
         if not message:
             await ws.send("{}")
             return []

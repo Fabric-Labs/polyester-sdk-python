@@ -163,6 +163,13 @@ def trading_balance_decimal(balances: BalancesList, asset_id: int) -> Decimal:
     return Decimal(0)
 
 
+def funding_balance_decimal(balances: BalancesList, asset_id: int) -> Decimal:
+    for row in balances.balances:
+        if row.asset_id == asset_id:
+            return Decimal(format_ledger_u128(row.funding))
+    return Decimal(0)
+
+
 def min_trading_quote_required() -> Decimal:
     raw = os.getenv("POLYESTER_TEST_MIN_TRADING_QUOTE", "10")
     return Decimal(raw)
@@ -192,34 +199,72 @@ def pair_tick_size(pair: dict) -> str:
     return str(pair.get("tickSize") or pair.get("tick_size") or "0.01")
 
 
+def post_only_buy_price_from_orderbook(book, *, tick_size: str) -> str | None:
+    """Return a post-only buy one tick below the best bid when the book has bids."""
+    bids = getattr(book, "bids", None) or []
+    asks = getattr(book, "asks", None) or []
+    if not bids:
+        return None
+    from polyester.codecs.scalars import align_price_ticks, format_price_ticks, parse_price_ticks
+
+    tick_ticks = parse_price_ticks(tick_size, "tick_size")
+    bid_ticks = parse_price_ticks(bids[0].price, "price")
+    target = max(bid_ticks - tick_ticks, tick_ticks)
+    if asks:
+        ask_ticks = parse_price_ticks(asks[0].price, "price")
+        target = min(target, max(ask_ticks - tick_ticks, tick_ticks))
+    return format_price_ticks(align_price_ticks(target, tick_size))
+
+
+def post_only_buy_price_from_last_ticks(
+    last_price_ticks: int,
+    *,
+    tick_size: str,
+    symbol: str,
+) -> str:
+    """Return a post-only buy price ~0.5% below the last trade, tick-aligned."""
+    from polyester.codecs.scalars import align_price_ticks, format_price_ticks
+
+    if last_price_ticks <= 0:
+        return FAR_BELOW_BUY_PRICE_HINTS.get(symbol, "100")
+    target_ticks = align_price_ticks(max(last_price_ticks * 995 // 1000, 1), tick_size)
+    return format_price_ticks(target_ticks)
+
+
 def far_below_price_from_last_ticks(
     last_price_ticks: int,
     *,
     tick_size: str,
     symbol: str,
 ) -> str:
-    """Return a post-only buy price ~2% of last trade, tick-aligned."""
-    from polyester.codecs.scalars import align_price_ticks, format_price_ticks
-
-    if last_price_ticks <= 0:
-        return FAR_BELOW_BUY_PRICE_HINTS.get(symbol, "100")
-    target_ticks = align_price_ticks(max(last_price_ticks // 50, 1), tick_size)
-    return format_price_ticks(target_ticks)
+    """Backward-compatible alias for post_only_buy_price_from_last_ticks."""
+    return post_only_buy_price_from_last_ticks(
+        last_price_ticks,
+        tick_size=tick_size,
+        symbol=symbol,
+    )
 
 
 async def resolve_far_below_buy_limit_price(client, symbol: str, pair: dict) -> str:
-    """Market-aware far-below buy price with static hint fallback."""
+    """Market-aware post-only buy price slightly below the live book."""
     override = os.getenv("POLYESTER_TEST_PRICE") or os.getenv("POLYESTER_SMOKE_PRICE")
     if override:
         return override
 
     tick_size = pair_tick_size(pair)
     try:
+        book = await client.orderbook.get(symbol=symbol, depth=5)
+        price = post_only_buy_price_from_orderbook(book, tick_size=tick_size)
+        if price:
+            return price
+    except Exception:
+        pass
+    try:
         overview = await client.market_overview.list(symbols=[symbol], limit=5)
         for row in overview.markets:
             if row.symbol != symbol or not row.last_price_ticks:
                 continue
-            return far_below_price_from_last_ticks(
+            return post_only_buy_price_from_last_ticks(
                 int(row.last_price_ticks),
                 tick_size=tick_size,
                 symbol=symbol,
@@ -246,6 +291,41 @@ async def resolve_far_above_buy_stop_price(client, symbol: str, pair: dict) -> s
 
             target_ticks = align_price_ticks(max(last * 2, last + 1), tick_size)
             return format_price_ticks(target_ticks)
+    except Exception:
+        pass
+    return FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(symbol, "50000")
+
+
+async def resolve_market_ref_price(client, symbol: str, pair: dict, *, side: str = "buy") -> str:
+    """Client reference price for MARKET order reservation."""
+    override = os.getenv("POLYESTER_TEST_TRADE_PRICE")
+    if override:
+        return override
+
+    side_norm = side.strip().lower()
+    try:
+        book = await client.orderbook.get(symbol=symbol, depth=5)
+        bids = book.bids or []
+        asks = book.asks or []
+        if side_norm == "sell":
+            if bids and bids[0].price:
+                return bids[0].price
+        elif asks and asks[0].price:
+            return asks[0].price
+        if asks and asks[0].price:
+            return asks[0].price
+        if bids and bids[0].price:
+            return bids[0].price
+    except Exception:
+        pass
+    try:
+        overview = await client.market_overview.list(symbols=[symbol], limit=5)
+        for row in overview.markets:
+            if row.symbol != symbol or not row.last_price_ticks:
+                continue
+            from polyester.codecs.scalars import format_price_ticks
+
+            return format_price_ticks(int(row.last_price_ticks))
     except Exception:
         pass
     return FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(symbol, "50000")

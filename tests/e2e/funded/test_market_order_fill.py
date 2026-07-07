@@ -1,10 +1,15 @@
-import asyncio
 import os
 from decimal import Decimal
 
 import pytest
 
 from polyester import AsyncPolyester
+from tests.e2e.funded.test_spot_fill import (
+    _hydrate_test_catalogs,
+    _maker_credentials,
+    _wait_for_filled_order,
+    _wait_for_trade_match,
+)
 from tests.e2e.helpers import unique_client_order_id
 from tests.helpers import (
     FAR_ABOVE_BUY_STOP_PRICE_HINTS,
@@ -21,60 +26,19 @@ def _trade_e2e_enabled() -> bool:
     return os.getenv("POLYESTER_TEST_TRADE_E2E", "").lower() in {"1", "true", "yes"}
 
 
-def _maker_credentials() -> tuple[str, str] | None:
-    key_id = os.getenv("POLYESTER_TEST_MAKER_API_KEY_ID")
-    private_key = os.getenv("POLYESTER_TEST_MAKER_API_PRIVATE_KEY")
-    if not key_id or not private_key:
-        return None
-    return key_id, private_key
-
-
-async def _hydrate_test_catalogs(client) -> tuple[dict, dict]:
-    spot = await client.market_data.get_spot_config()
-    client.catalogs.hydrate_spot_config(spot.raw)
-    if not client.catalogs.zipper:
-        zipper = await client.zipper.get_deposit_withdraw_config()
-        client.catalogs.hydrate_zipper_config(zipper)
-    return spot.raw, client.catalogs.zipper_config
-
-
-async def _wait_for_filled_order(client, client_order_id: str, *, timeout: float = 20):
-    attempts = max(1, int(timeout / 0.5))
-    last_detail = None
-    for _ in range(attempts):
-        detail = await client.orders.get(client_order_id=client_order_id)
-        last_detail = detail
-        if detail.order is not None and detail.order.status == "filled" and detail.trades:
-            return detail
-        await asyncio.sleep(0.5)
-    raise AssertionError(f"Order {client_order_id} did not fill within {timeout}s: {last_detail}")
-
-
-async def _wait_for_trade_match(client, symbol: str, match_id: str, *, timeout: float = 20):
-    attempts = max(1, int(timeout / 0.5))
-    for _ in range(attempts):
-        trades = await client.trades.list(symbol=symbol, limit=25)
-        for trade in trades.trades:
-            if trade.match_id == match_id:
-                return trade
-        await asyncio.sleep(0.5)
-    raise AssertionError(f"User trade {match_id} was not visible within {timeout}s")
-
-
 @pytest.mark.integration
 @pytest.mark.funded
-async def test_spot_fill(
+async def test_market_order_fill(
     live_client, trade_symbol, funded_enabled, require_trade_trading_balance
 ):
     if not _trade_e2e_enabled():
-        pytest.skip("Set POLYESTER_TEST_TRADE_E2E=1 to run spot fill e2e")
+        pytest.skip("Set POLYESTER_TEST_TRADE_E2E=1 to run market order fill e2e")
 
     maker_credentials = _maker_credentials()
     if maker_credentials is None:
         pytest.skip(
             "Set POLYESTER_TEST_MAKER_API_KEY_ID and "
-            "POLYESTER_TEST_MAKER_API_PRIVATE_KEY for limit fill e2e "
-            "(devnet orderbook often has no liquidity)"
+            "POLYESTER_TEST_MAKER_API_PRIVATE_KEY for market order fill e2e"
         )
 
     maker_key_id, maker_private_key = maker_credentials
@@ -84,8 +48,8 @@ async def test_spot_fill(
         api_url=live_client.api_url,
         hydrate_catalogs=True,
     )
-    maker_cid = unique_client_order_id("maker-fill")
-    taker_cid = unique_client_order_id("taker-fill")
+    maker_cid = unique_client_order_id("maker-mkt")
+    taker_cid = unique_client_order_id("taker-mkt")
     maker_order_created = False
     taker_order_created = False
 
@@ -154,11 +118,9 @@ async def test_spot_fill(
             taker_created = await live_client.orders.create(
                 symbol=trade_symbol,
                 side="buy",
-                order_type="limit",
-                tif="gtc",
+                order_type="market",
+                tif="ioc",
                 qty=qty,
-                price=price,
-                post_only=False,
                 client_order_id=taker_cid,
             )
         except Exception as exc:
@@ -170,6 +132,9 @@ async def test_spot_fill(
         taker_order_created = True
 
         taker_detail = await _wait_for_filled_order(live_client, taker_cid)
+        if taker_detail.order is not None and taker_detail.order.order_type:
+            assert taker_detail.order.order_type == "market"
+
         taker_match_ids = {trade.match_id for trade in taker_detail.trades}
         assert taker_match_ids
 
@@ -177,6 +142,7 @@ async def test_spot_fill(
         maker_match_ids = {trade.match_id for trade in maker_detail.trades}
         assert taker_match_ids & maker_match_ids
         match_id = next(iter(taker_match_ids & maker_match_ids))
+
         taker_trade = await _wait_for_trade_match(live_client, trade_symbol, match_id)
         assert taker_trade.side == "buy"
         maker_trade = await _wait_for_trade_match(maker, trade_symbol, match_id)
@@ -185,6 +151,7 @@ async def test_spot_fill(
         taker_after = await live_client.balances.list()
         assert trading_balance_decimal(taker_after, base_asset_id) > taker_base_before
         assert trading_balance_decimal(taker_after, quote_asset_id) < taker_quote_before
+
         maker_after = await maker.balances.list()
         assert trading_balance_decimal(maker_after, base_asset_id) < maker_base_before
         assert trading_balance_decimal(maker_after, quote_asset_id) > maker_quote_before

@@ -12,9 +12,12 @@ REALTIME_HEARTBEAT_HOLD_SECONDS = 35
 
 @pytest.mark.integration
 @pytest.mark.realtime
-async def test_public_trades_subscription_survives_centrifugo_ping() -> None:
+async def test_public_trades_subscription_survives_centrifugo_ping(live_credentials) -> None:
     """Regression: missing pong replies used to close the websocket with code 3012."""
-    async with AsyncPolyester() as client:
+    kwargs = live_client_kwargs_from_env(hydrate_catalogs=True)
+    assert kwargs is not None
+    client = AsyncPolyester(**kwargs)
+    try:
         await client.wait_for_catalogs()
         spot = await client.market_data.get_spot_config()
         symbol = pick_smoke_symbol(spot.raw)
@@ -23,18 +26,25 @@ async def test_public_trades_subscription_survives_centrifugo_ping() -> None:
         try:
             deadline = asyncio.get_running_loop().time() + REALTIME_HEARTBEAT_HOLD_SECONDS
             while asyncio.get_running_loop().time() < deadline:
-                try:
-                    await asyncio.wait_for(subscription.__anext__(), timeout=2.0)
-                except TimeoutError:
-                    continue
-                except StopAsyncIteration:
+                if subscription._close.is_set():
                     pytest.fail(
                         "public trades subscription closed before Centrifugo heartbeat window "
                         f"elapsed ({REALTIME_HEARTBEAT_HOLD_SECONDS}s)"
                     )
+                task = subscription._task
+                if task is not None and task.done():
+                    if exc := task.exception():
+                        raise exc
+                    pytest.fail(
+                        "public trades subscription closed before Centrifugo heartbeat window "
+                        f"elapsed ({REALTIME_HEARTBEAT_HOLD_SECONDS}s)"
+                    )
+                await asyncio.sleep(2.0)
         finally:
             await subscription.aclose()
             await asyncio.sleep(0.1)
+    finally:
+        await client.aclose()
 
 
 @pytest.mark.integration

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -145,8 +146,9 @@ async def test_handle_centrifugo_frame_ping_and_publication_in_one_batch() -> No
 
 
 @pytest.mark.asyncio
-async def test_subscribe_proto_disconnect_ends_stream_without_task_exception() -> None:
+async def test_subscribe_proto_reconnects_after_disconnect() -> None:
     client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    connect_calls = 0
 
     class FakeWS:
         messages = [
@@ -168,16 +170,23 @@ async def test_subscribe_proto_disconnect_ends_stream_without_task_exception() -
                 return self.messages.pop(0)
             raise RuntimeError("connection closed")
 
-    with patch("polyester.realtime.client.websockets.connect", return_value=FakeWS()):
+    def fake_connect(*args, **kwargs):
+        nonlocal connect_calls
+        connect_calls += 1
+        return FakeWS()
+
+    with patch("polyester.realtime.client.websockets.connect", side_effect=fake_connect):
         subscription = await client.subscribe_proto(
             "public:spot:market:trades:1:proto",
             decode=lambda payload: payload,
         )
-        with pytest.raises(StopAsyncIteration):
-            await asyncio.wait_for(subscription.__anext__(), timeout=1.0)
+        await asyncio.sleep(2.5)
+        assert connect_calls >= 2
         assert subscription._task is not None
-        await asyncio.wait_for(subscription._task, timeout=1.0)
-        assert subscription._task.exception() is None
+        assert not subscription._task.done()
+        await subscription.aclose()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await asyncio.wait_for(subscription._task, timeout=1.0)
 
 
 @pytest.mark.asyncio

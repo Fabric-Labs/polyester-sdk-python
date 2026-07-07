@@ -190,18 +190,23 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             }
         normalized = normalize_create_order_request(request, **kwargs)
         if normalized.sub_account_id is None:
-            normalized = CreateOrderRequest(
-                symbol=normalized.symbol,
-                symbol_id=normalized.symbol_id,
-                side=normalized.side,
-                order_type=normalized.order_type,
-                tif=normalized.tif,
-                qty=normalized.qty,
-                price=normalized.price,
-                sub_account_id=self._resolve_sub_account_id(None),
-                client_order_id=normalized.client_order_id,
-                expires_at=normalized.expires_at,
-            )
+            resolved_sub = self._resolve_sub_account_id(None)
+            if resolved_sub is not None:
+                normalized = CreateOrderRequest(
+                    symbol=normalized.symbol,
+                    symbol_id=normalized.symbol_id,
+                    side=normalized.side,
+                    order_type=normalized.order_type,
+                    tif=normalized.tif,
+                    qty=normalized.qty,
+                    price=normalized.price,
+                    sub_account_id=resolved_sub,
+                    client_order_id=normalized.client_order_id,
+                    post_only=normalized.post_only,
+                    expires_at=normalized.expires_at,
+                    attached_risk=normalized.attached_risk,
+                    market_client_ref_price=normalized.market_client_ref_price,
+                )
         quantity_scale = (
             self._catalogs.base_quantity_scale_for_symbol(normalized.symbol)
             if normalized.symbol
@@ -295,7 +300,6 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         symbol: str | None = None,
         side: str | None = None,
         dry_run: bool = False,
-        max_orders: int | None = None,
         request_id: str | None = None,
     ) -> CancelAllOrdersResult:
         proto_request = cancel_all_orders_to_proto(
@@ -303,7 +307,6 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             symbol=symbol,
             side=side,
             dry_run=dry_run,
-            max_orders=max_orders,
             request_id=request_id,
         )
         return await unary_auth_decoded(

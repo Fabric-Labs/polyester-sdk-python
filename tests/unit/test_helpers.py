@@ -13,7 +13,9 @@ from tests.helpers import (
 )
 
 
-def test_pick_smoke_symbol_prefers_eth_usdt():
+def test_pick_smoke_symbol_prefers_eth_usdt(monkeypatch):
+    monkeypatch.delenv("POLYESTER_TEST_SMOKE_SYMBOL", raising=False)
+    monkeypatch.delenv("POLYESTER_SMOKE_SYMBOL", raising=False)
     spot = {
         "pairs": [
             {"symbol": "BNB-USDT"},
@@ -36,6 +38,8 @@ def test_pick_trade_symbol_prefers_trade_env_override(monkeypatch):
 
 def test_pick_trade_symbol_falls_back_to_smoke_symbol(monkeypatch):
     monkeypatch.delenv("POLYESTER_TEST_TRADE_SYMBOL", raising=False)
+    monkeypatch.delenv("POLYESTER_TEST_SMOKE_SYMBOL", raising=False)
+    monkeypatch.delenv("POLYESTER_SMOKE_SYMBOL", raising=False)
     spot = {"pairs": [{"symbol": "ETH-USDT"}]}
     assert pick_trade_symbol(spot) == "ETH-USDT"
 
@@ -81,13 +85,13 @@ def test_eth_usdt_price_hints_present():
     assert FAR_ABOVE_BUY_STOP_PRICE_HINTS["ETH-USDT"] == "50000"
 
 
-def test_far_below_price_from_last_ticks_uses_fraction_of_spot():
+def test_post_only_buy_price_from_last_ticks_uses_fraction_of_spot():
     price = far_below_price_from_last_ticks(
         50_000_000_000,  # 50k USDT with 6 decimal ticks
         tick_size="0.01",
         symbol="BTC-USDT",
     )
-    assert price == "1000"
+    assert price == "49750"
 
 
 def test_far_below_price_from_last_ticks_falls_back_without_market():

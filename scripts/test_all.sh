@@ -23,11 +23,11 @@ if [[ -z "${POLYESTER_API_KEY_ID:-}" || -z "${POLYESTER_API_PRIVATE_KEY:-}" ]]; 
 fi
 
 echo "==> integration (API-key read-only)"
-"${PYTEST[@]}" tests/integration tests/e2e -m "integration and not mutation and not funded and not jwt_session" -v
+"${PYTEST[@]}" tests/integration tests/e2e -m "integration and not mutation and not funded and not jwt_session and not realtime" -v
 
 if [[ "${POLYESTER_TEST_REALTIME:-1}" =~ ^(1|true|yes)$ ]]; then
-  echo "==> realtime heartbeat (public trades, ~35s)"
-  "${PYTEST[@]}" tests/integration/test_realtime.py::test_public_trades_subscription_survives_centrifugo_ping -v
+  echo "==> realtime (Centrifugo subscriptions, ~35s heartbeat)"
+  "${PYTEST[@]}" tests/integration/test_realtime.py -m "integration and realtime" -v
 fi
 
 if [[ "${POLYESTER_TEST_MUTATION:-}" =~ ^(1|true|yes)$ ]]; then
@@ -37,7 +37,7 @@ fi
 
 if [[ "${POLYESTER_TEST_FUNDED:-}" =~ ^(1|true|yes)$ ]]; then
   echo "==> funded"
-  "${PYTEST[@]}" tests/e2e/funded tests/integration -m "integration or funded" -v
+  "${PYTEST[@]}" tests/e2e/funded tests/integration -m "(integration or funded) and not realtime" -v
 fi
 
 if [[ "${POLYESTER_TEST_TREASURY:-}" =~ ^(1|true|yes)$ ]]; then

@@ -1,6 +1,7 @@
 import pytest
 
 from polyester.models import BalancesList, LedgerHealth
+from tests.integration.support import call_optional
 
 
 @pytest.mark.integration
@@ -16,8 +17,12 @@ async def test_balances_list(live_client):
 
 
 @pytest.mark.integration
+@pytest.mark.optional
 async def test_balances_get_health(live_client):
-    result = await live_client.balances.get_health()
+    result = await call_optional(
+        live_client.balances.get_health(),
+        label="balances.get_health",
+    )
     assert isinstance(result, LedgerHealth)
     assert result.ok is True
 

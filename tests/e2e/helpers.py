@@ -103,3 +103,40 @@ async def wait_for_no_open_order(
 
 # Backwards-compatible alias for existing imports.
 far_below_market_limit_params = usdt_funded_buy_limit_params
+
+
+async def wait_for_terminal_order(
+    client, client_order_id: str, *, timeout: float = 20
+):
+    attempts = max(1, int(timeout / 0.5))
+    last_detail = None
+    for _ in range(attempts):
+        try:
+            detail = await client.orders.get(client_order_id=client_order_id)
+        except PolyesterApiError as exc:
+            if str(exc.code or "").lower() != "not_found":
+                raise
+        else:
+            last_detail = detail
+            if detail.order is not None and detail.order.status in _TERMINAL_ORDER_STATUSES:
+                return detail
+        await asyncio.sleep(0.5)
+    status = None
+    if last_detail is not None and last_detail.order is not None:
+        status = last_detail.order.status
+    raise AssertionError(
+        f"Order {client_order_id} did not reach terminal status within {timeout}s"
+        + (f" (last status: {status!r})" if status else "")
+    )
+
+
+async def btc_usdt_market_qty(client, symbol: str = "BTC-USDT") -> str:
+    spot = await client.market_data.get_spot_config()
+    pair = next((p for p in spot.raw.get("pairs") or [] if p.get("symbol") == symbol), {})
+    if not pair:
+        raise ValueError(f"{symbol} is not in spot config")
+    price = await resolve_far_below_buy_limit_price(client, symbol, pair)
+    qty = os.getenv("POLYESTER_TEST_TRADE_QTY") or os.getenv("POLYESTER_TEST_QTY")
+    if qty is None:
+        qty = min_base_qty_for_pair(pair, price)
+    return qty

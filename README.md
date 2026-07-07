@@ -157,6 +157,10 @@ Ledger balances have separate **funding** and **trading** buckets per asset.
 SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
+- **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
+  via wallet/smart-account signing in the Polyester app (not an API-key RPC).
+  `ledger_write.create_funding_user_transfer` is internal-only and is not mounted on
+  the public API host.
 - **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a
   signed intent payload.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`

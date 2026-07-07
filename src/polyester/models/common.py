@@ -53,6 +53,7 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     post_only: bool = False
     expires_at: str | None = None
     attached_risk: dict[str, Any] | None = None
+    market_client_ref_price: str | None = None
 
 
 __all__ = [

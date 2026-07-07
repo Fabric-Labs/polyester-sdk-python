@@ -95,6 +95,10 @@ def create_order_to_proto(
         proto.client_order_id = request.client_order_id
     if request.post_only:
         proto.post_only = True
+    if request.market_client_ref_price is not None:
+        proto.market_client_ref_price_ticks = parse_price_ticks(
+            request.market_client_ref_price, "market_client_ref_price"
+        )
     if request.attached_risk:
         risk = orders_pb2.RiskPolicy()
         ParseDict(request.attached_risk, risk, ignore_unknown_fields=True)
@@ -328,7 +332,6 @@ def cancel_all_orders_to_proto(
     symbol: str | None = None,
     side: str | None = None,
     dry_run: bool = False,
-    max_orders: int | None = None,
     request_id: str | None = None,
 ) -> orders_pb2.CancelAllOrdersRequest:
     proto = orders_pb2.CancelAllOrdersRequest(
@@ -344,8 +347,6 @@ def cancel_all_orders_to_proto(
         if key not in ORDER_SIDE_TO_PROTO:
             raise PolyesterValidationError("side must be buy or sell")
         proto.side = getattr(orders_pb2, ORDER_SIDE_TO_PROTO[key])
-    if max_orders is not None:
-        proto.max_orders = max_orders
     return proto
 
 

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.1.0a4
+
+### Breaking
+- `orders.cancel_all()` no longer accepts `max_orders`; the field was removed from the public proto and server no longer honors it
+
+### Orders
+- Market orders: pass `market_client_ref_price` on `create()` when the orderbook may be empty (required for IOC market buys on devnet)
+- Proto gen bump (2026-07-03 bundle) aligned with server contract
+
+### Realtime
+- Auto-reconnect on Centrifugo disconnect with 30s read timeout (matches Go SDK behavior)
+
+### Testing
+- Market order mutation e2e (single-account IOC buy/sell on devnet)
+- Market order fill e2e and spot fill e2e with optional maker credentials (`POLYESTER_TEST_MAKER_*`)
+- Realtime reconnect unit test; integration batch excludes duplicate realtime runs
+- `test_balances_get_health` marked optional when route is not mounted
+
 ## 0.1.0a3
 
 ### Codecs

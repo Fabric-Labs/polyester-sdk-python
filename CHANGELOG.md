@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.1.0a5
+
+### Triggers
+- `triggers.create()` exposes the full `CreateTriggerRequest` surface, unblocking `TRAILING_STOP`, `TWAP`, and `LADDER` creation via the SDK: `fee_source`, `self_trade_prevention_mode`, `trailing_distance_ticks`/`trailing_distance_bps`, `activation_price`, `max_slippage_ticks`/`max_slippage_bps`, `twap_duration_ms`/`twap_slice_interval_ms`, `ladder_price_min`/`ladder_price_max`, `ladder_levels`, and `ladder_distribution`
+- `trigger_price` is now optional on `create()` (not required for trailing/TWAP/ladder types)
+
+### Testing
+- Unit tests for advanced trigger param mapping (`tests/unit/test_triggers_codecs.py`)
+- Devnet mutation e2e proving trailing stop, TWAP, and ladder creation through the SDK (`tests/e2e/test_advanced_trigger_creation.py`)
+
 ## 0.1.0a4
 
 ### Breaking

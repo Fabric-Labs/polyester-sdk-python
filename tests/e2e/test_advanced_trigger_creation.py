@@ -8,6 +8,7 @@ min-notional sizing, unavailable route) skip rather than fail.
 
 from __future__ import annotations
 
+import contextlib
 from decimal import Decimal
 
 import pytest
@@ -54,14 +55,10 @@ async def _create_then_cleanup(client, symbol: str, **create_kwargs):
     created = await client.triggers.create(symbol=symbol, **create_kwargs)
     assert created.trigger_id
     assert created.status == "created"
-    try:
+    with contextlib.suppress(PolyesterApiError):
         await client.triggers.cancel(trigger_id=created.trigger_id)
-    except PolyesterApiError:
-        pass
-    try:
+    with contextlib.suppress(PolyesterApiError):
         await client.orders.cancel_all(symbol=symbol)
-    except PolyesterApiError:
-        pass
     return created
 
 

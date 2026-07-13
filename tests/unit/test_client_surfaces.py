@@ -31,7 +31,6 @@ EXPECTED_ASYNC_SERVICES = (
     "polychart",
     "layout",
     "guard_signer",
-    "ledger_write",
     "withdraw",
     "trading_withdraws",
     "realtime",

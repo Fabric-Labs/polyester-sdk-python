@@ -299,8 +299,3 @@ class CancelAllAfterResult(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class WithdrawIntentResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     intent_id: str = ""
-
-
-class LedgerWriteTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
-    transfer_id: str = ""
-    timestamp: int = 0

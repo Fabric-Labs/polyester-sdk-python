@@ -25,7 +25,6 @@ from polyester.services import (
     AsyncHeatmapService,
     AsyncInternalTransfersService,
     AsyncLayoutService,
-    AsyncLedgerWriteService,
     AsyncLifecycleService,
     AsyncMarketDataService,
     AsyncMarketOverviewService,
@@ -192,11 +191,6 @@ class AsyncPolyester:
         self.polychart = AsyncPolychartService(self._transport)
         self.layout = AsyncLayoutService(self._transport)
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
-        self.ledger_write = AsyncLedgerWriteService(
-            self._transport,
-            default_sub_account_id,
-            default_account_id,
-        )
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
         if hydrate_catalogs:
@@ -380,7 +374,6 @@ class Polyester:
         self.polychart = _SyncService(self._loop, self._client.polychart)
         self.layout = _SyncService(self._loop, self._client.layout)
         self.guard_signer = _SyncService(self._loop, self._client.guard_signer)
-        self.ledger_write = _SyncService(self._loop, self._client.ledger_write)
         self.withdraw = _SyncService(self._loop, self._client.withdraw)
         self.trading_withdraws = self.withdraw
 

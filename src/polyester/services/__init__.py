@@ -8,7 +8,6 @@ from polyester.services.guard_signer import AsyncGuardSignerService
 from polyester.services.heatmap import AsyncHeatmapService
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.layout import AsyncLayoutService
-from polyester.services.ledger_write import AsyncLedgerWriteService
 from polyester.services.lifecycle import AsyncLifecycleService
 from polyester.services.market_data import AsyncMarketDataService
 from polyester.services.market_overview import AsyncMarketOverviewService
@@ -38,7 +37,6 @@ __all__ = [
     "AsyncHeatmapService",
     "AsyncInternalTransfersService",
     "AsyncLayoutService",
-    "AsyncLedgerWriteService",
     "AsyncLifecycleService",
     "AsyncMarketDataService",
     "AsyncMarketOverviewService",

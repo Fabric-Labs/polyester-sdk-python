@@ -23,6 +23,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,realtime]"
 
+      - name: Reject private ledger.write gen
+        run: |
+          if [ -d src/polyester/gen/ledger/write ] || grep -Rql 'ledger\.write\.v1' src/polyester/gen; then
+            echo "private ledger.write.v1 must not appear in public SDK gen/" >&2
+            exit 1
+          fi
+
       - name: Ruff
         run: ruff check src tests scripts
 

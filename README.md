@@ -159,12 +159,9 @@ SDK notes:
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
   via wallet/smart-account signing in the Polyester app (not an API-key RPC).
-  `ledger_write.create_funding_user_transfer` is internal-only and is not mounted on
-  the public API host.
 - **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a
   signed intent payload.
-- **Trading → trading (another account):** `client.internal_transfers.create(...)`
-  or `client.ledger_write.transfer_trading_to_trading(...)`.
+- **Trading → trading (another account):** `client.internal_transfers.create(...)`.
 
 Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
 transfers and other account-scoped ledger operations.

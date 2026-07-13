@@ -53,7 +53,8 @@ async def test_internal_transfer_tiny(
         quantity_scale=LEDGER_SCALE,
     )
     assert result.request_id or result.transfer_id
-    assert result.quantity_scaled == str(int(qty * Decimal(10**LEDGER_SCALE)))
+    assert result.quantity is not None
+    assert result.quantity.scaled == int(qty * Decimal(10**LEDGER_SCALE))
 
     expected_after = trading_before - qty
     trading_after = trading_before

@@ -13,6 +13,7 @@ from polyester.models import WithdrawIntentResult
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+from polyester.types.money import AssetAmount
 
 
 class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
@@ -26,7 +27,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         asset_id: int,
-        quantity: str,
+        quantity: str | AssetAmount,
         payload_signature: bytes,
         idempotency_key: str | None = None,
         account: AccountScope | None = None,
@@ -55,7 +56,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         asset_id: int,
-        quantity: str,
+        quantity: str | AssetAmount,
         payload_signature: bytes,
         destination_chain_id: int,
         destination_address: str,
@@ -90,7 +91,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         *,
         action: str,
         asset_id: int,
-        amount: str,
+        amount: str | AssetAmount,
         idempotency_key: str,
         payload_signature: bytes,
         signer_wallet: str,

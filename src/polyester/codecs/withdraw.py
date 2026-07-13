@@ -6,13 +6,23 @@ from decimal import Decimal
 
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
+from polyester.types.money import (
+    AssetAmount,
+    QuantityDomain,
+    resolve_asset_amount_scaled,
+)
 
 DEFAULT_TRADING_WITHDRAW_DEADLINE_SECONDS = 5 * 60
 
 
-def str_to_u128_proto(value: str | int, *, scale: int = 18) -> u128_pb2.U128:
-    amount = Decimal(str(value)) * (Decimal(10) ** scale)
-    big = int(amount.to_integral_value())
+def str_to_u128_proto(value: str | Decimal | AssetAmount, *, scale: int = 18) -> u128_pb2.U128:
+    domain = QuantityDomain.LEDGER_E18 if scale == 18 else QuantityDomain.ASSET
+    big = resolve_asset_amount_scaled(value, scale, "amount", domain=domain)
+    return u128_pb2.U128(hi=big >> 64, lo=big & ((1 << 64) - 1))
+
+
+def _nonce_to_u128(value: str | int) -> u128_pb2.U128:
+    big = int(value)
     return u128_pb2.U128(hi=big >> 64, lo=big & ((1 << 64) - 1))
 
 
@@ -29,7 +39,7 @@ def trading_withdraw_payload_to_proto(
     *,
     action: str,
     asset_id: int,
-    amount: str,
+    amount: str | Decimal | AssetAmount,
     idempotency_key: str,
     destination_chain_id: int = 0,
     deadline_ts_sec: int | None = None,
@@ -56,7 +66,7 @@ def trading_withdraw_payload_to_proto(
         destination_chain_id=destination_chain_id,
         amount_e18=str_to_u128_proto(amount, scale=amount_scale),
         deadline_ts_sec=resolved_deadline,
-        nonce=str_to_u128_proto(str(resolved_nonce), scale=0),
+        nonce=_nonce_to_u128(resolved_nonce),
         destination_address=destination_address,
         idempotency_key=idempotency_key,
     )

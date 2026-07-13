@@ -82,19 +82,33 @@ def _id_str(value: Any) -> str:
 
 
 def decode_order(data: dict[str, Any]) -> Order:
+    from polyester.types.money import Price, Quantity
+
+    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
+
+    def _qty(raw: Any) -> Quantity | None:
+        if raw is None or raw == "":
+            return None
+        return Quantity.from_scaled(int(raw), symbol_id=symbol_id)
+
+    def _price(raw: Any) -> Price | None:
+        if raw is None or raw == "" or int(raw) == 0:
+            return None
+        return Price.from_ticks(int(raw))
+
     return Order(
         order_id=_id_str(_field(data, "orderId", "order_id")),
-        symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
+        symbol_id=symbol_id,
         client_order_id=str(_field(data, "clientOrderId", "client_order_id", default="") or ""),
         side=_enum_name(_field(data, "side")).lower(),
         status=_enum_name(_field(data, "status")),
         order_type=_enum_name(_field(data, "orderType", "order_type")).lower(),
         tif=_enum_name(_field(data, "tif")).lower(),
-        orig_qty=str(_field(data, "origQty", "orig_qty", default="") or ""),
-        cum_qty=str(_field(data, "cumQty", "cum_qty", default="") or ""),
-        leaves_qty=str(_field(data, "leavesQty", "leaves_qty", default="") or ""),
-        price_ticks=str(_field(data, "priceTicks", "price_ticks", default="") or ""),
-        avg_px_ticks=str(_field(data, "avgPxTicks", "avg_px_ticks", default="") or ""),
+        orig_qty=_qty(_field(data, "origQty", "orig_qty", default="") or 0),
+        cum_qty=_qty(_field(data, "cumQty", "cum_qty", default="") or 0),
+        leaves_qty=_qty(_field(data, "leavesQty", "leaves_qty", default="") or 0),
+        price=_price(_field(data, "priceTicks", "price_ticks", default=0) or 0),
+        avg_px=_price(_field(data, "avgPxTicks", "avg_px_ticks", default=0) or 0),
         created_ts_ns=str(_field(data, "createdTsNs", "created_ts_ns", default="") or ""),
     )
 
@@ -131,14 +145,19 @@ def decode_get_order(data: dict[str, Any]) -> GetOrderResult:
 
 
 def decode_user_trade(data: dict[str, Any]) -> UserTrade:
+    from polyester.types.money import Price, Quantity
+
+    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
+    qty_raw = _field(data, "qtyScaled", "qty_scaled", default=0) or 0
+    price_raw = _field(data, "priceTicks", "price_ticks", default=0) or 0
     return UserTrade(
-        symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
+        symbol_id=symbol_id,
         match_id=str(_field(data, "matchId", "match_id", default="") or ""),
         order_id=_id_str(_field(data, "orderId", "order_id")),
         side=_enum_name(_field(data, "side")).lower(),
         is_maker=bool(_field(data, "isMaker", "is_maker", default=False)),
-        price_ticks=str(_field(data, "priceTicks", "price_ticks", default="") or ""),
-        qty_scaled=str(_field(data, "qtyScaled", "qty_scaled", default="") or ""),
+        price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
+        qty=Quantity.from_scaled(int(qty_raw), symbol_id=symbol_id),
         fee_scaled=str(_field(data, "feeScaled", "fee_scaled", default="") or ""),
         ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
     )
@@ -157,12 +176,17 @@ def decode_user_trades_list(data: dict[str, Any]) -> UserTradesList:
 
 
 def decode_market_trade(data: dict[str, Any]) -> MarketTrade:
+    from polyester.types.money import Price, Quantity
+
+    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
+    qty_raw = _field(data, "qtyScaled", "qty_scaled", default=0) or 0
+    price_raw = _field(data, "priceTicks", "price_ticks", default=0) or 0
     return MarketTrade(
-        symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
+        symbol_id=symbol_id,
         match_id=str(_field(data, "matchId", "match_id", default="") or ""),
         is_buy=bool(_field(data, "isBuy", "is_buy", default=False)),
-        price_ticks=str(_field(data, "priceTicks", "price_ticks", default="") or ""),
-        qty_scaled=str(_field(data, "qtyScaled", "qty_scaled", default="") or ""),
+        price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
+        qty=Quantity.from_scaled(int(qty_raw), symbol_id=symbol_id),
         ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
     )
 
@@ -236,10 +260,14 @@ def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int = 8) -> 
 
 
 def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
+    from polyester.types.money import Price
+
+    ticks = _field(data, "lastPriceTicks", "last_price_ticks", default=0) or 0
+    symbol = str(_field(data, "symbol", default="") or "")
     return MarketOverviewEntry(
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
-        symbol=str(_field(data, "symbol", default="") or ""),
-        last_price_ticks=str(_field(data, "lastPriceTicks", "last_price_ticks", default="") or ""),
+        symbol=symbol,
+        last_price=Price.from_ticks(int(ticks), symbol=symbol or None) if int(ticks) else None,
         change_24h_bp=str(_field(data, "change24hBp", "change_24h_bp", default="") or ""),
         volume_24h_quote_scaled=str(
             _field(data, "volume24hQuoteScaled", "volume_24h_quote_scaled", default="") or ""
@@ -340,22 +368,32 @@ def decode_cancel_all_orders_result(data: dict[str, Any]) -> CancelAllOrdersResu
 
 
 def decode_trigger(data: dict[str, Any]) -> Trigger:
+    from polyester.types.money import Price, Quantity
+
     stop = _field(data, "stop")
-    trigger_price_ticks = ""
+    trigger_price_ticks = 0
     if isinstance(stop, dict):
-        trigger_price_ticks = str(
-            _field(stop, "triggerPriceTicks", "trigger_price_ticks", default="") or ""
+        trigger_price_ticks = int(
+            _field(stop, "triggerPriceTicks", "trigger_price_ticks", default=0) or 0
         )
+    if not trigger_price_ticks:
+        trigger_price_ticks = int(
+            _field(data, "triggerPriceTicks", "trigger_price_ticks", default=0) or 0
+        )
+    symbol = str(_field(data, "symbol", default="") or "")
+    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
+    qty_raw = int(_field(data, "qtyScaled", "qty_scaled", default=0) or 0)
     return Trigger(
         trigger_id=_id_str(_field(data, "triggerId", "trigger_id")),
-        symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
-        symbol=str(_field(data, "symbol", default="") or ""),
+        symbol_id=symbol_id,
+        symbol=symbol,
         trigger_type=_enum_name(_field(data, "triggerType", "trigger_type")).lower(),
         status=_enum_name(_field(data, "status")).lower(),
         side=_enum_name(_field(data, "side")).lower(),
-        qty_scaled=str(_field(data, "qtyScaled", "qty_scaled", default="") or ""),
-        trigger_price_ticks=trigger_price_ticks
-        or str(_field(data, "triggerPriceTicks", "trigger_price_ticks", default="") or ""),
+        qty=Quantity.from_scaled(qty_raw, symbol=symbol or None, symbol_id=symbol_id),
+        trigger_price=Price.from_ticks(trigger_price_ticks, symbol=symbol or None)
+        if trigger_price_ticks
+        else None,
         client_trigger_id=str(
             _field(data, "clientTriggerId", "client_trigger_id", default="") or ""
         ),
@@ -406,12 +444,23 @@ def decode_transfers_list(data: dict[str, Any]) -> TransfersList:
 
 
 def decode_internal_transfer_result(data: dict[str, Any]) -> InternalTransferResult:
+    from polyester.types.money import AssetAmount, QuantityDomain
+
+    asset_id = int(_field(data, "assetId", "asset_id", default=0) or 0)
+    qty_raw = _field(
+        data, "quantityScaled", "quantity_scaled", "qtyScaled", "qty_scaled", default=0
+    )
+    scaled = int(qty_raw or 0)
     return InternalTransferResult(
         request_id=str(_field(data, "requestId", "request_id", default="") or ""),
         transfer_id=str(_field(data, "transferId", "transfer_id", default="") or ""),
-        asset_id=int(_field(data, "assetId", "asset_id", default=0) or 0),
+        asset_id=asset_id,
         asset_code=str(_field(data, "assetCode", "asset_code", default="") or ""),
-        quantity_scaled=str(_field(data, "quantityScaled", "quantity_scaled", default="") or ""),
+        quantity=AssetAmount.from_scaled(
+            scaled, domain=QuantityDomain.ASSET, asset_id=asset_id
+        )
+        if scaled
+        else None,
     )
 
 

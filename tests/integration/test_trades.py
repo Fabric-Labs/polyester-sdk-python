@@ -14,6 +14,6 @@ async def test_user_trades_list(live_client, smoke_symbol):
         assert trade.match_id
         assert trade.order_id
         assert trade.side in {"buy", "sell"}
-        assert int(trade.price_ticks) > 0
-        assert int(trade.qty_scaled) > 0
+        assert trade.price is not None and trade.price.ticks > 0
+        assert trade.qty is not None and trade.qty.scaled > 0
         assert int(trade.ts_ns) > 0

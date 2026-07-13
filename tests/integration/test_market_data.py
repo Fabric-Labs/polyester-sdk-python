@@ -23,8 +23,8 @@ async def test_get_trades(live_client, smoke_symbol):
     for trade in result.trades:
         assert trade.symbol_id > 0
         assert trade.match_id
-        assert int(trade.price_ticks) > 0
-        assert int(trade.qty_scaled) > 0
+        assert trade.price is not None and trade.price.ticks > 0
+        assert trade.qty is not None and trade.qty.scaled > 0
         assert int(trade.ts_ns) > 0
 
 

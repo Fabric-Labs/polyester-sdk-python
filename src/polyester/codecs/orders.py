@@ -7,10 +7,11 @@ import msgspec
 from google.protobuf.json_format import ParseDict
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.scalars import id_to_int, omit_none, parse_price_ticks, parse_qty_scaled
+from polyester.codecs.scalars import id_to_int, omit_none
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import CreateOrderRequest
+from polyester.types.money import resolve_price_ticks, resolve_qty_scaled
 
 ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
 ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
@@ -30,9 +31,18 @@ def normalize_create_order_request(
         raise PolyesterValidationError("Pass either request or keyword arguments, not both")
     data = request if request is not None else kwargs
     try:
-        return msgspec.convert(data, type=CreateOrderRequest)
+        normalized = msgspec.convert(data, type=CreateOrderRequest)
     except (msgspec.ValidationError, TypeError) as exc:
         raise PolyesterValidationError("Invalid orders.create request") from exc
+    # Reject floats even when qty is typed as Any for dual-path inputs.
+    for field_name in ("qty", "price", "market_client_ref_price"):
+        value = getattr(normalized, field_name, None)
+        if isinstance(value, float):
+            raise PolyesterValidationError(
+                f"{field_name} must be a decimal string, Decimal, or typed scaled value "
+                "(floats are not allowed)"
+            )
+    return normalized
 
 
 def create_order_to_wire(
@@ -55,8 +65,14 @@ def create_order_to_wire(
         "side": ORDER_SIDE_TO_PROTO[request.side],
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
         "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
-        "qty_scaled": parse_qty_scaled(request.qty, quantity_scale),
-        "limit_price_ticks": parse_price_ticks(request.price, "price") if request.price else None,
+        "qty_scaled": resolve_qty_scaled(
+            request.qty, quantity_scale, symbol=request.symbol
+        ),
+        "limit_price_ticks": (
+            resolve_price_ticks(request.price, "price", symbol=request.symbol)
+            if request.price
+            else None
+        ),
         "sub_account_id": request.sub_account_id or None,
         "client_order_id": request.client_order_id,
     }
@@ -83,10 +99,14 @@ def create_order_to_proto(
         order_type=(
             orders_pb2.LIMIT if request.order_type == "limit" else orders_pb2.MARKET
         ),
-        qty_scaled=parse_qty_scaled(request.qty, quantity_scale),
+        qty_scaled=resolve_qty_scaled(
+            request.qty, quantity_scale, symbol=request.symbol
+        ),
     )
     if request.price is not None:
-        proto.price_ticks = parse_price_ticks(request.price, "price")
+        proto.price_ticks = resolve_price_ticks(
+            request.price, "price", symbol=request.symbol
+        )
     if request.tif:
         proto.time_in_force = getattr(orders_pb2, TIF_TO_PROTO[request.tif])
     if request.sub_account_id:
@@ -96,8 +116,10 @@ def create_order_to_proto(
     if request.post_only:
         proto.post_only = True
     if request.market_client_ref_price is not None:
-        proto.market_client_ref_price_ticks = parse_price_ticks(
-            request.market_client_ref_price, "market_client_ref_price"
+        proto.market_client_ref_price_ticks = resolve_price_ticks(
+            request.market_client_ref_price,
+            "market_client_ref_price",
+            symbol=request.symbol,
         )
     if request.attached_risk:
         risk = orders_pb2.RiskPolicy()
@@ -140,9 +162,9 @@ def batch_modify_item_to_proto(
     if client_order_id:
         proto.client_order_id = str(client_order_id)
     if new_price is not None:
-        proto.new_price_ticks = parse_price_ticks(str(new_price), "new_price")
+        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")
     if new_qty is not None:
-        proto.new_qty_scaled = parse_qty_scaled(str(new_qty), quantity_scale, "new_qty")
+        proto.new_qty_scaled = resolve_qty_scaled(new_qty, quantity_scale, "new_qty")
     risk = risk_policy_from_dict(new_attached_risk)
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
@@ -282,8 +304,8 @@ def modify_order_to_proto(
     client_order_id: str | None = None,
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
-    new_price: str | None = None,
-    new_qty: str | None = None,
+    new_price: object | None = None,
+    new_qty: object | None = None,
     new_attached_risk: dict[str, Any] | None = None,
     behavior: str | None = None,
     new_client_order_id: str | None = None,
@@ -308,9 +330,9 @@ def modify_order_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if new_price is not None:
-        proto.new_price_ticks = parse_price_ticks(new_price, "new_price")
+        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")  # type: ignore[arg-type]
     if new_qty is not None:
-        proto.new_qty_scaled = parse_qty_scaled(new_qty, quantity_scale, "new_qty")
+        proto.new_qty_scaled = resolve_qty_scaled(new_qty, quantity_scale, "new_qty")  # type: ignore[arg-type]
     if behavior:
         key = behavior.lower()
         if key not in MODIFY_BEHAVIOR_TO_PROTO:

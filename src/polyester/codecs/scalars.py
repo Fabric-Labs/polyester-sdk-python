@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
-from decimal import ROUND_DOWN, Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 import base58
@@ -9,26 +10,71 @@ import base58
 from polyester.errors import PolyesterValidationError
 
 UINT64_MAX = 2**64 - 1
-
-
-def _parse_decimal(raw: str, field_name: str) -> Decimal:
-    if not isinstance(raw, str):
-        raise PolyesterValidationError(f"{field_name} must be a decimal string")
-    try:
-        return Decimal(raw)
-    except InvalidOperation as exc:
-        raise PolyesterValidationError(f"{field_name} must be a valid decimal string") from exc
-
-
+INT64_MAX = 2**63 - 1
+INT64_MIN = -(2**63)
 PRICE_TICK_SCALE = 6
 
+# Strict non-negative decimal: digits with optional fractional part (TS-aligned).
+_STRICT_DECIMAL = re.compile(r"^\d+(?:\.\d+)?$")
 
-def parse_price_ticks(raw: str, field_name: str = "price") -> int:
-    value = _parse_decimal(raw, field_name)
-    scaled = (value * Decimal(1_000_000)).to_integral_exact(rounding=ROUND_DOWN)
+
+def _decimal_string_from_input(raw: str | Decimal, field_name: str) -> str:
+    if isinstance(raw, (bool, float)):
+        raise PolyesterValidationError(f"{field_name} must be a decimal string or Decimal")
+    if isinstance(raw, Decimal):
+        if not raw.is_finite():
+            raise PolyesterValidationError(f"{field_name} must be a finite decimal")
+        if raw < 0:
+            raise PolyesterValidationError(f"{field_name} must be non-negative")
+        text = format(raw, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        return text or "0"
+    if not isinstance(raw, str):
+        raise PolyesterValidationError(f"{field_name} must be a decimal string or Decimal")
+    text = raw.strip()
+    if not text or not _STRICT_DECIMAL.match(text):
+        raise PolyesterValidationError(f"{field_name} must be a valid decimal string")
+    return text
+
+
+def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, str | None]:
+    """Strict decimal→scaled. Returns (ok, scaled, failure_reason). Never rounds."""
+    raw = decimal.strip()
+    if not _STRICT_DECIMAL.match(raw):
+        return False, None, "invalid"
+    int_part, _, frac_part = raw.partition(".")
+    if len(frac_part) > scale:
+        return False, None, "precision"
+    digits = int_part + frac_part + ("0" * (scale - len(frac_part)))
+    if not digits:
+        digits = "0"
+    try:
+        scaled = int(digits)
+    except ValueError:
+        return False, None, "invalid"
+    return True, scaled, None
+
+
+def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
+    text = _decimal_string_from_input(raw, field_name)
+    ok, scaled, reason = try_decimal_to_scaled(text, scale)
+    if not ok or scaled is None:
+        if reason == "precision":
+            raise PolyesterValidationError(
+                f"{field_name} supports at most {scale} decimal places: {text}"
+            )
+        raise PolyesterValidationError(f"{field_name} must be a valid decimal string")
+    return scaled
+
+
+def parse_price_ticks(raw: str | Decimal, field_name: str = "price") -> int:
+    scaled = decimal_to_scaled(raw, PRICE_TICK_SCALE, field_name)
     if scaled < 0:
         raise PolyesterValidationError(f"{field_name} must be non-negative")
-    return int(scaled)
+    if scaled > INT64_MAX:
+        raise PolyesterValidationError(f"{field_name} exceeds int64 range")
+    return scaled
 
 
 def format_price_ticks(ticks: int) -> str:
@@ -65,12 +111,14 @@ def align_price_ticks(price_ticks: int, tick_size: str) -> int:
     return max(aligned, step)
 
 
-def parse_qty_scaled(raw: str, scale: int, field_name: str = "qty") -> int:
-    value = _parse_decimal(raw, field_name)
-    scaled = (value * (Decimal(10) ** scale)).to_integral_exact(rounding=ROUND_DOWN)
+def parse_qty_scaled(raw: str | Decimal, scale: int, field_name: str = "qty") -> int:
+    scaled = decimal_to_scaled(raw, scale, field_name)
     if scaled <= 0:
         raise PolyesterValidationError(f"{field_name} must be positive")
-    return int(scaled)
+    # amount_e18 / ledger scale 18 may exceed int64 (U128 on the wire).
+    if scale != 18 and scaled > INT64_MAX:
+        raise PolyesterValidationError(f"{field_name} exceeds int64 range")
+    return scaled
 
 
 def parse_required_uint64_decimal(raw: str, field_name: str) -> int:
@@ -83,6 +131,8 @@ def parse_required_uint64_decimal(raw: str, field_name: str) -> int:
 
 
 def id_to_int(value: str | int, label: str = "id") -> int:
+    if isinstance(value, bool):
+        raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if isinstance(value, int):
         parsed = value
     elif value.isdecimal():

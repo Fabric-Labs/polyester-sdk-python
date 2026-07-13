@@ -10,6 +10,7 @@ from polyester.models import (
     TriggerMutationResult,
     TriggersList,
 )
+from polyester.types.money import Price, Quantity
 
 # Match TypeScript TriggerStatusCodec.protoToOutput (British "cancelled" for status).
 _TRIGGER_STATUS_LABELS: dict[int, str] = {
@@ -46,13 +47,13 @@ def _trigger_event_type_label(value: int) -> str:
     )
 
 
-def _trigger_price_ticks(msg: triggers_pb2.Trigger) -> str:
+def _trigger_price(msg: triggers_pb2.Trigger) -> Price | None:
     if has_field(msg, "stop") and msg.stop.trigger_price_ticks:
-        return str(msg.stop.trigger_price_ticks)
-    return ""
+        return Price.from_ticks(int(msg.stop.trigger_price_ticks), symbol=msg.symbol or None)
+    return None
 
 
-def trigger_from_proto(msg: triggers_pb2.Trigger) -> Trigger:
+def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None = None) -> Trigger:
     return Trigger(
         trigger_id=format_uint64_id(msg.trigger_id),
         symbol_id=int(msg.symbol_id),
@@ -60,8 +61,13 @@ def trigger_from_proto(msg: triggers_pb2.Trigger) -> Trigger:
         trigger_type=proto_enum_name(triggers_pb2.TriggerType, msg.trigger_type),
         status=_trigger_status_label(msg.status),
         side=proto_enum_name(orders_pb2.Side, msg.side),
-        qty_scaled=str(msg.qty_scaled),
-        trigger_price_ticks=_trigger_price_ticks(msg),
+        qty=Quantity.from_scaled(
+            int(msg.qty_scaled),
+            scale=quantity_scale,
+            symbol=msg.symbol or None,
+            symbol_id=int(msg.symbol_id),
+        ),
+        trigger_price=_trigger_price(msg),
         client_trigger_id=msg.client_trigger_id,
     )
 
@@ -97,7 +103,7 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
         trigger_type=proto_enum_name(triggers_pb2.TriggerType, msg.trigger_type),
         event_type=_trigger_event_type_label(msg.event_type),
         ts_ns=str(msg.ts_ns),
-        fire_px_ticks=str(msg.fire_price_ticks),
+        fire_px=Price.from_ticks(int(msg.fire_price_ticks)) if msg.fire_price_ticks else None,
         reason=msg.reason,
     )
 

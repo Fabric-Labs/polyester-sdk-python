@@ -69,7 +69,8 @@ def test_internal_transfer_from_proto() -> None:
     )
     result = internal_transfer_from_proto(msg)
     assert result.request_id == "req-1"
-    assert result.quantity_scaled == "500"
+    assert result.quantity is not None
+    assert str(result.quantity.scaled) == "500"
 
 
 def test_api_keys_from_proto() -> None:
@@ -152,6 +153,6 @@ def test_orderbook_from_proto() -> None:
     result = orderbook_from_proto(msg, symbol="BTC-USD", depth=50, quantity_scale=8)
     assert result.book_seq == "42"
     assert len(result.bids) == 1
-    assert result.bids[0].price == "0.0001"
-    assert result.bids[0].qty == "0.0000005"
-    assert result.bids[0].price_ticks == "100"
+    assert result.bids[0].price is not None and result.bids[0].price.ticks == 100
+    assert result.bids[0].qty is not None and result.bids[0].qty.scaled == 50
+    assert result.bids[0].qty.format() == "0.0000005"

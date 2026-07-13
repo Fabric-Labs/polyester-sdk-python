@@ -90,8 +90,8 @@ def test_build_orderbook_data_sorts_sides() -> None:
         asks={150: 1, 120: 2, 110: 3},
     )
     assert data.book_seq == "3"
-    assert [level.price_ticks for level in data.bids] == ["300", "200"]
-    assert [level.price_ticks for level in data.asks] == ["110", "120"]
+    assert [level.price.ticks for level in data.bids] == [300, 200]
+    assert [level.price.ticks for level in data.asks] == [110, 120]
 
 
 def test_bucket_aggregation_formats_decimal_levels() -> None:
@@ -103,9 +103,9 @@ def test_bucket_aggregation_formats_decimal_levels() -> None:
         bucket_ticks=1_000_000,
         quantity_scale=8,
     )
-    assert levels[0].price == "100"
-    assert levels[0].qty == "1"
-    assert levels[0].price_ticks == "100000000"
+    assert levels[0].price is not None and levels[0].price.ticks == 100_000_000
+    assert levels[0].qty is not None and levels[0].qty.scaled == 100_000_000
+    assert levels[0].qty.format() == "1"
 
 
 def test_parse_bucket_ticks() -> None:

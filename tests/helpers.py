@@ -208,10 +208,18 @@ def post_only_buy_price_from_orderbook(book, *, tick_size: str) -> str | None:
     from polyester.codecs.scalars import align_price_ticks, format_price_ticks, parse_price_ticks
 
     tick_ticks = parse_price_ticks(tick_size, "tick_size")
-    bid_ticks = parse_price_ticks(bids[0].price, "price")
+    bid_price = bids[0].price
+    if hasattr(bid_price, "ticks"):
+        bid_ticks = bid_price.ticks
+    else:
+        bid_ticks = parse_price_ticks(bid_price, "price")
     target = max(bid_ticks - tick_ticks, tick_ticks)
     if asks:
-        ask_ticks = parse_price_ticks(asks[0].price, "price")
+        ask_price = asks[0].price
+        if hasattr(ask_price, "ticks"):
+            ask_ticks = ask_price.ticks
+        else:
+            ask_ticks = parse_price_ticks(ask_price, "price")
         target = min(target, max(ask_ticks - tick_ticks, tick_ticks))
     return format_price_ticks(align_price_ticks(target, tick_size))
 
@@ -262,10 +270,10 @@ async def resolve_far_below_buy_limit_price(client, symbol: str, pair: dict) -> 
     try:
         overview = await client.market_overview.list(symbols=[symbol], limit=5)
         for row in overview.markets:
-            if row.symbol != symbol or not row.last_price_ticks:
+            if row.symbol != symbol or not row.last_price:
                 continue
             return post_only_buy_price_from_last_ticks(
-                int(row.last_price_ticks),
+                int(row.last_price.ticks),
                 tick_size=tick_size,
                 symbol=symbol,
             )
@@ -284,9 +292,9 @@ async def resolve_far_above_buy_stop_price(client, symbol: str, pair: dict) -> s
     try:
         overview = await client.market_overview.list(symbols=[symbol], limit=5)
         for row in overview.markets:
-            if row.symbol != symbol or not row.last_price_ticks:
+            if row.symbol != symbol or not row.last_price:
                 continue
-            last = int(row.last_price_ticks)
+            last = int(row.last_price.ticks)
             from polyester.codecs.scalars import align_price_ticks, format_price_ticks
 
             target_ticks = align_price_ticks(max(last * 2, last + 1), tick_size)
@@ -321,11 +329,10 @@ async def resolve_market_ref_price(client, symbol: str, pair: dict, *, side: str
     try:
         overview = await client.market_overview.list(symbols=[symbol], limit=5)
         for row in overview.markets:
-            if row.symbol != symbol or not row.last_price_ticks:
+            if row.symbol != symbol or not row.last_price:
                 continue
-            from polyester.codecs.scalars import format_price_ticks
 
-            return format_price_ticks(int(row.last_price_ticks))
+            return row.last_price.format()
     except Exception:
         pass
     return FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(symbol, "50000")

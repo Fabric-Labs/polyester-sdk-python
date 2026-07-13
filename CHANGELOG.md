@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.1.0a7
+
+### Breaking
+- Dual-path qty/price scalars (POLY-3262): reads expose typed `price` / `qty` domain values (`.ticks` / `.scaled`) instead of primary digit-string `price_ticks` / `qty_scaled` fields
+- Order, trigger, transfer, and withdraw writes accept human decimals (`str` / `Decimal`) or bot scaled inputs (`Price` / `Quantity` / `AssetAmount`); excess precision is rejected (no silent `ROUND_DOWN`)
+
+### Money types
+- New `Price`, `Quantity`, and `AssetAmount` helpers for human decimal and scaled/tick paths, with compatibility checks when reusing read values on writes
+
+### Docs / examples
+- README documents human vs bot dual-path usage
+
+### Testing
+- Unit coverage for money conversion, bounds, and mismatch rejection
+- Funded/integration asserts updated for typed price/qty reads
+- Skip transfer-to-user smoke on Connect `"Request timed out"` as a devnet unavailable signal
+
 ## 0.1.0a6
 
 ### Breaking

@@ -31,13 +31,20 @@ def _timeframe_label(value: int) -> str:
     return proto_enum_name(marketdata_pb2.Timeframe, value)
 
 
-def market_trade_from_proto(msg: marketdata_pb2.MarketTrade) -> MarketTrade:
+def market_trade_from_proto(
+    msg: marketdata_pb2.MarketTrade,
+    *,
+    quantity_scale: int | None = None,
+) -> MarketTrade:
+    from polyester.types.money import Price, Quantity
+
+    symbol_id = int(msg.symbol_id)
     return MarketTrade(
-        symbol_id=int(msg.symbol_id),
+        symbol_id=symbol_id,
         match_id=str(msg.match_id),
         is_buy=bool(msg.is_buy),
-        price_ticks=str(msg.price_ticks),
-        qty_scaled=str(msg.qty_scaled),
+        price=Price.from_ticks(int(msg.price_ticks)),
+        qty=Quantity.from_scaled(int(msg.qty_scaled), scale=quantity_scale, symbol_id=symbol_id),
         ts_ns=str(msg.ts_ns),
     )
 

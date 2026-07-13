@@ -31,23 +31,33 @@ from polyester.models import (
 from polyester.models import (
     UserTrade as PublicUserTrade,
 )
+from polyester.types.money import Price, Quantity
 
 
-def order_from_proto(msg: Order) -> PublicOrder:
+def _qty(scaled: int, *, symbol_id: int, scale: int | None = None) -> Quantity:
+    return Quantity.from_scaled(int(scaled), scale=scale, symbol_id=int(symbol_id))
+
+
+def _price(ticks: int, *, symbol_id: int | None = None) -> Price:
+    return Price.from_ticks(int(ticks), symbol=None)
+
+
+def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> PublicOrder:
     status = proto_enum_name(OrderStatus, msg.status) if msg.status else ""
+    symbol_id = int(msg.symbol_id)
     return PublicOrder(
         order_id=format_uint64_id(msg.order_id),
-        symbol_id=int(msg.symbol_id),
+        symbol_id=symbol_id,
         client_order_id=msg.client_order_id,
         side=proto_enum_name(orders_pb2.Side, msg.side),
         status=status,
         order_type=proto_enum_name(orders_pb2.OrderType, msg.order_type),
         tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force),
-        orig_qty=str(msg.orig_qty_scaled),
-        cum_qty=str(msg.cum_qty_scaled),
-        leaves_qty=str(msg.leaves_qty_scaled),
-        price_ticks=str(msg.price_ticks),
-        avg_px_ticks=str(msg.avg_price_ticks),
+        orig_qty=_qty(msg.orig_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        cum_qty=_qty(msg.cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        leaves_qty=_qty(msg.leaves_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        price=_price(msg.price_ticks) if msg.price_ticks else None,
+        avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
         created_ts_ns=str(msg.created_ts_ns),
     )
 
@@ -59,15 +69,16 @@ def orders_list_from_proto(msg: GetOpenOrdersResponse | GetOrderHistoryResponse)
     )
 
 
-def user_trade_from_proto(msg: UserTrade) -> PublicUserTrade:
+def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) -> PublicUserTrade:
+    symbol_id = int(msg.symbol_id)
     return PublicUserTrade(
-        symbol_id=int(msg.symbol_id),
+        symbol_id=symbol_id,
         match_id=str(msg.match_id),
         order_id=format_uint64_id(msg.order_id),
         side=proto_enum_name(orders_pb2.Side, msg.side),
         is_maker=bool(msg.is_maker),
-        price_ticks=str(msg.price_ticks),
-        qty_scaled=str(msg.qty_scaled),
+        price=_price(msg.price_ticks) if msg.price_ticks else None,
+        qty=_qty(msg.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         fee_scaled=str(msg.fee_scaled),
         ts_ns=str(msg.ts_ns),
     )

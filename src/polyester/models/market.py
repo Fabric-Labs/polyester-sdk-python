@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import msgspec
 
+from polyester.types.money import Price, Quantity
+
 
 class MarketTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     symbol_id: int
     match_id: str = ""
     is_buy: bool = False
-    price_ticks: str = ""
-    qty_scaled: str = ""
+    price: Price | None = None
+    qty: Quantity | None = None
     ts_ns: str = ""
 
 
@@ -36,7 +38,7 @@ class CandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
 class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     symbol_id: int
     symbol: str = ""
-    last_price_ticks: str = ""
+    last_price: Price | None = None
     change_24h_bp: str = ""
     volume_24h_quote_scaled: str = ""
 

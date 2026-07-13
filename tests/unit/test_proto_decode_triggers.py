@@ -27,7 +27,7 @@ def test_trigger_from_proto_maps_stop_price() -> None:
     assert trigger.trigger_type == "stop_loss"
     assert trigger.status == "armed"
     assert trigger.side == "sell"
-    assert trigger.trigger_price_ticks == "50000000000"
+    assert trigger.trigger_price is not None and trigger.trigger_price.ticks == 50_000_000_000
 
 
 def test_triggers_list_from_proto() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.models.market import MarketOverviewEntry, MarketOverviewList
+from polyester.types.money import Price
 
 
 def market_overview_entry_from_proto(
@@ -10,7 +11,9 @@ def market_overview_entry_from_proto(
     return MarketOverviewEntry(
         symbol_id=int(msg.symbol_id),
         symbol=msg.symbol,
-        last_price_ticks=str(msg.last_price_ticks),
+        last_price=Price.from_ticks(int(msg.last_price_ticks), symbol=msg.symbol or None)
+        if msg.last_price_ticks
+        else None,
         change_24h_bp=str(msg.change_24h_bps),
         volume_24h_quote_scaled=str(msg.volume_24h_quote_scaled),
     )

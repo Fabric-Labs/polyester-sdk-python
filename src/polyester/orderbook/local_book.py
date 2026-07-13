@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from polyester.codecs.scalars import format_price_ticks, format_qty_scaled, parse_price_ticks
+from polyester.codecs.scalars import parse_price_ticks
 from polyester.models import OrderbookData, OrderbookLevel
 from polyester.models.realtime import OrderBookDeltaUpdate
 
@@ -60,16 +60,13 @@ def format_orderbook_level(
     price_ticks: int,
     qty_scaled: int,
     quantity_scale: int,
+    symbol: str | None = None,
 ) -> OrderbookLevel:
-    price = format_price_ticks(price_ticks)
-    qty = format_qty_scaled(qty_scaled, quantity_scale)
+    from polyester.types.money import Price, Quantity
+
     return OrderbookLevel(
-        price=price,
-        qty=qty,
-        price_ticks=str(price_ticks),
-        qty_scaled=str(qty_scaled),
-        price_display=price,
-        qty_display=qty,
+        price=Price.from_ticks(price_ticks, symbol=symbol),
+        qty=Quantity.from_scaled(qty_scaled, scale=quantity_scale, symbol=symbol),
     )
 
 

@@ -27,7 +27,11 @@ def _devnet_internal_transfer_unavailable(exc: BaseException) -> bool:
             or "internal error" in message
         )
     message = str(exc).lower()
-    return "context deadline exceeded" in message or "timeout" in message
+    return (
+        "context deadline exceeded" in message
+        or "timeout" in message
+        or "timed out" in message
+    )
 
 
 @pytest.mark.integration
@@ -94,7 +98,8 @@ async def test_transfer_to_user_tiny(live_client, smoke_symbol, funded_enabled):
         raise
 
     assert result.request_id or result.transfer_id
-    assert result.quantity_scaled == str(int(qty * Decimal(10**LEDGER_SCALE)))
+    assert result.quantity is not None
+    assert result.quantity.scaled == int(qty * Decimal(10**LEDGER_SCALE))
 
     expected_after = trading_before - qty
     trading_after = trading_before

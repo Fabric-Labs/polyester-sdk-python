@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import msgspec
 
+from polyester.types.money import AssetAmount, Price, Quantity
+
 
 class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_id: str
@@ -11,11 +13,11 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     status: str = ""
     order_type: str = ""
     tif: str = ""
-    orig_qty: str = ""
-    cum_qty: str = ""
-    leaves_qty: str = ""
-    price_ticks: str = ""
-    avg_px_ticks: str = ""
+    orig_qty: Quantity | None = None
+    cum_qty: Quantity | None = None
+    leaves_qty: Quantity | None = None
+    price: Price | None = None
+    avg_px: Price | None = None
     created_ts_ns: str = ""
 
 
@@ -41,8 +43,8 @@ class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_id: str = ""
     side: str = ""
     is_maker: bool = False
-    price_ticks: str = ""
-    qty_scaled: str = ""
+    price: Price | None = None
+    qty: Quantity | None = None
     fee_scaled: str = ""
     ts_ns: str = ""
 
@@ -100,8 +102,8 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_type: str = ""
     status: str = ""
     side: str = ""
-    qty_scaled: str = ""
-    trigger_price_ticks: str = ""
+    qty: Quantity | None = None
+    trigger_price: Price | None = None
     client_trigger_id: str = ""
 
 
@@ -136,7 +138,7 @@ class InternalTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     transfer_id: str = ""
     asset_id: int = 0
     asset_code: str = ""
-    quantity_scaled: str = ""
+    quantity: AssetAmount | None = None
 
 
 class DepositAddress(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -154,7 +156,7 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_type: str = ""
     event_type: str = ""
     ts_ns: str = ""
-    fire_px_ticks: str = ""
+    fire_px: Price | None = None
     reason: str = ""
 
 

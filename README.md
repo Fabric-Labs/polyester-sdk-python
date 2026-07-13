@@ -140,7 +140,32 @@ async with AsyncPolyester(
     await client.orders.cancel(client_order_id="my-bot-001")
 ```
 
-Use **decimal strings** for `qty` and `price`. Do not pass floats.
+Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
+Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
+(fixed 1e6), not market tick-size alignment (server validates tick size).
+
+### For bots (scaled integers)
+
+Stay in integer space — no string round-trip:
+
+```python
+from polyester import Price, Quantity
+
+result = await client.orders.create(
+    symbol="BNB-USDT",
+    side="buy",
+    order_type="limit",
+    tif="gtc",
+    qty=Quantity.from_scaled(1_000_000, scale=8),  # already wire units
+    price=Price.from_ticks(100_000_000),            # 100.000000 at 1e6
+    post_only=True,
+)
+# Reads expose the same types: order.price.ticks, order.orig_qty.scaled
+```
+
+Compatible values from fills/books can be passed back into writes when the
+instrument/domain matches.
+
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
@@ -187,7 +212,7 @@ trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 subscription = await client.market_data.subscribe_trades(symbol="BNB-USDT")
 try:
     async for trade in subscription:
-        print(trade.price_ticks, trade.qty_scaled)
+        print(trade.price.ticks if trade.price else None, trade.qty.scaled if trade.qty else None)
         break
 finally:
     await subscription.aclose()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
+from polyester.codecs.scalars import timestamp_dict_to_datetime
 from polyester.gen.auth.v1 import api_keys_pb2
 from polyester.models import ApiKeysList, ApiKeySummary
 
@@ -11,6 +12,7 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
         label=msg.label,
         status=proto_enum_name(api_keys_pb2.ApiKeyStatus, msg.status),
         subaccount_id=format_uint64_id(msg.subaccount_id),
+        updated_at=timestamp_dict_to_datetime(msg.updated_at),
     )
 
 

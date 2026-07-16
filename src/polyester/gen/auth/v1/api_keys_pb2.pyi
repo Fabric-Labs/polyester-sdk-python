@@ -26,7 +26,7 @@ REVOKED: ApiKeyStatus
 DISABLED: ApiKeyStatus
 
 class ApiKey(_message.Message):
-    __slots__ = ("key_id", "label", "icon", "color", "ip_whitelist", "status", "subaccount_id", "policy_id", "created_at", "last_used_at", "public_key_ed25519", "expires_at", "created_by_actor")
+    __slots__ = ("key_id", "label", "icon", "color", "ip_whitelist", "status", "subaccount_id", "policy_id", "created_at", "last_used_at", "public_key_ed25519", "expires_at", "created_by_actor", "updated_at")
     KEY_ID_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
@@ -40,6 +40,7 @@ class ApiKey(_message.Message):
     PUBLIC_KEY_ED25519_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     CREATED_BY_ACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     key_id: str
     label: str
     icon: str
@@ -53,7 +54,8 @@ class ApiKey(_message.Message):
     public_key_ed25519: bytes
     expires_at: _timestamp_pb2.Timestamp
     created_by_actor: str
-    def __init__(self, key_id: _Optional[str] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_used_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., public_key_ed25519: _Optional[bytes] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_by_actor: _Optional[str] = ...) -> None: ...
+    updated_at: _timestamp_pb2.Timestamp
+    def __init__(self, key_id: _Optional[str] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_used_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., public_key_ed25519: _Optional[bytes] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_by_actor: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class IpWhitelist(_message.Message):
     __slots__ = ("cidrs",)

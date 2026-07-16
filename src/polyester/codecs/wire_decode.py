@@ -301,6 +301,15 @@ def decode_asset_balance(data: dict[str, Any]) -> AssetBalance:
         funding=_u128_str(_field(data, "funding")),
         reserved=_u128_str(_field(data, "reserved")),
         available=_u128_str(_field(data, "available")),
+        trading_version=int(
+            _field(data, "tradingVersion", "trading_version", default=0) or 0
+        ),
+        funding_version=int(
+            _field(data, "fundingVersion", "funding_version", default=0) or 0
+        ),
+        reserved_version=int(
+            _field(data, "reservedVersion", "reserved_version", default=0) or 0
+        ),
     )
 
 
@@ -613,13 +622,13 @@ def decode_market_trade_bytes(payload: bytes) -> MarketTrade:
     return decode_market_trade(protobuf_to_public_dict(message))
 
 
-
 def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:
     return ApiKeySummary(
         key_id=str(_field(data, "keyId", "key_id", default="") or ""),
         label=str(_field(data, "label", default="") or ""),
         status=_enum_name(_field(data, "status")),
         subaccount_id=_id_str(_field(data, "subaccountId", "subaccount_id")),
+        updated_at=None,
     )
 
 

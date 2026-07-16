@@ -86,18 +86,24 @@ class GetBalancesRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
 
 class AssetBalance(_message.Message):
-    __slots__ = ("asset_id", "trading", "funding", "reserved", "available")
+    __slots__ = ("asset_id", "trading", "funding", "reserved", "available", "trading_version", "funding_version", "reserved_version")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     TRADING_FIELD_NUMBER: _ClassVar[int]
     FUNDING_FIELD_NUMBER: _ClassVar[int]
     RESERVED_FIELD_NUMBER: _ClassVar[int]
     AVAILABLE_FIELD_NUMBER: _ClassVar[int]
+    TRADING_VERSION_FIELD_NUMBER: _ClassVar[int]
+    FUNDING_VERSION_FIELD_NUMBER: _ClassVar[int]
+    RESERVED_VERSION_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     trading: _u128_pb2.U128
     funding: _u128_pb2.U128
     reserved: _u128_pb2.U128
     available: _u128_pb2.U128
-    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ...) -> None: ...
+    trading_version: int
+    funding_version: int
+    reserved_version: int
+    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., trading_version: _Optional[int] = ..., funding_version: _Optional[int] = ..., reserved_version: _Optional[int] = ...) -> None: ...
 
 class GetBalancesResponse(_message.Message):
     __slots__ = ("balances",)

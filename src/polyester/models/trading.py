@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import msgspec
 
 from polyester.types.money import AssetAmount, Price, Quantity
@@ -19,6 +21,7 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     price: Price | None = None
     avg_px: Price | None = None
     created_ts_ns: str = ""
+    state_revision: int = 0
 
 
 class OrdersList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -60,6 +63,9 @@ class AssetBalance(msgspec.Struct, kw_only=True, omit_defaults=True):
     funding: str = "0"
     reserved: str = "0"
     available: str = "0"
+    trading_version: int = 0
+    funding_version: int = 0
+    reserved_version: int = 0
 
 
 class BalancesList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -219,6 +225,7 @@ class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     label: str = ""
     status: str = ""
     subaccount_id: str = ""
+    updated_at: datetime | None = None
 
 
 class ApiKeysList(msgspec.Struct, kw_only=True, omit_defaults=True):

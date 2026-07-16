@@ -48,6 +48,7 @@ def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
         subaccount_policy_id=format_uint64_id(msg.subaccount_policy_id),
         require_member_mfa=bool(msg.require_member_mfa),
         smart_account_salt_nonce=int(msg.smart_account_salt_nonce),
+        updated_at=timestamp_dict_to_datetime(msg.updated_at),
     )
 
 

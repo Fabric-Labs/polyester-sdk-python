@@ -5,6 +5,7 @@ from polyester.codecs.decode.internal_transfers import internal_transfer_from_pr
 from polyester.codecs.ledger_amounts import LEDGER_SCALE
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import id_to_int
+from polyester.codecs.withdraw import str_to_u128_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import CreateInternalTransferRequest
@@ -12,11 +13,7 @@ from polyester.models import InternalTransferResult
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.types.money import (
-    AssetAmount,
-    QuantityDomain,
-    resolve_asset_amount_scaled,
-)
+from polyester.types.money import AssetAmount
 
 
 class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
@@ -55,13 +52,7 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         scale = quantity_scale if quantity_scale is not None else LEDGER_SCALE
         request = CreateInternalTransferRequest(
             asset_id=asset_id,
-            qty_scaled=resolve_asset_amount_scaled(
-                quantity,
-                scale,
-                "quantity",
-                domain=QuantityDomain.ASSET,
-                asset_id=asset_id,
-            ),
+            amount_e18=str_to_u128_proto(quantity, scale=scale),
             idempotency_key=idempotency_key,
         )
         parsed_sub = parse_optional_subaccount_id(

@@ -149,7 +149,7 @@ class Quantity:
 
 @dataclass(frozen=True, slots=True)
 class AssetAmount:
-    """Resolved asset/ledger amount (transfer qty_scaled or withdraw amount_e18)."""
+    """Resolved asset/ledger amount (transfer/withdraw amount_e18)."""
 
     scaled: int
     scale: int | None = None

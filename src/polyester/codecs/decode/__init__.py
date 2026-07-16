@@ -10,7 +10,6 @@ from polyester.codecs.decode.balances import (
     balances_list_from_proto,
     equity_history_from_proto,
     holds_list_from_proto,
-    ledger_health_from_proto,
 )
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.decode.deposit import (
@@ -77,7 +76,6 @@ __all__ = [
     "heatmap_from_proto",
     "holds_list_from_proto",
     "internal_transfer_from_proto",
-    "ledger_health_from_proto",
     "market_overview_list_from_proto",
     "market_trades_from_proto",
     "modify_order_from_proto",

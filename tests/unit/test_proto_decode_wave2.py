@@ -65,7 +65,7 @@ def test_internal_transfer_from_proto() -> None:
         transfer_id="xfer-1",
         asset_id=3,
         asset_code="USDT",
-        qty_scaled=500,
+        amount_e18=u128_pb2.U128(hi=0, lo=500),
     )
     result = internal_transfer_from_proto(msg)
     assert result.request_id == "req-1"

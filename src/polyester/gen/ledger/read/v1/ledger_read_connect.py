@@ -33,9 +33,6 @@ class LedgerReadService(Protocol):
     async def get_balances(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def get_health(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-
 
 class LedgerReadServiceASGIApplication(ConnectASGIApplication[LedgerReadService]):
     def __init__(self, service: LedgerReadService | AsyncGenerator[LedgerReadService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -91,16 +88,6 @@ class LedgerReadServiceASGIApplication(ConnectASGIApplication[LedgerReadService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_balances,
-                ),
-                "/ledger.read.v1.LedgerReadService/GetHealth": Endpoint.unary(
-                    method=MethodInfo(
-                        name="GetHealth",
-                        service_name="ledger.read.v1.LedgerReadService",
-                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest,
-                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
-                    ),
-                    function=svc.get_health,
                 ),
             },
             interceptors=interceptors,
@@ -216,26 +203,6 @@ class LedgerReadServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
-    async def get_health(
-        self,
-        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse:
-        return await self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="GetHealth",
-                service_name="ledger.read.v1.LedgerReadService",
-                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest,
-                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
 
 
 
@@ -250,8 +217,6 @@ class LedgerReadServiceSync(Protocol):
     def list_holds(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_balances(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def get_health(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -308,16 +273,6 @@ class LedgerReadServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_balances,
-                ),
-                "/ledger.read.v1.LedgerReadService/GetHealth": EndpointSync.unary(
-                    method=MethodInfo(
-                        name="GetHealth",
-                        service_name="ledger.read.v1.LedgerReadService",
-                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest,
-                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
-                    ),
-                    function=service.get_health,
                 ),
             },
             interceptors=interceptors,
@@ -427,26 +382,6 @@ class LedgerReadServiceClientSync(ConnectClientSync):
                 service_name="ledger.read.v1.LedgerReadService",
                 input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesRequest,
                 output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
-    def get_health(
-        self,
-        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse:
-        return self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="GetHealth",
-                service_name="ledger.read.v1.LedgerReadService",
-                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthRequest,
-                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetHealthResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

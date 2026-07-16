@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from polyester.codecs.ledger_amounts import LEDGER_SCALE
 from polyester.gen.transfer.v1 import internal_transfer_pb2
 from polyester.models import InternalTransferResult
 from polyester.types.money import AssetAmount, QuantityDomain
+
+
+def _u128_scaled(msg) -> int:
+    if msg is None:
+        return 0
+    return (int(getattr(msg, "hi", 0) or 0) << 64) + int(getattr(msg, "lo", 0) or 0)
 
 
 def internal_transfer_from_proto(
@@ -14,8 +21,9 @@ def internal_transfer_from_proto(
         asset_id=int(msg.asset_id),
         asset_code=msg.asset_code,
         quantity=AssetAmount.from_scaled(
-            int(msg.qty_scaled),
-            domain=QuantityDomain.ASSET,
+            _u128_scaled(msg.amount_e18) if msg.HasField("amount_e18") else 0,
+            scale=LEDGER_SCALE,
+            domain=QuantityDomain.LEDGER_E18,
             asset_id=int(msg.asset_id),
         ),
     )

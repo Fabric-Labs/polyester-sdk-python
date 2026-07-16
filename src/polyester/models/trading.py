@@ -214,11 +214,6 @@ class BucketTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     timestamp_ns: str = "0"
 
 
-class LedgerHealth(msgspec.Struct, kw_only=True, omit_defaults=True):
-    ok: bool = False
-    version: str = ""
-
-
 class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     key_id: str = ""
     label: str = ""

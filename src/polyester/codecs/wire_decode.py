@@ -31,7 +31,6 @@ from polyester.models.trading import (
     Hold,
     HoldsList,
     InternalTransferResult,
-    LedgerHealth,
     LedgerTransfer,
     LifecycleFlowsList,
     LifecycleFlowSummary,
@@ -613,12 +612,6 @@ def decode_market_trade_bytes(payload: bytes) -> MarketTrade:
     message.ParseFromString(payload)
     return decode_market_trade(protobuf_to_public_dict(message))
 
-
-def decode_ledger_health(data: dict[str, Any]) -> LedgerHealth:
-    return LedgerHealth(
-        ok=bool(_field(data, "ok", default=False)),
-        version=str(_field(data, "version", default="") or ""),
-    )
 
 
 def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:

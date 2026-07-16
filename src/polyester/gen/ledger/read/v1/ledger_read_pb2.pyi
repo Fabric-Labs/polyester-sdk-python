@@ -1,8 +1,6 @@
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
-from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.ledger.v1 import catalog_pb2 as _catalog_pb2
-from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -298,18 +296,6 @@ class ListHoldsResponse(_message.Message):
     holds: _containers.RepeatedCompositeFieldContainer[HoldRow]
     next_page_token: str
     def __init__(self, holds: _Optional[_Iterable[_Union[HoldRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
-
-class GetHealthRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
-class GetHealthResponse(_message.Message):
-    __slots__ = ("ok", "version")
-    OK_FIELD_NUMBER: _ClassVar[int]
-    VERSION_FIELD_NUMBER: _ClassVar[int]
-    ok: bool
-    version: str
-    def __init__(self, ok: _Optional[bool] = ..., version: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
     __slots__ = ("code",)

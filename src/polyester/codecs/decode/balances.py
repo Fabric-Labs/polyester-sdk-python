@@ -11,7 +11,6 @@ from polyester.models import (
     EquityHistorySeries,
     Hold,
     HoldsList,
-    LedgerHealth,
 )
 
 _BALANCE_RANGE_LABELS = {
@@ -49,8 +48,6 @@ def balances_list_from_proto(msg: ledger_read_pb2.GetBalancesResponse) -> Balanc
     return BalancesList(balances=[asset_balance_from_proto(item) for item in msg.balances])
 
 
-def ledger_health_from_proto(msg: ledger_read_pb2.GetHealthResponse) -> LedgerHealth:
-    return LedgerHealth(ok=bool(msg.ok), version=msg.version)
 
 
 def balance_history_series_from_proto(msg: ledger_read_pb2.BalanceSeries) -> BalanceHistorySeries:

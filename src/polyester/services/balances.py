@@ -6,7 +6,6 @@ from polyester.codecs.decode.balances import (
     balances_list_from_proto,
     equity_history_from_proto,
     holds_list_from_proto,
-    ledger_health_from_proto,
 )
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
@@ -16,7 +15,6 @@ from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
     GetBalancesRequest,
     GetEquityHistorySeriesRequest,
-    GetHealthRequest,
     ListHoldsRequest,
 )
 from polyester.models import (
@@ -25,7 +23,6 @@ from polyester.models import (
     BalancesList,
     EquityHistory,
     HoldsList,
-    LedgerHealth,
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
@@ -49,15 +46,6 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         self._default_sub_account_id = default_sub_account_id
         self._default_account_id = default_account_id
         self._realtime = realtime
-
-    async def get_health(self) -> LedgerHealth:
-        return await unary_auth_decoded(
-            self._transport,
-            LedgerReadServiceClient,
-            lambda client, req: client.get_health(req),
-            GetHealthRequest(),
-            ledger_health_from_proto,
-        )
 
     async def list(
         self,

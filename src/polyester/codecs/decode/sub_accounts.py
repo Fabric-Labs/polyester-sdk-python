@@ -136,9 +136,15 @@ def subaccount_activity_event_from_proto(
 ) -> SubAccountActivityEvent:
     return SubAccountActivityEvent(
         created_at=timestamp_dict_to_datetime(msg.created_at),
-        entity_kind=msg.entity_kind,
-        event_action=msg.event_action,
-        source=msg.source,
+        entity_kind=proto_enum_name(
+            subaccounts_pb2.ActivityEntityKind, msg.entity_kind
+        ).removeprefix("activity_entity_"),
+        event_action=proto_enum_name(
+            subaccounts_pb2.ActivityEventAction, msg.event_action
+        ).removeprefix("activity_action_"),
+        source=proto_enum_name(
+            subaccounts_pb2.ActivityEventSource, msg.source
+        ).removeprefix("activity_source_"),
         ip=msg.ip,
         user_agent=msg.user_agent,
         actor_account_id=format_uint64_id(msg.actor_account_id),

@@ -12,6 +12,8 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
         label=msg.label,
         status=proto_enum_name(api_keys_pb2.ApiKeyStatus, msg.status),
         subaccount_id=format_uint64_id(msg.subaccount_id),
+        created_at=timestamp_dict_to_datetime(msg.created_at),
+        last_used_at=timestamp_dict_to_datetime(msg.last_used_at),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
     )
 

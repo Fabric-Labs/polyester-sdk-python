@@ -7,8 +7,12 @@ from polyester.codecs.decode.auth import (
     profile_from_proto,
     username_history_from_proto,
 )
+from polyester.codecs.decode.sub_accounts import (
+    subaccount_activity_event_from_proto,
+    subaccount_from_proto,
+)
 from polyester.codecs.scalars import format_id
-from polyester.gen.auth.v1 import auth_pb2, profile_pb2
+from polyester.gen.auth.v1 import auth_pb2, profile_pb2, subaccounts_pb2
 
 
 def test_me_from_proto_formats_ids_and_session() -> None:
@@ -61,3 +65,25 @@ def test_username_history_from_proto_orders_entries() -> None:
     )
     result = username_history_from_proto(msg)
     assert [entry.username for entry in result.history] == ["new", "old"]
+
+
+def test_subaccount_freshness_and_activity_enums() -> None:
+    subaccount = subaccount_from_proto(
+        subaccounts_pb2.Subaccount(
+            id=12,
+            updated_at=Timestamp(seconds=3, nanos=123_456_000),
+        )
+    )
+    assert subaccount.updated_at is not None
+    assert subaccount.updated_at.microsecond == 123_456
+
+    event = subaccount_activity_event_from_proto(
+        subaccounts_pb2.ActivityEvent(
+            entity_kind=subaccounts_pb2.ACTIVITY_ENTITY_INVITE,
+            event_action=subaccounts_pb2.ACTIVITY_ACTION_CREATED,
+            source=subaccounts_pb2.ACTIVITY_SOURCE_API,
+        )
+    )
+    assert event.entity_kind == "invite"
+    assert event.event_action == "created"
+    assert event.source == "api"

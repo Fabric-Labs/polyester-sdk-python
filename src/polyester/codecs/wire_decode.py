@@ -109,6 +109,7 @@ def decode_order(data: dict[str, Any]) -> Order:
         price=_price(_field(data, "priceTicks", "price_ticks", default=0) or 0),
         avg_px=_price(_field(data, "avgPxTicks", "avg_px_ticks", default=0) or 0),
         created_ts_ns=str(_field(data, "createdTsNs", "created_ts_ns", default="") or ""),
+        version=int(_field(data, "version", default=0) or 0),
     )
 
 
@@ -301,14 +302,14 @@ def decode_asset_balance(data: dict[str, Any]) -> AssetBalance:
         funding=_u128_str(_field(data, "funding")),
         reserved=_u128_str(_field(data, "reserved")),
         available=_u128_str(_field(data, "available")),
-        trading_version=int(
-            _field(data, "tradingVersion", "trading_version", default=0) or 0
+        trading_updated_at_ns=int(
+            _field(data, "tradingUpdatedAtNs", "trading_updated_at_ns", default=0) or 0
         ),
-        funding_version=int(
-            _field(data, "fundingVersion", "funding_version", default=0) or 0
+        funding_updated_at_ns=int(
+            _field(data, "fundingUpdatedAtNs", "funding_updated_at_ns", default=0) or 0
         ),
-        reserved_version=int(
-            _field(data, "reservedVersion", "reserved_version", default=0) or 0
+        reserved_updated_at_ns=int(
+            _field(data, "reservedUpdatedAtNs", "reserved_updated_at_ns", default=0) or 0
         ),
     )
 

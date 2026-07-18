@@ -130,8 +130,10 @@ class SubaccountPolicyView(_message.Message):
     def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketRule, _Mapping]]] = ..., perp_markets: _Optional[_Iterable[_Union[PerpMarketRule, _Mapping]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., perp_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., is_template: _Optional[bool] = ..., source_template_id: _Optional[int] = ..., global_notional_cap: _Optional[int] = ..., max_order_notional: _Optional[int] = ..., max_open_orders: _Optional[int] = ..., max_open_positions: _Optional[int] = ..., global_perp_leverage_x: _Optional[int] = ..., daily_internal_transfer_out_limit: _Optional[int] = ..., daily_withdraw_limit: _Optional[int] = ..., internal_transfers_own_only: _Optional[bool] = ..., enforce_withdraw_whitelist: _Optional[bool] = ..., trading_halted: _Optional[bool] = ..., liquidation_only: _Optional[bool] = ..., daily_loss_limit: _Optional[int] = ..., intraday_drawdown_limit_bps: _Optional[int] = ..., locked: _Optional[bool] = ..., review_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ListSubaccountPoliciesRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("subaccount_id",)
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountPoliciesResponse(_message.Message):
     __slots__ = ("policies",)
@@ -140,10 +142,12 @@ class ListSubaccountPoliciesResponse(_message.Message):
     def __init__(self, policies: _Optional[_Iterable[_Union[SubaccountPolicyView, _Mapping]]] = ...) -> None: ...
 
 class GetSubaccountPolicyRequest(_message.Message):
-    __slots__ = ("policy_id",)
+    __slots__ = ("policy_id", "subaccount_id")
     POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     policy_id: int
-    def __init__(self, policy_id: _Optional[int] = ...) -> None: ...
+    subaccount_id: int
+    def __init__(self, policy_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ...) -> None: ...
 
 class GetSubaccountPolicyResponse(_message.Message):
     __slots__ = ("policy",)
@@ -324,8 +328,10 @@ class ApiPolicyView(_message.Message):
     def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketRule, _Mapping]]] = ..., perp_markets: _Optional[_Iterable[_Union[PerpMarketRule, _Mapping]]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., perp_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., max_order_notional: _Optional[int] = ..., daily_internal_transfer_out_limit: _Optional[int] = ..., daily_withdraw_limit: _Optional[int] = ..., is_template: _Optional[bool] = ..., source_template_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ListApiPoliciesRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("key_id",)
+    KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    key_id: str
+    def __init__(self, key_id: _Optional[str] = ...) -> None: ...
 
 class ListApiPoliciesResponse(_message.Message):
     __slots__ = ("policies",)
@@ -334,10 +340,12 @@ class ListApiPoliciesResponse(_message.Message):
     def __init__(self, policies: _Optional[_Iterable[_Union[ApiPolicyView, _Mapping]]] = ...) -> None: ...
 
 class GetApiPolicyRequest(_message.Message):
-    __slots__ = ("policy_id",)
+    __slots__ = ("policy_id", "key_id")
     POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    KEY_ID_FIELD_NUMBER: _ClassVar[int]
     policy_id: int
-    def __init__(self, policy_id: _Optional[int] = ...) -> None: ...
+    key_id: str
+    def __init__(self, policy_id: _Optional[int] = ..., key_id: _Optional[str] = ...) -> None: ...
 
 class GetApiPolicyResponse(_message.Message):
     __slots__ = ("policy",)

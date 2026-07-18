@@ -1,3 +1,5 @@
+from google.protobuf.timestamp_pb2 import Timestamp
+
 from polyester.codecs.decode.api_keys import api_key_from_proto, api_keys_list_from_proto
 from polyester.codecs.decode.deposit import deposit_address_from_proto
 from polyester.codecs.decode.internal_transfers import internal_transfer_from_proto
@@ -81,6 +83,9 @@ def test_api_keys_from_proto() -> None:
                 label="bot",
                 status=api_keys_pb2.ACTIVE,
                 subaccount_id=10,
+                created_at=Timestamp(seconds=1),
+                last_used_at=Timestamp(seconds=2),
+                updated_at=Timestamp(seconds=3, nanos=123_456_000),
             )
         ]
     )
@@ -89,6 +94,9 @@ def test_api_keys_from_proto() -> None:
     key = api_key_from_proto(msg.api_keys[0])
     assert key.status == "active"
     assert key.subaccount_id == format_id(10)
+    assert key.created_at is not None and key.created_at.timestamp() == 1
+    assert key.last_used_at is not None and key.last_used_at.timestamp() == 2
+    assert key.updated_at is not None and key.updated_at.microsecond == 123_456
 
 
 def test_resolved_accounts_from_proto() -> None:

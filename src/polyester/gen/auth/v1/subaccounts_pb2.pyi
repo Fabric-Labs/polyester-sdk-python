@@ -41,6 +41,44 @@ class SubaccountInviteAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SUBACCOUNT_INVITE_ACTION_ACCEPT: _ClassVar[SubaccountInviteAction]
     SUBACCOUNT_INVITE_ACTION_DECLINE: _ClassVar[SubaccountInviteAction]
     SUBACCOUNT_INVITE_ACTION_CANCEL: _ClassVar[SubaccountInviteAction]
+
+class ActivityEntityKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_ENTITY_UNSPECIFIED: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_ACCOUNT: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_SESSION: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_API_KEY: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_SUBACCOUNT: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_MEMBER: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_POLICY: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_INVITE: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_SECURITY: _ClassVar[ActivityEntityKind]
+    ACTIVITY_ENTITY_DESTINATION: _ClassVar[ActivityEntityKind]
+
+class ActivityEventAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_ACTION_UNSPECIFIED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_CREATED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_UPDATED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_DELETED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_ENABLED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_DISABLED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_REMOVED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_ROLE_SET: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_RECEIVED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_REPLIED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_FAILED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_REVOKED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_BLOCKED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_HOLD_PLACED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_HOLD_RELEASED: _ClassVar[ActivityEventAction]
+
+class ActivityEventSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_SOURCE_UNSPECIFIED: _ClassVar[ActivityEventSource]
+    ACTIVITY_SOURCE_WEB: _ClassVar[ActivityEventSource]
+    ACTIVITY_SOURCE_MOBILE: _ClassVar[ActivityEventSource]
+    ACTIVITY_SOURCE_API: _ClassVar[ActivityEventSource]
 SUBACCOUNT_ROLE_UNSPECIFIED: SubaccountRole
 VIEWER: SubaccountRole
 TRADER: SubaccountRole
@@ -57,6 +95,35 @@ SUBACCOUNT_INVITE_ACTION_UNSPECIFIED: SubaccountInviteAction
 SUBACCOUNT_INVITE_ACTION_ACCEPT: SubaccountInviteAction
 SUBACCOUNT_INVITE_ACTION_DECLINE: SubaccountInviteAction
 SUBACCOUNT_INVITE_ACTION_CANCEL: SubaccountInviteAction
+ACTIVITY_ENTITY_UNSPECIFIED: ActivityEntityKind
+ACTIVITY_ENTITY_ACCOUNT: ActivityEntityKind
+ACTIVITY_ENTITY_SESSION: ActivityEntityKind
+ACTIVITY_ENTITY_API_KEY: ActivityEntityKind
+ACTIVITY_ENTITY_SUBACCOUNT: ActivityEntityKind
+ACTIVITY_ENTITY_MEMBER: ActivityEntityKind
+ACTIVITY_ENTITY_POLICY: ActivityEntityKind
+ACTIVITY_ENTITY_INVITE: ActivityEntityKind
+ACTIVITY_ENTITY_SECURITY: ActivityEntityKind
+ACTIVITY_ENTITY_DESTINATION: ActivityEntityKind
+ACTIVITY_ACTION_UNSPECIFIED: ActivityEventAction
+ACTIVITY_ACTION_CREATED: ActivityEventAction
+ACTIVITY_ACTION_UPDATED: ActivityEventAction
+ACTIVITY_ACTION_DELETED: ActivityEventAction
+ACTIVITY_ACTION_ENABLED: ActivityEventAction
+ACTIVITY_ACTION_DISABLED: ActivityEventAction
+ACTIVITY_ACTION_REMOVED: ActivityEventAction
+ACTIVITY_ACTION_ROLE_SET: ActivityEventAction
+ACTIVITY_ACTION_RECEIVED: ActivityEventAction
+ACTIVITY_ACTION_REPLIED: ActivityEventAction
+ACTIVITY_ACTION_FAILED: ActivityEventAction
+ACTIVITY_ACTION_REVOKED: ActivityEventAction
+ACTIVITY_ACTION_BLOCKED: ActivityEventAction
+ACTIVITY_ACTION_HOLD_PLACED: ActivityEventAction
+ACTIVITY_ACTION_HOLD_RELEASED: ActivityEventAction
+ACTIVITY_SOURCE_UNSPECIFIED: ActivityEventSource
+ACTIVITY_SOURCE_WEB: ActivityEventSource
+ACTIVITY_SOURCE_MOBILE: ActivityEventSource
+ACTIVITY_SOURCE_API: ActivityEventSource
 
 class SubaccountRoleView(_message.Message):
     __slots__ = ("subaccount_id", "role")
@@ -343,14 +410,14 @@ class ActivityEvent(_message.Message):
     ACTOR_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     PAYLOAD_JSON_FIELD_NUMBER: _ClassVar[int]
     created_at: _timestamp_pb2.Timestamp
-    entity_kind: str
-    event_action: str
-    source: str
+    entity_kind: ActivityEntityKind
+    event_action: ActivityEventAction
+    source: ActivityEventSource
     ip: str
     user_agent: str
     actor_account_id: int
     payload_json: str
-    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[str] = ..., event_action: _Optional[str] = ..., source: _Optional[str] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
+    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[_Union[ActivityEntityKind, str]] = ..., event_action: _Optional[_Union[ActivityEventAction, str]] = ..., source: _Optional[_Union[ActivityEventSource, str]] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
 
 class ListSubaccountEventsRequest(_message.Message):
     __slots__ = ("subaccount_id", "limit", "page_token")

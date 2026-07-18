@@ -59,7 +59,7 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
         created_ts_ns=str(msg.created_ts_ns),
-        state_revision=int(msg.state_revision),
+        version=int(msg.version),
     )
 
 

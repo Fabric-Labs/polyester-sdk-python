@@ -39,9 +39,9 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
     assert order.order_type == "limit"
     assert order.tif == "gtc"
     assert order.orig_qty is not None and order.orig_qty.scaled == 100
-    msg.state_revision = 7
+    msg.version = 7
     order = order_from_proto(msg)
-    assert order.state_revision == 7
+    assert order.version == 7
 
 
 def test_orders_list_from_proto() -> None:

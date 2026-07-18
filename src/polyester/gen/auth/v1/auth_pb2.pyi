@@ -50,6 +50,9 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_STEP_UP_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_STEP_UP_PROOF_UNAVAILABLE: _ClassVar[AuthErrorCode]
     AUTH_STEP_UP_ALREADY_CLAIMED: _ClassVar[AuthErrorCode]
+    AUTH_POLICY_IN_USE: _ClassVar[AuthErrorCode]
+    AUTH_POLICY_LOCKED: _ClassVar[AuthErrorCode]
+    AUTH_POLICY_SCOPE_MISMATCH: _ClassVar[AuthErrorCode]
 AUTH_UNSPECIFIED: AuthErrorCode
 AUTH_USERNAME_INVALID: AuthErrorCode
 AUTH_USERNAME_TAKEN: AuthErrorCode
@@ -84,6 +87,9 @@ AUTH_MFA_ENROLLMENT_BINDING_INVALID: AuthErrorCode
 AUTH_STEP_UP_REQUIRED: AuthErrorCode
 AUTH_STEP_UP_PROOF_UNAVAILABLE: AuthErrorCode
 AUTH_STEP_UP_ALREADY_CLAIMED: AuthErrorCode
+AUTH_POLICY_IN_USE: AuthErrorCode
+AUTH_POLICY_LOCKED: AuthErrorCode
+AUTH_POLICY_SCOPE_MISMATCH: AuthErrorCode
 
 class GetNonceRequest(_message.Message):
     __slots__ = ("smart_account_address",)

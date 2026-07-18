@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.0a8
+
+### Breaking
+- Authoritative freshness (POLY-3564): `Order.state_revision` → `Order.version`; balance `trading_version` / `funding_version` / `reserved_version` → `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`; subaccount and API-key `updated_at` are configuration timestamps; API-key `last_used_at` stays independent activity time
+
+### Features
+- Generated reconciliation and policy types exposed in the public SDK surface
+- Internal transfer amounts use U128 wire types end-to-end
+
+### Docs
+- Added [VERSIONING.md](VERSIONING.md) for the shared Go/Python/Rust tag scheme (`v0.1.0aN`)
+
 ## 0.1.0a7
 
 ### Breaking

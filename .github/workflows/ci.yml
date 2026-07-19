@@ -30,6 +30,9 @@ jobs:
             exit 1
           fi
 
+      - name: SDK Connect coverage
+        run: python scripts/check_sdk_coverage.py
+
       - name: Ruff
         run: ruff check src tests scripts
 

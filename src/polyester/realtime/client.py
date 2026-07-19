@@ -69,6 +69,12 @@ class AsyncSubscription(Generic[T]):
                 await asyncio.wait_for(self._task, timeout=3.0)
         await self._queue.put(None)
 
+    async def __aenter__(self) -> AsyncSubscription[T]:
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.aclose()
+
 
 class AsyncRealtimeClient:
     """Centrifugo client for public and private protobuf channels."""

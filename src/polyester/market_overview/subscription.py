@@ -34,6 +34,12 @@ class MarketOverviewSubscription:
                 await self._start_task
         await self._queue.put(None)
 
+    async def __aenter__(self) -> MarketOverviewSubscription:
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.aclose()
+
     def unsubscribe(self) -> None:
         asyncio.get_running_loop().create_task(self.aclose())
 

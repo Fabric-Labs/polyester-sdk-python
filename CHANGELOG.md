@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.1.0a9
+
+### Features
+- Realtime, orderbook, and market-overview subscriptions support `async with` for automatic cleanup
+- Connect RPC wrapper coverage gate (POLY-3533): `scripts/check_sdk_coverage.py`, allowlist, and committed `docs/sdk-coverage.*` reports
+
+### Docs
+- README realtime examples use `async with` instead of manual `try` / `finally` / `aclose()`
+
 ## 0.1.0a8
 
 ### Breaking

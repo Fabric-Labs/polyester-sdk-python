@@ -10,12 +10,25 @@ import pytest
 
 from polyester.auth import ApiKeyCredentials
 from polyester.errors import PolyesterAuthError
-from polyester.realtime.client import AsyncRealtimeClient, is_private_channel
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription, is_private_channel
 
 
 def test_is_private_channel() -> None:
     assert is_private_channel("private:spot:orders:acct:proto")
     assert not is_private_channel("public:spot:market:trades:1:proto")
+
+
+@pytest.mark.asyncio
+async def test_async_subscription_context_manager_closes_subscription() -> None:
+    queue: asyncio.Queue[object | None] = asyncio.Queue()
+    close = asyncio.Event()
+    subscription = AsyncSubscription[object](queue=queue, close=close)
+
+    async with subscription as entered:
+        assert entered is subscription
+        assert not close.is_set()
+
+    assert close.is_set()
 
 
 @pytest.mark.asyncio

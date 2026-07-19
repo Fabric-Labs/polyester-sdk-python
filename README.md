@@ -210,22 +210,20 @@ current = await client.market_data.get_current_candle(symbol="BTC-USDT", timefra
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 
 subscription = await client.market_data.subscribe_trades(symbol="BNB-USDT")
-try:
+async with subscription:
     async for trade in subscription:
         print(trade.price.ticks if trade.price else None, trade.qty.scaled if trade.qty else None)
         break
-finally:
-    await subscription.aclose()
 ```
 
 Merged market overview stream (snapshot + live updates):
 
 ```python
 sub = await client.market_overview.create_subscription()
-async for markets in sub:
-    print(len(markets), "rows")
-    break
-await sub.aclose()
+async with sub:
+    async for markets in sub:
+        print(len(markets), "rows")
+        break
 ```
 
 ## Sync client
@@ -266,6 +264,16 @@ python -m pytest tests/unit -q
 ```
 
 Use `python -m pytest` (not bare `pytest`) so tests run in the same venv as `pip install`.
+
+Connect RPC wrapper coverage (public gen vs handwritten services) is tracked in
+[`docs/sdk-coverage.md`](docs/sdk-coverage.md). After wrapping a new RPC or
+refreshing gen:
+
+```bash
+python scripts/check_sdk_coverage.py --write
+```
+
+CI fails on unexpected gaps or a stale committed report.
 
 **Pre-release checklist (realtime changes):**
 

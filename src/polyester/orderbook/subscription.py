@@ -39,6 +39,12 @@ class OrderbookSubscription:
                 await self._start_task
         await self._queue.put(None)
 
+    async def __aenter__(self) -> OrderbookSubscription:
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.aclose()
+
     def unsubscribe(self) -> None:
         """Fire-and-forget close for TS-style ergonomics in running loops."""
         asyncio.get_running_loop().create_task(self.aclose())

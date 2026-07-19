@@ -2,7 +2,9 @@
 .env.*
 !.env.example
 
-docs/
+docs/*
+!docs/sdk-coverage.md
+!docs/sdk-coverage.json
 
 .coverage
 .coverage.*

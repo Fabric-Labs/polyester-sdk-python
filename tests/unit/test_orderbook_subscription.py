@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.models.realtime import OrderBookDeltaUpdate
+from polyester.orderbook.subscription import OrderbookSubscription
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.services.orderbook import AsyncOrderbookService
 
@@ -56,6 +58,24 @@ async def test_snapshot_then_stream_buffers_until_ready() -> None:
 
     await stream.refresh_snapshot()
     assert applied == [2]
+
+
+@pytest.mark.asyncio
+async def test_orderbook_subscription_context_manager_closes_stream() -> None:
+    stream = AsyncMock()
+    start_task = asyncio.create_task(asyncio.sleep(0))
+    subscription = OrderbookSubscription(
+        queue=asyncio.Queue(),
+        close=asyncio.Event(),
+        stream=stream,
+        set_bucket=lambda _bucket: None,
+        start_task=start_task,
+    )
+
+    async with subscription as entered:
+        assert entered is subscription
+
+    stream.aclose.assert_awaited_once()
 
 
 @pytest.mark.asyncio

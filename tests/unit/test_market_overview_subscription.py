@@ -41,6 +41,21 @@ async def test_market_overview_subscription_iterates_emitted_rows() -> None:
     assert fake.closed
 
 
+async def test_market_overview_subscription_context_manager_closes_stream() -> None:
+    fake = _FakeStream()
+    subscription = MarketOverviewSubscription(
+        queue=asyncio.Queue(),
+        close=asyncio.Event(),
+        stream=fake,
+        start_task=asyncio.create_task(asyncio.sleep(0)),
+    )
+
+    async with subscription as entered:
+        assert entered is subscription
+
+    assert fake.closed
+
+
 async def test_snapshot_then_stream_merges_market_overview_rows() -> None:
     emitted: list[list[MarketOverviewEntry]] = []
     by_symbol_id: dict[int, MarketOverviewEntry] = {}

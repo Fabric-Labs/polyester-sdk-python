@@ -1,4 +1,4 @@
-"""Proves the Python SDK can create advanced trigger types end-to-end (POLY-3210).
+"""Proves the Python SDK can create advanced trigger types end-to-end.
 
 Each test creates a trigger whose child orders are priced far from market so
 nothing fills, asserts the backend accepted the advanced params (returns a

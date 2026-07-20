@@ -12,7 +12,7 @@
 
 ### Features
 - Realtime, orderbook, and market-overview subscriptions support `async with` for automatic cleanup
-- Connect RPC wrapper coverage gate (POLY-3533): `scripts/check_sdk_coverage.py` + `sdk-coverage.toml`
+- Connect RPC wrapper coverage gate: `scripts/check_sdk_coverage.py` + `sdk-coverage.toml`
 
 ### Docs
 - README realtime examples use `async with` instead of manual `try` / `finally` / `aclose()`
@@ -20,7 +20,7 @@
 ## 0.1.0a8
 
 ### Breaking
-- Authoritative freshness (POLY-3564): `Order.state_revision` → `Order.version`; balance `trading_version` / `funding_version` / `reserved_version` → `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`; subaccount and API-key `updated_at` are configuration timestamps; API-key `last_used_at` stays independent activity time
+- Authoritative freshness: `Order.state_revision` → `Order.version`; balance `trading_version` / `funding_version` / `reserved_version` → `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`; subaccount and API-key `updated_at` are configuration timestamps; API-key `last_used_at` stays independent activity time
 
 ### Features
 - Generated reconciliation and policy types exposed in the public SDK surface
@@ -29,7 +29,7 @@
 ## 0.1.0a7
 
 ### Breaking
-- Dual-path qty/price scalars (POLY-3262): reads expose typed `price` / `qty` domain values (`.ticks` / `.scaled`) instead of primary digit-string `price_ticks` / `qty_scaled` fields
+- Dual-path qty/price scalars: reads expose typed `price` / `qty` domain values (`.ticks` / `.scaled`) instead of primary digit-string `price_ticks` / `qty_scaled` fields
 - Order, trigger, transfer, and withdraw writes accept human decimals (`str` / `Decimal`) or bot scaled inputs (`Price` / `Quantity` / `AssetAmount`); excess precision is rejected (no silent `ROUND_DOWN`)
 
 ### Money types

@@ -8,6 +8,14 @@ no browser login or JWT flows.
 
 Requires **Python 3.11+**.
 
+## Supported surface
+
+API-key trading, market data, accounts, funding, and realtime streams — parity with
+the Go and Rust SDKs. Wallet login and session MFA are TypeScript/browser only.
+
+Full cross-language comparison:
+[SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
+
 ## Install
 
 PyPI: https://pypi.org/project/polyester-sdk/

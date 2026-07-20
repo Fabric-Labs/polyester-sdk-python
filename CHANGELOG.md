@@ -2,11 +2,14 @@
 
 ## Unreleased
 
+### Changed
+- Connect RPC coverage gate no longer commits dashboard reports under `docs/`; CI fails on unexpected gaps only (`sdk-coverage.toml` + `scripts/check_sdk_coverage.py`)
+
 ## 0.1.0a9
 
 ### Features
 - Realtime, orderbook, and market-overview subscriptions support `async with` for automatic cleanup
-- Connect RPC wrapper coverage gate (POLY-3533): `scripts/check_sdk_coverage.py`, allowlist, and committed `docs/sdk-coverage.*` reports
+- Connect RPC wrapper coverage gate (POLY-3533): `scripts/check_sdk_coverage.py` + `sdk-coverage.toml`
 
 ### Docs
 - README realtime examples use `async with` instead of manual `try` / `finally` / `aclose()`

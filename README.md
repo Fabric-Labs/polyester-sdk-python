@@ -265,15 +265,8 @@ python -m pytest tests/unit -q
 
 Use `python -m pytest` (not bare `pytest`) so tests run in the same venv as `pip install`.
 
-Connect RPC wrapper coverage (public gen vs handwritten services) is tracked in
-[`docs/sdk-coverage.md`](docs/sdk-coverage.md). After wrapping a new RPC or
-refreshing gen:
-
-```bash
-python scripts/check_sdk_coverage.py --write
-```
-
-CI fails on unexpected gaps or a stale committed report.
+CI requires every public Connect RPC in gen to be wrapped or listed in
+`sdk-coverage.toml`. Contributors: `python scripts/check_sdk_coverage.py`.
 
 **Pre-release checklist (realtime changes):**
 

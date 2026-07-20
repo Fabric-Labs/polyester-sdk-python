@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,6 +16,9 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:
@@ -29,6 +35,26 @@ jobs:
             echo "private ledger.write.v1 must not appear in public SDK gen/" >&2
             exit 1
           fi
+
+      - name: Refresh SDK capability artifacts
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_sdk_coverage.py --write-capabilities
+
+      - name: Commit capability artifacts if changed
+        if: >
+          matrix.python-version == '3.12' &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sdk-capabilities.json README.md
+          if git diff --staged --quiet; then
+            echo "capability artifacts unchanged"
+            exit 0
+          fi
+          git commit -m "chore: refresh sdk-capabilities and README table"
+          git push
 
       - name: SDK Connect coverage
         run: python scripts/check_sdk_coverage.py

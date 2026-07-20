@@ -312,6 +312,8 @@ Use `python -m pytest` (not bare `pytest`) so tests run in the same venv as `pip
 
 CI requires every public Connect RPC in gen to be wrapped or listed in
 `sdk-coverage.toml`. Contributors: `python scripts/check_sdk_coverage.py`.
+CI refreshes `sdk-capabilities.json` and the README capability table on the
+same branch when they drift (same-repo PRs / pushes to `main`).
 
 **Pre-release checklist (realtime changes):**
 

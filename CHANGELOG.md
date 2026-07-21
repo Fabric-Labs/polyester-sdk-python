@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0a11
+
 ### Breaking
 - Durable auth PATCH contract: subaccount, API key, subaccount/API policy, and address-book entry updates require nested mutable specs, a non-empty FieldMask, and a positive `expected_revision` from a prior read
 - Policy creates nest fields under `policy` (optional `sub_account_id` / `assign_to_key_id` remain on the outer request)

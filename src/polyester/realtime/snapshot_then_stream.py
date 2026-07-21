@@ -28,6 +28,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
       on_open: Callable[[], None] | None = None,
       on_close: Callable[[], None] | None = None,
       on_error: Callable[[Exception], None] | None = None,
+      on_reconnect: Callable[[], None] | None = None,
+      on_snapshot_refresh: Callable[[], None] | None = None,
   ) -> None:
       self._realtime = realtime
       self._channel = channel
@@ -40,6 +42,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
       self._on_open = on_open
       self._on_close = on_close
       self._on_error = on_error
+      self._on_reconnect = on_reconnect
+      self._on_snapshot_refresh = on_snapshot_refresh
 
       self._ready = False
       self._disposed = False
@@ -80,6 +84,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
           if self._disposed or generation != self._generation:
               return
           self._ready = True
+          if self._on_snapshot_refresh is not None:
+              self._on_snapshot_refresh()
 
   async def aclose(self) -> None:
       self._disposed = True
@@ -109,11 +115,15 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
       self._apply_live_publications(publications)
 
   async def _run_ws_loop(self) -> None:
+      first = True
       while not self._disposed:
           try:
+              # Disable transport auto-reconnect so this loop can refresh
+              # REST snapshot state between reconnect attempts.
               sub = await self._realtime.subscribe_proto(
                   self._channel,
                   decode=self._decode,
+                  auto_reconnect=False,
               )
               if self._disposed:
                   await sub.aclose()
@@ -121,10 +131,17 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
               self._ws_sub = sub
               if self._on_open is not None:
                   self._on_open()
+              if not first:
+                  if self._on_reconnect is not None:
+                      self._on_reconnect()
+                  await self.refresh_snapshot()
+              first = False
               async for message in sub:
                   if self._disposed:
                       break
                   self._handle_publication(message)
+              if sub.error is not None and self._on_error is not None:
+                  self._on_error(sub.error)
           except asyncio.CancelledError:
               break
           except Exception as exc:
@@ -136,8 +153,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
               break
           if self._on_close is not None:
               self._on_close()
-          await self.refresh_snapshot()
-          await asyncio.sleep(0)
+          await asyncio.sleep(1.0)
 
   def _report_snapshot_error(self, error: Exception) -> None:
       if self._on_error is not None:

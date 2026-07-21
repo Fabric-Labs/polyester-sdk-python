@@ -77,9 +77,21 @@ class AsyncMarketOverviewService(BaseService):
             snapshot = list(by_symbol_id.values())
             if on_event is not None:
                 on_event(snapshot)
-            if not close.is_set():
+            if close.is_set():
+                return
+            try:
+                from polyester.realtime.client import enqueue_or_overflow
+
+                enqueue_or_overflow(
+                    queue,
+                    snapshot,
+                    close=close,
+                    message="market overview subscription queue full; consumer too slow",
+                )
+            except Exception:
+                close.set()
                 with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(snapshot)
+                    queue.put_nowait(None)
 
         def apply_rows(rows: list[MarketOverviewEntry]) -> None:
             for row in rows:

@@ -6,6 +6,7 @@ from polyester.errors import (
     PolyesterError,
     PolyesterRateLimitError,
     PolyesterRealtimeError,
+    PolyesterRealtimeOverflowError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
     PolyesterTransportError,
@@ -13,7 +14,7 @@ from polyester.errors import (
 )
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
-__version__ = "0.1.0a9"
+__version__ = "0.1.0a10"
 
 __all__ = [
     "AssetAmount",
@@ -25,6 +26,7 @@ __all__ = [
     "PolyesterError",
     "PolyesterRateLimitError",
     "PolyesterRealtimeError",
+    "PolyesterRealtimeOverflowError",
     "PolyesterRouteNotFoundError",
     "PolyesterServerError",
     "PolyesterTransportError",

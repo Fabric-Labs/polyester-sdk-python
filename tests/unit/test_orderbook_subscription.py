@@ -38,6 +38,46 @@ async def test_snapshot_then_stream_refresh_applies_snapshot() -> None:
 
 
 @pytest.mark.asyncio
+async def test_snapshot_then_stream_fires_on_snapshot_refresh_hook() -> None:
+    events: list[str] = []
+
+    async def fetch_snapshot():
+        return {"seq": 2}
+
+    stream = AsyncSnapshotThenStreamSubscription(
+        realtime=MagicMock(),
+        channel="public:test:proto",
+        decode=lambda _payload: OrderBookDeltaUpdate(),
+        fetch_snapshot=fetch_snapshot,
+        read_publication=lambda delta: [delta],
+        apply_snapshot=lambda _snap, _pending: None,
+        apply_live_publications=lambda _pubs: None,
+        on_snapshot_refresh=lambda: events.append("snapshot_refresh"),
+    )
+    await stream.refresh_snapshot()
+    assert events == ["snapshot_refresh"]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_then_stream_wires_on_reconnect_callback() -> None:
+    """Constructor must accept and store on_reconnect (fired after WS reconnect)."""
+    events: list[str] = []
+    stream = AsyncSnapshotThenStreamSubscription(
+        realtime=MagicMock(),
+        channel="public:test:proto",
+        decode=lambda _payload: OrderBookDeltaUpdate(),
+        fetch_snapshot=AsyncMock(return_value={"seq": 1}),
+        read_publication=lambda delta: [delta],
+        apply_snapshot=lambda _snap, _pending: None,
+        apply_live_publications=lambda _pubs: None,
+        on_reconnect=lambda: events.append("reconnect"),
+    )
+    assert stream._on_reconnect is not None
+    stream._on_reconnect()
+    assert events == ["reconnect"]
+
+
+@pytest.mark.asyncio
 async def test_snapshot_then_stream_buffers_until_ready() -> None:
     applied: list[int] = []
 

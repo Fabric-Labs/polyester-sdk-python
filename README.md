@@ -227,11 +227,55 @@ Ledger balances have separate **funding** and **trading** buckets per asset.
 SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
+  Install `pip install polyester-sdk[chain]`, then either encode calldata or submit
+  a UserOp: pass an owner EOA private key to `PolyesterSmartAccount` (SDK derives
+  the Polyester Safe — no UI-exported owner key).
+- **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `[chain]` extra).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
   via wallet/smart-account signing in the Polyester app (not an API-key RPC).
 - **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a
   signed intent payload.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
+
+```python
+from polyester.chain import (
+    POLYESTER_TESTNET_ENVIRONMENT,
+    PolyesterSmartAccount,
+    encode_trading_gateway_deposit,
+    encode_funding_withdraw_to_chain,
+    encode_withdraw_destination,
+    quote_zipper_fee,
+)
+
+account = PolyesterSmartAccount(owner_private_key="0x…")  # caller-supplied EOA
+
+# Funding → Trading
+deposit = encode_trading_gateway_deposit(
+    trading_gateway=POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
+    u_asset_id="0x…",
+    quantity_scaled=10**18,  # 1 USDT at 18 decimals
+)
+account.send_calls([deposit])
+
+# Funding → external (quote Zipper fee first)
+fee = quote_zipper_fee(
+    chain_id=6,  # BSC testnet Zipper id
+    z_token="0x…",
+    zipper_endpoint=POLYESTER_TESTNET_ENVIRONMENT.contracts.zipper_endpoint_address,
+)
+withdraw = encode_funding_withdraw_to_chain(
+    funding_account=POLYESTER_TESTNET_ENVIRONMENT.contracts.funding_account_address,
+    chain_id=6,
+    z_token="0x…",
+    withdraw_destination=encode_withdraw_destination(address="0x…", is_case_sensitive=False),
+    z_amount=5 * 10**18,
+    max_fee=fee.fee + fee.fee // 10,
+)
+account.send_calls([withdraw])
+```
+
+Whitelist toggles / destination entries / GuardRegistry signer setup are also encoded under
+`polyester.chain` (`encode_add_allowed_external_destinations`, …).
 
 Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
 transfers and other account-scoped ledger operations.
@@ -270,6 +314,17 @@ async with sub:
         print(len(markets), "rows")
         break
 ```
+
+### Realtime delivery contract
+
+- Subscription queues are bounded. If the consumer falls behind, the SDK raises
+  `PolyesterRealtimeOverflowError` and faults the subscription — it does **not**
+  silently drop updates.
+- Orderbook sequence gaps trigger a REST snapshot refresh. Use
+  `on_sequence_gap` / `on_reconnect` / `on_snapshot_refresh` on
+  `orderbook.create_subscription(...)` for recovery observability.
+- Managed snapshot-then-stream subscriptions disable transport auto-reconnect
+  so they can rebuild REST state between reconnect attempts.
 
 ## Sync client
 

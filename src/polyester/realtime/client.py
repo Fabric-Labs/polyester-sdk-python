@@ -10,7 +10,11 @@ from typing import Any, Generic, TypeVar
 import httpx
 
 from polyester.auth import ApiKeyCredentials
-from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
+from polyester.errors import (
+    PolyesterAuthError,
+    PolyesterRealtimeError,
+    PolyesterRealtimeOverflowError,
+)
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
 
 T = TypeVar("T")
@@ -38,6 +42,23 @@ def is_private_channel(channel: str) -> bool:
     return channel.startswith("private:")
 
 
+def enqueue_or_overflow(
+    queue: asyncio.Queue[Any],
+    item: Any,
+    *,
+    close: asyncio.Event,
+    message: str = "realtime subscription queue full; consumer too slow",
+) -> None:
+    """Put an item or fail the subscription on overflow (never silent drop)."""
+    try:
+        queue.put_nowait(item)
+    except asyncio.QueueFull as exc:
+        close.set()
+        with contextlib.suppress(asyncio.QueueFull):
+            queue.put_nowait(None)
+        raise PolyesterRealtimeOverflowError(message) from exc
+
+
 class AsyncSubscription(Generic[T]):
     def __init__(
         self,
@@ -49,15 +70,31 @@ class AsyncSubscription(Generic[T]):
         self._queue = queue
         self._close = close
         self._task = task
+        self._error: BaseException | None = None
+
+    @property
+    def error(self) -> BaseException | None:
+        """Terminal subscription error, if the stream failed."""
+        return self._error
+
+    def _set_error(self, exc: BaseException) -> None:
+        if self._error is None:
+            self._error = exc
 
     def __aiter__(self) -> AsyncIterator[T]:
         return self
 
     async def __anext__(self) -> T:
-        if self._close.is_set():
+        if self._error is not None and self._queue.empty():
+            raise self._error
+        if self._close.is_set() and self._queue.empty():
+            if self._error is not None:
+                raise self._error
             raise StopAsyncIteration
         item = await self._queue.get()
         if item is None:
+            if self._error is not None:
+                raise self._error
             raise StopAsyncIteration
         return item
 
@@ -67,7 +104,8 @@ class AsyncSubscription(Generic[T]):
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await asyncio.wait_for(self._task, timeout=3.0)
-        await self._queue.put(None)
+        with contextlib.suppress(asyncio.QueueFull):
+            self._queue.put_nowait(None)
 
     async def __aenter__(self) -> AsyncSubscription[T]:
         return self
@@ -107,11 +145,14 @@ class AsyncRealtimeClient:
         channel: str,
         *,
         decode: Callable[[bytes], T],
+        auto_reconnect: bool = True,
     ) -> AsyncSubscription[T]:
         if is_private_channel(channel):
             self._require_private_auth(channel)
         queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self._max_queue_size)
         close = asyncio.Event()
+
+        sub = AsyncSubscription[T](queue=queue, close=close, task=None)
 
         async def runner() -> None:
             try:
@@ -125,21 +166,34 @@ class AsyncRealtimeClient:
                         )
                     except asyncio.CancelledError:
                         break
-                    except Exception:
+                    except PolyesterRealtimeOverflowError as exc:
+                        sub._set_error(exc)
+                        break
+                    except Exception as exc:
                         if close.is_set():
+                            break
+                        # Transient transport failures reconnect; keep last error
+                        # only for terminal overflow (handled above).
+                        _ = exc
+                        if not auto_reconnect:
                             break
                     else:
                         if close.is_set():
                             break
+                        if not auto_reconnect:
+                            break
                     if close.is_set():
+                        break
+                    if not auto_reconnect:
                         break
                     await asyncio.sleep(CENTRIFUGO_RECONNECT_DELAY)
             finally:
                 with contextlib.suppress(Exception):
-                    await queue.put(None)
+                    queue.put_nowait(None)
 
         task = asyncio.create_task(runner())
-        return AsyncSubscription[T](queue=queue, close=close, task=task)
+        sub._task = task
+        return sub
 
     async def _run_subscription_once(
         self,
@@ -198,7 +252,7 @@ class AsyncRealtimeClient:
                     for item in publications:
                         if close.is_set():
                             return
-                        await queue.put(item)
+                        enqueue_or_overflow(queue, item, close=close)
 
     def _require_private_auth(self, channel: str) -> None:
         if self._credentials is None:

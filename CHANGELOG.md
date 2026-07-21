@@ -2,12 +2,22 @@
 
 ## Unreleased
 
+## 0.1.0a10
+
+### Features
+- Optional `[chain]` smart-account path: CREATE2 Safe prediction, ERC-4337 UserOp submit (bundler + paymaster), Funding → external / Funding → Trading calldata, Zipper fee quote, and full FundingAccount / GuardRegistry whitelist encoders
+- Realtime delivery is fail-closed on queue overflow (`PolyesterRealtimeOverflowError`); managed snapshot-then-stream subscriptions refresh Connect snapshots on reconnect and expose recovery hooks
+
 ### Changed
 - Connect RPC coverage gate no longer commits dashboard reports under `docs/`; CI fails on unexpected gaps only (`sdk-coverage.toml` + `scripts/check_sdk_coverage.py`)
 
 ### Docs
 - README `Supported surface` table is generated from `sdk-capabilities.json` (`--write-capabilities`); links to the public [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix)
 - CI auto-commits refreshed `sdk-capabilities.json` + README capability table when they drift (same-repo)
+- README documents on-chain Funding UserOps (caller-supplied owner EOA → derive Polyester Safe) vs Trading withdraw RPCs; realtime overflow / reconnect recovery contract
+
+### Testing
+- Live smokes on Polyester testnet: Funding → Trading UserOp (`TradingGateway.deposit`) and Funding → BSC USDT withdraw (`withdrawToChain`) via owner-key smart account
 
 ## 0.1.0a9
 

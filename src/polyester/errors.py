@@ -57,3 +57,11 @@ class PolyesterRouteNotFoundError(PolyesterApiError):
 
 class PolyesterRealtimeError(PolyesterError):
     """Raised for realtime connection, subscription, or decode failures."""
+
+
+class PolyesterRealtimeOverflowError(PolyesterRealtimeError):
+    """Raised when a realtime subscription queue is full.
+
+    Subscriptions fail instead of silently dropping updates so callers can
+    recover (reconnect, resubscribe, or slow their consumer).
+    """

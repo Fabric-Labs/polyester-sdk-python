@@ -82,6 +82,9 @@ class AsyncOrderbookService(BaseService):
         on_open: Callable[[], None] | None = None,
         on_close: Callable[[], None] | None = None,
         on_error: Callable[[Exception], None] | None = None,
+        on_sequence_gap: Callable[[], None] | None = None,
+        on_reconnect: Callable[[], None] | None = None,
+        on_snapshot_refresh: Callable[[], None] | None = None,
     ) -> OrderbookSubscription:
         """Snapshot + sequence-checked delta stream with optional price bucketing."""
         realtime = require_realtime(self._realtime)
@@ -122,9 +125,23 @@ class AsyncOrderbookService(BaseService):
             )
             if on_event is not None:
                 on_event(data)
-            if not close.is_set():
+            if close.is_set():
+                return
+            try:
+                from polyester.realtime.client import enqueue_or_overflow
+
+                enqueue_or_overflow(
+                    queue,
+                    data,
+                    close=close,
+                    message="orderbook subscription queue full; consumer too slow",
+                )
+            except Exception as exc:
+                if on_error is not None:
+                    on_error(exc)
+                close.set()
                 with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(data)
+                    queue.put_nowait(None)
 
         def set_bucket(value: str | None) -> None:
             nonlocal bucket_ticks
@@ -171,6 +188,8 @@ class AsyncOrderbookService(BaseService):
                 delta=delta,
             )
             if needs_refresh:
+                if on_sequence_gap is not None:
+                    on_sequence_gap()
                 stream = stream_holder["stream"]
                 if stream is not None and not stream.is_disposed():
                     asyncio.get_running_loop().create_task(stream.refresh_snapshot())
@@ -188,6 +207,8 @@ class AsyncOrderbookService(BaseService):
             on_open=on_open,
             on_close=on_close,
             on_error=on_error,
+            on_reconnect=on_reconnect,
+            on_snapshot_refresh=on_snapshot_refresh,
         )
         stream_holder["stream"] = stream
 
@@ -219,6 +240,9 @@ class AsyncOrderbookService(BaseService):
         on_open: Callable[[], None] | None = None,
         on_close: Callable[[], None] | None = None,
         on_error: Callable[[Exception], None] | None = None,
+        on_sequence_gap: Callable[[], None] | None = None,
+        on_reconnect: Callable[[], None] | None = None,
+        on_snapshot_refresh: Callable[[], None] | None = None,
     ) -> OrderbookSubscription:
         """Convenience wrapper around create_subscription."""
         return await self.create_subscription(
@@ -230,4 +254,7 @@ class AsyncOrderbookService(BaseService):
             on_open=on_open,
             on_close=on_close,
             on_error=on_error,
+            on_sequence_gap=on_sequence_gap,
+            on_reconnect=on_reconnect,
+            on_snapshot_refresh=on_snapshot_refresh,
         )

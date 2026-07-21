@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "polyester-sdk"
-version = "0.1.0a9"
+version = "0.1.0a10"
 description = "Official Python SDK for Polyester APIs."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,12 @@ dependencies = [
 [project.optional-dependencies]
 realtime = [
   "websockets>=15",
+]
+chain = [
+  "eth-abi>=5.1",
+  "eth-account>=0.13",
+  "eth-hash[pycryptodome]>=0.7",
+  "eth-utils>=5.0",
 ]
 dev = [
   "pytest>=8",

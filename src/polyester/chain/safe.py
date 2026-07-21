@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from eth_abi import encode
 from eth_hash.auto import keccak
-from eth_utils import to_checksum_address, to_canonical_address
+from eth_utils import to_canonical_address, to_checksum_address
 
 from polyester.chain._deps import require_eth_abi
 from polyester.chain.environment import (

@@ -9,9 +9,9 @@ from __future__ import annotations
 import pytest
 
 eth_abi = pytest.importorskip("eth_abi")
-from eth_utils import function_signature_to_4byte_selector
+from eth_utils import function_signature_to_4byte_selector  # noqa: E402
 
-from polyester.chain import (
+from polyester.chain import (  # noqa: E402
     GuardApproval,
     encode_add_allowed_external_destinations,
     encode_add_allowed_internal_accounts,
@@ -26,8 +26,7 @@ from polyester.chain import (
     encode_trading_gateway_deposit_to,
     encode_withdraw_destination,
 )
-from polyester.errors import PolyesterValidationError
-
+from polyester.errors import PolyesterValidationError  # noqa: E402
 TRADING_GATEWAY = "0x4444444444444444444444444444444444444444"
 FUNDING_ACCOUNT = "0x1111111111111111111111111111111111111111"
 INTERNAL_ACCOUNT = "0x3333333333333333333333333333333333333333"

@@ -65,6 +65,7 @@ def subaccount_policy_from_proto(msg: policies_pb2.SubaccountPolicyView) -> Suba
         expires_at=timestamp_dict_to_datetime(msg.expires_at),
         created_at=timestamp_dict_to_datetime(msg.created_at),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
+        revision=int(msg.revision),
     )
 
 
@@ -85,6 +86,7 @@ def api_policy_from_proto(msg: policies_pb2.ApiPolicyView) -> ApiPolicy:
         source_template_id=_optional_uint64_id(msg.source_template_id),
         created_at=timestamp_dict_to_datetime(msg.created_at),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
+        revision=int(msg.revision),
     )
 
 

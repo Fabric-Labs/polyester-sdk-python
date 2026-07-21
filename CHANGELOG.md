@@ -2,8 +2,16 @@
 
 ## Unreleased
 
+### Breaking
+- Durable auth PATCH contract: subaccount, API key, subaccount/API policy, and address-book entry updates require nested mutable specs, a non-empty FieldMask, and a positive `expected_revision` from a prior read
+- Policy creates nest fields under `policy` (optional `sub_account_id` / `assign_to_key_id` remain on the outer request)
+- Soft-delete subaccount requires `expected_revision`; update APIs are presence-aware via omitted kwargs / `UNSET` so `""`, `[]`, `false`, `0`, and null timestamp clears survive
+- Address-book entry updates no longer accept `new_tags` (mutable paths: `label`, `note`, `tag_ids`); tag updates remain optional `name` / `color` without revision/mask
+- Durable resource models expose `revision`; Connect `AuthErrorDetail` maps `AUTH_REVISION_CONFLICT` onto `PolyesterApiError.code`
+
 ### Testing
 - Live funded UserOp tests: Funding → Trading (`TradingGateway.deposit`) and Funding → external (`withdrawToChain`), gated by `POLYESTER_TEST_CHAIN_USEROP=1`
+- Unit coverage for nested FieldMask request construction, presence/clear semantics, revision decode, and revision-conflict error mapping
 
 ### Changed
 - Realtime (`websockets`) and on-chain Funding helpers (`eth-abi` / friends) are required dependencies, not optional extras. Empty `[realtime]` / `[chain]` extras remain for install compatibility.

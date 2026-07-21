@@ -9,6 +9,7 @@ from polyester.codecs.decode.sub_accounts import (
     subaccount_invites_list_from_proto,
     subaccount_members_list_from_proto,
     subaccounts_list_from_proto,
+    update_subaccount_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_api_key_bytes, decode_subaccount_bytes
@@ -30,6 +31,7 @@ from polyester.gen.auth.v1.subaccounts_pb2 import (
     RemoveSubaccountMemberRequest,
     RespondSubaccountInviteRequest,
     SetSubaccountMemberMFARequirementRequest,
+    SubaccountUpdateSpec,
     UpdateSubaccountMemberRoleRequest,
     UpdateSubaccountRequest,
 )
@@ -44,6 +46,7 @@ from polyester.models.sub_accounts import (
     SubAccountsList,
 )
 from polyester.models.trading import ApiKeySummary
+from polyester.patch import UNSET, field_mask, is_set, require_positive_revision
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
@@ -169,28 +172,43 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
-        label: str = "",
-        icon: str = "",
-        color: str = "",
-        status: str = "",
-    ) -> None:
+        expected_revision: int,
+        label: object = UNSET,
+        icon: object = UNSET,
+        color: object = UNSET,
+        status: object = UNSET,
+    ) -> SubAccount | None:
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
-        await unary_auth_decoded(
+        require_positive_revision(expected_revision)
+        spec = SubaccountUpdateSpec()
+        paths: list[str] = []
+        if is_set(label):
+            paths.append("label")
+            spec.label = str(label)
+        if is_set(icon):
+            paths.append("icon")
+            spec.icon = str(icon)
+        if is_set(color):
+            paths.append("color")
+            spec.color = str(color)
+        if is_set(status):
+            paths.append("status")
+            spec.status = str(status)
+        return await unary_auth_decoded(
             self._transport,
             SubaccountServiceClient,
             lambda client, req: client.update_subaccount(req),
             UpdateSubaccountRequest(
                 subaccount_id=parsed_sub,
-                label=label,
-                icon=icon,
-                color=color,
-                status=status,
+                subaccount=spec,
+                update_mask=field_mask(paths),
+                expected_revision=expected_revision,
             ),
-            lambda _msg: None,
+            update_subaccount_from_proto,
         )
 
     async def delete(
@@ -198,11 +216,13 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
-    ) -> None:
+        expected_revision: int,
+    ) -> SubAccount | None:
         """Soft-delete a subaccount by setting status to deleted."""
-        await self.update(
+        return await self.update(
             account=account,
             sub_account_id=sub_account_id,
+            expected_revision=expected_revision,
             status="deleted",
         )
 

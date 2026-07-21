@@ -121,16 +121,19 @@ async def test_layout_get_layouts_passes_pagination() -> None:
 
 @pytest.mark.asyncio
 async def test_sub_accounts_delete_issues_soft_delete_update() -> None:
+    from polyester.gen.auth.v1 import subaccounts_pb2
+
     sub_id = format_id(99)
-    capture = CaptureUnary(None)
-
-    async def fake_unary(transport, client_cls, call, request, decoder):
-        capture.request = request
-        return decoder(None)
-
-    with patch("polyester.services.sub_accounts.unary_auth_decoded", fake_unary):
+    capture = CaptureUnary(
+        subaccounts_pb2.UpdateSubaccountResponse(
+            subaccount=subaccounts_pb2.Subaccount(id=99, status="deleted", revision=2)
+        )
+    )
+    with patch("polyester.services.sub_accounts.unary_auth_decoded", capture):
         service = AsyncSubAccountsService(transport=MagicMock(), default_sub_account_id=None)
-        await service.delete(sub_account_id=sub_id)
+        await service.delete(sub_account_id=sub_id, expected_revision=1)
     assert isinstance(capture.request, UpdateSubaccountRequest)
-    assert capture.request.status == "deleted"
     assert capture.request.subaccount_id == 99
+    assert capture.request.expected_revision == 1
+    assert capture.request.subaccount.status == "deleted"
+    assert list(capture.request.update_mask.paths) == ["status"]

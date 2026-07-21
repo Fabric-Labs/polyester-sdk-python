@@ -630,6 +630,7 @@ def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:
         status=_enum_name(_field(data, "status")),
         subaccount_id=_id_str(_field(data, "subaccountId", "subaccount_id")),
         updated_at=None,
+        revision=int(_field(data, "revision", default=0) or 0),
     )
 
 

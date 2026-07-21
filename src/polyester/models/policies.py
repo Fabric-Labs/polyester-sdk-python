@@ -43,6 +43,7 @@ class SubaccountPolicy(msgspec.Struct, kw_only=True, omit_defaults=True):
     expires_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    revision: int = 0
 
 
 class ApiPolicy(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -61,6 +62,7 @@ class ApiPolicy(msgspec.Struct, kw_only=True, omit_defaults=True):
     source_template_id: str = ""
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    revision: int = 0
 
 
 class SubaccountPoliciesList(msgspec.Struct, kw_only=True, omit_defaults=True):

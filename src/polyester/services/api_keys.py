@@ -14,22 +14,31 @@ from polyester.codecs.decode.api_keys import (
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_api_key_bytes
+from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1.api_keys_connect import ApiKeyServiceClient
 from polyester.gen.auth.v1.api_keys_pb2 import (
+    ApiKeyUpdateSpec,
     CreateApiKeyRequest,
     DeleteApiKeyRequest,
     GetApiKeyRequest,
-    IpWhitelist,
     ListApiKeysRequest,
     UpdateApiKeyRequest,
 )
 from polyester.models import ApiKeysList, ApiKeySummary
 from polyester.models.auth import Ed25519Keypair
+from polyester.patch import UNSET, field_mask, is_set, require_positive_revision
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+
+
+def _timestamp_from_datetime(value: datetime) -> Timestamp:
+    if value.tzinfo is None:
+        raise PolyesterValidationError("expires_at must be timezone-aware")
+    utc = value.astimezone(UTC)
+    return Timestamp(seconds=int(utc.timestamp()), nanos=utc.microsecond * 1000)
 
 
 class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
@@ -108,35 +117,48 @@ class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         key_id: str,
-        label: str = "",
-        icon: str = "",
-        color: str = "",
-        status: str | None = None,
-        ip_whitelist: list[str] | None = None,
-        expires_at: datetime | None = None,
+        expected_revision: int,
+        label: object = UNSET,
+        icon: object = UNSET,
+        color: object = UNSET,
+        status: object = UNSET,
+        ip_whitelist: object = UNSET,
+        expires_at: datetime | None | object = UNSET,
     ) -> ApiKeySummary | None:
-        request = UpdateApiKeyRequest(key_id=key_id, label=label, icon=icon, color=color)
-        if status:
-            request.status = api_key_status_from_label(status)
-        if ip_whitelist is not None:
-            request.ip_whitelist.CopyFrom(IpWhitelist(cidrs=ip_whitelist))
-        if expires_at is not None:
-            if expires_at.tzinfo is None:
-                from polyester.errors import PolyesterValidationError
-
-                raise PolyesterValidationError("expires_at must be timezone-aware")
-            utc = expires_at.astimezone(UTC)
-            request.expires_at.CopyFrom(
-                Timestamp(
-                    seconds=int(utc.timestamp()),
-                    nanos=utc.microsecond * 1000,
-                )
-            )
+        require_positive_revision(expected_revision)
+        spec = ApiKeyUpdateSpec()
+        paths: list[str] = []
+        if is_set(label):
+            paths.append("label")
+            spec.label = str(label)
+        if is_set(icon):
+            paths.append("icon")
+            spec.icon = str(icon)
+        if is_set(color):
+            paths.append("color")
+            spec.color = str(color)
+        if is_set(status):
+            paths.append("status")
+            spec.status = api_key_status_from_label(str(status))
+        if is_set(ip_whitelist):
+            paths.append("ip_whitelist")
+            if ip_whitelist is None:
+                raise PolyesterValidationError("ip_whitelist cannot be null; pass [] to clear")
+            spec.ip_whitelist.extend(list(ip_whitelist))  # type: ignore[arg-type]
+        if is_set(expires_at):
+            paths.append("expires_at")
+            if expires_at is not None:
+                spec.expires_at.CopyFrom(_timestamp_from_datetime(expires_at))  # type: ignore[arg-type]
         return await unary_auth_decoded(
             self._transport,
             ApiKeyServiceClient,
             lambda client, req: client.update_api_key(req),
-            request,
+            UpdateApiKeyRequest(
+                key_id=key_id,
+                api_key=spec,
+                update_mask=field_mask(paths),
+                expected_revision=expected_revision,
+            ),
             api_key_from_update_proto,
         )
 

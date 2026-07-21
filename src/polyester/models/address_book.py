@@ -57,6 +57,7 @@ class AddressBookEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     external: ExternalWithdrawAddress | None = None
     internal: InternalTransferAccount | None = None
     tags: list[AddressBookTag] | None = None
+    revision: int = 0
 
 
 class AddressBookEntriesList(msgspec.Struct, kw_only=True, omit_defaults=True):

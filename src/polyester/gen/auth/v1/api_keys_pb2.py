@@ -26,10 +26,11 @@ from polyester.gen.buf.validate import validate_pb2 as buf_dot_validate_dot_vali
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as gnostic_dot_openapi_dot_v3_dot_annotations__pb2
 from polyester.gen.google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
 from polyester.gen.google.api import field_behavior_pb2 as google_dot_api_dot_field__behavior__pb2
+from google.protobuf import field_mask_pb2 as google_dot_protobuf_dot_field__mask__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x61uth/v1/api_keys.proto\x12\x07\x61uth.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa3\x05\n\x06\x41piKey\x12/\n\x06key_id\x18\x02 \x01(\tB\x18\xbaH\x15r\x13\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\x12\x14\n\x05label\x18\x03 \x01(\tR\x05label\x12\x1b\n\x04icon\x18\t \x01(\tB\x07\xbaH\x04r\x02\x18 R\x04icon\x12\x1d\n\x05\x63olor\x18\n \x01(\tB\x07\xbaH\x04r\x02\x18 R\x05\x63olor\x12\x34\n\x0cip_whitelist\x18\x04 \x03(\tB\x11\xbaH\x0e\x92\x01\x0b\x10 \x18\x01\"\x05r\x03\xd0\x01\x01R\x0bipWhitelist\x12-\n\x06status\x18\x06 \x01(\x0e\x32\x15.auth.v1.ApiKeyStatusR\x06status\x12(\n\rsubaccount_id\x18\x07 \x01(\x06H\x00R\x0csubaccountId\x88\x01\x01\x12 \n\tpolicy_id\x18\x08 \x01(\x06H\x01R\x08policyId\x88\x01\x01\x12\x39\n\ncreated_at\x18\x14 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n\x0clast_used_at\x18\x15 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\nlastUsedAt\x12,\n\x12public_key_ed25519\x18\x16 \x01(\x0cR\x10publicKeyEd25519\x12\x39\n\nexpires_at\x18\x17 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt\x12(\n\x10\x63reated_by_actor\x18\x18 \x01(\tR\x0e\x63reatedByActor\x12\x39\n\nupdated_at\x18\x19 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tupdatedAtB\x10\n\x0e_subaccount_idB\x0c\n\n_policy_id\"6\n\x0bIpWhitelist\x12\'\n\x05\x63idrs\x18\x01 \x03(\tB\x11\xbaH\x0e\x92\x01\x0b\x10 \x18\x01\"\x05r\x03\xd0\x01\x01R\x05\x63idrs\"\xa1\x02\n\x13\x43reateApiKeyRequest\x12\"\n\x05label\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\x05label\x12(\n\rsubaccount_id\x18\x03 \x01(\x06H\x00R\x0csubaccountId\x88\x01\x01\x12\x1b\n\x04icon\x18\x06 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x04icon\x12\x1d\n\x05\x63olor\x18\x07 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x05\x63olor\x12\x34\n\x0cip_whitelist\x18\x04 \x03(\tB\x11\xbaH\x0e\x92\x01\x0b\x10 \x18\x01\"\x05r\x03\xd0\x01\x01R\x0bipWhitelist\x12\x38\n\x12public_key_ed25519\x18\x05 \x01(\x0c\x42\n\xe0\x41\x02\xbaH\x04z\x02h R\x10publicKeyEd25519B\x10\n\x0e_subaccount_id\"@\n\x14\x43reateApiKeyResponse\x12(\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32\x0f.auth.v1.ApiKeyR\x06\x61piKey\"P\n\x12ListApiKeysRequest\x12(\n\rsubaccount_id\x18\x01 \x01(\x06H\x00R\x0csubaccountId\x88\x01\x01\x42\x10\n\x0e_subaccount_id\"A\n\x13ListApiKeysResponse\x12*\n\x08\x61pi_keys\x18\x01 \x03(\x0b\x32\x0f.auth.v1.ApiKeyR\x07\x61piKeys\"K\n\x13\x44\x65leteApiKeyRequest\x12\x34\n\x06key_id\x18\x01 \x01(\tB\x1d\xe0\x41\x02\xbaH\x17r\x15\x10\x01\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\"\x16\n\x14\x44\x65leteApiKeyResponse\"H\n\x10GetApiKeyRequest\x12\x34\n\x06key_id\x18\x01 \x01(\tB\x1d\xe0\x41\x02\xbaH\x17r\x15\x10\x01\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\"=\n\x11GetApiKeyResponse\x12(\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32\x0f.auth.v1.ApiKeyR\x06\x61piKey\"\x98\x04\n\x13UpdateApiKeyRequest\x12\x34\n\x06key_id\x18\x01 \x01(\tB\x1d\xe0\x41\x02\xbaH\x17r\x15\x10\x01\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\x12\x1d\n\x05label\x18\x02 \x01(\tB\x07\xbaH\x04r\x02\x18@R\x05label\x12\x1b\n\x04icon\x18\x06 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x04icon\x12\x1d\n\x05\x63olor\x18\x07 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x05\x63olor\x12\x39\n\x06status\x18\x03 \x01(\x0e\x32\x15.auth.v1.ApiKeyStatusB\n\xbaH\x07\x82\x01\x04\x10\x01 \x02R\x06status\x12\x37\n\x0cip_whitelist\x18\x04 \x01(\x0b\x32\x14.auth.v1.IpWhitelistR\x0bipWhitelist\x12\x39\n\nexpires_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt:\xc0\x01\xbaH\xbc\x01\x1a\xb9\x01\n\x19\x65xpires_at_future_or_zero\x12(expires_at must be in the future or zero\x1ar!has(this.expires_at) ? true : this.expires_at == timestamp(\'1970-01-01T00:00:00Z\') ? true : this.expires_at > now\"@\n\x14UpdateApiKeyResponse\x12(\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32\x0f.auth.v1.ApiKeyR\x06\x61piKey*U\n\x0c\x41piKeyStatus\x12\x1e\n\x1a\x41PI_KEY_STATUS_UNSPECIFIED\x10\x00\x12\n\n\x06\x41\x43TIVE\x10\x01\x12\x0b\n\x07REVOKED\x10\x02\x12\x0c\n\x08\x44ISABLED\x10\x03\x32\xe7\x08\n\rApiKeyService\x12\xe5\x01\n\x0c\x43reateApiKey\x12\x1c.auth.v1.CreateApiKeyRequest\x1a\x1d.auth.v1.CreateApiKeyResponse\"\x97\x01\xbaGx\n\x0c\x41uth Service\x12\x0e\x43reate API Key\x1aXCreate a new API key for the caller account, including public key material and metadata.\x82\xd3\xe4\x93\x02\x16\"\x11/v1/auth/api-keys:\x01*\x12\xea\x01\n\x0bListApiKeys\x12\x1b.auth.v1.ListApiKeysRequest\x1a\x1c.auth.v1.ListApiKeysResponse\"\x9f\x01\xbaG\x82\x01\n\x0c\x41uth Service\x12\rList API Keys\x1a\x63List non-revoked API keys for the caller account, newest first, optionally filtered by sub-account.\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/auth/api-keys\x12\xbc\x01\n\tGetApiKey\x12\x19.auth.v1.GetApiKeyRequest\x1a\x1a.auth.v1.GetApiKeyResponse\"x\xbaGS\n\x0c\x41uth Service\x12\x0bGet API Key\x1a\x36Retrieve a single API key owned by the caller account.\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/auth/api-keys/{key_id}\x12\xda\x01\n\x0c\x44\x65leteApiKey\x12\x1c.auth.v1.DeleteApiKeyRequest\x1a\x1d.auth.v1.DeleteApiKeyResponse\"\x8c\x01\xbaGg\n\x0c\x41uth Service\x12\x0e\x44\x65lete API Key\x1aGRevoke an API key owned by the caller account. Revocation is permanent.\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/auth/api-keys/{key_id}\x12\xe4\x01\n\x0cUpdateApiKey\x12\x1c.auth.v1.UpdateApiKeyRequest\x1a\x1d.auth.v1.UpdateApiKeyResponse\"\x96\x01\xbaGn\n\x0c\x41uth Service\x12\x0eUpdate API Key\x1aNUpdate mutable API key fields, including label, status, whitelist, and expiry.\x82\xd3\xe4\x93\x02\x1f\x32\x1a/v1/auth/api-keys/{key_id}:\x01*B<Z:github.com/Fabric-Labs/polyester-sdk-go/gen/auth/v1;authv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x61uth/v1/api_keys.proto\x12\x07\x61uth.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbf\x05\n\x06\x41piKey\x12/\n\x06key_id\x18\x02 \x01(\tB\x18\xbaH\x15r\x13\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\x12\x14\n\x05label\x18\x03 \x01(\tR\x05label\x12\x1b\n\x04icon\x18\t \x01(\tB\x07\xbaH\x04r\x02\x18 R\x04icon\x12\x1d\n\x05\x63olor\x18\n \x01(\tB\x07\xbaH\x04r\x02\x18 R\x05\x63olor\x12\x34\n\x0cip_whitelist\x18\x04 \x03(\tB\x11\xbaH\x0e\x92\x01\x0b\x10 \x18\x01\"\x05r\x03\xd0\x01\x01R\x0bipWhitelist\x12-\n\x06status\x18\x06 \x01(\x0e\x32\x15.auth.v1.ApiKeyStatusR\x06status\x12(\n\rsubaccount_id\x18\x07 \x01(\x06H\x00R\x0csubaccountId\x88\x01\x01\x12 \n\tpolicy_id\x18\x08 \x01(\x06H\x01R\x08policyId\x88\x01\x01\x12\x39\n\ncreated_at\x18\x14 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n\x0clast_used_at\x18\x15 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\nlastUsedAt\x12,\n\x12public_key_ed25519\x18\x16 \x01(\x0cR\x10publicKeyEd25519\x12\x39\n\nexpires_at\x18\x17 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt\x12(\n\x10\x63reated_by_actor\x18\x18 \x01(\tR\x0e\x63reatedByActor\x12\x39\n\nupdated_at\x18\x19 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1a\n\x08revision\x18\x1a \x01(\x04R\x08revisionB\x10\n\x0e_subaccount_idB\x0c\n\n_policy_id\"\xa1\x02\n\x13\x43reateApiKeyRequest\x12\"\n\x05label\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\x05label\x12(\n\rsubaccount_id\x18\x03 \x01(\x06H\x00R\x0csubaccountId\x88\x01\x01\x12\x1b\n\x04icon\x18\x06 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x04icon\x12\x1d\n\x05\x63olor\x18\x07 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x05\x63olor\x12\x34\n\x0cip_whitelist\x18\x04 \x03(\tB\x11\xbaH\x0e\x92\x01\x0b\x10 \x18\x01\"\x05r\x03\xd0\x01\x01R\x0bipWhitelist\x12\x38\n\x12public_key_ed25519\x18\x05 \x01(\x0c\x42\n\xe0\x41\x02\xbaH\x04z\x02h R\x10publicKeyEd25519B\x10\n\x0e_subaccount_id\"@\n\x14\x43reateApiKeyResponse\x12(\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32\x0f.auth.v1.ApiKeyR\x06\x61piKey\"P\n\x12ListApiKeysRequest\x12(\n\rsubaccount_id\x18\x01 \x01(\x06H\x00R\x0csubaccountId\x88\x01\x01\x42\x10\n\x0e_subaccount_id\"A\n\x13ListApiKeysResponse\x12*\n\x08\x61pi_keys\x18\x01 \x03(\x0b\x32\x0f.auth.v1.ApiKeyR\x07\x61piKeys\"K\n\x13\x44\x65leteApiKeyRequest\x12\x34\n\x06key_id\x18\x01 \x01(\tB\x1d\xe0\x41\x02\xbaH\x17r\x15\x10\x01\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\"\x16\n\x14\x44\x65leteApiKeyResponse\"H\n\x10GetApiKeyRequest\x12\x34\n\x06key_id\x18\x01 \x01(\tB\x1d\xe0\x41\x02\xbaH\x17r\x15\x10\x01\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\"=\n\x11GetApiKeyResponse\x12(\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32\x0f.auth.v1.ApiKeyR\x06\x61piKey\"\xdc\x03\n\x10\x41piKeyUpdateSpec\x12\x1d\n\x05label\x18\x01 \x01(\tB\x07\xbaH\x04r\x02\x18@R\x05label\x12\x1b\n\x04icon\x18\x02 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x04icon\x12\x1d\n\x05\x63olor\x18\x03 \x01(\tB\x07\xbaH\x04r\x02\x18 R\x05\x63olor\x12\x39\n\x06status\x18\x04 \x01(\x0e\x32\x15.auth.v1.ApiKeyStatusB\n\xbaH\x07\x82\x01\x04\x10\x01 \x02R\x06status\x12\x34\n\x0cip_whitelist\x18\x05 \x03(\tB\x11\xbaH\x0e\x92\x01\x0b\x10 \x18\x01\"\x05r\x03\xd0\x01\x01R\x0bipWhitelist\x12\x39\n\nexpires_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt:\xc0\x01\xbaH\xbc\x01\x1a\xb9\x01\n\x19\x65xpires_at_future_or_zero\x12(expires_at must be in the future or zero\x1ar!has(this.expires_at) ? true : this.expires_at == timestamp(\'1970-01-01T00:00:00Z\') ? true : this.expires_at > now\"\x8b\x02\n\x13UpdateApiKeyRequest\x12\x34\n\x06key_id\x18\x01 \x01(\tB\x1d\xe0\x41\x02\xbaH\x17r\x15\x10\x01\x32\x11^ak_[a-f0-9]{32}$R\x05keyId\x12=\n\x07\x61pi_key\x18\x02 \x01(\x0b\x32\x19.auth.v1.ApiKeyUpdateSpecB\t\xe0\x41\x02\xbaH\x03\xc8\x01\x01R\x06\x61piKey\x12\x46\n\x0bupdate_mask\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\t\xe0\x41\x02\xbaH\x03\xc8\x01\x01R\nupdateMask\x12\x37\n\x11\x65xpected_revision\x18\x04 \x01(\x04\x42\n\xe0\x41\x02\xbaH\x04\x32\x02 \x00R\x10\x65xpectedRevision\"@\n\x14UpdateApiKeyResponse\x12(\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32\x0f.auth.v1.ApiKeyR\x06\x61piKey*U\n\x0c\x41piKeyStatus\x12\x1e\n\x1a\x41PI_KEY_STATUS_UNSPECIFIED\x10\x00\x12\n\n\x06\x41\x43TIVE\x10\x01\x12\x0b\n\x07REVOKED\x10\x02\x12\x0c\n\x08\x44ISABLED\x10\x03\x32\xe7\x08\n\rApiKeyService\x12\xe5\x01\n\x0c\x43reateApiKey\x12\x1c.auth.v1.CreateApiKeyRequest\x1a\x1d.auth.v1.CreateApiKeyResponse\"\x97\x01\xbaGx\n\x0c\x41uth Service\x12\x0e\x43reate API Key\x1aXCreate a new API key for the caller account, including public key material and metadata.\x82\xd3\xe4\x93\x02\x16\"\x11/v1/auth/api-keys:\x01*\x12\xea\x01\n\x0bListApiKeys\x12\x1b.auth.v1.ListApiKeysRequest\x1a\x1c.auth.v1.ListApiKeysResponse\"\x9f\x01\xbaG\x82\x01\n\x0c\x41uth Service\x12\rList API Keys\x1a\x63List non-revoked API keys for the caller account, newest first, optionally filtered by sub-account.\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/auth/api-keys\x12\xbc\x01\n\tGetApiKey\x12\x19.auth.v1.GetApiKeyRequest\x1a\x1a.auth.v1.GetApiKeyResponse\"x\xbaGS\n\x0c\x41uth Service\x12\x0bGet API Key\x1a\x36Retrieve a single API key owned by the caller account.\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/auth/api-keys/{key_id}\x12\xda\x01\n\x0c\x44\x65leteApiKey\x12\x1c.auth.v1.DeleteApiKeyRequest\x1a\x1d.auth.v1.DeleteApiKeyResponse\"\x8c\x01\xbaGg\n\x0c\x41uth Service\x12\x0e\x44\x65lete API Key\x1aGRevoke an API key owned by the caller account. Revocation is permanent.\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/auth/api-keys/{key_id}\x12\xe4\x01\n\x0cUpdateApiKey\x12\x1c.auth.v1.UpdateApiKeyRequest\x1a\x1d.auth.v1.UpdateApiKeyResponse\"\x96\x01\xbaGn\n\x0c\x41uth Service\x12\x0eUpdate API Key\x1aNUpdate mutable API key fields, including label, status, whitelist, and expiry.\x82\xd3\xe4\x93\x02\x1f\x32\x1a/v1/auth/api-keys/{key_id}:\x01*B<Z:github.com/Fabric-Labs/polyester-sdk-go/gen/auth/v1;authv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -45,8 +46,6 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_APIKEY'].fields_by_name['color']._serialized_options = b'\272H\004r\002\030 '
   _globals['_APIKEY'].fields_by_name['ip_whitelist']._loaded_options = None
   _globals['_APIKEY'].fields_by_name['ip_whitelist']._serialized_options = b'\272H\016\222\001\013\020 \030\001\"\005r\003\320\001\001'
-  _globals['_IPWHITELIST'].fields_by_name['cidrs']._loaded_options = None
-  _globals['_IPWHITELIST'].fields_by_name['cidrs']._serialized_options = b'\272H\016\222\001\013\020 \030\001\"\005r\003\320\001\001'
   _globals['_CREATEAPIKEYREQUEST'].fields_by_name['label']._loaded_options = None
   _globals['_CREATEAPIKEYREQUEST'].fields_by_name['label']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
   _globals['_CREATEAPIKEYREQUEST'].fields_by_name['icon']._loaded_options = None
@@ -61,18 +60,26 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_DELETEAPIKEYREQUEST'].fields_by_name['key_id']._serialized_options = b'\340A\002\272H\027r\025\020\0012\021^ak_[a-f0-9]{32}$'
   _globals['_GETAPIKEYREQUEST'].fields_by_name['key_id']._loaded_options = None
   _globals['_GETAPIKEYREQUEST'].fields_by_name['key_id']._serialized_options = b'\340A\002\272H\027r\025\020\0012\021^ak_[a-f0-9]{32}$'
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['label']._loaded_options = None
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['label']._serialized_options = b'\272H\004r\002\030@'
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['icon']._loaded_options = None
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['icon']._serialized_options = b'\272H\004r\002\030 '
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['color']._loaded_options = None
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['color']._serialized_options = b'\272H\004r\002\030 '
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['status']._loaded_options = None
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['status']._serialized_options = b'\272H\007\202\001\004\020\001 \002'
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['ip_whitelist']._loaded_options = None
+  _globals['_APIKEYUPDATESPEC'].fields_by_name['ip_whitelist']._serialized_options = b'\272H\016\222\001\013\020 \030\001\"\005r\003\320\001\001'
+  _globals['_APIKEYUPDATESPEC']._loaded_options = None
+  _globals['_APIKEYUPDATESPEC']._serialized_options = b'\272H\274\001\032\271\001\n\031expires_at_future_or_zero\022(expires_at must be in the future or zero\032r!has(this.expires_at) ? true : this.expires_at == timestamp(\'1970-01-01T00:00:00Z\') ? true : this.expires_at > now'
   _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['key_id']._loaded_options = None
   _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['key_id']._serialized_options = b'\340A\002\272H\027r\025\020\0012\021^ak_[a-f0-9]{32}$'
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['label']._loaded_options = None
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['label']._serialized_options = b'\272H\004r\002\030@'
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['icon']._loaded_options = None
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['icon']._serialized_options = b'\272H\004r\002\030 '
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['color']._loaded_options = None
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['color']._serialized_options = b'\272H\004r\002\030 '
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['status']._loaded_options = None
-  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['status']._serialized_options = b'\272H\007\202\001\004\020\001 \002'
-  _globals['_UPDATEAPIKEYREQUEST']._loaded_options = None
-  _globals['_UPDATEAPIKEYREQUEST']._serialized_options = b'\272H\274\001\032\271\001\n\031expires_at_future_or_zero\022(expires_at must be in the future or zero\032r!has(this.expires_at) ? true : this.expires_at == timestamp(\'1970-01-01T00:00:00Z\') ? true : this.expires_at > now'
+  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['api_key']._loaded_options = None
+  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['api_key']._serialized_options = b'\340A\002\272H\003\310\001\001'
+  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['update_mask']._loaded_options = None
+  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['update_mask']._serialized_options = b'\340A\002\272H\003\310\001\001'
+  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['expected_revision']._loaded_options = None
+  _globals['_UPDATEAPIKEYREQUEST'].fields_by_name['expected_revision']._serialized_options = b'\340A\002\272H\0042\002 \000'
   _globals['_APIKEYSERVICE'].methods_by_name['CreateApiKey']._loaded_options = None
   _globals['_APIKEYSERVICE'].methods_by_name['CreateApiKey']._serialized_options = b'\272Gx\n\014Auth Service\022\016Create API Key\032XCreate a new API key for the caller account, including public key material and metadata.\202\323\344\223\002\026\"\021/v1/auth/api-keys:\001*'
   _globals['_APIKEYSERVICE'].methods_by_name['ListApiKeys']._loaded_options = None
@@ -83,32 +90,32 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_APIKEYSERVICE'].methods_by_name['DeleteApiKey']._serialized_options = b'\272Gg\n\014Auth Service\022\016Delete API Key\032GRevoke an API key owned by the caller account. Revocation is permanent.\202\323\344\223\002\034*\032/v1/auth/api-keys/{key_id}'
   _globals['_APIKEYSERVICE'].methods_by_name['UpdateApiKey']._loaded_options = None
   _globals['_APIKEYSERVICE'].methods_by_name['UpdateApiKey']._serialized_options = b'\272Gn\n\014Auth Service\022\016Update API Key\032NUpdate mutable API key fields, including label, status, whitelist, and expiry.\202\323\344\223\002\0372\032/v1/auth/api-keys/{key_id}:\001*'
-  _globals['_APIKEYSTATUS']._serialized_start=2282
-  _globals['_APIKEYSTATUS']._serialized_end=2367
-  _globals['_APIKEY']._serialized_start=199
-  _globals['_APIKEY']._serialized_end=874
-  _globals['_IPWHITELIST']._serialized_start=876
-  _globals['_IPWHITELIST']._serialized_end=930
-  _globals['_CREATEAPIKEYREQUEST']._serialized_start=933
-  _globals['_CREATEAPIKEYREQUEST']._serialized_end=1222
-  _globals['_CREATEAPIKEYRESPONSE']._serialized_start=1224
-  _globals['_CREATEAPIKEYRESPONSE']._serialized_end=1288
-  _globals['_LISTAPIKEYSREQUEST']._serialized_start=1290
-  _globals['_LISTAPIKEYSREQUEST']._serialized_end=1370
-  _globals['_LISTAPIKEYSRESPONSE']._serialized_start=1372
-  _globals['_LISTAPIKEYSRESPONSE']._serialized_end=1437
-  _globals['_DELETEAPIKEYREQUEST']._serialized_start=1439
-  _globals['_DELETEAPIKEYREQUEST']._serialized_end=1514
-  _globals['_DELETEAPIKEYRESPONSE']._serialized_start=1516
-  _globals['_DELETEAPIKEYRESPONSE']._serialized_end=1538
-  _globals['_GETAPIKEYREQUEST']._serialized_start=1540
-  _globals['_GETAPIKEYREQUEST']._serialized_end=1612
-  _globals['_GETAPIKEYRESPONSE']._serialized_start=1614
-  _globals['_GETAPIKEYRESPONSE']._serialized_end=1675
-  _globals['_UPDATEAPIKEYREQUEST']._serialized_start=1678
-  _globals['_UPDATEAPIKEYREQUEST']._serialized_end=2214
-  _globals['_UPDATEAPIKEYRESPONSE']._serialized_start=2216
-  _globals['_UPDATEAPIKEYRESPONSE']._serialized_end=2280
-  _globals['_APIKEYSERVICE']._serialized_start=2370
-  _globals['_APIKEYSERVICE']._serialized_end=3497
+  _globals['_APIKEYSTATUS']._serialized_start=2498
+  _globals['_APIKEYSTATUS']._serialized_end=2583
+  _globals['_APIKEY']._serialized_start=233
+  _globals['_APIKEY']._serialized_end=936
+  _globals['_CREATEAPIKEYREQUEST']._serialized_start=939
+  _globals['_CREATEAPIKEYREQUEST']._serialized_end=1228
+  _globals['_CREATEAPIKEYRESPONSE']._serialized_start=1230
+  _globals['_CREATEAPIKEYRESPONSE']._serialized_end=1294
+  _globals['_LISTAPIKEYSREQUEST']._serialized_start=1296
+  _globals['_LISTAPIKEYSREQUEST']._serialized_end=1376
+  _globals['_LISTAPIKEYSRESPONSE']._serialized_start=1378
+  _globals['_LISTAPIKEYSRESPONSE']._serialized_end=1443
+  _globals['_DELETEAPIKEYREQUEST']._serialized_start=1445
+  _globals['_DELETEAPIKEYREQUEST']._serialized_end=1520
+  _globals['_DELETEAPIKEYRESPONSE']._serialized_start=1522
+  _globals['_DELETEAPIKEYRESPONSE']._serialized_end=1544
+  _globals['_GETAPIKEYREQUEST']._serialized_start=1546
+  _globals['_GETAPIKEYREQUEST']._serialized_end=1618
+  _globals['_GETAPIKEYRESPONSE']._serialized_start=1620
+  _globals['_GETAPIKEYRESPONSE']._serialized_end=1681
+  _globals['_APIKEYUPDATESPEC']._serialized_start=1684
+  _globals['_APIKEYUPDATESPEC']._serialized_end=2160
+  _globals['_UPDATEAPIKEYREQUEST']._serialized_start=2163
+  _globals['_UPDATEAPIKEYREQUEST']._serialized_end=2430
+  _globals['_UPDATEAPIKEYRESPONSE']._serialized_start=2432
+  _globals['_UPDATEAPIKEYRESPONSE']._serialized_end=2496
+  _globals['_APIKEYSERVICE']._serialized_start=2586
+  _globals['_APIKEYSERVICE']._serialized_end=3713
 # @@protoc_insertion_point(module_scope)

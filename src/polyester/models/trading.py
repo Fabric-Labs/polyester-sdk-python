@@ -228,6 +228,7 @@ class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     created_at: datetime | None = None
     last_used_at: datetime | None = None
     updated_at: datetime | None = None
+    revision: int = 0
 
 
 class ApiKeysList(msgspec.Struct, kw_only=True, omit_defaults=True):

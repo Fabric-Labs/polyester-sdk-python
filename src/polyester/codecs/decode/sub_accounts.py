@@ -49,6 +49,7 @@ def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
         require_member_mfa=bool(msg.require_member_mfa),
         smart_account_salt_nonce=int(msg.smart_account_salt_nonce),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
+        revision=int(msg.revision),
     )
 
 
@@ -171,3 +172,11 @@ def get_subaccount_from_proto(msg: subaccounts_pb2.GetSubaccountResponse) -> Get
         invites=[subaccount_invite_from_proto(item) for item in msg.invites],
         policy=policy,
     )
+
+
+def update_subaccount_from_proto(
+    msg: subaccounts_pb2.UpdateSubaccountResponse,
+) -> SubAccount | None:
+    if has_field(msg, "subaccount"):
+        return subaccount_from_proto(msg.subaccount)
+    return None

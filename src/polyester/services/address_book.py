@@ -24,8 +24,10 @@ from polyester.codecs.decode.address_book import (
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_address_book_invalidation_bytes
 from polyester.codecs.scalars import id_to_int
+from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1.address_book_connect import AddressBookServiceClient
 from polyester.gen.auth.v1.address_book_pb2 import (
+    AddressBookEntryUpdateSpec,
     CopyAddressBookEntryRequest,
     CreateAddressBookEntryRequest,
     CreateAddressBookTagRequest,
@@ -53,6 +55,7 @@ from polyester.models.address_book import (
     WithdrawWhitelistView,
 )
 from polyester.models.realtime import AddressBookViewInvalidation
+from polyester.patch import UNSET, field_mask, is_set, require_positive_revision
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
@@ -178,31 +181,35 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         address_book_entry_id: str,
-        label: str,
-        note: str = "",
-        tag_ids: list[str] | None = None,
-        new_tags: list[dict[str, str]] | None = None,
+        expected_revision: int,
+        label: object = UNSET,
+        note: object = UNSET,
+        tag_ids: object = UNSET,
     ) -> AddressBookEntry:
-        request = UpdateAddressBookEntryRequest(
-            address_book_entry_id=id_to_int(address_book_entry_id, "address_book_entry_id"),
-            label=label,
-            note=note,
-        )
-        if tag_ids:
-            request.tag_ids.extend(id_to_int(item, "tag_id") for item in tag_ids)
-        if new_tags:
-            for tag in new_tags:
-                request.new_tags.append(
-                    address_book_tag_input_to_proto(
-                        name=tag["name"],
-                        color=tag.get("color", ""),
-                    )
-                )
+        require_positive_revision(expected_revision)
+        spec = AddressBookEntryUpdateSpec()
+        paths: list[str] = []
+        if is_set(label):
+            paths.append("label")
+            spec.label = str(label)
+        if is_set(note):
+            paths.append("note")
+            spec.note = str(note)
+        if is_set(tag_ids):
+            paths.append("tag_ids")
+            if tag_ids is None:
+                raise PolyesterValidationError("tag_ids cannot be null; pass [] to clear")
+            spec.tag_ids.extend(id_to_int(item, "tag_id") for item in tag_ids)  # type: ignore[union-attr]
         return await unary_auth_decoded(
             self._transport,
             AddressBookServiceClient,
             lambda client, req: client.update_address_book_entry(req),
-            request,
+            UpdateAddressBookEntryRequest(
+                address_book_entry_id=id_to_int(address_book_entry_id, "address_book_entry_id"),
+                entry=spec,
+                update_mask=field_mask(paths),
+                expected_revision=expected_revision,
+            ),
             entry_from_update_proto,
         )
 
@@ -266,18 +273,19 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         tag_id: str,
-        name: str,
-        color: str = "",
+        name: object = UNSET,
+        color: object = UNSET,
     ) -> AddressBookTag:
+        request = UpdateAddressBookTagRequest(tag_id=id_to_int(tag_id, "tag_id"))
+        if is_set(name):
+            request.name = str(name)
+        if is_set(color):
+            request.color = str(color)
         return await unary_auth_decoded(
             self._transport,
             AddressBookServiceClient,
             lambda client, req: client.update_address_book_tag(req),
-            UpdateAddressBookTagRequest(
-                tag_id=id_to_int(tag_id, "tag_id"),
-                name=name,
-                color=color,
-            ),
+            request,
             tag_from_update_proto,
         )
 

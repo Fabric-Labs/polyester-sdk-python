@@ -23,6 +23,7 @@ class SubAccount(msgspec.Struct, kw_only=True, omit_defaults=True):
     require_member_mfa: bool = False
     smart_account_salt_nonce: int = 0
     updated_at: datetime | None = None
+    revision: int = 0
 
 
 class SubAccountsList(msgspec.Struct, kw_only=True, omit_defaults=True):

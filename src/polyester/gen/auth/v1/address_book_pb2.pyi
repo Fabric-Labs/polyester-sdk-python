@@ -5,6 +5,7 @@ from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
+from google.protobuf import field_mask_pb2 as _field_mask_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api.validation.v1 import predefined_string_rules_pb2 as _predefined_string_rules_pb2
 from google.protobuf.internal import containers as _containers
@@ -142,7 +143,7 @@ class AddressBookTagSummary(_message.Message):
     def __init__(self, tag_id: _Optional[int] = ..., name: _Optional[str] = ..., color: _Optional[str] = ...) -> None: ...
 
 class AddressBookEntry(_message.Message):
-    __slots__ = ("address_book_entry_id", "scope", "kind", "label", "note", "created_at", "updated_at", "external", "internal", "tags")
+    __slots__ = ("address_book_entry_id", "scope", "kind", "label", "note", "created_at", "updated_at", "external", "internal", "tags", "revision")
     ADDRESS_BOOK_ENTRY_ID_FIELD_NUMBER: _ClassVar[int]
     SCOPE_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
@@ -153,6 +154,7 @@ class AddressBookEntry(_message.Message):
     EXTERNAL_FIELD_NUMBER: _ClassVar[int]
     INTERNAL_FIELD_NUMBER: _ClassVar[int]
     TAGS_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     address_book_entry_id: int
     scope: AccountScopeRef
     kind: AddressBookEntryKind
@@ -163,7 +165,8 @@ class AddressBookEntry(_message.Message):
     external: ExternalWithdrawAddress
     internal: InternalTransferAccount
     tags: _containers.RepeatedCompositeFieldContainer[AddressBookTag]
-    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., external: _Optional[_Union[ExternalWithdrawAddress, _Mapping]] = ..., internal: _Optional[_Union[InternalTransferAccount, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTag, _Mapping]]] = ...) -> None: ...
+    revision: int
+    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., kind: _Optional[_Union[AddressBookEntryKind, str]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., external: _Optional[_Union[ExternalWithdrawAddress, _Mapping]] = ..., internal: _Optional[_Union[InternalTransferAccount, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTag, _Mapping]]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class AddressBookEntriesView(_message.Message):
     __slots__ = ("external", "internal")
@@ -174,7 +177,7 @@ class AddressBookEntriesView(_message.Message):
     def __init__(self, external: _Optional[_Iterable[_Union[ExternalAddressBookEntry, _Mapping]]] = ..., internal: _Optional[_Iterable[_Union[InternalAddressBookEntry, _Mapping]]] = ...) -> None: ...
 
 class ExternalAddressBookEntry(_message.Message):
-    __slots__ = ("address_book_entry_id", "scope", "label", "note", "tag_ids", "whitelist_status", "polychain_chain_id", "address", "created_at", "updated_at")
+    __slots__ = ("address_book_entry_id", "scope", "label", "note", "tag_ids", "whitelist_status", "polychain_chain_id", "address", "created_at", "updated_at", "revision")
     ADDRESS_BOOK_ENTRY_ID_FIELD_NUMBER: _ClassVar[int]
     SCOPE_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -185,6 +188,7 @@ class ExternalAddressBookEntry(_message.Message):
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     address_book_entry_id: int
     scope: AccountScopeRef
     label: str
@@ -195,10 +199,11 @@ class ExternalAddressBookEntry(_message.Message):
     address: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., whitelist_status: _Optional[_Union[DestinationWhitelistStatus, str]] = ..., polychain_chain_id: _Optional[int] = ..., address: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., whitelist_status: _Optional[_Union[DestinationWhitelistStatus, str]] = ..., polychain_chain_id: _Optional[int] = ..., address: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class InternalAddressBookEntry(_message.Message):
-    __slots__ = ("address_book_entry_id", "scope", "label", "note", "tag_ids", "whitelist_status", "root_account_id", "target_account_id", "target_scope_type", "smart_account_address", "root_username", "subaccount_label", "created_at", "updated_at")
+    __slots__ = ("address_book_entry_id", "scope", "label", "note", "tag_ids", "whitelist_status", "root_account_id", "target_account_id", "target_scope_type", "smart_account_address", "root_username", "subaccount_label", "created_at", "updated_at", "revision")
     ADDRESS_BOOK_ENTRY_ID_FIELD_NUMBER: _ClassVar[int]
     SCOPE_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -213,6 +218,7 @@ class InternalAddressBookEntry(_message.Message):
     SUBACCOUNT_LABEL_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     address_book_entry_id: int
     scope: AccountScopeRef
     label: str
@@ -227,7 +233,8 @@ class InternalAddressBookEntry(_message.Message):
     subaccount_label: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., whitelist_status: _Optional[_Union[DestinationWhitelistStatus, str]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., whitelist_status: _Optional[_Union[DestinationWhitelistStatus, str]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class TransferCounterparty(_message.Message):
     __slots__ = ("counterparty_id", "scope", "direction", "kind", "saved", "address_book_entry_id", "use_count", "first_seen_at", "last_seen_at", "external", "internal")
@@ -443,19 +450,27 @@ class CreateAddressBookEntryResponse(_message.Message):
     entry: AddressBookEntry
     def __init__(self, entry: _Optional[_Union[AddressBookEntry, _Mapping]] = ...) -> None: ...
 
-class UpdateAddressBookEntryRequest(_message.Message):
-    __slots__ = ("address_book_entry_id", "label", "note", "tag_ids", "new_tags")
-    ADDRESS_BOOK_ENTRY_ID_FIELD_NUMBER: _ClassVar[int]
+class AddressBookEntryUpdateSpec(_message.Message):
+    __slots__ = ("label", "note", "tag_ids")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     NOTE_FIELD_NUMBER: _ClassVar[int]
     TAG_IDS_FIELD_NUMBER: _ClassVar[int]
-    NEW_TAGS_FIELD_NUMBER: _ClassVar[int]
-    address_book_entry_id: int
     label: str
     note: str
     tag_ids: _containers.RepeatedScalarFieldContainer[int]
-    new_tags: _containers.RepeatedCompositeFieldContainer[AddressBookTagInput]
-    def __init__(self, address_book_entry_id: _Optional[int] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., new_tags: _Optional[_Iterable[_Union[AddressBookTagInput, _Mapping]]] = ...) -> None: ...
+    def __init__(self, label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class UpdateAddressBookEntryRequest(_message.Message):
+    __slots__ = ("address_book_entry_id", "entry", "update_mask", "expected_revision")
+    ADDRESS_BOOK_ENTRY_ID_FIELD_NUMBER: _ClassVar[int]
+    ENTRY_FIELD_NUMBER: _ClassVar[int]
+    UPDATE_MASK_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_REVISION_FIELD_NUMBER: _ClassVar[int]
+    address_book_entry_id: int
+    entry: AddressBookEntryUpdateSpec
+    update_mask: _field_mask_pb2.FieldMask
+    expected_revision: int
+    def __init__(self, address_book_entry_id: _Optional[int] = ..., entry: _Optional[_Union[AddressBookEntryUpdateSpec, _Mapping]] = ..., update_mask: _Optional[_Union[_field_mask_pb2.FieldMask, _Mapping]] = ..., expected_revision: _Optional[int] = ...) -> None: ...
 
 class UpdateAddressBookEntryResponse(_message.Message):
     __slots__ = ("entry",)

@@ -105,6 +105,7 @@ def address_book_entry_from_proto(msg: address_book_pb2.AddressBookEntry) -> Add
         external=external,
         internal=internal,
         tags=[address_book_tag_from_proto(item) for item in msg.tags],
+        revision=int(msg.revision),
     )
 
 

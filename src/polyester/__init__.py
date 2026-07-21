@@ -12,6 +12,7 @@ from polyester.errors import (
     PolyesterTransportError,
     PolyesterValidationError,
 )
+from polyester.patch import UNSET
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
 __version__ = "0.1.0a10"
@@ -34,6 +35,7 @@ __all__ = [
     "Price",
     "Quantity",
     "QuantityDomain",
+    "UNSET",
     "__version__",
     "format_ledger_u128",
 ]

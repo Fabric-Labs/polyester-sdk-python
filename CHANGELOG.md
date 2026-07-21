@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Testing
+- Live funded UserOp tests: Funding → Trading (`TradingGateway.deposit`) and Funding → external (`withdrawToChain`), gated by `POLYESTER_TEST_CHAIN_USEROP=1`
+
 ### Changed
 - Realtime (`websockets`) and on-chain Funding helpers (`eth-abi` / friends) are required dependencies, not optional extras. Empty `[realtime]` / `[chain]` extras remain for install compatibility.
 

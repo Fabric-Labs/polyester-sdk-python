@@ -6,6 +6,7 @@ from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
+from google.protobuf import field_mask_pb2 as _field_mask_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2 as _ledger_read_pb2
 from google.protobuf.internal import containers as _containers
@@ -134,7 +135,7 @@ class SubaccountRoleView(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ...) -> None: ...
 
 class Subaccount(_message.Message):
-    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa", "smart_account_salt_nonce", "updated_at")
+    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa", "smart_account_salt_nonce", "updated_at", "revision")
     ID_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -149,6 +150,7 @@ class Subaccount(_message.Message):
     REQUIRE_MEMBER_MFA_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     id: int
     role: SubaccountRole
     label: str
@@ -163,7 +165,8 @@ class Subaccount(_message.Message):
     require_member_mfa: bool
     smart_account_salt_nonce: int
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    revision: int
+    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountsRequest(_message.Message):
     __slots__ = ()
@@ -207,23 +210,35 @@ class CreateSubaccountResponse(_message.Message):
     smart_account_salt_nonce: int
     def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ...) -> None: ...
 
-class UpdateSubaccountRequest(_message.Message):
-    __slots__ = ("subaccount_id", "label", "icon", "color", "status")
-    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+class SubaccountUpdateSpec(_message.Message):
+    __slots__ = ("label", "icon", "color", "status")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
     COLOR_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    subaccount_id: int
     label: str
     icon: str
     color: str
     status: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ...) -> None: ...
+    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ...) -> None: ...
+
+class UpdateSubaccountRequest(_message.Message):
+    __slots__ = ("subaccount_id", "subaccount", "update_mask", "expected_revision")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    UPDATE_MASK_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_REVISION_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    subaccount: SubaccountUpdateSpec
+    update_mask: _field_mask_pb2.FieldMask
+    expected_revision: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., subaccount: _Optional[_Union[SubaccountUpdateSpec, _Mapping]] = ..., update_mask: _Optional[_Union[_field_mask_pb2.FieldMask, _Mapping]] = ..., expected_revision: _Optional[int] = ...) -> None: ...
 
 class UpdateSubaccountResponse(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("subaccount",)
+    SUBACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    subaccount: Subaccount
+    def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ...) -> None: ...
 
 class SetSubaccountMemberMFARequirementRequest(_message.Message):
     __slots__ = ("subaccount_id", "require_member_mfa")

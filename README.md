@@ -58,11 +58,10 @@ Full cross-language comparison:
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk[realtime]"
+pip install polyester-sdk
 ```
 
-The `[realtime]` extra installs `websockets` for live market data and private
-streams. Omit it if you only need REST/Connect RPC calls.
+Realtime (Centrifugo) and on-chain Funding helpers are included by default.
 
 For development from a git checkout:
 
@@ -71,7 +70,7 @@ git clone https://github.com/Fabric-Labs/polyester-sdk-python.git
 cd polyester-sdk-python
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev,realtime]"
+pip install -e ".[dev]"
 ```
 
 ## Quickstart
@@ -227,10 +226,9 @@ Ledger balances have separate **funding** and **trading** buckets per asset.
 SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
-  Install `pip install polyester-sdk[chain]`, then either encode calldata or submit
-  a UserOp: pass an owner EOA private key to `PolyesterSmartAccount` (SDK derives
-  the Polyester Safe — no UI-exported owner key).
-- **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `[chain]` extra).
+  Either encode calldata or submit a UserOp: pass an owner EOA private key to
+  `PolyesterSmartAccount` (SDK derives the Polyester Safe — no UI-exported owner key).
+- **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `polyester.chain`).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
   via wallet/smart-account signing in the Polyester app (not an API-key RPC).
 - **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a
@@ -357,7 +355,7 @@ pattern application code should use.
 cp .env.example .env
 # fill in POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY, POLYESTER_ACCOUNT_ID
 
-pip install -e ".[dev,realtime]"
+pip install -e ".[dev]"
 python -m pytest tests/unit -q
 ./scripts/test_all.sh   # optional: unit + live tiers
 ./scripts/smoke_realtime.sh   # realtime unit + live heartbeat before release
@@ -375,12 +373,12 @@ same branch when they drift (same-repo PRs / pushes to `main`).
 ```bash
 cd polyester-sdk-python
 python -m venv /tmp/polyester-pypi-test && source /tmp/polyester-pypi-test/bin/activate
-pip install -e ".[dev,realtime]"
+pip install -e ".[dev]"
 python -m pytest tests/unit -q
 ./scripts/smoke_realtime.sh
 
 cd ../polyester-examples-python
-pip install -e "../polyester-sdk-python[realtime]"
+pip install -e "../polyester-sdk-python"
 python -m pytest -q
 python3 examples/04_public_realtime_trades.py
 python3 examples/05_public_orderbook_stream.py

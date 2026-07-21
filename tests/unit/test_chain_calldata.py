@@ -6,12 +6,11 @@ Selectors and shapes must stay aligned with TypeScript
 
 from __future__ import annotations
 
+import eth_abi
 import pytest
+from eth_utils import function_signature_to_4byte_selector
 
-eth_abi = pytest.importorskip("eth_abi")
-from eth_utils import function_signature_to_4byte_selector  # noqa: E402
-
-from polyester.chain import (  # noqa: E402
+from polyester.chain import (
     GuardApproval,
     encode_add_allowed_external_destinations,
     encode_add_allowed_internal_accounts,

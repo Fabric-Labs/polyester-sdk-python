@@ -1,12 +1,10 @@
-"""Optional on-chain Funding / smart-account helpers (POLY-3569).
+"""On-chain Funding / smart-account helpers (POLY-3569).
 
-Install with: ``pip install polyester-sdk[chain]``
+Encodes FundingAccount / TradingGateway calldata and can submit wallet-signed
+UserOperations (owner key → derive Polyester Safe → bundler).
 
-This module encodes FundingAccount / TradingGateway calldata and can submit
-wallet-signed UserOperations (owner key → derive Polyester Safe → bundler).
-
-It is intentionally separate from the API-key Connect surface: Trading withdraw
-RPCs cannot perform Funding → external or Funding → Trading.
+Separate from the API-key Connect surface: Trading withdraw RPCs cannot perform
+Funding → external or Funding → Trading.
 """
 
 from __future__ import annotations

@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
-pytest.importorskip("eth_abi")
-
 from eth_utils import function_signature_to_4byte_selector
 
 from polyester.chain.fees import quote_zipper_fee

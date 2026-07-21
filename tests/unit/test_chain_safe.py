@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
-eth_abi = pytest.importorskip("eth_abi")
-
 from polyester.chain.safe import (  # noqa: E402
     predict_safe_address,
     predict_safe_address_with_data,

@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
+from eth_utils import function_signature_to_4byte_selector
 
-eth_abi = pytest.importorskip("eth_abi")
-pytest.importorskip("eth_account")
-
-from eth_utils import function_signature_to_4byte_selector  # noqa: E402
-
-from polyester.chain.calldata import ChainCall  # noqa: E402
-from polyester.chain.userop import (  # noqa: E402
+from polyester.chain.calldata import ChainCall
+from polyester.chain.userop import (
     add_user_operation_gas_buffer,
     encode_execute_user_op_call_data,
     pack_paymaster_and_data,

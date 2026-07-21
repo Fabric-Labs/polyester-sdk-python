@@ -8,6 +8,8 @@ from collections.abc import AsyncIterator, Callable
 from typing import Any, Generic, TypeVar
 
 import httpx
+import websockets
+from websockets.asyncio.client import ClientConnection
 
 from polyester.auth import ApiKeyCredentials
 from polyester.errors import (
@@ -18,13 +20,6 @@ from polyester.errors import (
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
 
 T = TypeVar("T")
-
-try:
-    import websockets
-    from websockets.asyncio.client import ClientConnection
-except ImportError:  # pragma: no cover - optional extra
-    websockets = None
-    ClientConnection = Any
 
 # Match Go: long read deadline so Centrifugo ping/pong completes without reconnect churn.
 CENTRIFUGO_READ_TIMEOUT = 30.0
@@ -126,10 +121,6 @@ class AsyncRealtimeClient:
         http: httpx.AsyncClient | None = None,
         max_queue_size: int = 1000,
     ) -> None:
-        if websockets is None:
-            raise PolyesterRealtimeError(
-                "Realtime requires the websockets package. Install polyester-sdk[realtime]."
-            )
         self._ws_url = normalize_ws_url(ws_url)
         self._api_url = api_url
         self._credentials = credentials

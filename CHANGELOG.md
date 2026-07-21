@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Realtime (`websockets`) and on-chain Funding helpers (`eth-abi` / friends) are required dependencies, not optional extras. Empty `[realtime]` / `[chain]` extras remain for install compatibility.
+
 ## 0.1.0a10
 
 ### Features

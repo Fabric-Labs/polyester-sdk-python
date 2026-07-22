@@ -201,14 +201,16 @@ class CreateSubaccountRequest(_message.Message):
     def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., nonce: _Optional[str] = ..., signature: _Optional[str] = ..., primary_wallet_address: _Optional[str] = ..., wallet_provider: _Optional[str] = ...) -> None: ...
 
 class CreateSubaccountResponse(_message.Message):
-    __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce")
+    __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce", "revision")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     TOTAL_CREATED_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     total_created: int
     smart_account_salt_nonce: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ...) -> None: ...
+    revision: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class SubaccountUpdateSpec(_message.Message):
     __slots__ = ("label", "icon", "color", "status")

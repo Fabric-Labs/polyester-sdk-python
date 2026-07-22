@@ -67,6 +67,7 @@ def create_subaccount_from_proto(
         subaccount_id=format_uint64_id(msg.subaccount_id),
         total_created=int(msg.total_created),
         smart_account_salt_nonce=int(msg.smart_account_salt_nonce),
+        revision=int(msg.revision),
     )
 
 

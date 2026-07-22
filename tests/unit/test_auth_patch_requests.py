@@ -8,7 +8,7 @@ import pytest
 from polyester.codecs.decode.address_book import address_book_entry_from_proto
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_policy_from_proto
-from polyester.codecs.decode.sub_accounts import subaccount_from_proto
+from polyester.codecs.decode.sub_accounts import create_subaccount_from_proto, subaccount_from_proto
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import address_book_pb2, api_keys_pb2, policies_pb2, subaccounts_pb2
@@ -271,6 +271,16 @@ async def test_address_book_tag_set_name_omit_color() -> None:
 def test_revision_decoded_onto_models() -> None:
     sub = subaccount_from_proto(subaccounts_pb2.Subaccount(id=1, revision=9))
     assert sub.revision == 9
+
+    created = create_subaccount_from_proto(
+        subaccounts_pb2.CreateSubaccountResponse(
+            subaccount_id=1,
+            total_created=2,
+            smart_account_salt_nonce=2,
+            revision=1,
+        )
+    )
+    assert created.revision == 1
 
     key = api_key_from_proto(
         api_keys_pb2.ApiKey(key_id="ak_0123456789abcdef0123456789abcdef", revision=7)

@@ -15,7 +15,7 @@ from polyester.errors import (
 from polyester.patch import UNSET
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
-__version__ = "0.1.0a12"
+__version__ = "0.1.0a13"
 
 __all__ = [
     "AssetAmount",

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0a13
+
 ### Breaking
 - POLY-3701 wire break: order and trigger creation now target explicit execution variants. The flat `order_type`/`tif`/`post_only`/`price` inputs are still accepted on `CreateOrderRequest` but are mapped onto the new `OrderIntent` execution oneof (`market_ioc`/`limit_gtc`/`limit_ioc`/`limit_fok`); `post_only` is only valid for limit-GTC and is rejected otherwise
 - `CreateOrderRequest` now wraps an `OrderIntent` (`subaccount_id` + `order`); batch create items are `OrderIntent`s and the removed `allow_partial` argument is accepted but ignored

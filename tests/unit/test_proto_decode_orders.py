@@ -50,6 +50,8 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
 def test_order_from_proto_maps_attached_risk() -> None:
     from polyester.gen.orders.v1.orders_read_pb2 import (
         AttachedRisk as ProtoAttachedRisk,
+    )
+    from polyester.gen.orders.v1.orders_read_pb2 import (
         AttachedRiskTakeProfit,
         AttachedRiskTrailingStop,
     )

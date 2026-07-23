@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
 from polyester.gen.orders.v1 import orders_pb2
@@ -12,10 +12,10 @@ from polyester.models import (
     TriggerEventsList,
     TriggerLadderDetails,
     TriggerMutationResult,
+    TriggersList,
     TriggerStopDetails,
     TriggerTrailingDetails,
     TriggerTwapDetails,
-    TriggersList,
 )
 from polyester.types.money import Price, Quantity
 
@@ -95,7 +95,7 @@ def _timestamp(ts) -> datetime | None:
     nanos = int(getattr(ts, "nanos", 0) or 0)
     if seconds == 0 and nanos == 0:
         return None
-    return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=timezone.utc)
+    return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
 
 
 def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:

@@ -71,73 +71,147 @@ LINEAR: LadderDistribution
 GEOMETRIC: LadderDistribution
 WEIGHTED_FAVORABLE: LadderDistribution
 
-class CreateTriggerRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol", "trigger_type", "trigger_price_ticks", "trigger_price_source", "side", "order_type", "time_in_force", "qty_scaled", "limit_price_ticks", "fee_source", "self_trade_prevention_mode", "post_only", "trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps", "twap_duration_ms", "twap_slice_interval_ms", "ladder_price_min_ticks", "ladder_price_max_ticks", "ladder_levels", "ladder_distribution", "client_trigger_id")
-    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
-    SIDE_FIELD_NUMBER: _ClassVar[int]
-    ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    TIME_IN_FORCE_FIELD_NUMBER: _ClassVar[int]
-    QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    FEE_SOURCE_FIELD_NUMBER: _ClassVar[int]
-    SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
+class TriggerMarketIoc(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class TriggerLimitGtc(_message.Message):
+    __slots__ = ("price_ticks", "post_only")
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     POST_ONLY_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    post_only: bool
+    def __init__(self, price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ...) -> None: ...
+
+class TriggerLimitIoc(_message.Message):
+    __slots__ = ("price_ticks",)
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
+
+class TriggerLimitFok(_message.Message):
+    __slots__ = ("price_ticks",)
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
+
+class ConditionalChildExecution(_message.Message):
+    __slots__ = ("market_ioc", "limit_gtc", "limit_ioc", "limit_fok")
+    MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FOK_FIELD_NUMBER: _ClassVar[int]
+    market_ioc: TriggerMarketIoc
+    limit_gtc: TriggerLimitGtc
+    limit_ioc: TriggerLimitIoc
+    limit_fok: TriggerLimitFok
+    def __init__(self, market_ioc: _Optional[_Union[TriggerMarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[TriggerLimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[TriggerLimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[TriggerLimitFok, _Mapping]] = ...) -> None: ...
+
+class ConditionalTrigger(_message.Message):
+    __slots__ = ("trigger_price_ticks", "side", "child")
+    TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    CHILD_FIELD_NUMBER: _ClassVar[int]
+    trigger_price_ticks: int
+    side: _orders_pb2.Side
+    child: ConditionalChildExecution
+    def __init__(self, trigger_price_ticks: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., child: _Optional[_Union[ConditionalChildExecution, _Mapping]] = ...) -> None: ...
+
+class TrailingStopTrigger(_message.Message):
+    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRAILING_DISTANCE_BPS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
-    TWAP_DURATION_MS_FIELD_NUMBER: _ClassVar[int]
-    TWAP_SLICE_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
-    LADDER_PRICE_MIN_TICKS_FIELD_NUMBER: _ClassVar[int]
-    LADDER_PRICE_MAX_TICKS_FIELD_NUMBER: _ClassVar[int]
-    LADDER_LEVELS_FIELD_NUMBER: _ClassVar[int]
-    LADDER_DISTRIBUTION_FIELD_NUMBER: _ClassVar[int]
-    CLIENT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    subaccount_id: int
-    symbol: str
-    trigger_type: TriggerType
-    trigger_price_ticks: int
-    trigger_price_source: _orders_pb2.TriggerPriceSource
-    side: _orders_pb2.Side
-    order_type: _orders_pb2.OrderType
-    time_in_force: _orders_pb2.TimeInForce
-    qty_scaled: int
-    limit_price_ticks: int
-    fee_source: _orders_pb2.FeeSource
-    self_trade_prevention_mode: _orders_pb2.SelfTradePreventionMode
-    post_only: bool
     trailing_distance_ticks: int
     trailing_distance_bps: int
     activation_price_ticks: int
     max_slippage_ticks: int
     max_slippage_bps: int
-    twap_duration_ms: int
-    twap_slice_interval_ms: int
-    ladder_price_min_ticks: int
-    ladder_price_max_ticks: int
-    ladder_levels: int
-    ladder_distribution: LadderDistribution
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ...) -> None: ...
+
+class TwapMarketIoc(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class TwapLimitGtc(_message.Message):
+    __slots__ = ("price_ticks",)
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
+
+class TwapTrigger(_message.Message):
+    __slots__ = ("side", "duration_ms", "slice_interval_ms", "market_ioc", "limit_gtc")
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    DURATION_MS_FIELD_NUMBER: _ClassVar[int]
+    SLICE_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
+    MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
+    side: _orders_pb2.Side
+    duration_ms: int
+    slice_interval_ms: int
+    market_ioc: TwapMarketIoc
+    limit_gtc: TwapLimitGtc
+    def __init__(self, side: _Optional[_Union[_orders_pb2.Side, str]] = ..., duration_ms: _Optional[int] = ..., slice_interval_ms: _Optional[int] = ..., market_ioc: _Optional[_Union[TwapMarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[TwapLimitGtc, _Mapping]] = ...) -> None: ...
+
+class LadderTrigger(_message.Message):
+    __slots__ = ("side", "price_min_ticks", "price_max_ticks", "levels", "post_only")
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    PRICE_MIN_TICKS_FIELD_NUMBER: _ClassVar[int]
+    PRICE_MAX_TICKS_FIELD_NUMBER: _ClassVar[int]
+    LEVELS_FIELD_NUMBER: _ClassVar[int]
+    POST_ONLY_FIELD_NUMBER: _ClassVar[int]
+    side: _orders_pb2.Side
+    price_min_ticks: int
+    price_max_ticks: int
+    levels: int
+    post_only: bool
+    def __init__(self, side: _Optional[_Union[_orders_pb2.Side, str]] = ..., price_min_ticks: _Optional[int] = ..., price_max_ticks: _Optional[int] = ..., levels: _Optional[int] = ..., post_only: _Optional[bool] = ...) -> None: ...
+
+class TriggerIntent(_message.Message):
+    __slots__ = ("symbol", "qty_scaled", "fee_source", "self_trade_prevention_mode", "client_trigger_id", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder")
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    FEE_SOURCE_FIELD_NUMBER: _ClassVar[int]
+    SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
+    STOP_LOSS_FIELD_NUMBER: _ClassVar[int]
+    TAKE_PROFIT_FIELD_NUMBER: _ClassVar[int]
+    TRAILING_STOP_FIELD_NUMBER: _ClassVar[int]
+    TWAP_FIELD_NUMBER: _ClassVar[int]
+    LADDER_FIELD_NUMBER: _ClassVar[int]
+    symbol: str
+    qty_scaled: int
+    fee_source: _orders_pb2.FeeSource
+    self_trade_prevention_mode: _orders_pb2.SelfTradePreventionMode
     client_trigger_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., trigger_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., qty_scaled: _Optional[int] = ..., limit_price_ticks: _Optional[int] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., post_only: _Optional[bool] = ..., trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., twap_duration_ms: _Optional[int] = ..., twap_slice_interval_ms: _Optional[int] = ..., ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ..., client_trigger_id: _Optional[str] = ...) -> None: ...
+    stop_loss: ConditionalTrigger
+    take_profit: ConditionalTrigger
+    trailing_stop: TrailingStopTrigger
+    twap: TwapTrigger
+    ladder: LadderTrigger
+    def __init__(self, symbol: _Optional[str] = ..., qty_scaled: _Optional[int] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., client_trigger_id: _Optional[str] = ..., stop_loss: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., take_profit: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopTrigger, _Mapping]] = ..., twap: _Optional[_Union[TwapTrigger, _Mapping]] = ..., ladder: _Optional[_Union[LadderTrigger, _Mapping]] = ...) -> None: ...
+
+class CreateTriggerRequest(_message.Message):
+    __slots__ = ("subaccount_id", "trigger")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    trigger: TriggerIntent
+    def __init__(self, subaccount_id: _Optional[int] = ..., trigger: _Optional[_Union[TriggerIntent, _Mapping]] = ...) -> None: ...
 
 class CreateTriggerResponse(_message.Message):
-    __slots__ = ("trigger_id", "status", "client_trigger_id", "ts", "ts_ns")
+    __slots__ = ("trigger_id", "client_trigger_id", "accepted_at", "accepted_at_ts_ns")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    STATUS_FIELD_NUMBER: _ClassVar[int]
     CLIENT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    TS_FIELD_NUMBER: _ClassVar[int]
-    TS_NS_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
     trigger_id: int
-    status: TriggerStatus
     client_trigger_id: str
-    ts: _timestamp_pb2.Timestamp
-    ts_ns: int
-    def __init__(self, trigger_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., client_trigger_id: _Optional[str] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    accepted_at: _timestamp_pb2.Timestamp
+    accepted_at_ts_ns: int
+    def __init__(self, trigger_id: _Optional[int] = ..., client_trigger_id: _Optional[str] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ...) -> None: ...
 
 class GetTriggerRequest(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id")
@@ -376,26 +450,25 @@ class LadderDetails(_message.Message):
     def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ...) -> None: ...
 
 class Trigger(_message.Message):
-    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "symbol", "trigger_type", "status", "parent_order_id", "side", "order_type", "time_in_force", "qty_scaled", "limit_price_ticks", "fee_source", "self_trade_prevention_mode", "post_only", "stop", "trailing", "twap", "ladder", "client_trigger_id", "created_at", "updated_at", "armed_at", "completed_at", "child_order_ids")
+    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "symbol", "status", "parent_order_id", "qty_scaled", "fee_source", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "created_at", "updated_at", "armed_at", "completed_at", "child_order_ids")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_TYPE_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     PARENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    SIDE_FIELD_NUMBER: _ClassVar[int]
-    ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    TIME_IN_FORCE_FIELD_NUMBER: _ClassVar[int]
     QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     FEE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
-    POST_ONLY_FIELD_NUMBER: _ClassVar[int]
-    STOP_FIELD_NUMBER: _ClassVar[int]
-    TRAILING_FIELD_NUMBER: _ClassVar[int]
+    STOP_LOSS_FIELD_NUMBER: _ClassVar[int]
+    TAKE_PROFIT_FIELD_NUMBER: _ClassVar[int]
+    TRAILING_STOP_FIELD_NUMBER: _ClassVar[int]
     TWAP_FIELD_NUMBER: _ClassVar[int]
     LADDER_FIELD_NUMBER: _ClassVar[int]
+    STOP_FIELD_NUMBER: _ClassVar[int]
+    TRAILING_FIELD_NUMBER: _ClassVar[int]
+    TWAP_STATE_FIELD_NUMBER: _ClassVar[int]
+    LADDER_STATE_FIELD_NUMBER: _ClassVar[int]
     CLIENT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
@@ -406,25 +479,24 @@ class Trigger(_message.Message):
     subaccount_id: int
     symbol_id: int
     symbol: str
-    trigger_type: TriggerType
     status: TriggerStatus
     parent_order_id: int
-    side: _orders_pb2.Side
-    order_type: _orders_pb2.OrderType
-    time_in_force: _orders_pb2.TimeInForce
     qty_scaled: int
-    limit_price_ticks: int
     fee_source: _orders_pb2.FeeSource
     self_trade_prevention_mode: _orders_pb2.SelfTradePreventionMode
-    post_only: bool
+    stop_loss: ConditionalTrigger
+    take_profit: ConditionalTrigger
+    trailing_stop: TrailingStopTrigger
+    twap: TwapTrigger
+    ladder: LadderTrigger
     stop: StopDetails
     trailing: TrailingDetails
-    twap: TwapDetails
-    ladder: LadderDetails
+    twap_state: TwapDetails
+    ladder_state: LadderDetails
     client_trigger_id: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     armed_at: _timestamp_pb2.Timestamp
     completed_at: _timestamp_pb2.Timestamp
     child_order_ids: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., parent_order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., qty_scaled: _Optional[int] = ..., limit_price_ticks: _Optional[int] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., post_only: _Optional[bool] = ..., stop: _Optional[_Union[StopDetails, _Mapping]] = ..., trailing: _Optional[_Union[TrailingDetails, _Mapping]] = ..., twap: _Optional[_Union[TwapDetails, _Mapping]] = ..., ladder: _Optional[_Union[LadderDetails, _Mapping]] = ..., client_trigger_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., armed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., child_order_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., parent_order_id: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., stop_loss: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., take_profit: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopTrigger, _Mapping]] = ..., twap: _Optional[_Union[TwapTrigger, _Mapping]] = ..., ladder: _Optional[_Union[LadderTrigger, _Mapping]] = ..., stop: _Optional[_Union[StopDetails, _Mapping]] = ..., trailing: _Optional[_Union[TrailingDetails, _Mapping]] = ..., twap_state: _Optional[_Union[TwapDetails, _Mapping]] = ..., ladder_state: _Optional[_Union[LadderDetails, _Mapping]] = ..., client_trigger_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., armed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., child_order_ids: _Optional[_Iterable[int]] = ...) -> None: ...

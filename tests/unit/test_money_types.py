@@ -66,8 +66,8 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
         price=Decimal("50000"),
     )
     proto = create_order_to_proto(req, quantity_scale=8)
-    assert proto.qty_scaled == 10_000_000
-    assert proto.price_ticks == 50_000_000_000
+    assert proto.order.qty_scaled == 10_000_000
+    assert proto.order.limit_gtc.price_ticks == 50_000_000_000
 
     req2 = normalize_create_order_request(
         symbol="BTC-USD",
@@ -77,8 +77,8 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
         price=Price.from_ticks(50_000_000_000, symbol="BTC-USD"),
     )
     proto2 = create_order_to_proto(req2, quantity_scale=8)
-    assert proto2.qty_scaled == proto.qty_scaled
-    assert proto2.price_ticks == proto.price_ticks
+    assert proto2.order.qty_scaled == proto.order.qty_scaled
+    assert proto2.order.limit_gtc.price_ticks == proto.order.limit_gtc.price_ticks
 
 
 def test_create_order_rejects_float_qty() -> None:

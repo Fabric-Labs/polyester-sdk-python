@@ -32,6 +32,15 @@ class Timeframe(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     HOUR_12: _ClassVar[Timeframe]
     WEEK_1: _ClassVar[Timeframe]
     MONTH_1: _ClassVar[Timeframe]
+
+class PairStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    PAIR_STATUS_UNSPECIFIED: _ClassVar[PairStatus]
+    PAIR_STATUS_ENABLED: _ClassVar[PairStatus]
+    PAIR_STATUS_DISABLED: _ClassVar[PairStatus]
+    PAIR_STATUS_CANCEL_ONLY: _ClassVar[PairStatus]
+    PAIR_STATUS_POST_ONLY: _ClassVar[PairStatus]
+    PAIR_STATUS_REDUCE_ONLY: _ClassVar[PairStatus]
 SIDE_UNSPECIFIED: SideFilter
 BUY: SideFilter
 SELL: SideFilter
@@ -47,6 +56,12 @@ DAY_1: Timeframe
 HOUR_12: Timeframe
 WEEK_1: Timeframe
 MONTH_1: Timeframe
+PAIR_STATUS_UNSPECIFIED: PairStatus
+PAIR_STATUS_ENABLED: PairStatus
+PAIR_STATUS_DISABLED: PairStatus
+PAIR_STATUS_CANCEL_ONLY: PairStatus
+PAIR_STATUS_POST_ONLY: PairStatus
+PAIR_STATUS_REDUCE_ONLY: PairStatus
 
 class GetTradesRequest(_message.Message):
     __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "page_token")
@@ -268,11 +283,11 @@ class PairConfig(_message.Message):
     marketdata: PairMarketdataConfig
     listing_at: _timestamp_pb2.Timestamp
     delisting_at: _timestamp_pb2.Timestamp
-    status: str
+    status: PairStatus
     default_market_slippage_bps_buy: int
     default_market_slippage_bps_sell: int
     max_client_ref_drift_bps: int
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_received: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[str] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_received: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ...) -> None: ...
 
 class GetSpotConfigRequest(_message.Message):
     __slots__ = ()

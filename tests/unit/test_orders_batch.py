@@ -42,17 +42,19 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
         quantity_scale=8,
     )
     assert proto.request_id == "req-create-1"
-    assert proto.allow_partial is True
+    # allow_partial was removed from the wire (POLY-3701); the arg is ignored.
+    assert "allow_partial" not in {f.name for f in proto.DESCRIPTOR.fields}
     assert proto.subaccount_id == id_to_int("123")
     assert len(proto.items) == 2
     assert proto.items[0].symbol == "BTC-USD"
     assert proto.items[0].side == orders_pb2.BUY
     assert proto.items[0].client_order_id == "cid-1"
     assert proto.items[0].qty_scaled == 10_000_000
-    assert proto.items[0].price_ticks == 50_000_000_000
+    assert proto.items[0].WhichOneof("execution") == "limit_gtc"
+    assert proto.items[0].limit_gtc.price_ticks == 50_000_000_000
     assert proto.items[1].symbol == "ETH-USD"
     assert proto.items[1].side == orders_pb2.SELL
-    assert proto.items[1].order_type == orders_pb2.MARKET
+    assert proto.items[1].WhichOneof("execution") == "market_ioc"
 
 
 def test_batch_create_orders_to_proto_from_create_order_request() -> None:
@@ -66,6 +68,7 @@ def test_batch_create_orders_to_proto_from_create_order_request() -> None:
     proto = batch_create_orders_to_proto(items=[item])
     assert len(proto.items) == 1
     assert proto.items[0].qty_scaled == 50_000_000
+    assert proto.items[0].limit_gtc.price_ticks == 100_000_000
 
 
 def test_batch_create_requires_items() -> None:
@@ -127,15 +130,14 @@ def test_batch_create_from_proto() -> None:
     msg = orders_pb2.BatchCreateOrdersResponse(
         results=[
             orders_pb2.BatchCreateResultItem(
-                status="accepted",
-                order_id=101,
                 client_order_id="cid-a",
-                code="ok",
+                accepted=orders_pb2.BatchCreateAccepted(order_id=101),
             ),
             orders_pb2.BatchCreateResultItem(
-                status="rejected",
                 client_order_id="cid-b",
-                code="invalid_qty",
+                rejected=orders_pb2.BatchCreateRejected(
+                    error=orders_pb2.ErrorDetail(code=orders_pb2.ERROR_CODE_BAD_QTY)
+                ),
             ),
         ],
         accepted_count=1,
@@ -145,10 +147,12 @@ def test_batch_create_from_proto() -> None:
     assert result.accepted_count == 1
     assert result.rejected_count == 1
     assert len(result.results) == 2
+    assert result.results[0].status == "accepted"
     assert result.results[0].order_id == format_id(101)
     assert result.results[0].client_order_id == "cid-a"
     assert result.results[1].status == "rejected"
-    assert result.results[1].code == "invalid_qty"
+    assert result.results[1].client_order_id == "cid-b"
+    assert result.results[1].code == "error_code_bad_qty"
 
 
 def test_batch_cancel_from_proto() -> None:

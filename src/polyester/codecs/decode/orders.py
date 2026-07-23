@@ -11,6 +11,7 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     UserTrade,
 )
 from polyester.models import (
+    AttachedRisk,
     BatchCancelOrdersResult,
     BatchCancelResultItem,
     BatchCreateOrdersResult,
@@ -23,6 +24,8 @@ from polyester.models import (
     ModifyOrderResult,
     OrderMutationResult,
     OrdersList,
+    RiskLeg,
+    TrailingStop,
     UserTradesList,
 )
 from polyester.models import (
@@ -42,9 +45,80 @@ def _price(ticks: int, *, symbol_id: int | None = None) -> Price:
     return Price.from_ticks(int(ticks), symbol=None)
 
 
+def _trigger_price_source_label(value: int) -> str:
+    name = proto_enum_name(orders_pb2.TriggerPriceSource, value)
+    if name.endswith("_price"):
+        return name.removesuffix("_price")
+    return name
+
+
+def _risk_execution_order_type(child) -> tuple[str, int | None]:
+    """Return (order_type, limit_price_ticks) from a RiskExecution child."""
+    if child is None:
+        return "", None
+    if child.HasField("limit_gtc"):
+        return "limit", int(child.limit_gtc.price_ticks) or None
+    if child.HasField("market_ioc"):
+        return "market", None
+    return "", None
+
+
+def _risk_leg_from_policy(policy) -> RiskLeg | None:
+    if policy is None or not policy.trigger_price_ticks:
+        return None
+    order_type, limit_ticks = _risk_execution_order_type(
+        policy.child if policy.HasField("child") else None
+    )
+    return RiskLeg(
+        trigger_price=_price(policy.trigger_price_ticks),
+        order_type=order_type,
+        limit_price=_price(limit_ticks) if limit_ticks else None,
+    )
+
+
+def _trailing_stop_from_policy(policy) -> TrailingStop | None:
+    if policy is None:
+        return None
+    return TrailingStop(
+        distance_ticks=int(policy.trailing_distance_ticks),
+        distance_bps=int(policy.trailing_distance_bps),
+        max_slippage_ticks=int(policy.max_slippage_ticks),
+        max_slippage_bps=int(policy.max_slippage_bps),
+        activation_price=(
+            _price(policy.activation_price_ticks) if policy.activation_price_ticks else None
+        ),
+    )
+
+
+def _attached_risk_from_proto(msg) -> AttachedRisk | None:
+    if msg is None:
+        return None
+    take_profit = None
+    if msg.HasField("take_profit") and msg.take_profit.HasField("policy"):
+        take_profit = _risk_leg_from_policy(msg.take_profit.policy)
+    trailing_stop = None
+    if msg.HasField("trailing_stop") and msg.trailing_stop.HasField("policy"):
+        trailing_stop = _trailing_stop_from_policy(msg.trailing_stop.policy)
+    stop_loss = None
+    # Match TS: when trailing is present, stop-loss is suppressed.
+    if trailing_stop is None and msg.HasField("stop_loss") and msg.stop_loss.HasField("policy"):
+        stop_loss = _risk_leg_from_policy(msg.stop_loss.policy)
+    if take_profit is None and stop_loss is None and trailing_stop is None:
+        return None
+    return AttachedRisk(
+        take_profit=take_profit,
+        stop_loss=stop_loss,
+        trailing_stop=trailing_stop,
+        oco=bool(msg.oco),
+    )
+
+
 def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> PublicOrder:
     status = proto_enum_name(OrderStatus, msg.status) if msg.status else ""
     symbol_id = int(msg.symbol_id)
+    attached = (
+        _attached_risk_from_proto(msg.attached_risk) if msg.HasField("attached_risk") else None
+    )
     return PublicOrder(
         order_id=format_uint64_id(msg.order_id),
         symbol_id=symbol_id,
@@ -60,6 +134,8 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
         created_ts_ns=str(msg.created_ts_ns),
         version=int(msg.version),
+        post_only=bool(msg.post_only),
+        attached_risk=attached,
     )
 
 
@@ -100,8 +176,14 @@ def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
 
 def order_mutation_from_proto(msg) -> OrderMutationResult:
     client_order_id = getattr(msg, "client_order_id", "") or ""
+    # CreateOrderResponse no longer carries a status field (POLY-3701): reaching
+    # the client means the order was admitted, so synthesize "accepted".
+    if any(field.name == "status" for field in msg.DESCRIPTOR.fields):
+        status = msg.status
+    else:
+        status = "accepted"
     return OrderMutationResult(
-        status=msg.status,
+        status=status,
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
         client_order_id=client_order_id,
     )
@@ -142,16 +224,28 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
     )
 
 
-def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchCreateOrdersResult:
-    results = [
-        BatchCreateResultItem(
-            status=item.status,
-            order_id=format_uint64_id(item.order_id) if item.order_id else "",
+def _batch_create_result_item(item) -> BatchCreateResultItem:
+    # POLY-3701: each item carries an accepted/rejected oneof instead of flat
+    # status/order_id/code fields.
+    if item.HasField("accepted"):
+        return BatchCreateResultItem(
+            status="accepted",
+            order_id=(
+                format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""
+            ),
             client_order_id=item.client_order_id,
-            code=item.code,
         )
-        for item in msg.results
-    ]
+    if item.HasField("rejected"):
+        return BatchCreateResultItem(
+            status="rejected",
+            client_order_id=item.client_order_id,
+            code=proto_enum_name(orders_pb2.ErrorCode, item.rejected.error.code),
+        )
+    return BatchCreateResultItem(client_order_id=item.client_order_id)
+
+
+def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchCreateOrdersResult:
+    results = [_batch_create_result_item(item) for item in msg.results]
     return BatchCreateOrdersResult(
         results=results,
         accepted_count=int(msg.accepted_count),

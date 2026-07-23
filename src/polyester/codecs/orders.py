@@ -79,11 +79,17 @@ def create_order_to_wire(
     return omit_none(payload)
 
 
-def create_order_to_proto(
+def order_intent_from_request(
     request: CreateOrderRequest,
     *,
     quantity_scale: int = 8,
-) -> orders_pb2.CreateOrderRequest:
+) -> orders_pb2.OrderIntent:
+    """Build an :class:`OrderIntent` from the flat public request shape.
+
+    The flat ``order_type``/``tif``/``post_only`` inputs are mapped onto the
+    explicit execution oneof (``market_ioc``/``limit_gtc``/``limit_ioc``/
+    ``limit_fok``) introduced in POLY-3701.
+    """
     if request.symbol is None and request.symbol_id is None:
         raise PolyesterValidationError("orders.create requires symbol or symbol_id")
     if request.side not in ORDER_SIDE_TO_PROTO:
@@ -93,38 +99,70 @@ def create_order_to_proto(
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
         raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
 
-    proto = orders_pb2.CreateOrderRequest(
+    intent = orders_pb2.OrderIntent(
         symbol=request.symbol or "",
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
-        order_type=(
-            orders_pb2.LIMIT if request.order_type == "limit" else orders_pb2.MARKET
-        ),
         qty_scaled=resolve_qty_scaled(
             request.qty, quantity_scale, symbol=request.symbol
         ),
     )
-    if request.price is not None:
-        proto.price_ticks = resolve_price_ticks(
-            request.price, "price", symbol=request.symbol
-        )
-    if request.tif:
-        proto.time_in_force = getattr(orders_pb2, TIF_TO_PROTO[request.tif])
+    if request.client_order_id:
+        intent.client_order_id = request.client_order_id
+
+    price_ticks = (
+        resolve_price_ticks(request.price, "price", symbol=request.symbol)
+        if request.price is not None
+        else None
+    )
+    if request.order_type == "market":
+        if request.post_only:
+            raise PolyesterValidationError("post_only is only valid for limit GTC orders")
+        market = intent.market_ioc
+        market.SetInParent()
+        if request.market_client_ref_price is not None:
+            market.client_ref_price_ticks = resolve_price_ticks(
+                request.market_client_ref_price,
+                "market_client_ref_price",
+                symbol=request.symbol,
+            )
+    else:
+        tif = request.tif or "gtc"
+        if tif == "gtc":
+            intent.limit_gtc.SetInParent()
+            if price_ticks is not None:
+                intent.limit_gtc.price_ticks = price_ticks
+            if request.post_only:
+                intent.limit_gtc.post_only = True
+        else:
+            if request.post_only:
+                raise PolyesterValidationError(
+                    "post_only is only valid for limit GTC orders"
+                )
+            if tif == "ioc":
+                intent.limit_ioc.SetInParent()
+                if price_ticks is not None:
+                    intent.limit_ioc.price_ticks = price_ticks
+            else:  # fok
+                intent.limit_fok.SetInParent()
+                if price_ticks is not None:
+                    intent.limit_fok.price_ticks = price_ticks
+
+    risk = risk_policy_from_dict(request.attached_risk)
+    if risk is not None:
+        intent.attached_risk.CopyFrom(risk)
+    return intent
+
+
+def create_order_to_proto(
+    request: CreateOrderRequest,
+    *,
+    quantity_scale: int = 8,
+) -> orders_pb2.CreateOrderRequest:
+    proto = orders_pb2.CreateOrderRequest(
+        order=order_intent_from_request(request, quantity_scale=quantity_scale)
+    )
     if request.sub_account_id:
         proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
-    if request.client_order_id:
-        proto.client_order_id = request.client_order_id
-    if request.post_only:
-        proto.post_only = True
-    if request.market_client_ref_price is not None:
-        proto.market_client_ref_price_ticks = resolve_price_ticks(
-            request.market_client_ref_price,
-            "market_client_ref_price",
-            symbol=request.symbol,
-        )
-    if request.attached_risk:
-        risk = orders_pb2.RiskPolicy()
-        ParseDict(request.attached_risk, risk, ignore_unknown_fields=True)
-        proto.attached_risk.CopyFrom(risk)
     return proto
 
 
@@ -189,11 +227,12 @@ def batch_create_orders_to_proto(
     allow_partial: bool = False,
     quantity_scale: int = 8,
 ) -> orders_pb2.BatchCreateOrdersRequest:
+    # ``allow_partial`` was removed from the wire in POLY-3701; it is accepted
+    # for backwards compatibility but ignored.
     if not items:
         raise PolyesterValidationError("batch_create requires at least one item")
     proto = orders_pb2.BatchCreateOrdersRequest(
         request_id=request_id or f"batch-create-{uuid.uuid4().hex[:12]}",
-        allow_partial=allow_partial,
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
@@ -202,7 +241,9 @@ def batch_create_orders_to_proto(
             normalized = item
         else:
             normalized = normalize_create_order_request(item)
-        proto.items.append(create_order_to_proto(normalized, quantity_scale=quantity_scale))
+        proto.items.append(
+            order_intent_from_request(normalized, quantity_scale=quantity_scale)
+        )
     return proto
 
 

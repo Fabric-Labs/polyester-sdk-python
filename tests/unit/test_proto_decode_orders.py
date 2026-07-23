@@ -31,6 +31,7 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
         price_ticks=5000,
         avg_price_ticks=4990,
         created_ts_ns=1_700_000_000_000,
+        post_only=True,
     )
     order = order_from_proto(msg)
     assert order.order_id == format_id(42)
@@ -38,10 +39,56 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
     assert order.status == "working"
     assert order.order_type == "limit"
     assert order.tif == "gtc"
+    assert order.post_only is True
+    assert order.attached_risk is None
     assert order.orig_qty is not None and order.orig_qty.scaled == 100
     msg.version = 7
     order = order_from_proto(msg)
     assert order.version == 7
+
+
+def test_order_from_proto_maps_attached_risk() -> None:
+    from polyester.gen.orders.v1.orders_read_pb2 import (
+        AttachedRisk as ProtoAttachedRisk,
+    )
+    from polyester.gen.orders.v1.orders_read_pb2 import (
+        AttachedRiskTakeProfit,
+        AttachedRiskTrailingStop,
+    )
+
+    msg = Order(
+        order_id=1,
+        symbol_id=1,
+        attached_risk=ProtoAttachedRisk(
+            take_profit=AttachedRiskTakeProfit(
+                policy=orders_pb2.TakeProfitPolicy(
+                    trigger_price_ticks=6000,
+                    child=orders_pb2.RiskExecution(
+                        market_ioc=orders_pb2.RiskMarketIoc()
+                    ),
+                )
+            ),
+            trailing_stop=AttachedRiskTrailingStop(
+                policy=orders_pb2.TrailingStopPolicy(
+                    activation_price_ticks=5500,
+                    trailing_distance_bps=25,
+                    max_slippage_ticks=10,
+                )
+            ),
+            oco=True,
+        ),
+    )
+    order = order_from_proto(msg)
+    assert order.attached_risk is not None
+    assert order.attached_risk.oco is True
+    assert order.attached_risk.take_profit is not None
+    assert order.attached_risk.take_profit.trigger_price is not None
+    assert order.attached_risk.take_profit.trigger_price.ticks == 6000
+    assert order.attached_risk.take_profit.order_type == "market"
+    assert order.attached_risk.stop_loss is None
+    assert order.attached_risk.trailing_stop is not None
+    assert order.attached_risk.trailing_stop.distance_bps == 25
+    assert order.attached_risk.trailing_stop.max_slippage_ticks == 10
 
 
 def test_orders_list_from_proto() -> None:
@@ -80,8 +127,9 @@ def test_modify_order_from_proto_action_taken_enum() -> None:
 
 
 def test_order_mutation_from_proto_create_includes_client_order_id() -> None:
+    # CreateOrderResponse no longer carries a status field; decode synthesizes
+    # "accepted" (POLY-3701).
     msg = orders_pb2.CreateOrderResponse(
-        status="accepted",
         order_id=42,
         client_order_id="coid-1",
     )

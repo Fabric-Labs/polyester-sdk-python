@@ -109,6 +109,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID: _ClassVar[ErrorCode]
     ERROR_CODE_MAX_SLIPPAGE_INVALID: _ClassVar[ErrorCode]
     ERROR_CODE_STALE_QUOTE: _ClassVar[ErrorCode]
+    ERROR_CODE_VALIDATION_ERROR: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -214,6 +215,7 @@ ERROR_CODE_TRIGGER_NOT_MODIFIABLE: ErrorCode
 ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID: ErrorCode
 ERROR_CODE_MAX_SLIPPAGE_INVALID: ErrorCode
 ERROR_CODE_STALE_QUOTE: ErrorCode
+ERROR_CODE_VALIDATION_ERROR: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -229,59 +231,87 @@ MODIFY_ACTION_UNSPECIFIED: ModifyActionTaken
 AMENDED: ModifyActionTaken
 REPLACED: ModifyActionTaken
 
-class CreateOrderRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol", "side", "order_type", "time_in_force", "qty_scaled", "price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "market_client_ref_price_ticks", "post_only", "client_order_id", "fee_source", "self_trade_prevention_mode", "attached_risk")
-    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+class MarketIoc(_message.Message):
+    __slots__ = ("max_slippage_ticks", "max_slippage_bps", "client_ref_price_ticks")
+    MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_REF_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    max_slippage_ticks: int
+    max_slippage_bps: int
+    client_ref_price_ticks: int
+    def __init__(self, max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., client_ref_price_ticks: _Optional[int] = ...) -> None: ...
+
+class LimitGtc(_message.Message):
+    __slots__ = ("price_ticks", "post_only")
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    POST_ONLY_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    post_only: bool
+    def __init__(self, price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ...) -> None: ...
+
+class LimitIoc(_message.Message):
+    __slots__ = ("price_ticks",)
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
+
+class LimitFok(_message.Message):
+    __slots__ = ("price_ticks",)
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
+
+class OrderIntent(_message.Message):
+    __slots__ = ("symbol", "side", "qty_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "client_order_id", "fee_source", "self_trade_prevention_mode", "attached_risk")
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
-    ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    TIME_IN_FORCE_FIELD_NUMBER: _ClassVar[int]
     QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    MARKET_MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    MARKET_MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
-    MARKET_CLIENT_REF_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    POST_ONLY_FIELD_NUMBER: _ClassVar[int]
+    MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FOK_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     FEE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
     ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
-    subaccount_id: int
     symbol: str
     side: Side
-    order_type: OrderType
-    time_in_force: TimeInForce
     qty_scaled: int
-    price_ticks: int
-    market_max_slippage_ticks: int
-    market_max_slippage_bps: int
-    market_client_ref_price_ticks: int
-    post_only: bool
+    market_ioc: MarketIoc
+    limit_gtc: LimitGtc
+    limit_ioc: LimitIoc
+    limit_fok: LimitFok
     client_order_id: str
     fee_source: FeeSource
     self_trade_prevention_mode: SelfTradePreventionMode
     attached_risk: RiskPolicy
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., order_type: _Optional[_Union[OrderType, str]] = ..., time_in_force: _Optional[_Union[TimeInForce, str]] = ..., qty_scaled: _Optional[int] = ..., price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., market_client_ref_price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ..., client_order_id: _Optional[str] = ..., fee_source: _Optional[_Union[FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., qty_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_source: _Optional[_Union[FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
+
+class CreateOrderRequest(_message.Message):
+    __slots__ = ("subaccount_id", "order")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ORDER_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    order: OrderIntent
+    def __init__(self, subaccount_id: _Optional[int] = ..., order: _Optional[_Union[OrderIntent, _Mapping]] = ...) -> None: ...
 
 class CreateOrderResponse(_message.Message):
-    __slots__ = ("status", "order_id", "client_order_id", "ts", "ts_ns", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
-    STATUS_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("order_id", "client_order_id", "accepted_at", "accepted_at_ts_ns", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    TS_FIELD_NUMBER: _ClassVar[int]
-    TS_NS_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
     TAKE_PROFIT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     STOP_LOSS_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     TRAILING_STOP_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    status: str
     order_id: int
     client_order_id: str
-    ts: _timestamp_pb2.Timestamp
-    ts_ns: int
+    accepted_at: _timestamp_pb2.Timestamp
+    accepted_at_ts_ns: int
     take_profit_trigger_id: int
     stop_loss_trigger_id: int
     trailing_stop_trigger_id: int
-    def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
 
 class CancelOrderRequest(_message.Message):
     __slots__ = ("order_id", "client_order_id", "symbol_id", "subaccount_id")
@@ -307,53 +337,71 @@ class CancelOrderResponse(_message.Message):
     ts_ns: int
     def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
+class FieldViolation(_message.Message):
+    __slots__ = ("field_path", "rule_id", "message")
+    FIELD_PATH_FIELD_NUMBER: _ClassVar[int]
+    RULE_ID_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    field_path: str
+    rule_id: str
+    message: str
+    def __init__(self, field_path: _Optional[str] = ..., rule_id: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
+
 class ErrorDetail(_message.Message):
-    __slots__ = ("code",)
+    __slots__ = ("code", "violations")
     CODE_FIELD_NUMBER: _ClassVar[int]
+    VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
+    violations: _containers.RepeatedCompositeFieldContainer[FieldViolation]
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ...) -> None: ...
+
+class RiskMarketIoc(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class RiskLimitGtc(_message.Message):
+    __slots__ = ("price_ticks",)
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
+
+class RiskExecution(_message.Message):
+    __slots__ = ("market_ioc", "limit_gtc")
+    MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
+    market_ioc: RiskMarketIoc
+    limit_gtc: RiskLimitGtc
+    def __init__(self, market_ioc: _Optional[_Union[RiskMarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[RiskLimitGtc, _Mapping]] = ...) -> None: ...
 
 class TakeProfitPolicy(_message.Message):
-    __slots__ = ("trigger_price_ticks", "trigger_price_source", "order_type", "limit_price_ticks")
+    __slots__ = ("trigger_price_ticks", "child")
     TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
-    ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    CHILD_FIELD_NUMBER: _ClassVar[int]
     trigger_price_ticks: int
-    trigger_price_source: TriggerPriceSource
-    order_type: OrderType
-    limit_price_ticks: int
-    def __init__(self, trigger_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ..., order_type: _Optional[_Union[OrderType, str]] = ..., limit_price_ticks: _Optional[int] = ...) -> None: ...
+    child: RiskExecution
+    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ...) -> None: ...
 
 class StopLossPolicy(_message.Message):
-    __slots__ = ("trigger_price_ticks", "trigger_price_source", "order_type", "limit_price_ticks")
+    __slots__ = ("trigger_price_ticks", "child")
     TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
-    ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    CHILD_FIELD_NUMBER: _ClassVar[int]
     trigger_price_ticks: int
-    trigger_price_source: TriggerPriceSource
-    order_type: OrderType
-    limit_price_ticks: int
-    def __init__(self, trigger_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ..., order_type: _Optional[_Union[OrderType, str]] = ..., limit_price_ticks: _Optional[int] = ...) -> None: ...
+    child: RiskExecution
+    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ...) -> None: ...
 
 class TrailingStopPolicy(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "activation_price_ticks", "trigger_price_source", "order_type")
+    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "activation_price_ticks")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRAILING_DISTANCE_BPS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
-    ORDER_TYPE_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     trailing_distance_bps: int
     max_slippage_ticks: int
     max_slippage_bps: int
     activation_price_ticks: int
-    trigger_price_source: TriggerPriceSource
-    order_type: OrderType
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ..., order_type: _Optional[_Union[OrderType, str]] = ...) -> None: ...
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ...) -> None: ...
 
 class RiskPolicy(_message.Message):
     __slots__ = ("take_profit", "stop_loss", "trailing_stop", "oco")
@@ -425,35 +473,43 @@ class CancelAllAfterResponse(_message.Message):
     ts_ns: int
     def __init__(self, status: _Optional[str] = ..., effective_timeout_sec: _Optional[int] = ..., expires_at_ts_ns: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
-class BatchCreateResultItem(_message.Message):
-    __slots__ = ("status", "order_id", "client_order_id", "code", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
-    STATUS_FIELD_NUMBER: _ClassVar[int]
+class BatchCreateAccepted(_message.Message):
+    __slots__ = ("order_id", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    CODE_FIELD_NUMBER: _ClassVar[int]
     TAKE_PROFIT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     STOP_LOSS_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     TRAILING_STOP_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    status: str
     order_id: int
-    client_order_id: str
-    code: str
     take_profit_trigger_id: int
     stop_loss_trigger_id: int
     trailing_stop_trigger_id: int
-    def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, order_id: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+
+class BatchCreateRejected(_message.Message):
+    __slots__ = ("error",)
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    error: ErrorDetail
+    def __init__(self, error: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
+
+class BatchCreateResultItem(_message.Message):
+    __slots__ = ("client_order_id", "accepted", "rejected")
+    CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_FIELD_NUMBER: _ClassVar[int]
+    REJECTED_FIELD_NUMBER: _ClassVar[int]
+    client_order_id: str
+    accepted: BatchCreateAccepted
+    rejected: BatchCreateRejected
+    def __init__(self, client_order_id: _Optional[str] = ..., accepted: _Optional[_Union[BatchCreateAccepted, _Mapping]] = ..., rejected: _Optional[_Union[BatchCreateRejected, _Mapping]] = ...) -> None: ...
 
 class BatchCreateOrdersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "request_id", "items", "allow_partial")
+    __slots__ = ("subaccount_id", "request_id", "items")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     ITEMS_FIELD_NUMBER: _ClassVar[int]
-    ALLOW_PARTIAL_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     request_id: str
-    items: _containers.RepeatedCompositeFieldContainer[CreateOrderRequest]
-    allow_partial: bool
-    def __init__(self, subaccount_id: _Optional[int] = ..., request_id: _Optional[str] = ..., items: _Optional[_Iterable[_Union[CreateOrderRequest, _Mapping]]] = ..., allow_partial: _Optional[bool] = ...) -> None: ...
+    items: _containers.RepeatedCompositeFieldContainer[OrderIntent]
+    def __init__(self, subaccount_id: _Optional[int] = ..., request_id: _Optional[str] = ..., items: _Optional[_Iterable[_Union[OrderIntent, _Mapping]]] = ...) -> None: ...
 
 class BatchCreateOrdersResponse(_message.Message):
     __slots__ = ("results", "accepted_count", "rejected_count", "ts", "ts_ns")

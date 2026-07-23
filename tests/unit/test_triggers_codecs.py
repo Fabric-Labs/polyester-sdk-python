@@ -1,7 +1,8 @@
+import pytest
+
 from polyester.codecs.triggers import create_trigger_to_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
-from polyester.gen.triggers.v1 import triggers_pb2
 
 
 def test_create_trigger_stop_loss_maps_core_fields() -> None:
@@ -13,21 +14,50 @@ def test_create_trigger_stop_loss_maps_core_fields() -> None:
         qty="0.1",
         order_type="limit",
         limit_price="49900",
-        trigger_price_source="mark",
-        tif="ioc",
+        tif="gtc",
         client_trigger_id="trg-1",
         post_only=True,
     )
-    assert proto.symbol == "BTC-USDT"
-    assert proto.trigger_type == triggers_pb2.STOP_LOSS
-    assert proto.trigger_price_ticks == 50_000_000_000
-    assert proto.side == orders_pb2.SELL
-    assert proto.order_type == orders_pb2.LIMIT
-    assert proto.limit_price_ticks == 49_900_000_000
-    assert proto.trigger_price_source == orders_pb2.MARK_PRICE
-    assert proto.time_in_force == orders_pb2.IOC
-    assert proto.client_trigger_id == "trg-1"
-    assert proto.post_only is True
+    trigger = proto.trigger
+    assert trigger.symbol == "BTC-USDT"
+    assert trigger.WhichOneof("strategy") == "stop_loss"
+    stop = trigger.stop_loss
+    assert stop.trigger_price_ticks == 50_000_000_000
+    assert stop.side == orders_pb2.SELL
+    assert stop.child.WhichOneof("execution") == "limit_gtc"
+    assert stop.child.limit_gtc.price_ticks == 49_900_000_000
+    assert stop.child.limit_gtc.post_only is True
+    assert trigger.client_trigger_id == "trg-1"
+
+
+def test_create_trigger_rejects_post_only_on_non_gtc_child() -> None:
+    with pytest.raises(PolyesterValidationError):
+        create_trigger_to_proto(
+            symbol="BTC-USDT",
+            trigger_type="stop_loss",
+            trigger_price="50000",
+            side="sell",
+            qty="0.1",
+            order_type="limit",
+            limit_price="49900",
+            tif="ioc",
+            post_only=True,
+        )
+
+
+def test_create_trigger_stop_loss_market_child() -> None:
+    proto = create_trigger_to_proto(
+        symbol="BTC-USDT",
+        trigger_type="take_profit",
+        trigger_price="60000",
+        side="sell",
+        qty="0.1",
+        order_type="market",
+    )
+    trigger = proto.trigger
+    assert trigger.WhichOneof("strategy") == "take_profit"
+    assert trigger.take_profit.trigger_price_ticks == 60_000_000_000
+    assert trigger.take_profit.child.WhichOneof("execution") == "market_ioc"
 
 
 def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
@@ -42,12 +72,14 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
         fee_source="quote",
         self_trade_prevention_mode="expire_maker",
     )
-    assert proto.trigger_type == triggers_pb2.TRAILING_STOP
-    assert proto.trailing_distance_ticks == 500_000
-    assert proto.activation_price_ticks == 51_000_000_000
-    assert proto.max_slippage_bps == 25
-    assert proto.fee_source == orders_pb2.QUOTE
-    assert proto.self_trade_prevention_mode == orders_pb2.EXPIRE_MAKER
+    trigger = proto.trigger
+    assert trigger.WhichOneof("strategy") == "trailing_stop"
+    trailing = trigger.trailing_stop
+    assert trailing.trailing_distance_ticks == 500_000
+    assert trailing.activation_price_ticks == 51_000_000_000
+    assert trailing.max_slippage_bps == 25
+    assert trigger.fee_source == orders_pb2.QUOTE
+    assert trigger.self_trade_prevention_mode == orders_pb2.EXPIRE_MAKER
 
 
 def test_create_trigger_twap_maps_window_fields() -> None:
@@ -58,12 +90,14 @@ def test_create_trigger_twap_maps_window_fields() -> None:
         qty="1",
         twap_duration_ms=60_000,
         twap_slice_interval_ms=5_000,
-        max_slippage_ticks=100_000,
     )
-    assert proto.trigger_type == triggers_pb2.TWAP
-    assert proto.twap_duration_ms == 60_000
-    assert proto.twap_slice_interval_ms == 5_000
-    assert proto.max_slippage_ticks == 100_000
+    trigger = proto.trigger
+    assert trigger.WhichOneof("strategy") == "twap"
+    twap = trigger.twap
+    assert twap.duration_ms == 60_000
+    assert twap.slice_interval_ms == 5_000
+    assert twap.side == orders_pb2.BUY
+    assert twap.WhichOneof("execution") == "market_ioc"
 
 
 def test_create_trigger_ladder_maps_range_fields() -> None:
@@ -75,25 +109,28 @@ def test_create_trigger_ladder_maps_range_fields() -> None:
         ladder_price_min="48000",
         ladder_price_max="52000",
         ladder_levels=5,
-        ladder_distribution="geometric",
+        ladder_distribution="linear",
     )
-    assert proto.trigger_type == triggers_pb2.LADDER
-    assert proto.ladder_price_min_ticks == 48_000_000_000
-    assert proto.ladder_price_max_ticks == 52_000_000_000
-    assert proto.ladder_levels == 5
-    assert proto.ladder_distribution == triggers_pb2.GEOMETRIC
+    trigger = proto.trigger
+    assert trigger.WhichOneof("strategy") == "ladder"
+    ladder = trigger.ladder
+    assert ladder.price_min_ticks == 48_000_000_000
+    assert ladder.price_max_ticks == 52_000_000_000
+    assert ladder.levels == 5
+    assert ladder.side == orders_pb2.BUY
 
 
-def test_create_trigger_rejects_invalid_ladder_distribution() -> None:
-    try:
-        create_trigger_to_proto(
-            symbol="BTC-USDT",
-            trigger_type="ladder",
-            side="buy",
-            qty="1",
-            ladder_distribution="even",
-        )
-    except PolyesterValidationError as exc:
-        assert "ladder_distribution" in str(exc)
-    else:
-        raise AssertionError("expected PolyesterValidationError")
+def test_create_trigger_rejects_non_linear_ladder_distribution() -> None:
+    for distribution in ("geometric", "even"):
+        try:
+            create_trigger_to_proto(
+                symbol="BTC-USDT",
+                trigger_type="ladder",
+                side="buy",
+                qty="1",
+                ladder_distribution=distribution,
+            )
+        except PolyesterValidationError as exc:
+            assert "ladder_distribution" in str(exc)
+        else:
+            raise AssertionError("expected PolyesterValidationError")

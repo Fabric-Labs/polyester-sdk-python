@@ -22,6 +22,32 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     avg_px: Price | None = None
     created_ts_ns: str = ""
     version: int = 0
+    post_only: bool = False
+    attached_risk: AttachedRisk | None = None
+
+
+class RiskLeg(msgspec.Struct, kw_only=True, omit_defaults=True):
+    trigger_price: Price | None = None
+    trigger_price_source: str = ""
+    order_type: str = ""
+    limit_price: Price | None = None
+
+
+class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
+    distance_ticks: int = 0
+    distance_bps: int = 0
+    max_slippage_ticks: int = 0
+    max_slippage_bps: int = 0
+    activation_price: Price | None = None
+    trigger_price_source: str = ""
+    order_type: str = ""
+
+
+class AttachedRisk(msgspec.Struct, kw_only=True, omit_defaults=True):
+    take_profit: RiskLeg | None = None
+    stop_loss: RiskLeg | None = None
+    trailing_stop: TrailingStop | None = None
+    oco: bool = False
 
 
 class OrdersList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -101,16 +127,73 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     failed_cancels: int = 0
 
 
+class TriggerStopDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    trigger_price: Price | None = None
+    trigger_price_source: str = ""
+    trigger_direction: str = ""
+
+
+class TriggerTrailingDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    trailing_distance: Price | None = None
+    trailing_distance_bps: int = 0
+    activation_price: Price | None = None
+    peak_price: Price | None = None
+    trough_price: Price | None = None
+    max_slippage: Price | None = None
+    max_slippage_bps: int = 0
+    trigger_price_source: str = ""
+    trigger_direction: str = ""
+
+
+class TriggerTwapDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    twap_duration_ms: int = 0
+    twap_slice_interval_ms: int = 0
+    slice_idx: int = 0
+    slice_count: int = 0
+    executed_qty: Quantity | None = None
+
+
+class TriggerLadderDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    ladder_price_min: Price | None = None
+    ladder_price_max: Price | None = None
+    ladder_levels: int = 0
+    ladder_distribution: str = ""
+
+
+class TriggerDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Discriminated trigger strategy payload. ``case`` is stop|trailing|twap|ladder."""
+
+    case: str
+    stop: TriggerStopDetails | None = None
+    trailing: TriggerTrailingDetails | None = None
+    twap: TriggerTwapDetails | None = None
+    ladder: TriggerLadderDetails | None = None
+
+
 class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_id: str = ""
+    subaccount_id: str = ""
     symbol_id: int = 0
     symbol: str = ""
     trigger_type: str = ""
     status: str = ""
+    parent_order_id: str = ""
     side: str = ""
+    order_type: str = ""
+    time_in_force: str = ""
     qty: Quantity | None = None
+    limit_price: Price | None = None
+    fee_source: str = ""
+    self_trade_prevention_mode: str = ""
+    post_only: bool = False
     trigger_price: Price | None = None
     client_trigger_id: str = ""
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    armed_at: datetime | None = None
+    completed_at: datetime | None = None
+    child_order_ids: list[str] = []
+    details: TriggerDetails | None = None
 
 
 class TriggersList(msgspec.Struct, kw_only=True, omit_defaults=True):

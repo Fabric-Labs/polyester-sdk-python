@@ -38,6 +38,54 @@ LADDER_DISTRIBUTION_TO_PROTO = {
 }
 
 
+def _conditional_child(
+    *,
+    order_type: str,
+    tif: str,
+    limit_price: object | None,
+    post_only: bool,
+    symbol: str,
+) -> triggers_pb2.ConditionalChildExecution:
+    """Map flat order_type/tif/post_only onto a conditional child execution.
+
+    market -> market_ioc; limit+gtc -> limit_gtc; limit+ioc -> limit_ioc;
+    limit+fok -> limit_fok. ``post_only`` is only valid for limit GTC.
+    """
+    child = triggers_pb2.ConditionalChildExecution()
+    if order_type == "market":
+        if post_only:
+            raise PolyesterValidationError("post_only is only valid for limit GTC executions")
+        child.market_ioc.SetInParent()
+        return child
+    price_ticks = (
+        resolve_price_ticks(limit_price, "limit_price", symbol=symbol)  # type: ignore[arg-type]
+        if limit_price is not None
+        else None
+    )
+    tif_key = tif.lower()
+    if tif_key == "gtc":
+        child.limit_gtc.SetInParent()
+        if price_ticks is not None:
+            child.limit_gtc.price_ticks = price_ticks
+        if post_only:
+            child.limit_gtc.post_only = True
+    elif tif_key == "ioc":
+        if post_only:
+            raise PolyesterValidationError("post_only is only valid for limit GTC executions")
+        child.limit_ioc.SetInParent()
+        if price_ticks is not None:
+            child.limit_ioc.price_ticks = price_ticks
+    elif tif_key == "fok":
+        if post_only:
+            raise PolyesterValidationError("post_only is only valid for limit GTC executions")
+        child.limit_fok.SetInParent()
+        if price_ticks is not None:
+            child.limit_fok.price_ticks = price_ticks
+    else:
+        raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
+    return child
+
+
 def create_trigger_to_proto(
     *,
     symbol: str,
@@ -72,90 +120,110 @@ def create_trigger_to_proto(
         raise PolyesterValidationError(
             "trigger_type must be stop_loss, take_profit, trailing_stop, twap, or ladder"
         )
-    if side.lower() not in ("buy", "sell"):
+    side_key = side.lower()
+    if side_key not in ("buy", "sell"):
         raise PolyesterValidationError("side must be buy or sell")
     order_key = order_type.lower()
     if order_key not in ("limit", "market"):
         raise PolyesterValidationError("order_type must be limit or market")
+    side_proto = orders_pb2.BUY if side_key == "buy" else orders_pb2.SELL
 
-    proto = triggers_pb2.CreateTriggerRequest(
+    intent = triggers_pb2.TriggerIntent(
         symbol=symbol,
-        trigger_type=getattr(triggers_pb2, TRIGGER_TYPE_TO_PROTO[type_key]),
-        side=orders_pb2.BUY if side.lower() == "buy" else orders_pb2.SELL,
-        order_type=orders_pb2.LIMIT if order_key == "limit" else orders_pb2.MARKET,
         qty_scaled=resolve_qty_scaled(qty, quantity_scale, "qty", symbol=symbol),  # type: ignore[arg-type]
-        post_only=post_only,
     )
-    if trigger_price is not None:
-        proto.trigger_price_ticks = resolve_price_ticks(
-            trigger_price, "trigger_price", symbol=symbol
-        )  # type: ignore[arg-type]
-    source_key = trigger_price_source.lower()
-    if source_key in TRIGGER_PRICE_SOURCE_TO_PROTO:
-        proto.trigger_price_source = getattr(
-            orders_pb2, TRIGGER_PRICE_SOURCE_TO_PROTO[source_key]
-        )
-    if tif.lower() == "gtc":
-        proto.time_in_force = orders_pb2.GTC
-    elif tif.lower() == "ioc":
-        proto.time_in_force = orders_pb2.IOC
-    elif tif.lower() == "fok":
-        proto.time_in_force = orders_pb2.FOK
-    if limit_price is not None:
-        proto.limit_price_ticks = resolve_price_ticks(
-            limit_price, "limit_price", symbol=symbol
-        )  # type: ignore[arg-type]
-    if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if client_trigger_id:
-        proto.client_trigger_id = client_trigger_id
+        intent.client_trigger_id = client_trigger_id
     if fee_source is not None:
         fee_key = fee_source.lower()
         if fee_key not in FEE_SOURCE_TO_PROTO:
             raise PolyesterValidationError("fee_source must be quote or received")
-        proto.fee_source = getattr(orders_pb2, FEE_SOURCE_TO_PROTO[fee_key])
+        intent.fee_source = getattr(orders_pb2, FEE_SOURCE_TO_PROTO[fee_key])
     if self_trade_prevention_mode is not None:
         stp_key = self_trade_prevention_mode.lower()
         if stp_key not in SELF_TRADE_PREVENTION_MODE_TO_PROTO:
             raise PolyesterValidationError(
                 "self_trade_prevention_mode must be expire_taker, expire_maker, or expire_both"
             )
-        proto.self_trade_prevention_mode = getattr(
+        intent.self_trade_prevention_mode = getattr(
             orders_pb2, SELF_TRADE_PREVENTION_MODE_TO_PROTO[stp_key]
         )
-    if trailing_distance_ticks is not None:
-        proto.trailing_distance_ticks = trailing_distance_ticks
-    if trailing_distance_bps is not None:
-        proto.trailing_distance_bps = trailing_distance_bps
-    if activation_price is not None:
-        proto.activation_price_ticks = resolve_price_ticks(
-            activation_price, "activation_price", symbol=symbol
-        )  # type: ignore[arg-type]
-    if max_slippage_ticks is not None:
-        proto.max_slippage_ticks = max_slippage_ticks
-    if max_slippage_bps is not None:
-        proto.max_slippage_bps = max_slippage_bps
-    if twap_duration_ms is not None:
-        proto.twap_duration_ms = twap_duration_ms
-    if twap_slice_interval_ms is not None:
-        proto.twap_slice_interval_ms = twap_slice_interval_ms
-    if ladder_price_min is not None:
-        proto.ladder_price_min_ticks = resolve_price_ticks(
-            ladder_price_min, "ladder_price_min", symbol=symbol
-        )  # type: ignore[arg-type]
-    if ladder_price_max is not None:
-        proto.ladder_price_max_ticks = resolve_price_ticks(
-            ladder_price_max, "ladder_price_max", symbol=symbol
-        )  # type: ignore[arg-type]
-    if ladder_levels is not None:
-        proto.ladder_levels = ladder_levels
-    if ladder_distribution is not None:
-        ladder_key = ladder_distribution.lower()
-        if ladder_key not in LADDER_DISTRIBUTION_TO_PROTO:
-            raise PolyesterValidationError(
-                "ladder_distribution must be linear, geometric, or weighted_favorable"
+
+    # trigger_price_source is no longer part of the conditional/trailing wire
+    # shape in POLY-3701; the argument is accepted but ignored.
+    _ = trigger_price_source
+
+    if type_key in ("stop_loss", "take_profit"):
+        conditional = triggers_pb2.ConditionalTrigger(side=side_proto)
+        if trigger_price is not None:
+            conditional.trigger_price_ticks = resolve_price_ticks(
+                trigger_price, "trigger_price", symbol=symbol
+            )  # type: ignore[arg-type]
+        conditional.child.CopyFrom(
+            _conditional_child(
+                order_type=order_key,
+                tif=tif,
+                limit_price=limit_price,
+                post_only=post_only,
+                symbol=symbol,
             )
-        proto.ladder_distribution = getattr(triggers_pb2, LADDER_DISTRIBUTION_TO_PROTO[ladder_key])
+        )
+        getattr(intent, type_key).CopyFrom(conditional)
+    elif type_key == "trailing_stop":
+        # Trailing stops are always SELL market-IOC executions on the wire.
+        trailing = intent.trailing_stop
+        trailing.SetInParent()
+        if trailing_distance_ticks is not None:
+            trailing.trailing_distance_ticks = trailing_distance_ticks
+        if trailing_distance_bps is not None:
+            trailing.trailing_distance_bps = trailing_distance_bps
+        if activation_price is not None:
+            trailing.activation_price_ticks = resolve_price_ticks(
+                activation_price, "activation_price", symbol=symbol
+            )  # type: ignore[arg-type]
+        if max_slippage_ticks is not None:
+            trailing.max_slippage_ticks = max_slippage_ticks
+        if max_slippage_bps is not None:
+            trailing.max_slippage_bps = max_slippage_bps
+    elif type_key == "twap":
+        twap = intent.twap
+        twap.side = side_proto
+        if twap_duration_ms is not None:
+            twap.duration_ms = twap_duration_ms
+        if twap_slice_interval_ms is not None:
+            twap.slice_interval_ms = twap_slice_interval_ms
+        # TWAP children are market-IOC or limit-GTC only.
+        if order_key == "limit":
+            if limit_price is not None:
+                twap.limit_gtc.price_ticks = resolve_price_ticks(
+                    limit_price, "limit_price", symbol=symbol
+                )  # type: ignore[arg-type]
+            else:
+                twap.limit_gtc.SetInParent()
+        else:
+            twap.market_ioc.SetInParent()
+    else:  # ladder
+        if ladder_distribution is not None and ladder_distribution.lower() != "linear":
+            raise PolyesterValidationError("ladder_distribution must be linear")
+        ladder = intent.ladder
+        ladder.side = side_proto
+        ladder.SetInParent()
+        if ladder_price_min is not None:
+            ladder.price_min_ticks = resolve_price_ticks(
+                ladder_price_min, "ladder_price_min", symbol=symbol
+            )  # type: ignore[arg-type]
+        if ladder_price_max is not None:
+            ladder.price_max_ticks = resolve_price_ticks(
+                ladder_price_max, "ladder_price_max", symbol=symbol
+            )  # type: ignore[arg-type]
+        if ladder_levels is not None:
+            ladder.levels = ladder_levels
+        if post_only:
+            ladder.post_only = True
+
+    proto = triggers_pb2.CreateTriggerRequest(trigger=intent)
+    if sub_account_id is not None:
+        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     return proto
 
 

@@ -214,6 +214,19 @@ instrument/domain matches.
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
 
+## Triggers
+
+`triggers.list(status=...)` filters by lifecycle status. Valid values:
+
+`created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
+
+Unknown values raise `ValueError` (they do not silently return an empty list).
+Response `status` uses the same labels (British spelling `cancelled`).
+
+`orders.get(..., include_attached_risk=True)` returns policy data on
+`order.attached_risk` (take-profit / stop-loss / trailing-stop). `Order` also
+exposes `post_only`.
+
 ## Balances: funding vs trading
 
 Ledger balances have separate **funding** and **trading** buckets per asset.

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.triggers import (
     get_trigger_from_proto,
     trigger_events_list_from_proto,
     trigger_mutation_from_proto,
+    trigger_status_from_label,
     triggers_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
@@ -60,9 +63,15 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         symbol: str | None = None,
+        status: str | Sequence[str] | None = None,
         limit: int = 50,
         page_token: str | None = None,
     ) -> TriggersList:
+        """List triggers.
+
+        ``status`` accepts one or more of: created, armed, running, completed,
+        cancelled, failed, paused. Unknown values raise ``ValueError``.
+        """
         request = ListTriggersRequest(limit=limit)
         if page_token:
             request.page_token = page_token
@@ -73,6 +82,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             request.subaccount_id = parsed_sub
         if symbol:
             request.symbol = symbol
+        if status is not None:
+            labels = [status] if isinstance(status, str) else list(status)
+            request.status.extend(trigger_status_from_label(label) for label in labels)
         return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,

@@ -29,7 +29,6 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_RESOURCE_NOT_FOUND: _ClassVar[AuthErrorCode]
     AUTH_SUBACCOUNT_ACCESS_DENIED: _ClassVar[AuthErrorCode]
     AUTH_API_KEY_ACCESS_DENIED: _ClassVar[AuthErrorCode]
-    AUTH_API_KEY_MFA_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_API_KEY_INVALID_STATUS_TRANSITION: _ClassVar[AuthErrorCode]
     AUTH_POLICY_INVALID: _ClassVar[AuthErrorCode]
     AUTH_SMART_ACCOUNT_ALREADY_LINKED: _ClassVar[AuthErrorCode]
@@ -54,6 +53,8 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_POLICY_LOCKED: _ClassVar[AuthErrorCode]
     AUTH_POLICY_SCOPE_MISMATCH: _ClassVar[AuthErrorCode]
     AUTH_REVISION_CONFLICT: _ClassVar[AuthErrorCode]
+    AUTH_MFA_ELEVATION_REQUIRED: _ClassVar[AuthErrorCode]
+    AUTH_MFA_LAST_FACTOR_REQUIRED: _ClassVar[AuthErrorCode]
 AUTH_UNSPECIFIED: AuthErrorCode
 AUTH_USERNAME_INVALID: AuthErrorCode
 AUTH_USERNAME_TAKEN: AuthErrorCode
@@ -67,7 +68,6 @@ AUTH_WALLET_LOGIN_FAILED: AuthErrorCode
 AUTH_RESOURCE_NOT_FOUND: AuthErrorCode
 AUTH_SUBACCOUNT_ACCESS_DENIED: AuthErrorCode
 AUTH_API_KEY_ACCESS_DENIED: AuthErrorCode
-AUTH_API_KEY_MFA_REQUIRED: AuthErrorCode
 AUTH_API_KEY_INVALID_STATUS_TRANSITION: AuthErrorCode
 AUTH_POLICY_INVALID: AuthErrorCode
 AUTH_SMART_ACCOUNT_ALREADY_LINKED: AuthErrorCode
@@ -92,6 +92,8 @@ AUTH_POLICY_IN_USE: AuthErrorCode
 AUTH_POLICY_LOCKED: AuthErrorCode
 AUTH_POLICY_SCOPE_MISMATCH: AuthErrorCode
 AUTH_REVISION_CONFLICT: AuthErrorCode
+AUTH_MFA_ELEVATION_REQUIRED: AuthErrorCode
+AUTH_MFA_LAST_FACTOR_REQUIRED: AuthErrorCode
 
 class GetNonceRequest(_message.Message):
     __slots__ = ("smart_account_address",)

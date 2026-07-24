@@ -3,8 +3,8 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha. Proprietary license (not open source). API-key only —
-no browser login or JWT flows.
+**Status:** Alpha (`0.1.0a15`). Proprietary license (not open source).
+API-key only — no browser login or JWT flows.
 
 Requires **Python 3.11+**.
 
@@ -49,6 +49,14 @@ Requires **Python 3.11+**.
 Rows marked **No** are intentional for API-key SDKs (use the TypeScript
 browser client for wallet login and session MFA).
 
+Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
+still applies. In particular, whiteboard/social-verification and some
+layout/polychart routes may require a JWT session or may not be mounted.
+Subscription-token requests for API-key, policy, subaccount, and address-book
+administration channels may return `401` where those channels are not enabled
+for API-key principals. Normal order, balance, trade, trigger, and transfer
+market-making flows are separate.
+
 Full cross-language comparison:
 [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
@@ -58,7 +66,7 @@ Full cross-language comparison:
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install polyester-sdk
+pip install "polyester-sdk==0.1.0a15"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -91,7 +99,8 @@ async def main() -> None:
     ) as client:
         overview = await client.market_overview.list(limit=5)
         for market in overview.markets:
-            print(market.symbol, market.last_price_ticks)
+            ticks = market.last_price.ticks if market.last_price is not None else None
+            print(market.symbol, ticks)
 
         open_orders = await client.orders.list_open()
         print(f"{len(open_orders.orders)} open orders")

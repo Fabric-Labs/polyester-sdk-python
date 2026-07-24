@@ -31,7 +31,11 @@ def test_map_connect_error_surfaces_stable_mfa_codes() -> None:
     cases = [
         (auth_pb2.AUTH_MFA_NOT_ENROLLED, AUTH_MFA_NOT_ENROLLED, is_mfa_enrollment_required),
         (auth_pb2.AUTH_STEP_UP_REQUIRED, AUTH_STEP_UP_REQUIRED, is_step_up_required),
-        (auth_pb2.AUTH_MFA_ELEVATION_REQUIRED, AUTH_MFA_ELEVATION_REQUIRED, is_mfa_elevation_required),
+        (
+            auth_pb2.AUTH_MFA_ELEVATION_REQUIRED,
+            AUTH_MFA_ELEVATION_REQUIRED,
+            is_mfa_elevation_required,
+        ),
         (
             auth_pb2.AUTH_MFA_LAST_FACTOR_REQUIRED,
             AUTH_MFA_LAST_FACTOR_REQUIRED,

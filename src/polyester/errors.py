@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+# Stable auth.v1.AuthErrorDetail codes used for MFA control flow.
+# Prefer these over ConnectError message text.
+AUTH_MFA_NOT_ENROLLED = "AUTH_MFA_NOT_ENROLLED"
+AUTH_STEP_UP_REQUIRED = "AUTH_STEP_UP_REQUIRED"
+AUTH_MFA_ELEVATION_REQUIRED = "AUTH_MFA_ELEVATION_REQUIRED"
+AUTH_MFA_LAST_FACTOR_REQUIRED = "AUTH_MFA_LAST_FACTOR_REQUIRED"
+
+
 class PolyesterError(Exception):
     """Base class for all SDK-raised errors."""
 
@@ -41,6 +51,33 @@ class PolyesterApiError(PolyesterError):
         self.code = code
         self.metadata = metadata or {}
         self.raw = raw
+
+
+def auth_error_code(err: BaseException) -> str | None:
+    """Return the structured auth.v1.AuthErrorDetail code when present."""
+    if isinstance(err, PolyesterApiError) and err.code:
+        return err.code
+    return None
+
+
+def is_mfa_enrollment_required(err: BaseException) -> bool:
+    """True when the caller must enroll an MFA factor before continuing."""
+    return auth_error_code(err) == AUTH_MFA_NOT_ENROLLED
+
+
+def is_step_up_required(err: BaseException) -> bool:
+    """True when the caller must retry with a fresh X-Auth-Step-Up proof."""
+    return auth_error_code(err) == AUTH_STEP_UP_REQUIRED
+
+
+def is_mfa_elevation_required(err: BaseException) -> bool:
+    """True when the caller needs a recent MFA-elevated interactive session."""
+    return auth_error_code(err) == AUTH_MFA_ELEVATION_REQUIRED
+
+
+def is_mfa_last_factor_required(err: BaseException) -> bool:
+    """True when the final active MFA factor cannot be removed."""
+    return auth_error_code(err) == AUTH_MFA_LAST_FACTOR_REQUIRED
 
 
 class PolyesterRouteNotFoundError(PolyesterApiError):

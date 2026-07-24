@@ -1,6 +1,10 @@
 from polyester.client import AsyncPolyester, Polyester
 from polyester.codecs.ledger_amounts import LEDGER_SCALE, format_ledger_u128
 from polyester.errors import (
+    AUTH_MFA_ELEVATION_REQUIRED,
+    AUTH_MFA_LAST_FACTOR_REQUIRED,
+    AUTH_MFA_NOT_ENROLLED,
+    AUTH_STEP_UP_REQUIRED,
     PolyesterApiError,
     PolyesterAuthError,
     PolyesterError,
@@ -11,6 +15,11 @@ from polyester.errors import (
     PolyesterServerError,
     PolyesterTransportError,
     PolyesterValidationError,
+    auth_error_code,
+    is_mfa_elevation_required,
+    is_mfa_enrollment_required,
+    is_mfa_last_factor_required,
+    is_step_up_required,
 )
 from polyester.patch import UNSET
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
@@ -18,6 +27,10 @@ from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 __version__ = "0.1.0a13"
 
 __all__ = [
+    "AUTH_MFA_ELEVATION_REQUIRED",
+    "AUTH_MFA_LAST_FACTOR_REQUIRED",
+    "AUTH_MFA_NOT_ENROLLED",
+    "AUTH_STEP_UP_REQUIRED",
     "AssetAmount",
     "AsyncPolyester",
     "LEDGER_SCALE",
@@ -37,5 +50,10 @@ __all__ = [
     "QuantityDomain",
     "UNSET",
     "__version__",
+    "auth_error_code",
     "format_ledger_u128",
+    "is_mfa_elevation_required",
+    "is_mfa_enrollment_required",
+    "is_mfa_last_factor_required",
+    "is_step_up_required",
 ]

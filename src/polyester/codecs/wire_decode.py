@@ -418,6 +418,9 @@ def decode_triggers_list(data: dict[str, Any]) -> TriggersList:
     return TriggersList(
         triggers=triggers,
         total=int(_field(data, "total", default=0) or 0),
+        next_page_token=str(
+            _field(data, "nextPageToken", "next_page_token", default="") or ""
+        ),
     )
 
 
@@ -490,13 +493,18 @@ def decode_deposit_addresses_list(data: dict[str, Any]) -> DepositAddressesList:
 
 
 def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
+    from polyester.types.money import Price
+
+    fire_raw = _field(
+        data, "firePriceTicks", "fire_price_ticks", "firePxTicks", "fire_px_ticks", default=0
+    ) or 0
     return TriggerEvent(
         trigger_id=_id_str(_field(data, "triggerId", "trigger_id")),
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
         trigger_type=_enum_name(_field(data, "triggerType", "trigger_type")).lower(),
         event_type=_enum_name(_field(data, "eventType", "event_type")).lower(),
         ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
-        fire_px_ticks=str(_field(data, "firePxTicks", "fire_px_ticks", default="") or ""),
+        fire_px=Price.from_ticks(int(fire_raw)) if int(fire_raw) else None,
         reason=str(_field(data, "reason", default="") or ""),
     )
 
@@ -507,8 +515,12 @@ def decode_trigger_events_list(data: dict[str, Any]) -> TriggerEventsList:
         for item in _field(data, "events", default=[]) or []
         if isinstance(item, dict)
     ]
-    next_before = _field(data, "nextBeforeTsNs", "next_before_ts_ns", default="0") or "0"
-    return TriggerEventsList(events=events, next_before_ts_ns=str(next_before))
+    return TriggerEventsList(
+        events=events,
+        next_page_token=str(
+            _field(data, "nextPageToken", "next_page_token", default="") or ""
+        ),
+    )
 
 
 def _balance_range_label(value: Any) -> str:

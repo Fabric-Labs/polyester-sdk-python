@@ -12,7 +12,7 @@ from polyester.codecs.decode.triggers import (
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_bytes
-from polyester.codecs.scalars import id_to_int, parse_required_uint64_decimal
+from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
     create_trigger_to_proto,
     modify_trigger_to_proto,
@@ -284,7 +284,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         sub_account_id: str | None = None,
         limit: int = 50,
-        before_ts_ns: str | int | None = None,
+        page_token: str | None = None,
     ) -> TriggerEventsList:
         request = ListTriggerEventsRequest(
             trigger_id=id_to_int(trigger_id, "trigger_id"),
@@ -295,13 +295,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        if before_ts_ns is not None:
-            if isinstance(before_ts_ns, str):
-                request.before_ts_ns = parse_required_uint64_decimal(
-                    before_ts_ns, "before_ts_ns"
-                )
-            else:
-                request.before_ts_ns = int(before_ts_ns)
+        if page_token:
+            request.page_token = page_token
         return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,

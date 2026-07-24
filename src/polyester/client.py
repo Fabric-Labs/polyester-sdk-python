@@ -350,7 +350,10 @@ class Polyester:
             self._loop,
             self._client.policies,
             self._active_sync_subscriptions,
-            subscribe_methods={"subscribe_sync": "subscribe_subaccount_policies"},
+            subscribe_methods={
+                "subscribe_sync": "subscribe_subaccount_policies",
+                "subscribe_api_policies_sync": "subscribe_api_policies",
+            },
         )
         self.sub_accounts = _SyncSubscribeService(
             self._loop,

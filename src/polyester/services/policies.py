@@ -14,7 +14,10 @@ from polyester.codecs.decode.policies import (
     update_subaccount_policy_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.realtime_decode import decode_subaccount_policy_bytes
+from polyester.codecs.realtime_decode import (
+    decode_api_policy_bytes,
+    decode_subaccount_policy_bytes,
+)
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import policies_pb2
@@ -533,4 +536,17 @@ class AsyncPoliciesService(ScopedSubAccountMixin, BaseService):
             account_id=account_id,
             default_account_id=self._default_account_id,
             decode=decode_subaccount_policy_bytes,
+        )
+
+    async def subscribe_api_policies(
+        self,
+        *,
+        account_id: str | int | None = None,
+    ) -> AsyncSubscription[ApiPolicy]:
+        return await subscribe_account_proto(
+            self._realtime,
+            channel_template="private:auth:api-policies:{account_id}:proto",
+            account_id=account_id,
+            default_account_id=self._default_account_id,
+            decode=decode_api_policy_bytes,
         )

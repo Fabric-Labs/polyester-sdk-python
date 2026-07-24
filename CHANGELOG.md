@@ -8,9 +8,11 @@
 ### Features
 - `is_mfa_enrollment_required` / `is_step_up_required` / `is_mfa_elevation_required` / `is_mfa_last_factor_required` classify MFA control flow from structured auth codes only (no message heuristics)
 - Public method options expose `polyester.api.MFARequirement` documentation metadata
+- POLY-3739: `policies.subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account_id}:proto` (sync: `subscribe_api_policies_sync`)
 
 ### Testing
 - Unit coverage for MFA auth-code mapping and predicates
+- Unit coverage for API/subaccount policy realtime protobuf decode
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.

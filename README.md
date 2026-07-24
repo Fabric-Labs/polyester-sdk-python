@@ -354,7 +354,9 @@ with Polyester(
 ```
 
 Realtime subscriptions are available via `subscribe_sync` helpers on the sync
-client.
+client. Private API-key policy snapshots use
+`client.policies.subscribe_api_policies_sync(...)` (async:
+`await client.policies.subscribe_api_policies(...)`).
 
 ## Testing (contributors)
 

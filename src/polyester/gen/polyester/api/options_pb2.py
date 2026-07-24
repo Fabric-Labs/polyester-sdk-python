@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import descriptor_pb2 as google_dot_protobuf_dot_descriptor__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bpolyester/api/options.proto\x12\rpolyester.api\x1a google/protobuf/descriptor.proto:8\n\x06public\x12\x1e.google.protobuf.MethodOptions\x18\xd1\x86\x03 \x01(\x08R\x06public:8\n\x06hidden\x12\x1e.google.protobuf.MethodOptions\x18\xd2\x86\x03 \x01(\x08R\x06hiddenBJZHgithub.com/Fabric-Labs/polyester-sdk-go/gen/polyester/api;polyesterapiv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bpolyester/api/options.proto\x12\rpolyester.api\x1a google/protobuf/descriptor.proto*a\n\x0eMFARequirement\x12\x13\n\x0fMFA_UNSPECIFIED\x10\x00\x12\x0e\n\nMFA_RECENT\x10\x01\x12\x15\n\x11MFA_FRESH_STEP_UP\x10\x02\x12\x13\n\x0fMFA_CONDITIONAL\x10\x03:8\n\x06public\x12\x1e.google.protobuf.MethodOptions\x18\xd1\x86\x03 \x01(\x08R\x06public:8\n\x06hidden\x12\x1e.google.protobuf.MethodOptions\x18\xd2\x86\x03 \x01(\x08R\x06hidden:h\n\x0fmfa_requirement\x12\x1e.google.protobuf.MethodOptions\x18\xd3\x86\x03 \x01(\x0e\x32\x1d.polyester.api.MFARequirementR\x0emfaRequirementBJZHgithub.com/Fabric-Labs/polyester-sdk-go/gen/polyester/api;polyesterapiv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,4 +33,6 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'polyester.api.options_pb2',
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'ZHgithub.com/Fabric-Labs/polyester-sdk-go/gen/polyester/api;polyesterapiv1'
+  _globals['_MFAREQUIREMENT']._serialized_start=80
+  _globals['_MFAREQUIREMENT']._serialized_end=177
 # @@protoc_insertion_point(module_scope)

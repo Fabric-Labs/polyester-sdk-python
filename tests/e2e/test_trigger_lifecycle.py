@@ -55,7 +55,8 @@ async def test_trigger_pause_resume_cancel(
         client_trigger_id=client_trigger_id,
     )
     assert created.trigger_id
-    assert created.status == "created"
+    # Admission response synthesizes "accepted" (POLY-3701); not "created".
+    assert created.status == "accepted"
 
     cancelled_ok = False
     try:

@@ -6,7 +6,6 @@ from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_en
 from polyester.codecs.scalars import timestamp_dict_to_datetime
 from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.models.sub_accounts import (
-    CreateSubaccountResult,
     GetSubaccountResult,
     SubAccount,
     SubAccountActivityEvent,
@@ -60,17 +59,6 @@ def subaccounts_list_from_proto(msg: subaccounts_pb2.ListSubaccountsResponse) ->
     )
 
 
-def create_subaccount_from_proto(
-    msg: subaccounts_pb2.CreateSubaccountResponse,
-) -> CreateSubaccountResult:
-    return CreateSubaccountResult(
-        subaccount_id=format_uint64_id(msg.subaccount_id),
-        total_created=int(msg.total_created),
-        smart_account_salt_nonce=int(msg.smart_account_salt_nonce),
-        revision=int(msg.revision),
-    )
-
-
 def subaccount_member_from_proto(msg: subaccounts_pb2.SubaccountMemberView) -> SubAccountMember:
     return SubAccountMember(
         account_id=format_uint64_id(msg.account_id),
@@ -117,22 +105,6 @@ def subaccount_invites_list_from_proto(
     )
 
 
-def invite_subaccount_member_from_proto(
-    msg: subaccounts_pb2.InviteSubaccountMemberResponse,
-) -> SubAccountInvite | None:
-    if has_field(msg, "invite"):
-        return subaccount_invite_from_proto(msg.invite)
-    return None
-
-
-def respond_subaccount_invite_from_proto(
-    msg: subaccounts_pb2.RespondSubaccountInviteResponse,
-) -> SubAccountInvite | None:
-    if has_field(msg, "invite"):
-        return subaccount_invite_from_proto(msg.invite)
-    return None
-
-
 def subaccount_activity_event_from_proto(
     msg: subaccounts_pb2.ActivityEvent,
 ) -> SubAccountActivityEvent:
@@ -174,10 +146,3 @@ def get_subaccount_from_proto(msg: subaccounts_pb2.GetSubaccountResponse) -> Get
         policy=policy,
     )
 
-
-def update_subaccount_from_proto(
-    msg: subaccounts_pb2.UpdateSubaccountResponse,
-) -> SubAccount | None:
-    if has_field(msg, "subaccount"):
-        return subaccount_from_proto(msg.subaccount)
-    return None

@@ -135,40 +135,6 @@ def list_entries_from_proto(
     )
 
 
-def entry_from_create_proto(
-    msg: address_book_pb2.CreateAddressBookEntryResponse,
-) -> AddressBookEntry:
-    if msg.HasField("entry"):
-        return address_book_entry_from_proto(msg.entry)
-    return AddressBookEntry(address_book_entry_id="")
-
-
-def entry_from_update_proto(
-    msg: address_book_pb2.UpdateAddressBookEntryResponse,
-) -> AddressBookEntry:
-    if msg.HasField("entry"):
-        return address_book_entry_from_proto(msg.entry)
-    return AddressBookEntry(address_book_entry_id="")
-
-
-def entry_from_copy_proto(msg: address_book_pb2.CopyAddressBookEntryResponse) -> AddressBookEntry:
-    if msg.HasField("entry"):
-        return address_book_entry_from_proto(msg.entry)
-    return AddressBookEntry(address_book_entry_id="")
-
-
-def tag_from_create_proto(msg: address_book_pb2.CreateAddressBookTagResponse) -> AddressBookTag:
-    if msg.HasField("tag"):
-        return address_book_tag_from_proto(msg.tag)
-    return AddressBookTag(tag_id="")
-
-
-def tag_from_update_proto(msg: address_book_pb2.UpdateAddressBookTagResponse) -> AddressBookTag:
-    if msg.HasField("tag"):
-        return address_book_tag_from_proto(msg.tag)
-    return AddressBookTag(tag_id="")
-
-
 def transfer_counterparty_from_proto(
     msg: address_book_pb2.TransferCounterparty,
 ) -> TransferCounterparty:

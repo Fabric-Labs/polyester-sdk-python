@@ -632,17 +632,17 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "profile",
-        "label": "Profile",
-        "any_services": ["auth.v1.ProfileService"],
+        "label": "Profile (identity subscribe)",
+        "kind": "always_yes",
     },
     {
         "id": "api_keys",
-        "label": "API keys",
+        "label": "API keys (list/get/subscribe/generate_keypair)",
         "any_services": ["auth.v1.ApiKeyService"],
     },
     {
         "id": "subaccounts",
-        "label": "Subaccounts (members, invites, activity)",
+        "label": "Subaccounts (reads/subscribe)",
         "any_services": [
             "auth.v1.SubaccountService",
             "auth.v1.SubaccountViewService",
@@ -650,13 +650,13 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "address_book",
-        "label": "Address book",
+        "label": "Address book (reads/subscribe)",
         "any_services": ["auth.v1.AddressBookService"],
     },
     {
         "id": "policies",
-        "label": "Policies",
-        "any_services": ["auth.v1.PolicyService"],
+        "label": "Policies (realtime subscribe)",
+        "kind": "always_yes",
     },
     {
         "id": "guard_signer",
@@ -761,7 +761,8 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     {
         "id": "resolve",
         "label": "Account resolve / lookup",
-        "any_services": ["auth.v1.ResolveService"],
+        "kind": "always_no",
+        "note": "Requires interactive JWT/session; not exposed on API-key SDKs.",
     },
 ]
 

@@ -32,9 +32,19 @@ def devnet_proto_mismatch(exc: BaseException) -> bool:
 
 
 def jwt_session_only(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    sessionish = (
+        "authorization header" in message
+        or "bearer" in message
+        or "interactive session" in message
+        or "permission denied" in message
+        or "permission_denied" in message
+    )
     if isinstance(exc, PolyesterAuthError):
-        message = str(exc).lower()
-        return "authorization header" in message or "bearer" in message
+        return sessionish
+    if isinstance(exc, PolyesterApiError):
+        code = str(getattr(exc, "code", "") or "").lower()
+        return sessionish or code in {"unauthenticated", "permission_denied"}
     return False
 
 
@@ -53,6 +63,12 @@ async def call_optional(
     except PolyesterAuthError as exc:
         if allow_jwt_only and jwt_session_only(exc):
             pytest.skip(f"{label} requires JWT/session auth (API key not accepted on devnet)")
+        raise
+    except PolyesterApiError as exc:
+        if allow_jwt_only and jwt_session_only(exc):
+            pytest.skip(f"{label} requires JWT/session auth (API key not accepted on devnet)")
+        if route_unavailable(exc):
+            pytest.skip(f"{label} not mounted on devnet")
         raise
     except PolyesterServerError as exc:
         if allow_proto_mismatch and devnet_proto_mismatch(exc):

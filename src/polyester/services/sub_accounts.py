@@ -1,84 +1,40 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.sub_accounts import (
-    create_subaccount_from_proto,
     get_subaccount_from_proto,
-    invite_subaccount_member_from_proto,
-    respond_subaccount_invite_from_proto,
     subaccount_activity_list_from_proto,
     subaccount_invites_list_from_proto,
     subaccount_members_list_from_proto,
     subaccounts_list_from_proto,
-    update_subaccount_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_api_key_bytes, decode_subaccount_bytes
-from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
-from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.gen.auth.v1.subaccounts_connect import (
     SubaccountServiceClient,
     SubaccountViewServiceClient,
 )
 from polyester.gen.auth.v1.subaccounts_pb2 import (
-    CreateSubaccountRequest,
     GetSubaccountRequest,
-    InviteSubaccountMemberRequest,
     ListSubaccountEventsRequest,
     ListSubaccountInvitesRequest,
     ListSubaccountMembersRequest,
     ListSubaccountsRequest,
-    RemoveSubaccountMemberRequest,
-    RespondSubaccountInviteRequest,
-    SetSubaccountMemberMFARequirementRequest,
-    SubaccountUpdateSpec,
-    UpdateSubaccountMemberRoleRequest,
-    UpdateSubaccountRequest,
 )
 from polyester.models.sub_accounts import (
-    CreateSubaccountResult,
     GetSubaccountResult,
     SubAccount,
     SubAccountActivityList,
-    SubAccountInvite,
     SubAccountInvitesList,
     SubAccountMembersList,
     SubAccountsList,
 )
 from polyester.models.trading import ApiKeySummary
-from polyester.patch import UNSET, field_mask, is_set, require_positive_revision
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-
-
-def _subaccount_role_to_proto(value: str) -> int:
-    normalized = value.lower().replace("-", "_")
-    if normalized.startswith("subaccount_role_"):
-        enum_name = normalized.upper()
-    else:
-        enum_name = normalized.upper()
-    role = getattr(subaccounts_pb2, enum_name, None)
-    if role is None:
-        raise PolyesterValidationError(f"unknown subaccount role: {value}")
-    return role
-
-
-def _invite_action_to_proto(value: str) -> int:
-    normalized = value.lower().replace("-", "_")
-    aliases = {
-        "accept": subaccounts_pb2.SUBACCOUNT_INVITE_ACTION_ACCEPT,
-        "decline": subaccounts_pb2.SUBACCOUNT_INVITE_ACTION_DECLINE,
-        "cancel": subaccounts_pb2.SUBACCOUNT_INVITE_ACTION_CANCEL,
-    }
-    if normalized in aliases:
-        return aliases[normalized]
-    action = getattr(subaccounts_pb2, f"SUBACCOUNT_INVITE_ACTION_{normalized.upper()}", None)
-    if action is None:
-        raise PolyesterValidationError("invite action must be 'accept', 'decline', or 'cancel'")
-    return action
 
 
 class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
@@ -138,117 +94,6 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             get_subaccount_from_proto,
         )
 
-    async def create(
-        self,
-        *,
-        smart_account_address: str,
-        nonce: str,
-        signature: str,
-        label: str = "",
-        icon: str = "",
-        color: str = "",
-        primary_wallet_address: str = "",
-        wallet_provider: str = "",
-    ) -> CreateSubaccountResult:
-        return await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.create_subaccount(req),
-            CreateSubaccountRequest(
-                label=label,
-                icon=icon,
-                color=color,
-                smart_account_address=smart_account_address,
-                nonce=nonce,
-                signature=signature,
-                primary_wallet_address=primary_wallet_address,
-                wallet_provider=wallet_provider,
-            ),
-            create_subaccount_from_proto,
-        )
-
-    async def update(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        expected_revision: int,
-        label: object = UNSET,
-        icon: object = UNSET,
-        color: object = UNSET,
-        status: object = UNSET,
-    ) -> SubAccount | None:
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is None:
-            raise PolyesterValidationError("sub_account_id is required")
-        require_positive_revision(expected_revision)
-        spec = SubaccountUpdateSpec()
-        paths: list[str] = []
-        if is_set(label):
-            paths.append("label")
-            spec.label = str(label)
-        if is_set(icon):
-            paths.append("icon")
-            spec.icon = str(icon)
-        if is_set(color):
-            paths.append("color")
-            spec.color = str(color)
-        if is_set(status):
-            paths.append("status")
-            spec.status = str(status)
-        return await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.update_subaccount(req),
-            UpdateSubaccountRequest(
-                subaccount_id=parsed_sub,
-                subaccount=spec,
-                update_mask=field_mask(paths),
-                expected_revision=expected_revision,
-            ),
-            update_subaccount_from_proto,
-        )
-
-    async def delete(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        expected_revision: int,
-    ) -> SubAccount | None:
-        """Soft-delete a subaccount by setting status to deleted."""
-        return await self.update(
-            account=account,
-            sub_account_id=sub_account_id,
-            expected_revision=expected_revision,
-            status="deleted",
-        )
-
-    async def set_member_mfa_requirement(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        require_member_mfa: bool,
-    ) -> None:
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is None:
-            raise PolyesterValidationError("sub_account_id is required")
-        await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.set_subaccount_member_m_f_a_requirement(req),
-            SetSubaccountMemberMFARequirementRequest(
-                subaccount_id=parsed_sub,
-                require_member_mfa=require_member_mfa,
-            ),
-            lambda _msg: None,
-        )
-
     async def list_members(
         self,
         *,
@@ -268,79 +113,6 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             subaccount_members_list_from_proto,
         )
 
-    async def remove_member(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        grantee_account_id: str,
-    ) -> None:
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is None:
-            raise PolyesterValidationError("sub_account_id is required")
-        await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.remove_subaccount_member(req),
-            RemoveSubaccountMemberRequest(
-                subaccount_id=parsed_sub,
-                grantee_account_id=id_to_int(grantee_account_id, "grantee_account_id"),
-            ),
-            lambda _msg: None,
-        )
-
-    async def update_member_role(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        grantee_account_id: str,
-        role: str,
-    ) -> None:
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is None:
-            raise PolyesterValidationError("sub_account_id is required")
-        await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.update_subaccount_member_role(req),
-            UpdateSubaccountMemberRoleRequest(
-                subaccount_id=parsed_sub,
-                grantee_account_id=id_to_int(grantee_account_id, "grantee_account_id"),
-                role=_subaccount_role_to_proto(role),
-            ),
-            lambda _msg: None,
-        )
-
-    async def invite_member(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        grantee_account_id: str,
-        role: str,
-    ) -> SubAccountInvite | None:
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is None:
-            raise PolyesterValidationError("sub_account_id is required")
-        return await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.invite_subaccount_member(req),
-            InviteSubaccountMemberRequest(
-                subaccount_id=parsed_sub,
-                grantee_account_id=id_to_int(grantee_account_id, "grantee_account_id"),
-                role=_subaccount_role_to_proto(role),
-            ),
-            invite_subaccount_member_from_proto,
-        )
-
     async def list_invites(self, *, direction: str = "") -> SubAccountInvitesList:
         return await unary_auth_decoded(
             self._transport,
@@ -348,23 +120,6 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.list_subaccount_invites(req),
             ListSubaccountInvitesRequest(direction=direction),
             subaccount_invites_list_from_proto,
-        )
-
-    async def respond_invite(
-        self,
-        *,
-        invite_id: str,
-        action: str,
-    ) -> SubAccountInvite | None:
-        return await unary_auth_decoded(
-            self._transport,
-            SubaccountServiceClient,
-            lambda client, req: client.respond_subaccount_invite(req),
-            RespondSubaccountInviteRequest(
-                invite_id=id_to_int(invite_id, "invite_id"),
-                action=_invite_action_to_proto(action),
-            ),
-            respond_subaccount_invite_from_proto,
         )
 
     async def list_activity(

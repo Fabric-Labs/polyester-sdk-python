@@ -13,3 +13,83 @@ reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
 [[allowlist]]
 procedure = "/auth.v1.AuthService/LoginWithWallet"
 reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
+
+[[allowlist]]
+service = "auth.v1.PolicyService"
+reason = "Policy CRUD/list/get require interactive JWT/session; API-key SDK exposes realtime subscribe only."
+
+[[allowlist]]
+service = "auth.v1.ProfileService"
+reason = "Profile CRUD requires interactive JWT/session; API-key SDK exposes public identity subscribe only."
+
+[[allowlist]]
+service = "auth.v1.ResolveService"
+reason = "Account resolve/lookup requires interactive JWT/session; not exposed on API-key SDK."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/CreateApiKey"
+reason = "API key create requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/UpdateApiKey"
+reason = "API key update requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/DeleteApiKey"
+reason = "API key delete requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/CreateSubaccount"
+reason = "Subaccount create requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/UpdateSubaccount"
+reason = "Subaccount update/delete requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/SetSubaccountMemberMFARequirement"
+reason = "Member MFA admin requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/RemoveSubaccountMember"
+reason = "Member admin requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/UpdateSubaccountMemberRole"
+reason = "Member admin requires interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/InviteSubaccountMember"
+reason = "Invite mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/RespondSubaccountInvite"
+reason = "Invite mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/CreateAddressBookEntry"
+reason = "Address-book mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/UpdateAddressBookEntry"
+reason = "Address-book mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/DeleteAddressBookEntry"
+reason = "Address-book mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/CopyAddressBookEntry"
+reason = "Address-book mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/CreateAddressBookTag"
+reason = "Address-book mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/UpdateAddressBookTag"
+reason = "Address-book mutations require interactive JWT/session."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/DeleteAddressBookTag"
+reason = "Address-book mutations require interactive JWT/session."

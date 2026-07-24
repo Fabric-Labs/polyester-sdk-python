@@ -13,7 +13,6 @@ from polyester.services.deposit import AsyncDepositService
 from polyester.services.guard_signer import AsyncGuardSignerService
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.orders import AsyncOrdersService
-from polyester.services.policies import AsyncPoliciesService
 from polyester.services.sub_accounts import AsyncSubAccountsService
 from polyester.services.trades import AsyncTradesService
 from polyester.services.transfers import AsyncTransfersService
@@ -67,7 +66,6 @@ def test_scoped_sub_account_mixin_on_service() -> None:
         AsyncGuardSignerService,
         AsyncInternalTransfersService,
         AsyncOrdersService,
-        AsyncPoliciesService,
         AsyncSubAccountsService,
         AsyncTradesService,
         AsyncTransfersService,

@@ -4,13 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterValidationError
-from polyester.gen.auth.v1 import auth_pb2, profile_pb2
+from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.auth.v1 import social_verification_pb2 as sv_pb2
 from polyester.gen.auth.v1.auth_pb2 import MeRequest
-from polyester.gen.auth.v1.profile_pb2 import GetProfileRequest, UserProfilePatch
-from polyester.gen.auth.v1.subaccounts_pb2 import UpdateSubaccountRequest
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2
 from polyester.gen.collab.v1 import whiteboard_pb2 as wb_pb2
 from polyester.gen.layout.v1 import layout_pb2
@@ -18,9 +15,7 @@ from polyester.models import ApiData
 from polyester.services.auth import AsyncAuthService
 from polyester.services.chain_analytics import AsyncChainAnalyticsService
 from polyester.services.layout import AsyncLayoutService
-from polyester.services.profile import AsyncProfileService
 from polyester.services.social_verification import AsyncSocialVerificationService
-from polyester.services.sub_accounts import AsyncSubAccountsService
 from polyester.services.whiteboard import AsyncWhiteboardService
 from tests.unit.support import CaptureUnary
 
@@ -33,27 +28,6 @@ async def test_auth_me_sends_empty_me_request() -> None:
         result = await service.me()
     assert isinstance(capture.request, MeRequest)
     assert result.username == "alice"
-
-
-@pytest.mark.asyncio
-async def test_profile_get_sends_get_profile_request() -> None:
-    capture = CaptureUnary(profile_pb2.UserProfile(username="alice"))
-    with patch("polyester.services.profile.unary_auth_decoded", capture):
-        service = AsyncProfileService(transport=MagicMock())
-        profile = await service.get()
-    assert isinstance(capture.request, GetProfileRequest)
-    assert profile.username == "alice"
-
-
-@pytest.mark.asyncio
-async def test_profile_update_builds_patch_fields() -> None:
-    capture = CaptureUnary(profile_pb2.UserProfile(username="alice", bio="hi"))
-    with patch("polyester.services.profile.unary_auth_decoded", capture):
-        service = AsyncProfileService(transport=MagicMock())
-        profile = await service.update(bio="hi")
-    assert isinstance(capture.request, UserProfilePatch)
-    assert capture.request.bio == "hi"
-    assert profile.bio == "hi"
 
 
 @pytest.mark.asyncio
@@ -118,22 +92,3 @@ async def test_layout_get_layouts_passes_pagination() -> None:
     assert capture.request.limit == 25
     assert capture.request.page_token == "tok"
 
-
-@pytest.mark.asyncio
-async def test_sub_accounts_delete_issues_soft_delete_update() -> None:
-    from polyester.gen.auth.v1 import subaccounts_pb2
-
-    sub_id = format_id(99)
-    capture = CaptureUnary(
-        subaccounts_pb2.UpdateSubaccountResponse(
-            subaccount=subaccounts_pb2.Subaccount(id=99, status="deleted", revision=2)
-        )
-    )
-    with patch("polyester.services.sub_accounts.unary_auth_decoded", capture):
-        service = AsyncSubAccountsService(transport=MagicMock(), default_sub_account_id=None)
-        await service.delete(sub_account_id=sub_id, expected_revision=1)
-    assert isinstance(capture.request, UpdateSubaccountRequest)
-    assert capture.request.subaccount_id == 99
-    assert capture.request.expected_revision == 1
-    assert capture.request.subaccount.status == "deleted"
-    assert list(capture.request.update_mask.paths) == ["status"]

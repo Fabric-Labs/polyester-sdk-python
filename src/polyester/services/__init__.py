@@ -16,7 +16,6 @@ from polyester.services.orders import AsyncOrdersService
 from polyester.services.policies import AsyncPoliciesService
 from polyester.services.polychart import AsyncPolychartService
 from polyester.services.profile import AsyncProfileService
-from polyester.services.resolve import AsyncResolveService
 from polyester.services.social_verification import AsyncSocialVerificationService
 from polyester.services.sub_accounts import AsyncSubAccountsService
 from polyester.services.trades import AsyncTradesService
@@ -45,7 +44,6 @@ __all__ = [
     "AsyncPoliciesService",
     "AsyncPolychartService",
     "AsyncProfileService",
-    "AsyncResolveService",
     "AsyncSocialVerificationService",
     "AsyncSubAccountsService",
     "AsyncTradesService",

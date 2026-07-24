@@ -1,25 +1,7 @@
-import os
-
 import pytest
 
-from polyester.models import ApiKeysList, DepositAddressesList, ResolvedAccountsList
+from polyester.models import ApiKeysList, DepositAddressesList
 from tests.integration.support import call_optional, call_required
-
-
-@pytest.mark.integration
-@pytest.mark.optional
-@pytest.mark.jwt_session
-async def test_resolve_account_by_env_account_id(live_client) -> None:
-    account_id = os.getenv("POLYESTER_ACCOUNT_ID")
-    if not account_id:
-        pytest.skip("POLYESTER_ACCOUNT_ID not set")
-    result = await call_optional(
-        live_client.resolve.resolve_account(query=account_id, hint="id"),
-        label="resolve.resolve_account",
-    )
-    assert isinstance(result, ResolvedAccountsList)
-    assert result.matches, "expected at least one resolved account"
-    assert any(account.account_id == account_id for account in result.matches)
 
 
 @pytest.mark.integration

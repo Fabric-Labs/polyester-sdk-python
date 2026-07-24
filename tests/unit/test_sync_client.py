@@ -13,8 +13,9 @@ def test_sync_client_exposes_catalogs_and_nested_profile(
     try:
         assert client.catalogs is client.catalog
         assert hasattr(client.auth, "profile")
-        assert callable(client.auth.profile.get)
+        assert hasattr(client.auth.profile, "subscribe_identity")
         assert hasattr(client.auth.profile, "subscribe_sync")
+        assert not hasattr(client.auth.profile, "get")
         subscribe_surfaces = {
             "orders": ("subscribe_sync",),
             "trades": ("subscribe_sync",),

@@ -1,6 +1,6 @@
 import pytest
 
-from tests.integration.support import call_optional, call_required
+from tests.integration.support import call_required
 
 
 @pytest.mark.integration
@@ -19,14 +19,3 @@ async def test_account_identity_snapshot(live_client, smoke_symbol) -> None:
     spot = await live_client.market_data.get_spot_config()
     symbols = {pair.get("symbol") for pair in spot.raw.get("pairs") or []}
     assert smoke_symbol in symbols
-
-
-@pytest.mark.integration
-@pytest.mark.optional
-@pytest.mark.jwt_session
-async def test_profile_identity_snapshot(live_client) -> None:
-    """Session-profile compatibility check; skipped under API-key-only devnet auth."""
-    me = await call_required(live_client.auth.me(), label="auth.me")
-    profile = await call_optional(live_client.auth.profile.get(), label="profile.get")
-    if me.username:
-        assert profile.username == me.username

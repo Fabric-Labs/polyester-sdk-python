@@ -43,31 +43,3 @@ def transfer_counterparty_direction_from_label(direction: str) -> int:
     if value is None:
         raise PolyesterValidationError(f"Unknown transfer counterparty direction: {direction}")
     return value
-
-
-def address_book_tag_input_to_proto(
-    *,
-    name: str,
-    color: str = "",
-) -> address_book_pb2.AddressBookTagInput:
-    return address_book_pb2.AddressBookTagInput(name=name, color=color)
-
-
-def create_entry_external_to_proto(
-    *,
-    polychain_chain_id: int,
-    address: str,
-) -> address_book_pb2.ExternalWithdrawAddress:
-    return address_book_pb2.ExternalWithdrawAddress(
-        polychain_chain_id=polychain_chain_id,
-        address=address,
-    )
-
-
-def create_entry_internal_to_proto(
-    *,
-    smart_account_address: str,
-) -> address_book_pb2.RequestedInternalTransferAccount:
-    return address_book_pb2.RequestedInternalTransferAccount(
-        smart_account_address=smart_account_address,
-    )

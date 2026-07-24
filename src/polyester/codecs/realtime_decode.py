@@ -9,7 +9,7 @@ from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summa
 from polyester.codecs.decode.market_data import candle_point_from_proto
 from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
 from polyester.codecs.decode.orders import order_from_proto, user_trade_from_proto
-from polyester.codecs.decode.policies import subaccount_policy_from_proto
+from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_policy_from_proto
 from polyester.codecs.decode.sub_accounts import subaccount_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto
 from polyester.codecs.decode.triggers import trigger_event_from_proto, trigger_from_proto
@@ -17,7 +17,7 @@ from polyester.codecs.scalars import format_id
 from polyester.models import ApiData, AssetBalance, LedgerTransfer, Order, UserTrade
 from polyester.models.auth import AccountIdentity
 from polyester.models.market import Candle, MarketOverviewList
-from polyester.models.policies import SubaccountPolicy
+from polyester.models.policies import ApiPolicy, SubaccountPolicy
 from polyester.models.realtime import AddressBookViewInvalidation, OrderBookDeltaUpdate
 from polyester.models.sub_accounts import SubAccount
 from polyester.models.trading import ApiKeySummary, LifecycleFlowSummary, Trigger, TriggerEvent
@@ -83,6 +83,12 @@ def decode_subaccount_policy_bytes(payload: bytes) -> SubaccountPolicy:
     from polyester.gen.auth.v1.policies_pb2 import SubaccountPolicyView
 
     return subaccount_policy_from_proto(_parse_proto(payload, SubaccountPolicyView))
+
+
+def decode_api_policy_bytes(payload: bytes) -> ApiPolicy:
+    from polyester.gen.auth.v1.policies_pb2 import ApiPolicyView
+
+    return api_policy_from_proto(_parse_proto(payload, ApiPolicyView))
 
 
 def decode_flow_summary_bytes(payload: bytes) -> LifecycleFlowSummary:

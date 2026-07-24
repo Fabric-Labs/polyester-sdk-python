@@ -5,7 +5,6 @@ from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV
 
 EXPECTED_ASYNC_SERVICES = (
     "auth",
-    "accounts",
     "chain_analytics",
     "market_data",
     "candles",
@@ -24,7 +23,6 @@ EXPECTED_ASYNC_SERVICES = (
     "api_keys",
     "policies",
     "sub_accounts",
-    "resolve",
     "address_book",
     "social_verification",
     "whiteboard",
@@ -47,9 +45,12 @@ async def test_async_client_exposes_all_documented_services(
     try:
         for name in EXPECTED_ASYNC_SERVICES:
             assert hasattr(client, name), f"missing client.{name}"
-        assert client.accounts is client.resolve
+        assert not hasattr(client, "resolve")
+        assert not hasattr(client, "accounts")
         assert client.candles is client.market_data
         assert client.trading_withdraws is client.withdraw
         assert hasattr(client.auth, "profile")
+        assert hasattr(client.auth.profile, "subscribe_identity")
+        assert not hasattr(client.auth.profile, "get")
     finally:
         await client.aclose()

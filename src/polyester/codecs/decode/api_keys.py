@@ -30,33 +30,3 @@ def api_key_from_get_proto(msg: api_keys_pb2.GetApiKeyResponse) -> ApiKeySummary
 
 
 get_api_key_from_proto = api_key_from_get_proto
-
-
-def api_key_from_create_proto(msg: api_keys_pb2.CreateApiKeyResponse) -> ApiKeySummary | None:
-    if msg.HasField("api_key"):
-        return api_key_from_proto(msg.api_key)
-    return None
-
-
-def api_key_from_update_proto(msg: api_keys_pb2.UpdateApiKeyResponse) -> ApiKeySummary | None:
-    if msg.HasField("api_key"):
-        return api_key_from_proto(msg.api_key)
-    return None
-
-
-def api_key_status_from_label(status: str) -> int:
-    from polyester.errors import PolyesterValidationError
-
-    aliases = {
-        "active": api_keys_pb2.ACTIVE,
-        "revoked": api_keys_pb2.REVOKED,
-        "disabled": api_keys_pb2.DISABLED,
-    }
-    key = status.lower()
-    if key in aliases:
-        return aliases[key]
-    enum_name = key.upper()
-    value = getattr(api_keys_pb2, enum_name, None)
-    if value is None:
-        raise PolyesterValidationError(f"Unknown API key status: {status}")
-    return value

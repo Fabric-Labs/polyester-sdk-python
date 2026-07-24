@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
+from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
 from polyester.codecs.scalars import timestamp_dict_to_datetime
 from polyester.gen.auth.v1 import policies_pb2
 from polyester.models.policies import (
-    ApiPoliciesList,
     ApiPolicy,
     PerpMarketRule,
     SpotMarketRule,
-    SubaccountPoliciesList,
     SubaccountPolicy,
 )
 
@@ -88,61 +86,3 @@ def api_policy_from_proto(msg: policies_pb2.ApiPolicyView) -> ApiPolicy:
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
         revision=int(msg.revision),
     )
-
-
-def subaccount_policies_list_from_proto(
-    msg: policies_pb2.ListSubaccountPoliciesResponse,
-) -> SubaccountPoliciesList:
-    return SubaccountPoliciesList(
-        policies=[subaccount_policy_from_proto(item) for item in msg.policies]
-    )
-
-
-def get_subaccount_policy_from_proto(
-    msg: policies_pb2.GetSubaccountPolicyResponse,
-) -> SubaccountPolicy | None:
-    if has_field(msg, "policy"):
-        return subaccount_policy_from_proto(msg.policy)
-    return None
-
-
-def create_subaccount_policy_from_proto(
-    msg: policies_pb2.CreateSubaccountPolicyResponse,
-) -> SubaccountPolicy | None:
-    if has_field(msg, "policy"):
-        return subaccount_policy_from_proto(msg.policy)
-    return None
-
-
-def update_subaccount_policy_from_proto(
-    msg: policies_pb2.UpdateSubaccountPolicyResponse,
-) -> SubaccountPolicy | None:
-    if has_field(msg, "policy"):
-        return subaccount_policy_from_proto(msg.policy)
-    return None
-
-
-def api_policies_list_from_proto(msg: policies_pb2.ListApiPoliciesResponse) -> ApiPoliciesList:
-    return ApiPoliciesList(policies=[api_policy_from_proto(item) for item in msg.policies])
-
-
-def get_api_policy_from_proto(msg: policies_pb2.GetApiPolicyResponse) -> ApiPolicy | None:
-    if has_field(msg, "policy"):
-        return api_policy_from_proto(msg.policy)
-    return None
-
-
-def create_api_policy_from_proto(
-    msg: policies_pb2.CreateApiPolicyResponse,
-) -> ApiPolicy | None:
-    if has_field(msg, "policy"):
-        return api_policy_from_proto(msg.policy)
-    return None
-
-
-def update_api_policy_from_proto(
-    msg: policies_pb2.UpdateApiPolicyResponse,
-) -> ApiPolicy | None:
-    if has_field(msg, "policy"):
-        return api_policy_from_proto(msg.policy)
-    return None

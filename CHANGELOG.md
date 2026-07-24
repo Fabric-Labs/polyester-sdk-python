@@ -4,16 +4,26 @@
 
 ### Breaking
 - Stable MFA auth error codes (POLY-2919): `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
+- Removed JWT/session-only account-admin RPCs from the API-key SDK surface. Use the TypeScript browser client for interactive account administration.
+  - Policies: unary create/update/delete/list/get/set removed; keep `subscribe_subaccount_policies` / `subscribe_api_policies`
+  - API keys: `create` / `update` / `delete` removed; keep `list` / `get` / `subscribe` / `generate_keypair`
+  - Subaccounts: create/update/delete and member/invite mutations removed; keep reads + `subscribe` / `subscribe_api_keys`
+  - Address book: entry/tag mutations removed; keep list/get/view/subscribe
+  - Profile: `get` / `update` / `get_username_history` removed; keep `subscribe_identity`
+  - Account resolve (`client.resolve` / `client.accounts`) removed entirely
 
 ### Features
 - `is_mfa_enrollment_required` / `is_step_up_required` / `is_mfa_elevation_required` / `is_mfa_last_factor_required` classify MFA control flow from structured auth codes only (no message heuristics)
 - Public method options expose `polyester.api.MFARequirement` documentation metadata
+- POLY-3739: `policies.subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account_id}:proto` (sync: `subscribe_api_policies_sync`)
 
 ### Testing
 - Unit coverage for MFA auth-code mapping and predicates
+- Unit coverage for API/subaccount policy realtime protobuf decode
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.
+- README capability matrix labels clarify API-key-safe account surfaces (reads/subscribe vs session-only admin)
 
 ## 0.1.0a13
 

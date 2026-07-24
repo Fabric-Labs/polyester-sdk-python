@@ -32,7 +32,6 @@ from polyester.services import (
     AsyncOrdersService,
     AsyncPoliciesService,
     AsyncPolychartService,
-    AsyncResolveService,
     AsyncSocialVerificationService,
     AsyncSubAccountsService,
     AsyncTradesService,
@@ -168,7 +167,6 @@ class AsyncPolyester:
         )
         self.policies = AsyncPoliciesService(
             self._transport,
-            default_sub_account_id,
             default_account_id=default_account_id,
             realtime=self.realtime,
         )
@@ -178,8 +176,6 @@ class AsyncPolyester:
             default_account_id=default_account_id,
             realtime=self.realtime,
         )
-        self.resolve = AsyncResolveService(self._transport)
-        self.accounts = self.resolve
         self.address_book = AsyncAddressBookService(
             self._transport,
             default_sub_account_id,
@@ -350,7 +346,10 @@ class Polyester:
             self._loop,
             self._client.policies,
             self._active_sync_subscriptions,
-            subscribe_methods={"subscribe_sync": "subscribe_subaccount_policies"},
+            subscribe_methods={
+                "subscribe_sync": "subscribe_subaccount_policies",
+                "subscribe_api_policies_sync": "subscribe_api_policies",
+            },
         )
         self.sub_accounts = _SyncSubscribeService(
             self._loop,
@@ -361,8 +360,6 @@ class Polyester:
                 "subscribe_api_keys_sync": "subscribe_api_keys",
             },
         )
-        self.resolve = _SyncService(self._loop, self._client.resolve)
-        self.accounts = self.resolve
         self.address_book = _SyncSubscribeService(
             self._loop,
             self._client.address_book,

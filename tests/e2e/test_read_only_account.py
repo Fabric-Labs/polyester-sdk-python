@@ -28,8 +28,5 @@ async def test_account_read_snapshot(live_client, smoke_symbol):
         assert transfer.asset_id >= 0
         assert int(transfer.amount) >= 0
 
-    policies = await live_client.policies.list_api_policies()
-    assert isinstance(policies.policies, list)
-
     subaccounts = await live_client.sub_accounts.list()
     assert isinstance(subaccounts.subaccounts, list)

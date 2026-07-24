@@ -20,10 +20,12 @@
 ### Testing
 - Unit coverage for MFA auth-code mapping and predicates
 - Unit coverage for API/subaccount policy realtime protobuf decode
+- Live trigger create asserts `status == "accepted"` (POLY-3701 synthesized admission status)
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.
 - README capability matrix labels clarify API-key-safe account surfaces (reads/subscribe vs session-only admin)
+- Realtime subscribe waits for the Centrifugo handshake (including private token fetch) before returning; initial auth failures are returned immediately
 
 ## 0.1.0a13
 

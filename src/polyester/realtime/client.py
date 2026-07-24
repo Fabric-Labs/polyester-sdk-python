@@ -138,12 +138,27 @@ class AsyncRealtimeClient:
         decode: Callable[[bytes], T],
         auto_reconnect: bool = True,
     ) -> AsyncSubscription[T]:
+        """Subscribe to a Centrifugo protobuf channel.
+
+        Waits for the connect/subscribe handshake (including private token fetch)
+        to succeed before returning. Initial auth/handshake failures raise and do
+        not reconnect in the background.
+        """
         if is_private_channel(channel):
             self._require_private_auth(channel)
         queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self._max_queue_size)
         close = asyncio.Event()
 
         sub = AsyncSubscription[T](queue=queue, close=close, task=None)
+        ready: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+
+        def signal_ready(exc: BaseException | None = None) -> None:
+            if ready.done():
+                return
+            if exc is None:
+                ready.set_result(None)
+            else:
+                ready.set_exception(exc)
 
         async def runner() -> None:
             try:
@@ -154,19 +169,35 @@ class AsyncRealtimeClient:
                             decode=decode,
                             queue=queue,
                             close=close,
+                            on_ready=lambda: signal_ready(None),
                         )
                     except asyncio.CancelledError:
+                        if not ready.done():
+                            signal_ready(
+                                PolyesterRealtimeError(
+                                    "realtime subscription cancelled before handshake"
+                                )
+                            )
                         break
                     except PolyesterRealtimeOverflowError as exc:
                         sub._set_error(exc)
+                        signal_ready(exc)
+                        break
+                    except PolyesterAuthError as exc:
+                        # Auth failures must be observable; never hide behind reconnect.
+                        sub._set_error(exc)
+                        signal_ready(exc)
                         break
                     except Exception as exc:
                         if close.is_set():
                             break
-                        # Transient transport failures reconnect; keep last error
-                        # only for terminal overflow (handled above).
-                        _ = exc
+                        if not ready.done():
+                            # Match Rust/Go: first handshake failure is terminal.
+                            signal_ready(exc)
+                            break
+                        # Transient transport failures reconnect after a successful handshake.
                         if not auto_reconnect:
+                            sub._set_error(exc)
                             break
                     else:
                         if close.is_set():
@@ -179,11 +210,22 @@ class AsyncRealtimeClient:
                         break
                     await asyncio.sleep(CENTRIFUGO_RECONNECT_DELAY)
             finally:
+                if not ready.done():
+                    signal_ready(
+                        PolyesterRealtimeError(
+                            "realtime subscription ended before handshake"
+                        )
+                    )
                 with contextlib.suppress(Exception):
                     queue.put_nowait(None)
 
         task = asyncio.create_task(runner())
         sub._task = task
+        try:
+            await ready
+        except BaseException:
+            await sub.aclose()
+            raise
         return sub
 
     async def _run_subscription_once(
@@ -193,6 +235,7 @@ class AsyncRealtimeClient:
         decode: Callable[[bytes], T],
         queue: asyncio.Queue[Any],
         close: asyncio.Event,
+        on_ready: Callable[[], None] | None = None,
     ) -> None:
         async with websockets.connect(
             self._ws_url,
@@ -223,6 +266,8 @@ class AsyncRealtimeClient:
             else:
                 await self._centrifugo_connect(ws)
                 await self._centrifugo_subscribe(ws, channel)
+            if on_ready is not None:
+                on_ready()
             while not close.is_set():
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=CENTRIFUGO_READ_TIMEOUT)

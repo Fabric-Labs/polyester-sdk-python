@@ -17,6 +17,40 @@ def test_canonical_query_sorts_and_encodes_values() -> None:
     )
 
 
+def test_canonical_query_preserves_hyphens_in_channel_param() -> None:
+    assert (
+        canonical_query(
+            "https://api.example.test/v1/rt/subscribe?channel=private:auth:api-keys:account:proto"
+        )
+        == "channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
+    )
+
+
+def test_canonical_query_shared_vectors() -> None:
+    cases = [
+        (
+            "https://api.example.test/x?z=1&a=hello world&m=a+b",
+            "a=hello%20world&m=a%20b&z=1",
+        ),
+        (
+            "https://api.example.test/x?z=1&a=hello%20world&m=a%2Bb",
+            "a=hello%20world&m=a%2Bb&z=1",
+        ),
+        ("https://api.example.test/x?b=&a=1", "a=1&b="),
+        ("https://api.example.test/x?a=1&a=2&b=0", "a=1&a=2&b=0"),
+        (
+            "https://api.example.test/x?path=foo/bar&name=a_b.c~d-e",
+            "name=a_b.c~d-e&path=foo%2Fbar",
+        ),
+        (
+            "https://api.example.test/x?msg=%E2%9C%93&plain=ok",
+            "msg=%E2%9C%93&plain=ok",
+        ),
+    ]
+    for url, want in cases:
+        assert canonical_query(url) == want, url
+
+
 def test_canonical_signing_string_matches_contract() -> None:
     canonical = canonical_signing_string(
         timestamp_ms="123",

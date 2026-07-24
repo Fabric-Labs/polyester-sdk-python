@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.1.0a15
+
+### Breaking
+- `TriggerEventsList.next_before_ts_ns` renamed to `next_page_token` (opaque API cursor; no longer timestamp-shaped)
+- `triggers.list_events(..., before_ts_ns=...)` renamed to `page_token=...` and now sets the proto `page_token` field
+
+### Fixed
+- `TriggersList` and `TriggerEventsList` expose `next_page_token` from the API so trigger list/event pagination can continue
+- JSON wire decode for trigger events maps `fire_price_ticks` onto `fire_px` (was a broken `fire_px_ticks` kwarg)
+
 ## 0.1.0a14
 
 ### Breaking

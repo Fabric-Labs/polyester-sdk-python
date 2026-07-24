@@ -199,6 +199,7 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
 class TriggersList(msgspec.Struct, kw_only=True, omit_defaults=True):
     triggers: list[Trigger]
     total: int = 0
+    next_page_token: str = ""
 
 
 class TriggerMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -251,7 +252,7 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class TriggerEventsList(msgspec.Struct, kw_only=True, omit_defaults=True):
     events: list[TriggerEvent]
-    next_before_ts_ns: str = "0"
+    next_page_token: str = ""
 
 
 class BalanceHistorySeries(msgspec.Struct, kw_only=True, omit_defaults=True):

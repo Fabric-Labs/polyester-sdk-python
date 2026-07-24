@@ -58,11 +58,13 @@ def test_trigger_status_from_label() -> None:
 
 def test_triggers_list_from_proto() -> None:
     msg = triggers_pb2.ListTriggersResponse(
-        triggers=[triggers_pb2.Trigger(trigger_id=1, symbol_id=1)]
+        triggers=[triggers_pb2.Trigger(trigger_id=1, symbol_id=1)],
+        next_page_token="trig-page-2",
     )
     result = triggers_list_from_proto(msg)
     assert len(result.triggers) == 1
     assert result.total == 1
+    assert result.next_page_token == "trig-page-2"
 
 
 def test_get_trigger_from_proto() -> None:
@@ -105,9 +107,9 @@ def test_trigger_events_list_from_proto() -> None:
                 reason="hit",
             )
         ],
-        next_page_token="456",
+        next_page_token="evt-page-2",
     )
     result = trigger_events_list_from_proto(msg)
     assert len(result.events) == 1
     assert result.events[0].event_type == "fired"
-    assert result.next_before_ts_ns == "456"
+    assert result.next_page_token == "evt-page-2"

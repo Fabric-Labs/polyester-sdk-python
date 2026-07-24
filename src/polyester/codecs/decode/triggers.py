@@ -293,7 +293,11 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
 
 def triggers_list_from_proto(msg: triggers_pb2.ListTriggersResponse) -> TriggersList:
     triggers = [trigger_from_proto(item) for item in msg.triggers]
-    return TriggersList(triggers=triggers, total=len(triggers))
+    return TriggersList(
+        triggers=triggers,
+        total=len(triggers),
+        next_page_token=msg.next_page_token,
+    )
 
 
 def get_trigger_from_proto(msg: triggers_pb2.GetTriggerResponse) -> Trigger | None:
@@ -339,5 +343,5 @@ def trigger_events_list_from_proto(
 ) -> TriggerEventsList:
     return TriggerEventsList(
         events=[trigger_event_from_proto(item) for item in msg.events],
-        next_before_ts_ns=msg.next_page_token or "0",
+        next_page_token=msg.next_page_token,
     )

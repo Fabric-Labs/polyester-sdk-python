@@ -86,24 +86,22 @@ class GetBalancesRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
 
 class AssetBalance(_message.Message):
-    __slots__ = ("asset_id", "trading", "funding", "reserved", "available", "trading_updated_at_ns", "funding_updated_at_ns", "reserved_updated_at_ns")
+    __slots__ = ("asset_id", "trading", "funding", "reserved", "available", "trading_revision", "funding_revision")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     TRADING_FIELD_NUMBER: _ClassVar[int]
     FUNDING_FIELD_NUMBER: _ClassVar[int]
     RESERVED_FIELD_NUMBER: _ClassVar[int]
     AVAILABLE_FIELD_NUMBER: _ClassVar[int]
-    TRADING_UPDATED_AT_NS_FIELD_NUMBER: _ClassVar[int]
-    FUNDING_UPDATED_AT_NS_FIELD_NUMBER: _ClassVar[int]
-    RESERVED_UPDATED_AT_NS_FIELD_NUMBER: _ClassVar[int]
+    TRADING_REVISION_FIELD_NUMBER: _ClassVar[int]
+    FUNDING_REVISION_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     trading: _u128_pb2.U128
     funding: _u128_pb2.U128
     reserved: _u128_pb2.U128
     available: _u128_pb2.U128
-    trading_updated_at_ns: int
-    funding_updated_at_ns: int
-    reserved_updated_at_ns: int
-    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., trading_updated_at_ns: _Optional[int] = ..., funding_updated_at_ns: _Optional[int] = ..., reserved_updated_at_ns: _Optional[int] = ...) -> None: ...
+    trading_revision: int
+    funding_revision: int
+    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., trading_revision: _Optional[int] = ..., funding_revision: _Optional[int] = ...) -> None: ...
 
 class GetBalancesResponse(_message.Message):
     __slots__ = ("balances",)

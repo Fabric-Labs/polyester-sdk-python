@@ -89,9 +89,8 @@ class AssetBalance(msgspec.Struct, kw_only=True, omit_defaults=True):
     funding: str = "0"
     reserved: str = "0"
     available: str = "0"
-    trading_updated_at_ns: int = 0
-    funding_updated_at_ns: int = 0
-    reserved_updated_at_ns: int = 0
+    trading_revision: int = 0
+    funding_revision: int = 0
 
 
 class BalancesList(msgspec.Struct, kw_only=True, omit_defaults=True):

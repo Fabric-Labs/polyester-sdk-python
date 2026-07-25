@@ -9,17 +9,15 @@ from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
 
 
-def test_asset_balance_from_proto_preserves_uint64_component_timestamps() -> None:
+def test_asset_balance_from_proto_preserves_uint64_revisions() -> None:
     msg = ledger_read_pb2.AssetBalance(
         asset_id=1,
-        trading_updated_at_ns=2**63 + 1,
-        funding_updated_at_ns=2**63 + 2,
-        reserved_updated_at_ns=2**63 + 3,
+        trading_revision=2**63 + 1,
+        funding_revision=2**63 + 2,
     )
     result = asset_balance_from_proto(msg)
-    assert result.trading_updated_at_ns == 2**63 + 1
-    assert result.funding_updated_at_ns == 2**63 + 2
-    assert result.reserved_updated_at_ns == 2**63 + 3
+    assert result.trading_revision == 2**63 + 1
+    assert result.funding_revision == 2**63 + 2
 
 
 def test_balance_history_from_proto() -> None:

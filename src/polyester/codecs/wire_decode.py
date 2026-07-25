@@ -302,14 +302,11 @@ def decode_asset_balance(data: dict[str, Any]) -> AssetBalance:
         funding=_u128_str(_field(data, "funding")),
         reserved=_u128_str(_field(data, "reserved")),
         available=_u128_str(_field(data, "available")),
-        trading_updated_at_ns=int(
-            _field(data, "tradingUpdatedAtNs", "trading_updated_at_ns", default=0) or 0
+        trading_revision=int(
+            _field(data, "tradingRevision", "trading_revision", default=0) or 0
         ),
-        funding_updated_at_ns=int(
-            _field(data, "fundingUpdatedAtNs", "funding_updated_at_ns", default=0) or 0
-        ),
-        reserved_updated_at_ns=int(
-            _field(data, "reservedUpdatedAtNs", "reserved_updated_at_ns", default=0) or 0
+        funding_revision=int(
+            _field(data, "fundingRevision", "funding_revision", default=0) or 0
         ),
     )
 

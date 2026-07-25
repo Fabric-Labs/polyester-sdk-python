@@ -41,9 +41,8 @@ def asset_balance_from_proto(msg: ledger_read_pb2.AssetBalance) -> AssetBalance:
         funding=u128_from_proto(msg.funding),
         reserved=u128_from_proto(msg.reserved),
         available=u128_from_proto(msg.available),
-        trading_updated_at_ns=int(msg.trading_updated_at_ns),
-        funding_updated_at_ns=int(msg.funding_updated_at_ns),
-        reserved_updated_at_ns=int(msg.reserved_updated_at_ns),
+        trading_revision=int(msg.trading_revision),
+        funding_revision=int(msg.funding_revision),
     )
 
 

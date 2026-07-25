@@ -53,7 +53,7 @@ class AsyncOrderbookService(BaseService):
                 msg,
                 symbol=symbol,
                 depth=depth,
-                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol),
+                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol) or 8,
             ),
         )
 
@@ -121,7 +121,7 @@ class AsyncOrderbookService(BaseService):
                 bids=bids_map,
                 asks=asks_map,
                 bucket_ticks=bucket_ticks,
-                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol),
+                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol) or 8,
             )
             if on_event is not None:
                 on_event(data)

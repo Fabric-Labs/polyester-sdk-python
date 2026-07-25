@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from polyester.catalogs import CatalogManager
@@ -66,12 +67,18 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         default_account_id: str | int | None = None,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._default_sub_account_id = default_sub_account_id
         self._default_account_id = default_account_id
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
+
+    async def _ensure_catalogs(self) -> None:
+        if self._wait_for_catalogs is not None:
+            await self._wait_for_catalogs()
 
     async def list_open(
         self,
@@ -207,6 +214,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     attached_risk=normalized.attached_risk,
                     market_client_ref_price=normalized.market_client_ref_price,
                 )
+        await self._ensure_catalogs()
         quantity_scale = resolve_quantity_scale(
             self._catalogs, normalized.symbol, normalized.qty
         )
@@ -268,6 +276,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         behavior: str | None = None,
         new_client_order_id: str | None = None,
     ) -> ModifyOrderResult:
+        await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
         proto_request = modify_order_to_proto(
             symbol=symbol,
@@ -326,6 +335,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         behavior_default: str | None = None,
         allow_partial: bool = False,
     ) -> BatchModifyOrdersResult:
+        await self._ensure_catalogs()
         scale = resolve_quantity_scale(
             self._catalogs,
             symbol,
@@ -368,6 +378,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 qty_values.append(item.get("qty"))
                 if scale_symbol is None and item.get("symbol"):
                     scale_symbol = str(item["symbol"])
+        await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, scale_symbol, *qty_values)
         proto_request = batch_create_orders_to_proto(
             items=items,

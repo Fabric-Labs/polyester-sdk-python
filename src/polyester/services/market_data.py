@@ -281,4 +281,5 @@ def _datetime_to_timestamp(value: datetime) -> Timestamp:
 def _volume_scale_for_symbol_id(catalogs: CatalogManager | None, symbol_id: int) -> int:
     if catalogs is None:
         return 8
-    return catalogs.base_quantity_scale_for_symbol_id(symbol_id)
+    # Decode-only fallback when the spot catalog has not resolved this id yet.
+    return catalogs.base_quantity_scale_for_symbol_id(symbol_id) or 8

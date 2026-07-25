@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.triggers import (
@@ -49,12 +49,18 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         default_account_id: str | int | None = None,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._default_sub_account_id = default_sub_account_id
         self._default_account_id = default_account_id
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
+
+    async def _ensure_catalogs(self) -> None:
+        if self._wait_for_catalogs is not None:
+            await self._wait_for_catalogs()
 
     async def list(
         self,
@@ -143,6 +149,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ladder_levels: int | None = None,
         ladder_distribution: str | None = None,
     ) -> TriggerMutationResult:
+        await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)
         request = create_trigger_to_proto(
             symbol=symbol,

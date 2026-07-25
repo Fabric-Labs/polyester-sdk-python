@@ -24,7 +24,7 @@ from polyester.codecs.orders import (
     modify_order_to_proto,
     normalize_create_order_request,
     parse_optional_subaccount_id,
-    quantity_scale_for_symbol,
+    resolve_quantity_scale,
 )
 from polyester.codecs.realtime_decode import decode_order_bytes
 from polyester.codecs.scalars import id_to_int
@@ -207,10 +207,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     attached_risk=normalized.attached_risk,
                     market_client_ref_price=normalized.market_client_ref_price,
                 )
-        quantity_scale = (
-            self._catalogs.base_quantity_scale_for_symbol(normalized.symbol)
-            if normalized.symbol
-            else 8
+        quantity_scale = resolve_quantity_scale(
+            self._catalogs, normalized.symbol, normalized.qty
         )
         proto_request = create_order_to_proto(normalized, quantity_scale=quantity_scale)
         return await unary_auth_decoded(
@@ -270,7 +268,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         behavior: str | None = None,
         new_client_order_id: str | None = None,
     ) -> ModifyOrderResult:
-        scale = quantity_scale_for_symbol(self._catalogs, symbol)
+        scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
         proto_request = modify_order_to_proto(
             symbol=symbol,
             order_id=order_id,
@@ -328,7 +326,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         behavior_default: str | None = None,
         allow_partial: bool = False,
     ) -> BatchModifyOrdersResult:
-        scale = quantity_scale_for_symbol(self._catalogs, symbol) if symbol else 8
+        scale = resolve_quantity_scale(
+            self._catalogs,
+            symbol,
+            *(item.get("new_qty") for item in items),
+        )
         proto_request = batch_modify_orders_to_proto(
             items=items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
@@ -355,7 +357,18 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         request_id: str | None = None,
         allow_partial: bool = False,
     ) -> BatchCreateOrdersResult:
-        scale = quantity_scale_for_symbol(self._catalogs, symbol) if symbol else 8
+        qty_values: list[object | None] = []
+        scale_symbol = symbol
+        for item in items:
+            if isinstance(item, CreateOrderRequest):
+                qty_values.append(item.qty)
+                if scale_symbol is None and item.symbol:
+                    scale_symbol = item.symbol
+            else:
+                qty_values.append(item.get("qty"))
+                if scale_symbol is None and item.get("symbol"):
+                    scale_symbol = str(item["symbol"])
+        scale = resolve_quantity_scale(self._catalogs, scale_symbol, *qty_values)
         proto_request = batch_create_orders_to_proto(
             items=items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),

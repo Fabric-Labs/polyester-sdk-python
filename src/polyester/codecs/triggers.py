@@ -230,9 +230,12 @@ def create_trigger_to_proto(
 
 
 def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | None) -> int:
-    if symbol and catalogs is not None:
-        return catalogs.base_quantity_scale_for_symbol(symbol)
-    return 8
+    if not symbol or catalogs is None:
+        raise PolyesterValidationError(
+            "quantity scale requires symbol and catalogs "
+            "(or pass a scaled Quantity / explicit quantity_scale)"
+        )
+    return catalogs.base_quantity_scale_for_symbol(symbol)
 
 
 def modify_trigger_to_proto(

@@ -39,6 +39,14 @@ TIMEFRAME_ALIASES: dict[str, str] = {
     "1mo": "MONTH_1",
 }
 
+# Live Centrifugo channels use human labels (`1m`), not REST enum names (`MIN_1`).
+_CHANNEL_TIMEFRAME_ALIASES: dict[str, str] = {}
+for _label, _enum_name in TIMEFRAME_ALIASES.items():
+    _CHANNEL_TIMEFRAME_ALIASES[_label] = _label
+    _CHANNEL_TIMEFRAME_ALIASES[_enum_name] = _label
+    _CHANNEL_TIMEFRAME_ALIASES[_enum_name.lower()] = _label
+    _CHANNEL_TIMEFRAME_ALIASES[_enum_name.replace("_", "").lower()] = _label
+
 
 class AsyncMarketDataService(BaseService):
     def __init__(
@@ -197,17 +205,32 @@ class AsyncMarketDataService(BaseService):
             symbol_id=symbol_id,
             label="subscribe_candles",
         )
-        channel = f"public:spot:market:candles:{timeframe}:{resolved_symbol_id}:proto"
+        channel_timeframe = _resolve_candle_channel_timeframe(timeframe)
+        channel = f"public:spot:market:candles:{channel_timeframe}:{resolved_symbol_id}:proto"
         volume_scale = _volume_scale_for_symbol_id(self._catalogs, resolved_symbol_id)
         return await subscribe_public_proto(
             self._realtime,
             channel=channel,
             decode=decode_candle_point_bytes(
                 symbol_id=resolved_symbol_id,
-                timeframe=timeframe,
+                timeframe=channel_timeframe,
                 volume_scale=volume_scale,
             ),
         )
+
+
+def _resolve_candle_channel_timeframe(timeframe: str) -> str:
+    """Normalize user timeframe aliases to the live channel label (e.g. MIN_1 → 1m)."""
+    label = _CHANNEL_TIMEFRAME_ALIASES.get(timeframe)
+    if label is None:
+        label = _CHANNEL_TIMEFRAME_ALIASES.get(timeframe.upper())
+    if label is None:
+        label = _CHANNEL_TIMEFRAME_ALIASES.get(timeframe.lower().replace("_", ""))
+    if label is None:
+        raise PolyesterValidationError(
+            f"Unknown candle timeframe {timeframe!r}; use aliases like '1m', '1h', '1d'"
+        )
+    return label
 
 
 def _build_candles_request(

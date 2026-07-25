@@ -11,7 +11,7 @@ from polyester.codecs.scalars import id_to_int, omit_none
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import CreateOrderRequest
-from polyester.types.money import resolve_price_ticks, resolve_qty_scaled
+from polyester.types.money import Quantity, resolve_price_ticks, resolve_qty_scaled
 
 ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
 ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
@@ -414,9 +414,35 @@ def cancel_all_orders_to_proto(
 
 
 def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | None) -> int:
-    if symbol and catalogs is not None:
-        return catalogs.base_quantity_scale_for_symbol(symbol)
-    return 8
+    if not symbol or catalogs is None:
+        raise PolyesterValidationError(
+            "quantity scale requires symbol and catalogs "
+            "(or pass a scaled Quantity / explicit quantity_scale)"
+        )
+    return catalogs.base_quantity_scale_for_symbol(symbol)
+
+
+def resolve_quantity_scale(
+    catalogs: CatalogManager | None,
+    symbol: str | None,
+    *values: object | None,
+) -> int:
+    """Resolve base quantity scale for decimal qty inputs.
+
+    Scaled :class:`Quantity` values do not require catalogs/symbol. Decimal
+    strings/Decimals hard-error when scale cannot be resolved.
+    """
+    needs_catalog_scale = any(
+        value is not None and not isinstance(value, Quantity) for value in values
+    )
+    if not needs_catalog_scale:
+        if symbol and catalogs is not None:
+            return catalogs.base_quantity_scale_for_symbol(symbol)
+        for value in values:
+            if isinstance(value, Quantity) and value.scale is not None:
+                return value.scale
+        return 0
+    return quantity_scale_for_symbol(catalogs, symbol)
 
 
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:

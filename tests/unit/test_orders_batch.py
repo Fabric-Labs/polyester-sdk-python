@@ -79,7 +79,8 @@ def test_batch_create_requires_items() -> None:
 def test_batch_cancel_orders_to_proto() -> None:
     proto = batch_cancel_orders_to_proto(
         items=[
-            {"order_id": "42", "symbol_id": 3},
+            # "10" is pure decimal (not a canonical base58 encoding).
+            {"order_id": "10", "symbol_id": 3},
             {"client_order_id": "cid-9", "symbol_id": 5},
         ],
         sub_account_id="99",
@@ -88,7 +89,7 @@ def test_batch_cancel_orders_to_proto() -> None:
     assert proto.request_id == "req-cancel-1"
     assert proto.subaccount_id == id_to_int("99")
     assert len(proto.items) == 2
-    assert proto.items[0].order_id == 42
+    assert proto.items[0].order_id == 10
     assert proto.items[0].symbol_id == 3
     assert proto.items[1].client_order_id == "cid-9"
     assert proto.items[1].symbol_id == 5

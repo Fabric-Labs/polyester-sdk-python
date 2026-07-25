@@ -74,11 +74,35 @@ class AsyncSubscription(Generic[T]):
         self._close = close
         self._task = task
         self._error: BaseException | None = None
+        # Successful reconnects after the initial handshake. Each increment means
+        # the consumer must treat prior stream continuity as lost (possible gap).
+        self._resubscribed = 0
+        self._resubscribed_pending = False
 
     @property
     def error(self) -> BaseException | None:
         """Terminal subscription error, if the stream failed."""
         return self._error
+
+    @property
+    def resubscribed(self) -> int:
+        """Count of successful reconnects after the first connect.
+
+        Consumers must treat a non-zero / increasing value as possible data loss
+        (missed publications while disconnected).
+        """
+        return self._resubscribed
+
+    def take_resubscribed(self) -> bool:
+        """Return True once per reconnect gap since the previous take."""
+        if not self._resubscribed_pending:
+            return False
+        self._resubscribed_pending = False
+        return True
+
+    def _mark_resubscribed(self) -> None:
+        self._resubscribed += 1
+        self._resubscribed_pending = True
 
     def _set_error(self, exc: BaseException) -> None:
         if self._error is None:
@@ -159,6 +183,7 @@ class AsyncRealtimeClient:
 
         sub = AsyncSubscription[T](queue=queue, close=close, task=None)
         ready: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        handshake_count = 0
 
         def signal_ready(exc: BaseException | None = None) -> None:
             if ready.done():
@@ -167,6 +192,13 @@ class AsyncRealtimeClient:
                 ready.set_result(None)
             else:
                 ready.set_exception(exc)
+
+        def on_ready() -> None:
+            nonlocal handshake_count
+            handshake_count += 1
+            if handshake_count > 1:
+                sub._mark_resubscribed()
+            signal_ready(None)
 
         async def runner() -> None:
             try:
@@ -177,7 +209,7 @@ class AsyncRealtimeClient:
                             decode=decode,
                             queue=queue,
                             close=close,
-                            on_ready=lambda: signal_ready(None),
+                            on_ready=on_ready,
                         )
                     except asyncio.CancelledError:
                         if not ready.done():
@@ -282,8 +314,10 @@ class AsyncRealtimeClient:
             while not close.is_set():
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=CENTRIFUGO_READ_TIMEOUT)
-                except TimeoutError:
-                    continue
+                except TimeoutError as exc:
+                    # Timeout = connection death (half-open). Exit so reconnect
+                    # can run when enabled; do not spin forever on continue.
+                    raise PolyesterRealtimeError("realtime read timeout") from exc
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:

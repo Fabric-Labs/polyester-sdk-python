@@ -9,6 +9,11 @@
 - Authentication failures without server detail now carry a non-empty fallback message.
 - `ApiKeyCredentials` / `Ed25519Keypair` repr output redacts private key material.
 - Realtime subscription-token HTTP exchange rejects response bodies larger than 64 KiB.
+- Public ID parsing prefers canonical base58 when an all-digit string round-trips via `format_id`.
+- Quantity scale resolution no longer silently defaults to 8 when catalogs/symbol are missing for decimal qty.
+- WebSocket read timeout is treated as connection death (reconnect / error), not a silent continue.
+- Subscriptions expose `resubscribed` / `take_resubscribed()` after reconnect gaps.
+- Candle subscriptions normalize aliases (`MIN_1` / `min1`) to the live channel label (`1m`).
 
 ## 0.1.0a15
 

@@ -10,13 +10,12 @@ from polyester.codecs.decode.triggers import (
     trigger_status_from_label,
     triggers_list_from_proto,
 )
-from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.orders import parse_optional_subaccount_id, resolve_quantity_scale
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
     create_trigger_to_proto,
     modify_trigger_to_proto,
-    quantity_scale_for_symbol,
 )
 from polyester.gen.triggers.v1.triggers_connect import TriggersServiceClient
 from polyester.gen.triggers.v1.triggers_pb2 import (
@@ -144,7 +143,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ladder_levels: int | None = None,
         ladder_distribution: str | None = None,
     ) -> TriggerMutationResult:
-        scale = quantity_scale_for_symbol(self._catalogs, symbol)
+        scale = resolve_quantity_scale(self._catalogs, symbol, qty)
         request = create_trigger_to_proto(
             symbol=symbol,
             trigger_type=trigger_type,

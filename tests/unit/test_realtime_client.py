@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from polyester.auth import ApiKeyCredentials
-from polyester.errors import PolyesterAuthError
+from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription, is_private_channel
 from polyester.realtime.protocol import (
     Ping,
@@ -224,3 +224,136 @@ async def test_subscribe_proto_replies_to_centrifugo_ping() -> None:
 
     assert first == b"\x01\x02\x03"
     assert pong_command() in fake_ws.sent
+
+
+@pytest.mark.asyncio
+async def test_subscribe_proto_read_timeout_is_connection_death_no_reconnect() -> None:
+    """Read timeout must not hang in a continue loop; with auto_reconnect=False, surface error."""
+    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+
+    class SilentWS:
+        subprotocol = "centrifuge-protobuf"
+        messages = [ACK_CONNECT, ACK_SUBSCRIBE]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def send(self, payload: bytes) -> None:
+            return None
+
+        async def recv(self):
+            if self.messages:
+                return self.messages.pop(0)
+            await asyncio.sleep(3600)
+
+    with (
+        patch("polyester.realtime.client.CENTRIFUGO_READ_TIMEOUT", 0.05),
+        patch("polyester.realtime.client.websockets.connect", return_value=SilentWS()),
+    ):
+        subscription = await client.subscribe_proto(
+            "public:spot:market:trades:1:proto",
+            decode=lambda payload: payload,
+            auto_reconnect=False,
+        )
+        with pytest.raises(PolyesterRealtimeError, match="timeout"):
+            await asyncio.wait_for(subscription.__anext__(), timeout=2.0)
+        assert subscription.error is not None
+        assert "timeout" in str(subscription.error).lower()
+
+
+@pytest.mark.asyncio
+async def test_subscribe_proto_read_timeout_reconnects_when_enabled() -> None:
+    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    connect_calls = 0
+
+    class SilentThenAliveWS:
+        subprotocol = "centrifuge-protobuf"
+
+        def __init__(self) -> None:
+            self.messages = [ACK_CONNECT, ACK_SUBSCRIBE]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def send(self, payload: bytes) -> None:
+            return None
+
+        async def recv(self):
+            if self.messages:
+                return self.messages.pop(0)
+            await asyncio.sleep(3600)
+
+    def fake_connect(*args, **kwargs):
+        nonlocal connect_calls
+        connect_calls += 1
+        return SilentThenAliveWS()
+
+    with (
+        patch("polyester.realtime.client.CENTRIFUGO_READ_TIMEOUT", 0.05),
+        patch("polyester.realtime.client.CENTRIFUGO_RECONNECT_DELAY", 0.01),
+        patch("polyester.realtime.client.websockets.connect", side_effect=fake_connect),
+    ):
+        subscription = await client.subscribe_proto(
+            "public:spot:market:trades:1:proto",
+            decode=lambda payload: payload,
+            auto_reconnect=True,
+        )
+        await asyncio.sleep(0.25)
+        assert connect_calls >= 2
+        assert subscription.resubscribed >= 1
+        assert subscription.take_resubscribed() is True
+        assert subscription.take_resubscribed() is False
+        await subscription.aclose()
+
+
+@pytest.mark.asyncio
+async def test_subscribe_proto_resubscribed_increments_after_forced_reconnect() -> None:
+    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    connect_calls = 0
+
+    class FakeWS:
+        subprotocol = "centrifuge-protobuf"
+
+        def __init__(self) -> None:
+            self.messages = [ACK_CONNECT, ACK_SUBSCRIBE]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def send(self, payload: bytes) -> None:
+            return None
+
+        async def recv(self):
+            if self.messages:
+                return self.messages.pop(0)
+            raise RuntimeError("connection closed")
+
+    def fake_connect(*args, **kwargs):
+        nonlocal connect_calls
+        connect_calls += 1
+        return FakeWS()
+
+    with (
+        patch("polyester.realtime.client.CENTRIFUGO_RECONNECT_DELAY", 0.01),
+        patch("polyester.realtime.client.websockets.connect", side_effect=fake_connect),
+    ):
+        subscription = await client.subscribe_proto(
+            "public:spot:market:trades:1:proto",
+            decode=lambda payload: payload,
+        )
+        assert subscription.resubscribed == 0
+        assert subscription.take_resubscribed() is False
+        await asyncio.sleep(0.2)
+        assert connect_calls >= 2
+        assert subscription.resubscribed >= 1
+        assert subscription.take_resubscribed() is True
+        await subscription.aclose()

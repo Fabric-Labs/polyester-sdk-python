@@ -130,28 +130,52 @@ def parse_required_uint64_decimal(raw: str, field_name: str) -> int:
     return value
 
 
+def _encode_id(parsed: int) -> str:
+    """Encode a uint64 id as canonical SDK base58 (0 maps to '1')."""
+    if parsed == 0:
+        return "1"
+    return base58.b58encode_int(parsed).decode("ascii")
+
+
+def _base58_to_int(value: str) -> int:
+    raw = base58.b58decode(value)
+    return int.from_bytes(raw, "big") if raw else 0
+
+
 def id_to_int(value: str | int, label: str = "id") -> int:
     if isinstance(value, bool):
         raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if isinstance(value, int):
         parsed = value
-    elif value.isdecimal():
-        parsed = int(value)
+    elif isinstance(value, str):
+        if not value:
+            raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
+        if value.isdecimal():
+            # All-digit strings are ambiguous: prefer canonical SDK base58 when it
+            # round-trips via format_id, otherwise treat as decimal.
+            decimal_value = int(value)
+            try:
+                base58_value = _base58_to_int(value)
+            except ValueError:
+                parsed = decimal_value
+            else:
+                parsed = base58_value if _encode_id(base58_value) == value else decimal_value
+        else:
+            try:
+                parsed = _base58_to_int(value)
+            except ValueError as exc:
+                raise PolyesterValidationError(
+                    f"{label} must be base58 or decimal uint64"
+                ) from exc
     else:
-        try:
-            parsed = int.from_bytes(base58.b58decode(value), "big")
-        except ValueError as exc:
-            raise PolyesterValidationError(f"{label} must be base58 or decimal uint64") from exc
+        raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if parsed < 0 or parsed > UINT64_MAX:
         raise PolyesterValidationError(f"{label} exceeds uint64 range")
     return parsed
 
 
 def format_id(value: str | int) -> str:
-    parsed = id_to_int(value)
-    if parsed == 0:
-        return "1"
-    return base58.b58encode_int(parsed).decode("ascii")
+    return _encode_id(id_to_int(value))
 
 
 def datetime_to_timestamp_dict(value: datetime) -> dict[str, int]:

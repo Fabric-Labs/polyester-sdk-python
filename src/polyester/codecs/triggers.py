@@ -235,7 +235,14 @@ def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | Non
             "quantity scale requires symbol and catalogs "
             "(or pass a scaled Quantity / explicit quantity_scale)"
         )
-    return catalogs.base_quantity_scale_for_symbol(symbol)
+    scale = catalogs.base_quantity_scale_for_symbol(symbol)
+    if scale is None:
+        raise PolyesterValidationError(
+            f"quantity scale for {symbol!r} is unavailable; "
+            "await client.wait_for_catalogs() before creating triggers, "
+            "or pass a scaled Quantity"
+        )
+    return scale
 
 
 def modify_trigger_to_proto(

@@ -64,7 +64,12 @@ class CatalogManager:
                 return int(value) if value is not None else None
         return None
 
-    def base_quantity_scale_for_symbol(self, symbol: str) -> int:
+    def base_quantity_scale_for_symbol(self, symbol: str) -> int | None:
+        """Return the pair base quantity scale, or None when unknown/unhydrated.
+
+        Never invents scale 8 for missing symbols — callers that need a decode
+        fallback must choose it explicitly.
+        """
         for pair in self._pairs():
             if pair.get("symbol") == symbol:
                 value = (
@@ -72,10 +77,10 @@ class CatalogManager:
                     or pair.get("baseQuantityScale")
                     or pair.get("qtyScale")
                 )
-                return int(value) if value is not None else 8
-        return 8
+                return int(value) if value is not None else None
+        return None
 
-    def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int:
+    def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int | None:
         for pair in self._pairs():
             value = pair.get("symbol_id") or pair.get("symbolId")
             if value is not None and int(value) == int(symbol_id):
@@ -83,7 +88,7 @@ class CatalogManager:
                 if symbol:
                     return self.base_quantity_scale_for_symbol(str(symbol))
                 break
-        return 8
+        return None
 
     def orderbook_price_buckets_for_symbol(self, symbol: str) -> list[str]:
         pair = self._pair_for_symbol(symbol)

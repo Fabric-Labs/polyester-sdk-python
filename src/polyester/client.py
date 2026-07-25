@@ -134,6 +134,7 @@ class AsyncPolyester:
             default_sub_account_id,
             default_account_id=default_account_id,
             realtime=self.realtime,
+            wait_for_catalogs=self.wait_for_catalogs,
         )
         self.trades = AsyncTradesService(
             self._transport,
@@ -148,6 +149,7 @@ class AsyncPolyester:
             default_sub_account_id,
             default_account_id=default_account_id,
             realtime=self.realtime,
+            wait_for_catalogs=self.wait_for_catalogs,
         )
         self.transfers = AsyncTransfersService(
             self._transport,

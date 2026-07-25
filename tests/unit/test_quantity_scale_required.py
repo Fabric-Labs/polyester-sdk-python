@@ -20,7 +20,7 @@ from polyester.types.money import Quantity
 
 def test_quantity_scale_for_symbol_raises_without_symbol_or_catalogs() -> None:
     catalogs = MagicMock()
-    catalogs.base_quantity_scale_for_symbol.return_value = 8
+    catalogs.base_quantity_scale_for_symbol.return_value = 6
 
     with pytest.raises(PolyesterValidationError, match="symbol"):
         quantity_scale_for_symbol(None, "BTC-USD")
@@ -30,6 +30,15 @@ def test_quantity_scale_for_symbol_raises_without_symbol_or_catalogs() -> None:
         quantity_scale_for_symbol(catalogs, "")
     with pytest.raises(PolyesterValidationError, match="symbol"):
         trigger_quantity_scale(None, None)
+
+
+def test_quantity_scale_for_symbol_raises_when_catalog_scale_missing() -> None:
+    catalogs = MagicMock()
+    catalogs.base_quantity_scale_for_symbol.return_value = None
+    with pytest.raises(PolyesterValidationError, match="unavailable"):
+        quantity_scale_for_symbol(catalogs, "ETH-USDT")
+    with pytest.raises(PolyesterValidationError, match="unavailable"):
+        trigger_quantity_scale(catalogs, "ETH-USDT")
 
 
 def test_quantity_scale_for_symbol_resolves_when_present() -> None:

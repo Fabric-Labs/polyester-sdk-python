@@ -419,7 +419,14 @@ def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | Non
             "quantity scale requires symbol and catalogs "
             "(or pass a scaled Quantity / explicit quantity_scale)"
         )
-    return catalogs.base_quantity_scale_for_symbol(symbol)
+    scale = catalogs.base_quantity_scale_for_symbol(symbol)
+    if scale is None:
+        raise PolyesterValidationError(
+            f"quantity scale for {symbol!r} is unavailable; "
+            "await client.wait_for_catalogs() before placing orders, "
+            "or pass a scaled Quantity"
+        )
+    return scale
 
 
 def resolve_quantity_scale(
@@ -437,7 +444,9 @@ def resolve_quantity_scale(
     )
     if not needs_catalog_scale:
         if symbol and catalogs is not None:
-            return catalogs.base_quantity_scale_for_symbol(symbol)
+            scale = catalogs.base_quantity_scale_for_symbol(symbol)
+            if scale is not None:
+                return scale
         for value in values:
             if isinstance(value, Quantity) and value.scale is not None:
                 return value.scale

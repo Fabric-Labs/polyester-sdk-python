@@ -28,8 +28,9 @@ def _trade_e2e_enabled() -> bool:
 
 @pytest.mark.integration
 @pytest.mark.funded
+@pytest.mark.mutation
 async def test_market_order_fill(
-    live_client, trade_symbol, funded_enabled, require_trade_trading_balance
+    live_client, trade_symbol, funded_enabled, mutation_enabled, require_trade_trading_balance
 ):
     if not _trade_e2e_enabled():
         pytest.skip("Set POLYESTER_TEST_TRADE_E2E=1 to run market order fill e2e")
@@ -56,9 +57,7 @@ async def test_market_order_fill(
     try:
         spot_raw, zipper_raw = await _hydrate_test_catalogs(live_client)
         await _hydrate_test_catalogs(maker)
-        pair = next(
-            (p for p in spot_raw.get("pairs") or [] if p.get("symbol") == trade_symbol), {}
-        )
+        pair = next((p for p in spot_raw.get("pairs") or [] if p.get("symbol") == trade_symbol), {})
         if not pair:
             pytest.skip(f"Trade symbol {trade_symbol} is not in spot config")
 
@@ -70,9 +69,7 @@ async def test_market_order_fill(
         qty = os.getenv("POLYESTER_TEST_TRADE_QTY") or min_base_qty_for_pair(pair, price)
         qty_decimal = Decimal(qty)
 
-        quote_asset_id = quote_asset_id_for_symbol(
-            spot_raw, trade_symbol, zipper_raw=zipper_raw
-        )
+        quote_asset_id = quote_asset_id_for_symbol(spot_raw, trade_symbol, zipper_raw=zipper_raw)
         base_asset_id = base_asset_id_for_symbol(spot_raw, trade_symbol, zipper_raw=zipper_raw)
         assert quote_asset_id is not None
         assert base_asset_id is not None
@@ -91,9 +88,7 @@ async def test_market_order_fill(
         maker_quote_before = trading_balance_decimal(maker_before, quote_asset_id)
         maker_base_before = trading_balance_decimal(maker_before, base_asset_id)
         if maker_base_before < qty_decimal:
-            pytest.skip(
-                f"Maker base balance {maker_base_before} below fill quantity {qty_decimal}"
-            )
+            pytest.skip(f"Maker base balance {maker_base_before} below fill quantity {qty_decimal}")
 
         try:
             maker_created = await maker.orders.create(

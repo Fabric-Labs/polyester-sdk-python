@@ -63,7 +63,8 @@ def _scaled_from_env(name: str, default: int) -> int:
 
 @pytest.mark.integration
 @pytest.mark.funded
-async def test_funding_to_trading_userop(live_client, funded_enabled):
+@pytest.mark.mutation
+async def test_funding_to_trading_userop(live_client, funded_enabled, mutation_enabled):
     owner = _require_chain_userop()
     asset, _ = await _usdt_asset(live_client)
     quantity = _scaled_from_env("POLYESTER_TEST_DEPOSIT_QTY_SCALED", 10**18)
@@ -73,8 +74,7 @@ async def test_funding_to_trading_userop(live_client, funded_enabled):
     trading_before = trading_balance_decimal(before, asset.ledger_id)
     if funding_before * Decimal(10**18) < quantity:
         pytest.skip(
-            f"Funding {funding_before} below deposit qty {quantity} "
-            f"for asset {asset.ledger_id}"
+            f"Funding {funding_before} below deposit qty {quantity} for asset {asset.ledger_id}"
         )
 
     account = PolyesterSmartAccount(owner_private_key=owner)
@@ -100,7 +100,8 @@ async def test_funding_to_trading_userop(live_client, funded_enabled):
 
 @pytest.mark.integration
 @pytest.mark.funded
-async def test_funding_withdraw_to_chain_userop(live_client, funded_enabled):
+@pytest.mark.mutation
+async def test_funding_withdraw_to_chain_userop(live_client, funded_enabled, mutation_enabled):
     owner = _require_chain_userop()
     dest = (os.getenv("POLYESTER_TEST_WITHDRAW_DESTINATION") or "").strip()
     if not dest:

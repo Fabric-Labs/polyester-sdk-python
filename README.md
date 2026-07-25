@@ -53,6 +53,13 @@ Full cross-language comparison:
 [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
 
+Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
+still applies. In particular, whiteboard/social-verification and some
+layout/polychart routes may require a JWT session or may not be mounted.
+Current devnet testing verifies API-key subscription handshakes for API keys,
+API policies, subaccount policies, subaccounts, address-book invalidations, and
+normal trading and ledger streams.
+
 ## Install
 
 PyPI: https://pypi.org/project/polyester-sdk/
@@ -77,6 +84,8 @@ pip install -e ".[dev]"
 
 Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
 and private key when shown — the private key is only displayed once.
+Open the key's **Permissions**, enable **Spot trading**, select the markets it
+may trade, and set a maximum order size appropriate for the strategy.
 
 ```python
 import asyncio
@@ -185,6 +194,11 @@ async with AsyncPolyester(
     await client.orders.cancel(client_order_id="my-bot-001")
 ```
 
+Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
+`-`. Batch create accepts at most 20 orders. Treat a cancel response as an
+admission acknowledgement and reconcile with `list_open` before releasing local
+state.
+
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
 (fixed 1e6), not market tick-size alignment (server validates tick size).
@@ -232,7 +246,8 @@ exposes `post_only`.
 
 Ledger balances have separate **funding** and **trading** buckets per asset.
 
-- Deposits land in **funding**.
+- An external deposit can stop in **funding** or continue to **trading**,
+  depending on its configured route.
 - Spot orders spend **trading** balance.
 - Move funds funding → trading in the Polyester UI (**Funding → Unified Trading**)
   or on-chain via the funding wallet.
@@ -329,6 +344,9 @@ async with sub:
 
 ### Realtime delivery contract
 
+- Realtime is binary-only. The client negotiates the `centrifuge-protobuf`
+  WebSocket subprotocol and consumes protobuf publications from `:proto`
+  channels. ConnectRPC's optional JSON wire mode does not apply to realtime.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
   `PolyesterRealtimeOverflowError` and faults the subscription — it does **not**
   silently drop updates.
@@ -378,6 +396,10 @@ python -m pytest tests/unit -q
 ```
 
 Use `python -m pytest` (not bare `pytest`) so tests run in the same venv as `pip install`.
+Set `POLYESTER_TEST_MUTATION=1` for state-changing tests. Funded mutations
+require both `POLYESTER_TEST_MUTATION=1` and `POLYESTER_TEST_FUNDED=1`. For a
+release-certification run, set `POLYESTER_TEST_STRICT_LIVE=1`; any skipped test
+then fails instead of making an incomplete live run appear green.
 
 CI requires every public Connect RPC in gen to be wrapped or listed in
 `sdk-coverage.toml`. Contributors: `python scripts/check_sdk_coverage.py`.

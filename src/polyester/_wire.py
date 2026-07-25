@@ -18,6 +18,7 @@ from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.orders.v1 import orders_pb2
 
 _ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
+_EMPTY_ERROR_MESSAGE = "request failed without server error details"
 
 
 def protobuf_to_public_dict(message: Message) -> dict[str, Any]:
@@ -43,6 +44,7 @@ def _unpack_error_detail(detail: Message) -> Message | None:
 
 
 def map_connect_error(exc: ConnectError):
+    error_message = exc.message or _EMPTY_ERROR_MESSAGE
     if exc.details:
         for detail in exc.details:
             unpacked = _unpack_error_detail(detail)
@@ -51,7 +53,7 @@ def map_connect_error(exc: ConnectError):
             full_name = unpacked.DESCRIPTOR.full_name
             if full_name == "auth.v1.AuthErrorDetail":
                 code_name = auth_pb2.AuthErrorCode.Name(unpacked.code)
-                message = unpacked.message or exc.message
+                message = unpacked.message or error_message
                 return PolyesterApiError(message, code=code_name, raw=unpacked)
             if full_name.endswith("ErrorDetail") and hasattr(unpacked, "code"):
                 code_name = orders_pb2.ErrorCode.Name(unpacked.code)
@@ -60,17 +62,17 @@ def map_connect_error(exc: ConnectError):
                     or "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
                 ):
-                    return PolyesterAuthError(exc.message)
+                    return PolyesterAuthError(error_message)
                 if code_name.startswith("ERROR_CODE_"):
-                    return PolyesterApiError(exc.message, code=code_name)
+                    return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
     if code in ("unauthenticated", "permission_denied"):
-        return PolyesterAuthError(exc.message)
+        return PolyesterAuthError(error_message)
     if code in ("unavailable", "internal"):
-        return PolyesterServerError(exc.message)
+        return PolyesterServerError(error_message)
     if code == "deadline_exceeded":
-        return PolyesterTransportError(exc.message)
+        return PolyesterTransportError(error_message)
     message = (exc.message or "").strip().lower()
     if code == "unimplemented" and message in _ROUTE_NOT_FOUND_MESSAGES:
         return PolyesterRouteNotFoundError()
-    return PolyesterApiError(exc.message, code=code)
+    return PolyesterApiError(error_message, code=code)

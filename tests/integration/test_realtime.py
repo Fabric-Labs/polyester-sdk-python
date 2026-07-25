@@ -25,6 +25,7 @@ async def test_public_trades_subscription_survives_centrifugo_ping(live_credenti
         subscription = await client.market_data.subscribe_trades(symbol=symbol)
         try:
             deadline = asyncio.get_running_loop().time() + REALTIME_HEARTBEAT_HOLD_SECONDS
+            publications = 0
             while asyncio.get_running_loop().time() < deadline:
                 if subscription._close.is_set():
                     pytest.fail(
@@ -39,7 +40,14 @@ async def test_public_trades_subscription_survives_centrifugo_ping(live_credenti
                         "public trades subscription closed before Centrifugo heartbeat window "
                         f"elapsed ({REALTIME_HEARTBEAT_HOLD_SECONDS}s)"
                     )
-                await asyncio.sleep(2.0)
+                try:
+                    await asyncio.wait_for(subscription.__anext__(), timeout=2.0)
+                    publications += 1
+                except TimeoutError:
+                    pass
+            assert publications > 0, (
+                "protobuf subscription stayed open but delivered no publications"
+            )
         finally:
             await subscription.aclose()
             await asyncio.sleep(0.1)

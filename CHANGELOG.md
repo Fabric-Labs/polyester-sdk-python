@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+- Realtime now negotiates the `centrifuge-protobuf` WebSocket subprotocol and uses binary, length-delimited Centrifugo commands, replies, pings, and publications. Previous releases selected `:proto` channels while speaking the JSON client protocol, so subscriptions could handshake but receive no binary publications.
+- Concurrent authenticated calls now receive distinct monotonic signing timestamps, preventing identical same-millisecond requests from colliding with replay protection.
+- BUY trailing-stop requests are rejected locally because the wire strategy is SELL-only; they are no longer silently encoded as SELL.
+- Authentication failures without server detail now carry a non-empty fallback message.
+- `ApiKeyCredentials` / `Ed25519Keypair` repr output redacts private key material.
+- Realtime subscription-token HTTP exchange rejects response bodies larger than 64 KiB.
+
 ## 0.1.0a15
 
 ### Breaking

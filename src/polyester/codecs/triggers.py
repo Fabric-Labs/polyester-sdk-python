@@ -170,7 +170,9 @@ def create_trigger_to_proto(
         )
         getattr(intent, type_key).CopyFrom(conditional)
     elif type_key == "trailing_stop":
-        # Trailing stops are always SELL market-IOC executions on the wire.
+        # The wire strategy has no side field and executes as SELL.
+        if side_key != "sell":
+            raise PolyesterValidationError("trailing_stop only supports side=sell")
         trailing = intent.trailing_stop
         trailing.SetInParent()
         if trailing_distance_ticks is not None:

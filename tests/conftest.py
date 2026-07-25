@@ -48,6 +48,18 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
+    outcome = yield
+    report = outcome.get_result()
+    if _env_truthy("POLYESTER_TEST_STRICT_LIVE") and report.skipped:
+        report.outcome = "failed"
+        report.longrepr = (
+            f"{item.nodeid}: strict live mode forbids skipped tests; "
+            "unset POLYESTER_TEST_STRICT_LIVE for capability discovery"
+        )
+
+
 def _env_truthy(name: str) -> bool:
     return os.getenv(name, "").lower() in ("1", "true", "yes")
 

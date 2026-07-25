@@ -14,8 +14,14 @@ from tests.helpers import (
 
 @pytest.mark.integration
 @pytest.mark.funded
+@pytest.mark.mutation
 async def test_order_hold_visible_while_open(
-    live_client, trade_symbol, funded_enabled, require_trade_trading_balance, capabilities
+    live_client,
+    trade_symbol,
+    funded_enabled,
+    mutation_enabled,
+    require_trade_trading_balance,
+    capabilities,
 ):
     if not capabilities["list_holds"]:
         pytest.skip("list_holds unavailable on devnet")

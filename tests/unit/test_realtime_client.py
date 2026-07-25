@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import contextlib
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,6 +9,19 @@ import pytest
 from polyester.auth import ApiKeyCredentials
 from polyester.errors import PolyesterAuthError
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription, is_private_channel
+from polyester.realtime.protocol import (
+    Ping,
+    Publication,
+    Reply,
+    connect_command,
+    decode_replies,
+    pong_command,
+    subscribe_command,
+)
+
+ACK_CONNECT = bytes([2, 8, 1])
+ACK_SUBSCRIBE = bytes([2, 8, 2])
+PUBLICATION = bytes([9, 34, 7, 34, 5, 34, 3, 1, 2, 3])
 
 
 def test_is_private_channel() -> None:
@@ -57,10 +68,11 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
     )
 
     class FakeWS:
-        sent: list[str] = []
+        sent: list[bytes] = []
+        subprotocol = "centrifuge-protobuf"
         messages = [
-            '{"id": 1, "connect": {}}',
-            '{"id": 2, "subscribe": {}}',
+            ACK_CONNECT,
+            ACK_SUBSCRIBE,
         ]
 
         async def __aenter__(self):
@@ -69,7 +81,7 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
         async def __aexit__(self, *args):
             return None
 
-        async def send(self, payload: str) -> None:
+        async def send(self, payload: bytes) -> None:
             self.sent.append(payload)
 
         def __aiter__(self):
@@ -105,57 +117,25 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
     fetch_conn.assert_awaited_once()
     fetch_sub.assert_awaited_once()
     assert fetch_sub.await_args.kwargs["channel"] == "private:spot:orders:acct_test:proto"
+    assert FakeWS.sent == [
+        connect_command(1, "conn-token"),
+        subscribe_command(
+            2,
+            "private:spot:orders:acct_test:proto",
+            "sub-token",
+        ),
+    ]
 
 
-@pytest.mark.asyncio
-async def test_handle_centrifugo_frame_replies_to_ping() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
-    ws = AsyncMock()
-    publications = await client._handle_centrifugo_frame(ws, "{}", decode=lambda payload: payload)
-    assert publications == []
-    ws.send.assert_awaited_once_with("{}")
-
-
-@pytest.mark.asyncio
-async def test_handle_centrifugo_frame_replies_to_push_ping() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
-    ws = AsyncMock()
-    publications = await client._handle_centrifugo_frame(
-        ws,
-        '{"push": {"ping": {}}}',
-        decode=lambda payload: payload,
-    )
-    assert publications == []
-    ws.send.assert_awaited_once_with("{}")
-
-
-@pytest.mark.asyncio
-async def test_handle_centrifugo_frame_decodes_base64_publication() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
-    ws = AsyncMock()
-    payload = base64.b64encode(b"trade-bytes").decode("ascii")
-    frame = json.dumps({"push": {"pub": {"data": payload}}})
-    publications = await client._handle_centrifugo_frame(
-        ws,
-        frame,
-        decode=lambda raw: raw,
-    )
-    assert publications == [b"trade-bytes"]
-    ws.send.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_handle_centrifugo_frame_ping_and_publication_in_one_batch() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
-    ws = AsyncMock()
-    batch = '{"push": {"pub": {"data": [9]}}}\n{}\n'
-    publications: list[bytes] = []
-    for frame in AsyncRealtimeClient._split_centrifugo_frames(batch):
-        publications.extend(
-            await client._handle_centrifugo_frame(ws, frame, decode=lambda raw: raw)
-        )
-    assert publications == [bytes([9])]
-    ws.send.assert_awaited_once_with("{}")
+def test_binary_protocol_commands_and_replies() -> None:
+    assert connect_command(1) == bytes([4, 8, 1, 34, 0])
+    assert subscribe_command(2, "x") == bytes([7, 8, 2, 42, 3, 10, 1, ord("x")])
+    assert pong_command() == b"\x00"
+    assert decode_replies(ACK_CONNECT + b"\x00" + PUBLICATION) == [
+        Reply(1, None),
+        Ping(),
+        Publication(b"\x01\x02\x03"),
+    ]
 
 
 @pytest.mark.asyncio
@@ -164,9 +144,10 @@ async def test_subscribe_proto_reconnects_after_disconnect() -> None:
     connect_calls = 0
 
     class FakeWS:
+        subprotocol = "centrifuge-protobuf"
         messages = [
-            '{"id": 1, "connect": {}}',
-            '{"id": 2, "subscribe": {}}',
+            ACK_CONNECT,
+            ACK_SUBSCRIBE,
         ]
 
         async def __aenter__(self):
@@ -175,7 +156,7 @@ async def test_subscribe_proto_reconnects_after_disconnect() -> None:
         async def __aexit__(self, *args):
             return None
 
-        async def send(self, payload: str) -> None:
+        async def send(self, payload: bytes) -> None:
             return None
 
         async def recv(self):
@@ -207,12 +188,13 @@ async def test_subscribe_proto_replies_to_centrifugo_ping() -> None:
     client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
 
     class FakeWS:
-        sent: list[str] = []
+        sent: list[bytes] = []
+        subprotocol = "centrifuge-protobuf"
         messages = [
-            '{"id": 1, "connect": {}}',
-            '{"id": 2, "subscribe": {}}',
-            '{"push": {"pub": {"data": [1, 2, 3]}}}',
-            "{}",
+            ACK_CONNECT,
+            ACK_SUBSCRIBE,
+            PUBLICATION,
+            b"\x00",
         ]
 
         async def __aenter__(self):
@@ -221,7 +203,7 @@ async def test_subscribe_proto_replies_to_centrifugo_ping() -> None:
         async def __aexit__(self, *args):
             return None
 
-        async def send(self, payload: str) -> None:
+        async def send(self, payload: bytes) -> None:
             self.sent.append(payload)
 
         async def recv(self):
@@ -241,11 +223,4 @@ async def test_subscribe_proto_replies_to_centrifugo_ping() -> None:
         await asyncio.wait_for(subscription._task, timeout=1.0)
 
     assert first == b"\x01\x02\x03"
-    assert "{}" in fake_ws.sent
-
-
-def test_split_centrifugo_frames_handles_newline_batches() -> None:
-    frames = AsyncRealtimeClient._split_centrifugo_frames(
-        '{"push":{"pub":{"data":[1]}}}\n{}\n'
-    )
-    assert frames == ['{"push":{"pub":{"data":[1]}}}', "{}"]
+    assert pong_command() in fake_ws.sent

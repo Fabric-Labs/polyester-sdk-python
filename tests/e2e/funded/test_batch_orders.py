@@ -16,8 +16,9 @@ from tests.helpers import (
 
 @pytest.mark.integration
 @pytest.mark.funded
+@pytest.mark.mutation
 async def test_batch_create_and_cancel(
-    live_client, trade_symbol, funded_enabled, require_trade_trading_balance
+    live_client, trade_symbol, funded_enabled, mutation_enabled, require_trade_trading_balance
 ):
     price, qty = await usdt_funded_buy_limit_params(live_client, trade_symbol)
     cid1 = unique_client_order_id("b1")

@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from polyester.auth import (
@@ -82,6 +84,51 @@ def test_sign_request_returns_polyester_headers() -> None:
     assert headers["X-API-KEY-ID"] == "key_123"
     assert headers["X-API-TIMESTAMP"] == "123"
     assert len(headers["X-API-SIGNATURE"]) == 128
+
+
+def test_api_key_credentials_repr_redacts_private_key() -> None:
+    private = Ed25519PrivateKey.generate().private_bytes_raw()
+    credentials = ApiKeyCredentials(key_id="key_123", private_key=private)
+    rendered = repr(credentials)
+    assert "key_123" in rendered
+    assert "[REDACTED]" in rendered
+    assert private.hex() not in rendered
+    assert str(private) not in rendered
+
+
+def test_ed25519_keypair_repr_redacts_secret() -> None:
+    from polyester.models.auth import Ed25519Keypair
+
+    secret = b"\x01" * 32
+    keypair = Ed25519Keypair(
+        public_key_hex="aa",
+        public_key=b"\x02" * 32,
+        secret_key_hex=secret.hex(),
+        secret_key=secret,
+    )
+    rendered = repr(keypair)
+    assert "[REDACTED]" in rendered
+    assert secret.hex() not in rendered
+
+
+def test_automatic_timestamps_are_unique_under_concurrency() -> None:
+    credentials = ApiKeyCredentials(
+        key_id="key_123",
+        private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
+    )
+
+    def sign(_: int) -> dict[str, str]:
+        return sign_request(
+            credentials,
+            method="POST",
+            url="https://api.example.test/foo",
+            body=b"{}",
+        )
+
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        headers = list(executor.map(sign, range(32)))
+    assert len({item["X-API-TIMESTAMP"] for item in headers}) == 32
+    assert len({item["X-API-SIGNATURE"] for item in headers}) == 32
 
 
 def test_load_credentials_from_private_key_env(monkeypatch) -> None:

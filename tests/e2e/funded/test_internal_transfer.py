@@ -14,8 +14,9 @@ from tests.helpers import (
 
 @pytest.mark.integration
 @pytest.mark.funded
+@pytest.mark.mutation
 async def test_internal_transfer_tiny(
-    live_client, smoke_symbol, funded_enabled, require_trading_balance
+    live_client, smoke_symbol, funded_enabled, mutation_enabled, require_trading_balance
 ):
     dest = os.getenv("POLYESTER_TEST_INTERNAL_TRANSFER_DEST")
     if not dest:

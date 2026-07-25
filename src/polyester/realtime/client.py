@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import contextlib
-import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any, Generic, TypeVar
 
@@ -18,12 +16,22 @@ from polyester.errors import (
     PolyesterRealtimeOverflowError,
 )
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
+from polyester.realtime.protocol import (
+    Ping,
+    Publication,
+    Reply,
+    connect_command,
+    decode_replies,
+    pong_command,
+    subscribe_command,
+)
 
 T = TypeVar("T")
 
 # Match Go: long read deadline so Centrifugo ping/pong completes without reconnect churn.
 CENTRIFUGO_READ_TIMEOUT = 30.0
 CENTRIFUGO_RECONNECT_DELAY = 1.0
+CENTRIFUGO_PROTOBUF_SUBPROTOCOL = "centrifuge-protobuf"
 
 
 def normalize_ws_url(ws_url: str) -> str:
@@ -212,9 +220,7 @@ class AsyncRealtimeClient:
             finally:
                 if not ready.done():
                     signal_ready(
-                        PolyesterRealtimeError(
-                            "realtime subscription ended before handshake"
-                        )
+                        PolyesterRealtimeError("realtime subscription ended before handshake")
                     )
                 with contextlib.suppress(Exception):
                     queue.put_nowait(None)
@@ -241,7 +247,12 @@ class AsyncRealtimeClient:
             self._ws_url,
             open_timeout=10,
             max_size=None,
+            subprotocols=[CENTRIFUGO_PROTOBUF_SUBPROTOCOL],
         ) as ws:
+            if ws.subprotocol != CENTRIFUGO_PROTOBUF_SUBPROTOCOL:
+                raise PolyesterRealtimeError(
+                    "server did not negotiate centrifuge-protobuf websocket subprotocol"
+                )
             if is_private_channel(channel):
                 http = self._require_http()
                 credentials = self._require_credentials()
@@ -277,18 +288,18 @@ class AsyncRealtimeClient:
                     raise
                 except Exception as exc:
                     raise PolyesterRealtimeError(str(exc)) from exc
-                for frame in self._split_centrifugo_frames(raw):
-                    if close.is_set():
-                        return
-                    publications = await self._handle_centrifugo_frame(
-                        ws,
-                        frame,
-                        decode=decode,
-                    )
-                    for item in publications:
+                if not isinstance(raw, bytes):
+                    raise PolyesterRealtimeError("received JSON text frame on protobuf websocket")
+                for incoming in decode_replies(raw):
+                    if isinstance(incoming, Ping):
+                        await ws.send(pong_command())
+                    elif isinstance(incoming, Publication):
+                        item = decode(incoming.data)
                         if close.is_set():
                             return
                         enqueue_or_overflow(queue, item, close=close)
+                    elif isinstance(incoming, Reply) and incoming.error is not None:
+                        raise self._protocol_error(incoming)
 
     def _require_private_auth(self, channel: str) -> None:
         if self._credentials is None:
@@ -325,14 +336,8 @@ class AsyncRealtimeClient:
         *,
         token: str | None = None,
     ) -> None:
-        connect_payload: dict[str, Any] = {}
-        if token:
-            connect_payload["token"] = token
-        await ws.send(json.dumps({"id": 1, "connect": connect_payload}))
-        reply = await asyncio.wait_for(ws.recv(), timeout=10)
-        payload = json.loads(self._coerce_frame_text(reply))
-        if payload.get("error"):
-            raise PolyesterRealtimeError(str(payload["error"]))
+        await ws.send(connect_command(1, token))
+        await self._read_centrifugo_reply(ws, expected_id=1)
 
     async def _centrifugo_subscribe(
         self,
@@ -341,63 +346,31 @@ class AsyncRealtimeClient:
         *,
         token: str | None = None,
     ) -> None:
-        subscribe_payload: dict[str, Any] = {"channel": channel}
-        if token:
-            subscribe_payload["token"] = token
-        await ws.send(json.dumps({"id": 2, "subscribe": subscribe_payload}))
-        reply = await asyncio.wait_for(ws.recv(), timeout=10)
-        payload = json.loads(self._coerce_frame_text(reply))
-        if payload.get("error"):
-            raise PolyesterRealtimeError(str(payload["error"]))
+        await ws.send(subscribe_command(2, channel, token))
+        await self._read_centrifugo_reply(ws, expected_id=2)
 
-    @staticmethod
-    def _coerce_frame_text(raw: str | bytes) -> str:
-        if isinstance(raw, bytes):
-            return raw.decode("utf-8")
-        return raw
-
-    @staticmethod
-    def _split_centrifugo_frames(raw: str | bytes) -> list[str]:
-        text = AsyncRealtimeClient._coerce_frame_text(raw).strip()
-        if not text:
-            return []
-        return [frame for frame in text.split("\n") if frame.strip()]
-
-    async def _handle_centrifugo_frame(
+    async def _read_centrifugo_reply(
         self,
         ws: ClientConnection,
-        frame: str,
         *,
-        decode: Callable[[bytes], T],
-    ) -> list[T]:
-        try:
-            message = json.loads(frame)
-        except json.JSONDecodeError:
-            return []
-        if not message:
-            await ws.send("{}")
-            return []
-
-        push = message.get("push")
-        if isinstance(push, dict):
-            if push.get("ping") is not None:
-                await ws.send("{}")
-                return []
-            pub = push.get("pub") or {}
-            data = pub.get("data")
-            if data is not None:
-                return [decode(self._decode_publication_data(data))]
-
-        if message.get("ping") is not None and not message.get("id"):
-            await ws.send("{}")
-            return []
-
-        return []
+        expected_id: int,
+    ) -> None:
+        while True:
+            raw = await asyncio.wait_for(ws.recv(), timeout=10)
+            if not isinstance(raw, bytes):
+                raise PolyesterRealtimeError("received JSON text reply on protobuf websocket")
+            for incoming in decode_replies(raw):
+                if isinstance(incoming, Ping):
+                    await ws.send(pong_command())
+                elif isinstance(incoming, Reply) and incoming.id == expected_id:
+                    if incoming.error is not None:
+                        raise self._protocol_error(incoming)
+                    return
 
     @staticmethod
-    def _decode_publication_data(data: Any) -> bytes:
-        if isinstance(data, str):
-            return base64.b64decode(data)
-        if isinstance(data, list):
-            return bytes(data)
-        return bytes(data)
+    def _protocol_error(reply: Reply) -> PolyesterRealtimeError:
+        assert reply.error is not None
+        temporary = " (temporary)" if reply.error.temporary else ""
+        return PolyesterRealtimeError(
+            f"centrifugo error {reply.error.code}: {reply.error.message}{temporary}"
+        )

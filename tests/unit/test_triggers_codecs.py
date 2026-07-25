@@ -82,6 +82,17 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
     assert trigger.self_trade_prevention_mode == orders_pb2.EXPIRE_MAKER
 
 
+def test_create_trigger_trailing_stop_rejects_buy() -> None:
+    with pytest.raises(PolyesterValidationError, match="only supports side=sell"):
+        create_trigger_to_proto(
+            symbol="BTC-USDT",
+            trigger_type="trailing_stop",
+            side="buy",
+            qty="0.1",
+            trailing_distance_bps=100,
+        )
+
+
 def test_create_trigger_twap_maps_window_fields() -> None:
     proto = create_trigger_to_proto(
         symbol="BTC-USDT",

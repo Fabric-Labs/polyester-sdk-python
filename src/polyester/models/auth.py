@@ -50,3 +50,9 @@ class Ed25519Keypair(msgspec.Struct, kw_only=True):
     public_key: bytes
     secret_key_hex: str
     secret_key: bytes
+
+    def __repr__(self) -> str:
+        return (
+            f"Ed25519Keypair(public_key_hex={self.public_key_hex!r}, "
+            "secret_key_hex='[REDACTED]', secret_key='[REDACTED]')"
+        )

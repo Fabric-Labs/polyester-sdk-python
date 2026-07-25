@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, quote, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -15,10 +16,28 @@ API_PRIVATE_KEY_ENV = "POLYESTER_API_PRIVATE_KEY"
 ACCOUNT_ID_ENV = "POLYESTER_ACCOUNT_ID"
 
 
+class _TimestampSequencer:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._last = 0
+
+    def next(self) -> int:
+        with self._lock:
+            now = int(time.time() * 1000)
+            self._last = max(now, self._last + 1)
+            return self._last
+
+
 @dataclass(frozen=True, slots=True)
 class ApiKeyCredentials:
     key_id: str
-    private_key: bytes
+    private_key: bytes = field(repr=False)
+    _timestamps: _TimestampSequencer = field(
+        default_factory=_TimestampSequencer, repr=False, compare=False
+    )
+
+    def __repr__(self) -> str:
+        return f"ApiKeyCredentials(key_id={self.key_id!r}, private_key='[REDACTED]')"
 
 
 def load_api_key_credentials(
@@ -100,7 +119,7 @@ def sign_request(
     body: bytes = b"",
     timestamp_ms: str | None = None,
 ) -> dict[str, str]:
-    timestamp = timestamp_ms or str(int(time.time() * 1000))
+    timestamp = timestamp_ms or str(credentials._timestamps.next())
     canonical = canonical_signing_string(
         timestamp_ms=timestamp,
         method=method,

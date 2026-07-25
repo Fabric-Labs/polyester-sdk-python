@@ -27,16 +27,13 @@ def _devnet_internal_transfer_unavailable(exc: BaseException) -> bool:
             or "internal error" in message
         )
     message = str(exc).lower()
-    return (
-        "context deadline exceeded" in message
-        or "timeout" in message
-        or "timed out" in message
-    )
+    return "context deadline exceeded" in message or "timeout" in message or "timed out" in message
 
 
 @pytest.mark.integration
 @pytest.mark.funded
-async def test_transfer_to_user_tiny(live_client, smoke_symbol, funded_enabled):
+@pytest.mark.mutation
+async def test_transfer_to_user_tiny(live_client, smoke_symbol, funded_enabled, mutation_enabled):
     """Cross-account transfer smoke.
 
     Funding→user in the Polyester app is on-chain (FundingAccount.UAssetTransfer via wallet).

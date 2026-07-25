@@ -7,6 +7,8 @@ import httpx
 from polyester.auth import ApiKeyCredentials, sign_request
 from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
 
+MAX_TOKEN_RESPONSE_BYTES = 64 * 1024
+
 
 def connection_token_url(api_url: str) -> str:
     return f"{api_url.rstrip('/')}/v1/rt/token"
@@ -15,6 +17,16 @@ def connection_token_url(api_url: str) -> str:
 def subscription_token_url(api_url: str, channel: str) -> str:
     base = f"{api_url.rstrip('/')}/v1/rt/subscribe"
     return f"{base}?channel={quote(channel, safe='')}"
+
+
+def _content_length_exceeds_limit(response: httpx.Response, max_bytes: int) -> bool:
+    raw = response.headers.get("content-length")
+    if raw is None:
+        return False
+    try:
+        return int(raw) > max_bytes
+    except ValueError:
+        return False
 
 
 async def fetch_rt_token(
@@ -26,6 +38,14 @@ async def fetch_rt_token(
 ) -> str:
     headers = sign_request(credentials, method="GET", url=url, body=b"")
     response = await http.get(url, headers=headers)
+    if _content_length_exceeds_limit(response, MAX_TOKEN_RESPONSE_BYTES):
+        raise PolyesterRealtimeError(
+            f"{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
+        )
+    if len(response.content) > MAX_TOKEN_RESPONSE_BYTES:
+        raise PolyesterRealtimeError(
+            f"{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
+        )
     if response.status_code == 401:
         raise PolyesterAuthError(f"{label}: authentication failed")
     if response.status_code >= 400:

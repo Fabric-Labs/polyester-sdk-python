@@ -46,6 +46,14 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "smoke: shallow live RPC check (shape only; empty results OK)",
     )
+    config.addinivalue_line(
+        "markers",
+        "credentialed: live tests that require API-key credentials",
+    )
+    config.addinivalue_line(
+        "markers",
+        "public_smoke: public/read-only smoke selection (no mutation/funded)",
+    )
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -57,6 +65,67 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         report.longrepr = (
             f"{item.nodeid}: strict live mode forbids skipped tests; "
             "unset POLYESTER_TEST_STRICT_LIVE for capability discovery"
+        )
+
+
+def _is_live_item(item: pytest.Item) -> bool:
+    return item.get_closest_marker("integration") is not None
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Tag live integration tests as credentialed; smoke subset as public_smoke."""
+    del config
+    for item in items:
+        if item.get_closest_marker("integration") is None:
+            continue
+        if item.get_closest_marker("credentialed") is None:
+            item.add_marker(pytest.mark.credentialed)
+        if (
+            item.get_closest_marker("smoke") is not None
+            and item.get_closest_marker("mutation") is None
+            and item.get_closest_marker("funded") is None
+            and item.get_closest_marker("public_smoke") is None
+        ):
+            item.add_marker(pytest.mark.public_smoke)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """A7: emit live-only executed/skipped/failed counts; min floor under STRICT_LIVE."""
+    del exitstatus
+    tr = session.config.pluginmanager.get_plugin("terminalreporter")
+    if tr is None:
+        return
+    live_nodeids = {item.nodeid for item in session.items if _is_live_item(item)}
+    if not live_nodeids:
+        return
+    stats = getattr(tr, "stats", {})
+
+    def _count(key: str) -> int:
+        return sum(
+            1
+            for report in stats.get(key, [])
+            if getattr(report, "nodeid", None) in live_nodeids
+        )
+
+    passed = _count("passed")
+    failed = _count("failed")
+    skipped = _count("skipped")
+    executed = passed + failed
+    print(
+        f"\nA7 live harness counts: executed={executed} skipped={skipped} failed={failed}",
+        flush=True,
+    )
+    min_floor = int(os.getenv("POLYESTER_TEST_MIN_EXECUTED", "5"))
+    if not _env_truthy("POLYESTER_TEST_STRICT_LIVE"):
+        return
+    try:
+        has_creds = live_client_kwargs_from_env() is not None
+    except Exception:
+        # Malformed credentials must not crash the session printer; treat as absent.
+        has_creds = False
+    if has_creds and executed < min_floor:
+        raise AssertionError(
+            f"STRICT_LIVE requires at least {min_floor} executed live tests; got {executed}"
         )
 
 
@@ -129,7 +198,9 @@ async def trade_symbol(live_client) -> str:
     spot = await live_client.market_data.get_spot_config()
     live_client.catalogs.hydrate_spot_config(spot.raw)
     await _ensure_zipper_catalog(live_client)
-    return pick_trade_symbol(spot.raw)
+    symbol = pick_trade_symbol(spot.raw)
+    print(f"trade_symbol={symbol}", flush=True)
+    return symbol
 
 
 @pytest.fixture(scope="session")

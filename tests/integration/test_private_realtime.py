@@ -1,4 +1,15 @@
-"""Live private-channel realtime coverage (auth + trading/ledger streams)."""
+"""Live private-channel realtime coverage (auth + trading/ledger streams).
+
+Permission fixtures (F-24): each subscribe group needs the matching API-key
+scope. Missing permission returns structured Auth/403 and soft-skips (fails
+closed under ``POLYESTER_TEST_STRICT_LIVE=1``):
+
+- ``address_book.subscribe_view_invalidations`` → address-book read
+- ``transfers.subscribe`` → transfer:read
+- ``orders`` / ``trades`` / ``triggers`` → trading read
+- ``balances.subscribe`` → ledger read
+- ``api_keys`` / ``policies`` / ``sub_accounts`` → auth admin read
+"""
 
 from __future__ import annotations
 
@@ -8,10 +19,64 @@ from collections.abc import Awaitable, Callable
 import pytest
 
 from polyester import AsyncPolyester
+from polyester.errors import PolyesterApiError, PolyesterAuthError, PolyesterServerError
 from tests.helpers import live_client_kwargs_from_env
-from tests.integration.support import call_optional
+from tests.integration.support import (
+    devnet_proto_mismatch,
+    jwt_session_only,
+    route_unavailable,
+)
 
 SubscribeFn = Callable[[AsyncPolyester], Awaitable[object]]
+
+# Explicit permission requirements for private realtime fixtures (F-24).
+PERMISSION_REQUIREMENTS: dict[str, str] = {
+    "address_book.subscribe_view_invalidations": "address-book read",
+    "transfers.subscribe": "transfer:read",
+    "balances.subscribe": "ledger read",
+    "orders.subscribe": "trading read",
+    "trades.subscribe": "trading read",
+    "triggers.subscribe": "trading read",
+    "triggers.subscribe_events": "trading read",
+    "api_keys.subscribe": "auth admin read",
+    "policies.subscribe_api_policies": "auth admin read",
+    "policies.subscribe_subaccount_policies": "auth admin read",
+    "sub_accounts.subscribe": "auth admin read",
+}
+
+
+def _is_permission_denied(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    permissionish = (
+        "permission denied" in msg
+        or "permission_denied" in msg
+        or "http 403" in msg
+    )
+    if isinstance(exc, PolyesterAuthError):
+        return permissionish
+    if isinstance(exc, PolyesterApiError):
+        code = str(getattr(exc, "code", "") or "").lower()
+        return permissionish or "permission_denied" in code
+    return False
+
+
+async def _subscribe_optional(subscribe: SubscribeFn, client: AsyncPolyester, *, label: str):
+    required_perm = PERMISSION_REQUIREMENTS.get(label, "required scope")
+    try:
+        return await subscribe(client)
+    except Exception as exc:  # noqa: BLE001
+        if _is_permission_denied(exc):
+            pytest.skip(
+                f"{label} missing required API-key permission "
+                f"({required_perm}; declare fixture scopes): {exc}"
+            )
+        if route_unavailable(exc):
+            pytest.skip(f"{label} not mounted on devnet")
+        if jwt_session_only(exc):
+            pytest.skip(f"{label} requires JWT/session auth (API key not accepted on devnet)")
+        if isinstance(exc, PolyesterServerError) and devnet_proto_mismatch(exc):
+            pytest.skip(f"{label} unavailable on devnet: {exc}")
+        raise
 
 
 async def _with_fresh_client(
@@ -27,7 +92,7 @@ async def _with_fresh_client(
         await client.aclose()
         pytest.skip(f"POLYESTER_ACCOUNT_ID required for {label}")
     try:
-        subscription = await call_optional(subscribe(client), label=label)
+        subscription = await _subscribe_optional(subscribe, client, label=label)
         try:
             try:
                 await asyncio.wait_for(subscription.__anext__(), timeout=5)  # type: ignore[attr-defined]

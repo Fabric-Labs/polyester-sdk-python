@@ -33,6 +33,12 @@ class TransportConfig:
     max_retries: int = 2
     wire_format: WireFormat = "binary"
 
+    def __repr__(self) -> str:
+        return (
+            f"TransportConfig(api_url={self.api_url!r}, timeout={self.timeout!r}, "
+            f"max_retries={self.max_retries!r}, wire_format={self.wire_format!r})"
+        )
+
 
 class TransportFactory:
     """Owns SDK HTTP clients and generated Connect-client construction."""
@@ -56,6 +62,10 @@ class TransportFactory:
                     codec=self._codec,
                 )
             )
+
+    def __repr__(self) -> str:
+        creds = "[REDACTED]" if self.credentials is not None else None
+        return f"TransportFactory(config={self.config!r}, credentials={creds})"
 
     def connect_headers(self) -> dict[str, str]:
         return build_connect_headers(wire_format=self.config.wire_format)

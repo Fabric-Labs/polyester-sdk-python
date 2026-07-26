@@ -96,6 +96,27 @@ def test_api_key_credentials_repr_redacts_private_key() -> None:
     assert str(private) not in rendered
 
 
+def test_transport_factory_repr_redacts_credentials() -> None:
+    import asyncio
+
+    from polyester.transport import TransportConfig, TransportFactory
+
+    private = Ed25519PrivateKey.generate().private_bytes_raw()
+    credentials = ApiKeyCredentials(key_id="key_123", private_key=private)
+    factory = TransportFactory(
+        TransportConfig(api_url="https://api.example.test"),
+        credentials=credentials,
+    )
+    try:
+        rendered = repr(factory)
+        assert "[REDACTED]" in rendered
+        assert private.hex() not in rendered
+        assert "credentials=[REDACTED]" in rendered
+        assert "api_url=" in repr(factory.config)
+    finally:
+        asyncio.run(factory.aclose())
+
+
 def test_ed25519_keypair_repr_redacts_secret() -> None:
     from polyester.models.auth import Ed25519Keypair
 

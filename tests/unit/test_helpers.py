@@ -36,12 +36,12 @@ def test_pick_trade_symbol_prefers_trade_env_override(monkeypatch):
     assert pick_trade_symbol(spot) == "BTC-USDT"
 
 
-def test_pick_trade_symbol_falls_back_to_smoke_symbol(monkeypatch):
+def test_pick_trade_symbol_ignores_smoke_override_and_prefers_btc(monkeypatch):
     monkeypatch.delenv("POLYESTER_TEST_TRADE_SYMBOL", raising=False)
-    monkeypatch.delenv("POLYESTER_TEST_SMOKE_SYMBOL", raising=False)
-    monkeypatch.delenv("POLYESTER_SMOKE_SYMBOL", raising=False)
-    spot = {"pairs": [{"symbol": "ETH-USDT"}]}
-    assert pick_trade_symbol(spot) == "ETH-USDT"
+    monkeypatch.setenv("POLYESTER_TEST_SMOKE_SYMBOL", "ETH-USDT")
+    monkeypatch.setenv("POLYESTER_SMOKE_SYMBOL", "ETH-USDT")
+    spot = {"pairs": [{"symbol": "ETH-USDT"}, {"symbol": "BTC-USDT"}]}
+    assert pick_trade_symbol(spot) == "BTC-USDT"
 
 
 def test_quote_asset_id_resolves_via_zipper_catalog():

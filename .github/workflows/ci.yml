@@ -85,8 +85,10 @@ jobs:
       - name: Compile generated modules
         run: python -m compileall src/polyester
 
-      - name: Pytest
-        run: pytest tests/unit -q --cov=polyester --cov-report=term-missing
+      # Required PR gate: focused tests plus deterministic public-API local
+      # HTTP/WS integration tests. Live staging tests run separately.
+      - name: Pytest unit and local L2
+        run: pytest tests/unit tests/hardening -q --cov=polyester --cov-report=term-missing
 
       - name: Build wheel
         run: python -m build

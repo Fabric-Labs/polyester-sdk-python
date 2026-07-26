@@ -72,10 +72,15 @@ def pick_smoke_symbol(spot_raw: dict) -> str:
 
 
 def pick_trade_symbol(spot_raw: dict) -> str:
+    """Resolve mutation/heartbeat symbol without smoke-environment fallbacks."""
     override = env_trade_symbol()
     if override:
         return override
-    return pick_smoke_symbol(spot_raw)
+    pairs = spot_raw.get("pairs") or []
+    symbols = [str(pair.get("symbol") or "") for pair in pairs]
+    if "BTC-USDT" in symbols:
+        return "BTC-USDT"
+    return next((symbol for symbol in symbols if symbol), "BTC-USDT")
 
 
 def pair_for_symbol(spot_raw: dict, symbol: str) -> dict | None:
@@ -161,6 +166,22 @@ def trading_balance_decimal(balances: BalancesList, asset_id: int) -> Decimal:
         if row.asset_id == asset_id:
             return Decimal(format_ledger_u128(row.trading))
     return Decimal(0)
+
+
+def trading_balance_raw(balances: BalancesList, asset_id: int) -> int:
+    """Return trading ledger balance in exact scaled integer units."""
+    for row in balances.balances:
+        if row.asset_id == asset_id:
+            return int(row.trading or "0")
+    return 0
+
+
+def reserved_balance_raw(balances: BalancesList, asset_id: int) -> int:
+    """Return reserved ledger balance in exact scaled integer units."""
+    for row in balances.balances:
+        if row.asset_id == asset_id:
+            return int(row.reserved or "0")
+    return 0
 
 
 def funding_balance_decimal(balances: BalancesList, asset_id: int) -> Decimal:

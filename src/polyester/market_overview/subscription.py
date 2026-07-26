@@ -23,6 +23,11 @@ class MarketOverviewSubscription:
         self._stream = stream
         self._start_task = start_task
 
+    @property
+    def last_error(self) -> BaseException | None:
+        stream = self._stream
+        return getattr(stream, "last_error", None)
+
     async def refresh_snapshot(self) -> None:
         await self._stream.refresh_snapshot()
 

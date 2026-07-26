@@ -33,7 +33,7 @@ def _devnet_internal_transfer_unavailable(exc: BaseException) -> bool:
 @pytest.mark.integration
 @pytest.mark.funded
 @pytest.mark.mutation
-async def test_transfer_to_user_tiny(live_client, smoke_symbol, funded_enabled, mutation_enabled):
+async def test_transfer_to_user_tiny(live_client, trade_symbol, funded_enabled, mutation_enabled):
     """Cross-account transfer smoke.
 
     Funding→user in the Polyester app is on-chain (FundingAccount.UAssetTransfer via wallet).
@@ -65,11 +65,11 @@ async def test_transfer_to_user_tiny(live_client, smoke_symbol, funded_enabled, 
 
     asset_id = quote_asset_id_for_symbol(
         spot.raw,
-        smoke_symbol,
+        trade_symbol,
         zipper_raw=live_client.catalogs.zipper_config,
     )
     if asset_id is None:
-        pytest.skip(f"Cannot resolve quote asset for internal transfer on {smoke_symbol}")
+        pytest.skip(f"Cannot resolve quote asset for internal transfer on {trade_symbol}")
 
     quantity = os.getenv("POLYESTER_TEST_INTERNAL_TRANSFER_QTY", "1")
     qty = Decimal(quantity)

@@ -5,11 +5,40 @@ from typing import Any
 
 from polyester.catalogs.zipper import build_zipper_catalog_data
 from polyester.catalogs.zipper_supply import patch_zipper_catalog_supply
+from polyester.codecs.scalars import MAX_PROTOCOL_SCALE, UINT32_MAX, validate_protocol_scale
+from polyester.errors import PolyesterValidationError
 from polyester.models.zipper import (
     DepositWithdrawConfig,
     ZippedAssetSupplyUpdate,
     ZipperCatalogData,
 )
+
+
+def _parse_u32_field(value: Any, *, field_name: str) -> int | None:
+    """Parse a catalog id/scale candidate; reject values that would truncate as u32."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise PolyesterValidationError(f"catalog {field_name} must be an integer")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise PolyesterValidationError(f"catalog {field_name} must be an integer") from exc
+    if parsed < 0:
+        raise PolyesterValidationError(f"catalog {field_name} must be non-negative")
+    if parsed > UINT32_MAX:
+        raise PolyesterValidationError(
+            f"catalog {field_name} {parsed} exceeds uint32 range (silent truncation rejected)"
+        )
+    return parsed
+
+
+def _parse_protocol_scale(value: Any, *, field_name: str) -> int | None:
+    parsed = _parse_u32_field(value, field_name=field_name)
+    if parsed is None:
+        return None
+    validate_protocol_scale(parsed, field_name=f"catalog {field_name}")
+    return parsed
 
 
 @dataclass(slots=True)
@@ -18,6 +47,24 @@ class CatalogManager:
     zipper: ZipperCatalogData | None = None
     deposit_withdraw_config: DepositWithdrawConfig | None = None
     _legacy_zipper_raw: dict[str, Any] = field(default_factory=dict)
+    _unusable: bool = False
+    _unusable_reason: str | None = None
+
+    @property
+    def is_unusable(self) -> bool:
+        return self._unusable
+
+    @property
+    def unusable_reason(self) -> str | None:
+        return self._unusable_reason
+
+    def mark_unusable(self, reason: str) -> None:
+        self._unusable = True
+        self._unusable_reason = reason
+        self.spot_config = {}
+        self.zipper = None
+        self.deposit_withdraw_config = None
+        self._legacy_zipper_raw = {}
 
     @property
     def zipper_config(self) -> dict[str, Any]:
@@ -40,24 +87,123 @@ class CatalogManager:
         }
 
     def hydrate_spot_config(self, config: dict[str, Any]) -> None:
-        self.spot_config = config
+        """Hydrate spot pairs; reject out-of-range ids/scales (no silent truncation)."""
+        if not isinstance(config, dict):
+            self.mark_unusable("spot catalog is not an object")
+            raise PolyesterValidationError("spot catalog is not an object")
+        pairs = config.get("pairs") or config.get("symbols") or []
+        if not isinstance(pairs, list) or not pairs:
+            self.mark_unusable("spot catalog empty or missing pairs")
+            raise PolyesterValidationError("spot catalog empty or missing pairs")
+        cleaned_pairs: list[dict[str, Any]] = []
+        try:
+            for pair in pairs:
+                if not isinstance(pair, dict):
+                    continue
+                symbol = pair.get("symbol")
+                symbol_id_raw = (
+                    pair.get("symbol_id")
+                    if pair.get("symbol_id") is not None
+                    else pair.get("symbolId")
+                )
+                symbol_id = _parse_u32_field(
+                    symbol_id_raw,
+                    field_name="symbol_id",
+                )
+                scale = _parse_protocol_scale(
+                    pair.get("base_quantity_scale")
+                    if pair.get("base_quantity_scale") is not None
+                    else pair.get("baseQuantityScale")
+                    if pair.get("baseQuantityScale") is not None
+                    else pair.get("qtyScale"),
+                    field_name="base_quantity_scale",
+                )
+                row = dict(pair)
+                if symbol_id is not None:
+                    row["symbol_id"] = symbol_id
+                if scale is not None:
+                    row["base_quantity_scale"] = scale
+                if symbol:
+                    cleaned_pairs.append(row)
+        except PolyesterValidationError as exc:
+            self.mark_unusable(str(exc))
+            raise
+        if not cleaned_pairs:
+            self.mark_unusable("spot catalog contained no usable pairs")
+            raise PolyesterValidationError("spot catalog contained no usable pairs")
+        self._unusable = False
+        self._unusable_reason = None
+        self.spot_config = {**config, "pairs": cleaned_pairs}
 
     def hydrate_zipper_config(
         self,
         config: DepositWithdrawConfig | dict[str, Any],
     ) -> None:
         if isinstance(config, DepositWithdrawConfig):
-            self.deposit_withdraw_config = config
-            self.zipper = build_zipper_catalog_data(config)
+            self.hydrate_zipper_config_typed(config)
             return
+        if not isinstance(config, dict):
+            self.mark_unusable("zipper catalog is not an object")
+            raise PolyesterValidationError("zipper catalog is not an object")
+        assets = config.get("assets") or []
+        if not isinstance(assets, list):
+            self.mark_unusable("zipper catalog assets must be a list")
+            raise PolyesterValidationError("zipper catalog assets must be a list")
+        try:
+            for row in assets:
+                if not isinstance(row, dict):
+                    continue
+                ledger_id_raw = (
+                    row.get("ledgerId")
+                    if row.get("ledgerId") is not None
+                    else row.get("ledger_id")
+                )
+                _parse_u32_field(
+                    ledger_id_raw,
+                    field_name="ledger_id",
+                )
+                scale_raw = (
+                    row.get("quantityScale")
+                    if row.get("quantityScale") is not None
+                    else row.get("quantity_scale")
+                )
+                if scale_raw is not None:
+                    _parse_protocol_scale(scale_raw, field_name="quantity_scale")
+        except PolyesterValidationError as exc:
+            self.mark_unusable(str(exc))
+            raise
         self.deposit_withdraw_config = None
         self.zipper = None
         self._legacy_zipper_raw = config
+        self._unusable = False
+        self._unusable_reason = None
+
+    def hydrate_zipper_config_typed(self, config: DepositWithdrawConfig) -> None:
+        """Hydrate from the typed deposit/withdraw config (no consumer JSON round-trip)."""
+        try:
+            for asset in config.assets:
+                if asset.ledger_id is not None:
+                    _parse_u32_field(asset.ledger_id, field_name="ledger_id")
+                if asset.quantity_scale is not None:
+                    validate_protocol_scale(
+                        int(asset.quantity_scale),
+                        field_name="catalog quantity_scale",
+                    )
+        except PolyesterValidationError as exc:
+            self.mark_unusable(str(exc))
+            raise
+        self.deposit_withdraw_config = config
+        self.zipper = build_zipper_catalog_data(config)
+        self._legacy_zipper_raw = {}
+        self._unusable = False
+        self._unusable_reason = None
 
     def hydrate_deposit_withdraw_config(self, config: DepositWithdrawConfig) -> None:
-        self.hydrate_zipper_config(config)
+        self.hydrate_zipper_config_typed(config)
 
     def symbol_id_for_symbol(self, symbol: str) -> int | None:
+        if self._unusable:
+            return None
         for pair in self._pairs():
             if pair.get("symbol") == symbol:
                 value = pair.get("symbol_id") or pair.get("symbolId")
@@ -70,6 +216,8 @@ class CatalogManager:
         Never invents scale 8 for missing symbols — callers that need a decode
         fallback must choose it explicitly.
         """
+        if self._unusable:
+            return None
         for pair in self._pairs():
             if pair.get("symbol") == symbol:
                 value = (
@@ -81,6 +229,8 @@ class CatalogManager:
         return None
 
     def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int | None:
+        if self._unusable:
+            return None
         for pair in self._pairs():
             value = pair.get("symbol_id") or pair.get("symbolId")
             if value is not None and int(value) == int(symbol_id):
@@ -110,6 +260,8 @@ class CatalogManager:
         return result
 
     def ledger_id_for_asset(self, asset_symbol: str) -> int | None:
+        if self._unusable:
+            return None
         catalog = self.zipper
         if catalog is not None:
             for asset in catalog.assets:
@@ -124,6 +276,8 @@ class CatalogManager:
         return None
 
     def quantity_scale_for_asset(self, asset_symbol: str) -> int | None:
+        if self._unusable:
+            return None
         catalog = self.zipper
         if catalog is not None:
             for asset in catalog.assets:
@@ -170,3 +324,10 @@ def msgspec_to_dict(value: object) -> dict[str, Any]:
     import msgspec
 
     return msgspec.to_builtins(value)
+
+
+__all__ = [
+    "MAX_PROTOCOL_SCALE",
+    "CatalogManager",
+    "msgspec_to_dict",
+]

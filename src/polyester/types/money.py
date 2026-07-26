@@ -15,6 +15,7 @@ from polyester.codecs.scalars import (
     format_qty_scaled,
     parse_price_ticks,
     parse_qty_scaled,
+    validate_protocol_scale,
 )
 from polyester.errors import PolyesterValidationError
 
@@ -89,8 +90,8 @@ class Quantity:
         symbol_id: int | None = None,
     ) -> Quantity:
         value = _require_scaled_int(scaled, "scaled")
-        if scale is not None and scale < 0:
-            raise PolyesterValidationError("scale must be non-negative")
+        if scale is not None:
+            validate_protocol_scale(scale)
         return cls(
             scaled=value,
             scale=scale,
@@ -105,6 +106,7 @@ class Quantity:
             raise PolyesterValidationError(
                 "as_decimal requires a known scale; pass scale= or construct with scale="
             )
+        validate_protocol_scale(resolved)
         return Decimal(format_qty_scaled(self.scaled, resolved))
 
     def format(self, scale: int | None = None) -> str:
@@ -113,6 +115,7 @@ class Quantity:
             raise PolyesterValidationError(
                 "format requires a known scale; pass scale= or construct with scale="
             )
+        validate_protocol_scale(resolved)
         return format_qty_scaled(self.scaled, resolved)
 
     def compatible_with(
@@ -170,8 +173,8 @@ class AssetAmount:
             "scaled",
             allow_u128=domain == QuantityDomain.LEDGER_E18,
         )
-        if scale is not None and scale < 0:
-            raise PolyesterValidationError("scale must be non-negative")
+        if scale is not None:
+            validate_protocol_scale(scale)
         if domain not in (QuantityDomain.ASSET, QuantityDomain.LEDGER_E18):
             raise PolyesterValidationError("AssetAmount domain must be asset or ledger_e18")
         return cls(scaled=value, scale=scale, domain=domain, asset_id=asset_id)
@@ -182,6 +185,7 @@ class AssetAmount:
             raise PolyesterValidationError(
                 "as_decimal requires a known scale; pass scale= or construct with scale="
             )
+        validate_protocol_scale(resolved)
         return Decimal(format_qty_scaled(self.scaled, resolved))
 
     def format(self, scale: int | None = None) -> str:
@@ -190,6 +194,7 @@ class AssetAmount:
             raise PolyesterValidationError(
                 "format requires a known scale; pass scale= or construct with scale="
             )
+        validate_protocol_scale(resolved)
         return format_qty_scaled(self.scaled, resolved)
 
     def compatible_with(

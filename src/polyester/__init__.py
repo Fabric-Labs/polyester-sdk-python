@@ -26,7 +26,7 @@ from polyester.patch import UNSET
 from polyester.services.orders import wait_for_order_trades_complete
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
-__version__ = "0.1.0a18"
+__version__ = "0.1.0a19"
 
 __all__ = [
     "AUTH_MFA_ELEVATION_REQUIRED",

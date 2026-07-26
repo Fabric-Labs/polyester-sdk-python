@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a18`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a19`). Proprietary license (not open source).
 API-key only — no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -65,7 +65,7 @@ normal trading and ledger streams.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a18"
+pip install "polyester-sdk==0.1.0a19"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -347,6 +347,7 @@ async with sub:
 - Realtime is binary-only. The client negotiates the `centrifuge-protobuf`
   WebSocket subprotocol and consumes protobuf publications from `:proto`
   channels. ConnectRPC's optional JSON wire mode does not apply to realtime.
+  Inbound WebSocket messages are capped at 4 MiB.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
   `PolyesterRealtimeOverflowError` and faults the subscription — it does **not**
   silently drop updates.
@@ -354,7 +355,9 @@ async with sub:
   `on_sequence_gap` / `on_reconnect` / `on_snapshot_refresh` on
   `orderbook.create_subscription(...)` for recovery observability.
 - Managed snapshot-then-stream subscriptions disable transport auto-reconnect
-  so they can rebuild REST state between reconnect attempts.
+  so they can rebuild REST state between reconnect attempts. Buffered
+  publications survive a failed snapshot retry and are merged exactly once
+  after recovery; cancellation closes the replacement socket.
 
 ## Sync client
 

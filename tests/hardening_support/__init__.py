@@ -390,6 +390,16 @@ class MockWsServer:
         await self._start()
         return self
 
+    @classmethod
+    async def spawn_centrifugo_oversized_after_handshake(
+        cls, message_bytes: int
+    ) -> MockWsServer:
+        self = cls()
+        self._mode = "oversized"
+        self._message_bytes = message_bytes
+        await self._start()
+        return self
+
     async def _start(self) -> None:
         self._server = await serve(
             self._handler,
@@ -428,6 +438,9 @@ class MockWsServer:
                     await ws.send(centrifugo_ok_reply(replies))
                     if disconnect_after and replies >= 2:
                         await ws.close()
+                        return
+                    if self._mode == "oversized" and replies >= 2:
+                        await ws.send(b"\0" * self._message_bytes)
                         return
         except Exception:
             return

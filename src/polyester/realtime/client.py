@@ -36,6 +36,15 @@ CENTRIFUGO_PROTOBUF_SUBPROTOCOL = "centrifuge-protobuf"
 WS_MAX_MESSAGE_BYTES = 4 * 1024 * 1024
 
 
+class _TerminalRealtimeError(PolyesterRealtimeError):
+    """Protocol/data failure that reconnecting cannot repair."""
+
+
+def _is_oversized_websocket_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "1009" in message or "message too big" in message or "exceeds limit" in message
+
+
 def normalize_ws_url(ws_url: str) -> str:
     url = ws_url.rstrip("/")
     if url.endswith("/connection/websocket"):
@@ -259,6 +268,10 @@ class AsyncRealtimeClient:
                         sub._set_error(exc)
                         signal_ready(exc)
                         break
+                    except _TerminalRealtimeError as exc:
+                        sub._set_error(exc)
+                        signal_ready(exc)
+                        break
                     except PolyesterAuthError as exc:
                         # Auth failures must be observable; never hide behind reconnect.
                         sub._set_error(exc)
@@ -368,10 +381,22 @@ class AsyncRealtimeClient:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
+                    if _is_oversized_websocket_error(exc):
+                        raise _TerminalRealtimeError(
+                            f"realtime message exceeds {WS_MAX_MESSAGE_BYTES} bytes"
+                        ) from exc
                     raise PolyesterRealtimeError(str(exc)) from exc
                 if not isinstance(raw, bytes):
-                    raise PolyesterRealtimeError("received JSON text frame on protobuf websocket")
-                for incoming in decode_replies(raw):
+                    raise _TerminalRealtimeError(
+                        "received JSON text frame on protobuf websocket"
+                    )
+                try:
+                    incoming_messages = decode_replies(raw)
+                except Exception as exc:
+                    raise _TerminalRealtimeError(
+                        f"invalid realtime protobuf frame: {exc}"
+                    ) from exc
+                for incoming in incoming_messages:
                     if isinstance(incoming, Ping):
                         await ws.send(pong_command())
                     elif isinstance(incoming, Publication):

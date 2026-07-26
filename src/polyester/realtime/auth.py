@@ -71,18 +71,38 @@ def _auth_http_error(
     *,
     status_code: int,
     label: str,
+    endpoint: str,
     body: bytes,
 ) -> PolyesterAuthError:
     truncated = _truncate_body(body)
+    code: str | None = None
+    server_message: str | None = None
+    try:
+        payload = json.loads(body)
+        if isinstance(payload, dict):
+            raw_code = payload.get("code")
+            raw_message = payload.get("message")
+            if isinstance(raw_code, str) and raw_code.strip():
+                code = raw_code.strip()
+            if isinstance(raw_message, str) and raw_message.strip():
+                server_message = raw_message.strip()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        pass
+    code = code or ("permission_denied" if status_code == 403 else "unauthenticated")
     kind = "permission denied" if status_code == 403 else "authentication failed"
-    message = f"{label}: {kind} (HTTP {status_code})"
-    if truncated:
-        message = f"{message}: {truncated}"
+    detail = server_message or truncated
+    message = f"{label}: {kind} (HTTP {status_code}, code {code})"
+    if detail:
+        message = f"{message}: {detail}"
+    message = f"{message} [{endpoint}]"
     return PolyesterAuthError(
         message,
         status_code=status_code,
         label=label,
         body=truncated or None,
+        code=code,
+        context=label,
+        endpoint=endpoint,
     )
 
 
@@ -113,6 +133,7 @@ async def fetch_rt_token(
                     raise _auth_http_error(
                         status_code=response.status_code,
                         label=label,
+                        endpoint=url,
                         body=raw,
                     )
                 if response.status_code >= 400:

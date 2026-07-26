@@ -68,3 +68,33 @@ async def test_reconnect_refresh_fail_closed_after_retry() -> None:
     assert sub.last_error is not None
     assert len(errors) >= 1
     await sub.aclose()
+
+
+@pytest.mark.asyncio
+async def test_failed_refresh_retains_publications_for_successful_retry() -> None:
+    realtime = AsyncRealtimeClient("wss://example.invalid")
+    attempts = {"n": 0}
+    merged: list[list[bytes]] = []
+
+    async def fetch_snapshot() -> str:
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise PolyesterRealtimeError("transient snapshot failure")
+        return "recovered"
+
+    sub = AsyncSnapshotThenStreamSubscription(
+        realtime=realtime,
+        channel="public:test",
+        decode=lambda b: b,
+        fetch_snapshot=fetch_snapshot,
+        read_publication=lambda p: [p],
+        apply_snapshot=lambda _snapshot, pending: merged.append(pending),
+        apply_live_publications=lambda _p: None,
+    )
+    sub._handle_publication(b"before")
+    assert await sub.refresh_snapshot() is False
+    sub._handle_publication(b"during")
+    assert await sub.refresh_snapshot() is True
+    assert merged == [[b"before", b"during"]]
+    assert sub.last_error is None
+    await sub.aclose()

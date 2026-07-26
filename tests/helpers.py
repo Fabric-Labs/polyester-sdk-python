@@ -7,10 +7,6 @@ from polyester import format_ledger_u128
 from polyester.errors import PolyesterApiError, PolyesterServerError
 from polyester.models import BalancesList
 
-# USDT-quoted pairs; ETH-USDT first (devnet funding uses USDT on Ethereum).
-SMOKE_SYMBOL_CANDIDATES = ("ETH-USDT", "BTC-USDT", "SOL-USDT", "BNB-USDT")
-DEFAULT_SMOKE_SYMBOL = "ETH-USDT"
-
 # Limit prices safely below typical devnet spot when market overview is unavailable.
 FAR_BELOW_BUY_PRICE_HINTS: dict[str, str] = {
     "ETH-USDT": "100",
@@ -49,30 +45,17 @@ def live_client_kwargs_from_env(**overrides) -> dict | None:
     return kwargs
 
 
-def env_smoke_symbol() -> str | None:
-    return os.getenv("POLYESTER_TEST_SMOKE_SYMBOL") or os.getenv("POLYESTER_SMOKE_SYMBOL")
-
-
 def env_trade_symbol() -> str | None:
     return os.getenv("POLYESTER_TEST_TRADE_SYMBOL")
 
 
 def pick_smoke_symbol(spot_raw: dict) -> str:
-    override = env_smoke_symbol()
-    if override:
-        return override
-    symbols = {p.get("symbol") for p in spot_raw.get("pairs") or []}
-    for candidate in SMOKE_SYMBOL_CANDIDATES:
-        if candidate in symbols:
-            return candidate
-    pairs = spot_raw.get("pairs") or []
-    if pairs:
-        return str(pairs[0].get("symbol") or DEFAULT_SMOKE_SYMBOL)
-    return DEFAULT_SMOKE_SYMBOL
+    """Use the same canonical symbol selection as every other live test."""
+    return pick_trade_symbol(spot_raw)
 
 
 def pick_trade_symbol(spot_raw: dict) -> str:
-    """Resolve mutation/heartbeat symbol without smoke-environment fallbacks."""
+    """Resolve every live-test symbol from one canonical environment variable."""
     override = env_trade_symbol()
     if override:
         return override

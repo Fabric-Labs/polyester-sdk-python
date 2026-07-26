@@ -53,7 +53,7 @@ def _is_permission_denied(exc: BaseException) -> bool:
         or "http 403" in msg
     )
     if isinstance(exc, PolyesterAuthError):
-        return permissionish
+        return permissionish or str(exc.code or "").lower() == "permission_denied"
     if isinstance(exc, PolyesterApiError):
         code = str(getattr(exc, "code", "") or "").lower()
         return permissionish or "permission_denied" in code

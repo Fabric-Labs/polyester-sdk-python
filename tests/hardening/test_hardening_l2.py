@@ -32,7 +32,7 @@ from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.orders.v1 import orders_read_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
-from polyester.realtime.client import AsyncRealtimeClient
+from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncRealtimeClient
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from tests.hardening_support import (
     HttpScript,
@@ -272,12 +272,14 @@ async def test_l2_token_http_403_maps_to_auth_not_realtime() -> None:
     body = b'{"code":"permission_denied","message":"missing transfer:read"}'
 
     async def handler(req: ParsedRequest) -> HttpScript:
-        if req.path.startswith("/v1/rt/"):
+        if req.path == "/v1/rt/token":
+            return HttpScript.json(200, b'{"token":"connection-ok"}')
+        if req.path.startswith("/v1/rt/subscribe"):
             return HttpScript.json(403, body)
         return HttpScript.not_found()
 
     http = await MockHttpServer.spawn(handler)
-    ws = await MockWsServer.spawn_hang_after_accept()
+    ws = await MockWsServer.spawn_centrifugo_public()
     rt, client_http = await _private_rt(ws=ws, http=http, timeout=2.0)
     try:
         with pytest.raises(PolyesterAuthError) as exc_info:
@@ -287,6 +289,9 @@ async def test_l2_token_http_403_maps_to_auth_not_realtime() -> None:
             )
         err = exc_info.value
         assert err.status_code == 403
+        assert err.code == "permission_denied"
+        assert err.context is not None and "private:auth:transfers:acct:proto" in err.context
+        assert err.endpoint is not None and "/v1/rt/subscribe?channel=" in err.endpoint
         text = str(err).lower()
         assert "permission" in text
         assert "http 403" in text
@@ -577,6 +582,23 @@ async def test_l2_hundred_sub_close_returns_conn_count_to_baseline() -> None:
         await asyncio.gather(*(s.aclose() for s in subs))
         await wait_until(lambda: ws.active == 0, 0.75)
         assert time.monotonic() - started < 0.75, "100-sub close soak exceeded 750ms"
+    finally:
+        await rt.aclose()
+        await ws.aclose()
+
+
+@pytest.mark.asyncio
+async def test_l2_realtime_oversized_binary_message_fails_closed() -> None:
+    ws = await MockWsServer.spawn_centrifugo_oversized_after_handshake(
+        WS_MAX_MESSAGE_BYTES + 1
+    )
+    rt = AsyncRealtimeClient(ws.ws_url())
+    try:
+        sub = await rt.subscribe_proto(PUBLIC_CHANNEL, decode=_identity_decode)
+        await wait_until(lambda: sub.error is not None and not sub.is_alive, 3.0)
+        error = str(sub.error).lower()
+        assert "exceeds" in error or "too big" in error
+        await wait_until(lambda: ws.active == 0, 0.75)
     finally:
         await rt.aclose()
         await ws.aclose()
@@ -922,6 +944,51 @@ async def test_l2_snapshot_reconnect_success_clears_and_merges_once() -> None:
         assert sub.is_ready()
         assert sub.last_error is None
         assert attempts["n"] == 2
+    finally:
+        await sub.aclose()
+        await rt.aclose()
+        await ws.aclose()
+
+
+@pytest.mark.asyncio
+async def test_l2_close_during_snapshot_retry_cancels_fetch_and_socket() -> None:
+    ws = await MockWsServer.spawn_centrifugo_disconnect_after_handshake()
+    rt = AsyncRealtimeClient(ws.ws_url())
+    attempts = {"n": 0}
+    retry_stalled = asyncio.Event()
+    fetch_cancelled = asyncio.Event()
+
+    async def fetch_snapshot() -> str:
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return "initial"
+        if attempts["n"] == 2:
+            raise PolyesterRealtimeError("retry once")
+        retry_stalled.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            fetch_cancelled.set()
+            raise
+        return "unreachable"
+
+    sub = AsyncSnapshotThenStreamSubscription(
+        realtime=rt,
+        channel=PUBLIC_CHANNEL,
+        decode=_identity_decode,
+        fetch_snapshot=fetch_snapshot,
+        read_publication=lambda p: [p],
+        apply_snapshot=lambda _s, _p: None,
+        apply_live_publications=lambda _p: None,
+    )
+    try:
+        await sub.start()
+        await asyncio.wait_for(retry_stalled.wait(), timeout=5.0)
+        started = time.monotonic()
+        await asyncio.wait_for(sub.aclose(), timeout=0.75)
+        assert time.monotonic() - started < 0.75
+        assert fetch_cancelled.is_set()
+        await wait_until(lambda: ws.active == 0, 0.75)
     finally:
         await sub.aclose()
         await rt.aclose()

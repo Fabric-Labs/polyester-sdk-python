@@ -13,16 +13,16 @@ from tests.helpers import (
 )
 
 
-def test_pick_smoke_symbol_prefers_eth_usdt(monkeypatch):
-    monkeypatch.delenv("POLYESTER_TEST_SMOKE_SYMBOL", raising=False)
-    monkeypatch.delenv("POLYESTER_SMOKE_SYMBOL", raising=False)
+def test_pick_smoke_symbol_uses_canonical_trade_selection(monkeypatch):
+    monkeypatch.delenv("POLYESTER_TEST_TRADE_SYMBOL", raising=False)
     spot = {
         "pairs": [
             {"symbol": "BNB-USDT"},
+            {"symbol": "BTC-USDT"},
             {"symbol": "ETH-USDT"},
         ]
     }
-    assert pick_smoke_symbol(spot) == "ETH-USDT"
+    assert pick_smoke_symbol(spot) == "BTC-USDT"
 
 
 def test_pick_trade_symbol_prefers_trade_env_override(monkeypatch):

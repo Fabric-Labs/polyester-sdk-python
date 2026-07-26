@@ -87,7 +87,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             generation = self._generation + 1
             self._generation = generation
             self._ready = False
-            self._pending.clear()
+            # Publications buffered during a failed refresh must survive for
+            # the next successful retry and be merged exactly once.
             try:
                 snapshot = await self._fetch_snapshot()
             except Exception as exc:
@@ -168,6 +169,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
     async def _run_ws_loop(self) -> None:
         first = True
         while not self._disposed:
+            sub: AsyncSubscription[TPublication] | None = None
             try:
                 # Disable transport auto-reconnect so this loop can refresh
                 # REST snapshot state between reconnect attempts.
@@ -210,6 +212,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     if self._on_error is not None:
                         self._on_error(exc)
             finally:
+                if sub is not None:
+                    await sub.aclose()
                 self._ws_sub = None
             if self._disposed:
                 break

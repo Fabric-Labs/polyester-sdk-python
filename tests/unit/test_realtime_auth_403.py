@@ -37,6 +37,9 @@ async def test_fetch_rt_token_403_is_auth_error_with_fields() -> None:
     assert err.label == "realtime connection token"
     assert err.body is not None
     assert "permission_denied" in err.body
+    assert err.code == "permission_denied"
+    assert err.context == "realtime connection token"
+    assert err.endpoint == "https://api.example.test/v1/rt/token"
     assert "HTTP 403" in str(err)
     assert not isinstance(err, PolyesterRealtimeError)
 
@@ -56,3 +59,4 @@ async def test_fetch_rt_token_401_remains_auth() -> None:
                 label="realtime connection token",
             )
     assert exc_info.value.status_code == 401
+    assert exc_info.value.code == "unauthenticated"

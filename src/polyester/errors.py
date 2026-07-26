@@ -22,11 +22,17 @@ class PolyesterAuthError(PolyesterError):
         status_code: int | None = None,
         label: str | None = None,
         body: str | None = None,
+        code: str | None = None,
+        context: str | None = None,
+        endpoint: str | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.label = label
         self.body = body
+        self.code = code
+        self.context = context or label
+        self.endpoint = endpoint
 
 
 class PolyesterValidationError(PolyesterError):

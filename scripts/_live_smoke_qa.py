@@ -34,7 +34,7 @@ async def main() -> int:
         print("OK: concurrent list_open 32/32")
 
         # Public protobuf realtime: must receive at least one publication.
-        symbol = os.getenv("POLYESTER_TEST_SMOKE_SYMBOL") or "BTC-USDT"
+        symbol = os.getenv("POLYESTER_TEST_TRADE_SYMBOL") or "BTC-USDT"
         sub = await client.market_data.subscribe_trades(symbol=symbol)
         got = 0
         deadline = asyncio.get_running_loop().time() + 25

@@ -115,7 +115,7 @@ def create_trigger_to_proto(
     ladder_price_max: Any | None = None,
     ladder_levels: int | None = None,
     ladder_distribution: str | None = None,
-    quantity_scale: int = 8,
+    quantity_scale: int,
 ) -> triggers_pb2.CreateTriggerRequest:
     type_key = trigger_type.lower().replace("-", "_")
     if type_key not in TRIGGER_TYPE_TO_PROTO:

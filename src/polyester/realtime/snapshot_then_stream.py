@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
 from polyester.errors import PolyesterRealtimeError, PolyesterRealtimeOverflowError
-from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription, _ReconnectBackoff
 
 TSnapshot = TypeVar("TSnapshot")
 TPublication = TypeVar("TPublication")
@@ -56,6 +56,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         self._ws_sub: AsyncSubscription[TPublication] | None = None
         self._runner_task: asyncio.Task[None] | None = None
         self._last_error: BaseException | None = None
+        self._initial_handshake: asyncio.Future[None] | None = None
 
     @property
     def last_error(self) -> BaseException | None:
@@ -68,8 +69,19 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
     async def start(self) -> None:
         if self._runner_task is not None:
             return
+        self._initial_handshake = asyncio.get_running_loop().create_future()
         self._runner_task = asyncio.create_task(self._run_ws_loop())
-        await self.refresh_snapshot()
+        try:
+            await self._initial_handshake
+            if not await self.refresh_snapshot():
+                error = self._last_error or PolyesterRealtimeError("initial snapshot failed")
+                raise error
+        except BaseException as exc:
+            if isinstance(exc, Exception):
+                self._last_error = exc
+                self._report_snapshot_error(exc)
+            await self.aclose()
+            raise
 
     def is_ready(self) -> bool:
         return self._ready
@@ -99,13 +111,18 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             if self._disposed or generation != self._generation:
                 return False
             buffered = self._take_pending()
-            self._apply_snapshot(snapshot, buffered)
+            try:
+                self._apply_snapshot(snapshot, buffered)
+            except Exception as exc:
+                self._fail_closed(
+                    PolyesterRealtimeError(f"apply_snapshot callback failed: {exc}")
+                )
+                return False
             if self._disposed or generation != self._generation:
                 return False
             self._ready = True
             self._last_error = None
-            if self._on_snapshot_refresh is not None:
-                self._on_snapshot_refresh()
+            self._notify(self._on_snapshot_refresh)
             return True
 
     async def aclose(self) -> None:
@@ -125,7 +142,13 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         return buffered
 
     def _handle_publication(self, message: TPublication) -> None:
-        publications = self._read_publication(message)
+        try:
+            publications = self._read_publication(message)
+        except Exception as exc:
+            self._fail_closed(
+                PolyesterRealtimeError(f"read_publication callback failed: {exc}")
+            )
+            return
         if not publications:
             return
         if not self._ready:
@@ -135,13 +158,14 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                 overflow = PolyesterRealtimeOverflowError(
                     "snapshot recovery buffer full; recreate the subscription"
                 )
-                self._last_error = overflow
-                self._ready = False
-                self._disposed = True
-                self._generation += 1
-                self._report_snapshot_error(overflow)
+                self._fail_closed(overflow)
             return
-        self._apply_live_publications(publications)
+        try:
+            self._apply_live_publications(publications)
+        except Exception as exc:
+            self._fail_closed(
+                PolyesterRealtimeError(f"apply_live_publications callback failed: {exc}")
+            )
 
     async def _refresh_after_reconnect(self) -> None:
         """One bounded retry on reconnect, then fail-closed."""
@@ -159,15 +183,15 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             )
         self._disposed = True
         self._ready = False
-        if self._on_error is not None:
-            self._on_error(
-                self._last_error
-                if isinstance(self._last_error, Exception)
-                else Exception(str(self._last_error))
-            )
+        self._report_snapshot_error(
+            self._last_error
+            if isinstance(self._last_error, Exception)
+            else Exception(str(self._last_error))
+        )
 
     async def _run_ws_loop(self) -> None:
         first = True
+        backoff = _ReconnectBackoff()
         while not self._disposed:
             sub: AsyncSubscription[TPublication] | None = None
             try:
@@ -182,11 +206,16 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     await sub.aclose()
                     break
                 self._ws_sub = sub
-                if self._on_open is not None:
-                    self._on_open()
+                backoff.reset()
+                if (
+                    first
+                    and self._initial_handshake is not None
+                    and not self._initial_handshake.done()
+                ):
+                    self._initial_handshake.set_result(None)
+                self._notify(self._on_open)
                 if not first:
-                    if self._on_reconnect is not None:
-                        self._on_reconnect()
+                    self._notify(self._on_reconnect)
                     await self._refresh_after_reconnect()
                     if self._disposed:
                         await sub.aclose()
@@ -198,29 +227,48 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     self._handle_publication(message)
                 if sub.error is not None:
                     self._last_error = sub.error
-                    if self._on_error is not None:
-                        self._on_error(
-                            sub.error
-                            if isinstance(sub.error, Exception)
-                            else Exception(str(sub.error))
-                        )
+                    self._report_snapshot_error(
+                        sub.error
+                        if isinstance(sub.error, Exception)
+                        else Exception(str(sub.error))
+                    )
             except asyncio.CancelledError:
                 break
             except Exception as exc:
                 if not self._disposed:
                     self._last_error = exc
-                    if self._on_error is not None:
-                        self._on_error(exc)
+                    if (
+                        first
+                        and self._initial_handshake is not None
+                        and not self._initial_handshake.done()
+                    ):
+                        self._initial_handshake.set_exception(exc)
+                        return
+                    self._report_snapshot_error(exc)
             finally:
                 if sub is not None:
                     await sub.aclose()
                 self._ws_sub = None
             if self._disposed:
                 break
-            if self._on_close is not None:
-                self._on_close()
-            await asyncio.sleep(1.0)
+            self._notify(self._on_close)
+            await asyncio.sleep(backoff.next_delay())
 
     def _report_snapshot_error(self, error: Exception) -> None:
         if self._on_error is not None:
-            self._on_error(error)
+            with contextlib.suppress(BaseException):
+                self._on_error(error)
+
+    @staticmethod
+    def _notify(callback: Callable[[], None] | None) -> None:
+        if callback is not None:
+            with contextlib.suppress(BaseException):
+                callback()
+
+    def _fail_closed(self, error: Exception) -> None:
+        self._last_error = error
+        self._ready = False
+        self._disposed = True
+        self._generation += 1
+        self._pending.clear()
+        self._report_snapshot_error(error)

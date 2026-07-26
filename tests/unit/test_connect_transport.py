@@ -1,4 +1,5 @@
 import httpx
+import pytest
 
 from polyester.connect_transport import (
     connect_headers,
@@ -6,7 +7,11 @@ from polyester.connect_transport import (
     normalize_procedure,
     raise_for_status,
 )
-from polyester.errors import PolyesterRouteNotFoundError, PolyesterValidationError
+from polyester.errors import (
+    PolyesterRateLimitError,
+    PolyesterRouteNotFoundError,
+    PolyesterValidationError,
+)
 
 
 def test_normalize_procedure_adds_leading_slash() -> None:
@@ -42,3 +47,17 @@ def test_binary_wire_requires_generated_clients() -> None:
         pass
     else:
         raise AssertionError("expected binary wire format to require generated clients")
+
+
+def test_rate_limit_parses_retry_after_seconds() -> None:
+    response = httpx.Response(429, text="slow down", headers={"Retry-After": "2.5"})
+    with pytest.raises(PolyesterRateLimitError) as caught:
+        raise_for_status(response)
+    assert caught.value.retry_after == 2.5
+
+
+def test_rate_limit_ignores_malformed_retry_after() -> None:
+    response = httpx.Response(429, text="slow down", headers={"Retry-After": "tomorrow"})
+    with pytest.raises(PolyesterRateLimitError) as caught:
+        raise_for_status(response)
+    assert caught.value.retry_after is None

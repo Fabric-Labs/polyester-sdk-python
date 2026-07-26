@@ -121,3 +121,23 @@ class PolyesterRealtimeOverflowError(PolyesterRealtimeError):
     Subscriptions fail instead of silently dropping updates so callers can
     recover (reconnect, resubscribe, or slow their consumer).
     """
+
+
+def is_retryable_error(err: BaseException) -> bool:
+    """Return whether retrying may succeed after backoff.
+
+    This does not guarantee that a mutation was not applied. Preserve the
+    original idempotency key and reconcile first when
+    :func:`mutation_outcome_unknown` returns true.
+    """
+    return isinstance(
+        err,
+        (PolyesterTransportError, PolyesterRateLimitError, PolyesterServerError),
+    )
+
+
+def mutation_outcome_unknown(err: BaseException) -> bool:
+    """Return whether the server may have applied a failed mutation."""
+    return isinstance(err, (PolyesterTransportError, PolyesterServerError)) and not isinstance(
+        err, PolyesterRateLimitError
+    )

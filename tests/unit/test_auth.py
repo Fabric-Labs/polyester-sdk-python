@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -131,7 +132,7 @@ def test_ed25519_keypair_repr_redacts_secret() -> None:
     assert secret.hex() not in rendered
 
 
-def test_automatic_timestamps_are_unique_under_concurrency() -> None:
+def test_automatic_timestamps_track_wall_clock_under_concurrency() -> None:
     credentials = ApiKeyCredentials(
         key_id="key_123",
         private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
@@ -145,10 +146,26 @@ def test_automatic_timestamps_are_unique_under_concurrency() -> None:
             body=b"{}",
         )
 
+    before = int(time.time() * 1000)
     with ThreadPoolExecutor(max_workers=32) as executor:
-        headers = list(executor.map(sign, range(32)))
-    assert len({item["X-API-TIMESTAMP"] for item in headers}) == 32
-    assert len({item["X-API-SIGNATURE"] for item in headers}) == 32
+        headers = list(executor.map(sign, range(100_000)))
+    after = int(time.time() * 1000)
+    timestamps = [int(item["X-API-TIMESTAMP"]) for item in headers]
+    assert min(timestamps) >= before
+    assert max(timestamps) <= after
+
+
+def test_signing_rejects_malformed_absolute_url() -> None:
+    credentials = ApiKeyCredentials(
+        key_id="key_123",
+        private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
+    )
+    try:
+        sign_request(credentials, method="POST", url="://not-a-url", body=b"{}")
+    except Exception as exc:
+        assert "malformed absolute HTTP URL" in str(exc)
+    else:
+        raise AssertionError("malformed URL must fail closed")
 
 
 def test_load_credentials_from_private_key_env(monkeypatch) -> None:

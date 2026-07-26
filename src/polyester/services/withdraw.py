@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.withdraw import (
-    new_trading_withdraw_idempotency_key,
-    trading_withdraw_payload_to_proto,
-)
+from polyester.codecs.withdraw import trading_withdraw_payload_to_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.chain.withdraw.v1.withdraw_connect import WithdrawServiceClient
@@ -29,11 +26,13 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         asset_id: int,
         quantity: str | AssetAmount,
         payload_signature: bytes,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
+        nonce: str | int,
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         destination_address: str = "",
         amount_scale: int = 18,
+        deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
         """Move trading balance to funding via a signed withdraw intent."""
         if not payload_signature:
@@ -42,7 +41,9 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
             action="to_funding",
             asset_id=asset_id,
             amount=quantity,
-            idempotency_key=idempotency_key or new_trading_withdraw_idempotency_key(),
+            idempotency_key=idempotency_key,
+            deadline_ts_sec=deadline_ts_sec,
+            nonce=nonce,
             destination_address=destination_address,
             amount_scale=amount_scale,
         )
@@ -60,10 +61,12 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         payload_signature: bytes,
         destination_chain_id: int,
         destination_address: str,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
+        nonce: str | int,
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         amount_scale: int = 18,
+        deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")
@@ -75,8 +78,10 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
             action="to_external_chain",
             asset_id=asset_id,
             amount=quantity,
-            idempotency_key=idempotency_key or new_trading_withdraw_idempotency_key(),
+            idempotency_key=idempotency_key,
             destination_chain_id=destination_chain_id,
+            deadline_ts_sec=deadline_ts_sec,
+            nonce=nonce,
             destination_address=destination_address,
             amount_scale=amount_scale,
         )
@@ -99,10 +104,12 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         sub_account_id: str | None = None,
         destination_chain_id: int = 0,
         deadline_ts_sec: int | None = None,
-        nonce: str | int | None = None,
+        nonce: str | int,
         destination_address: str = "",
         amount_scale: int = 18,
     ) -> WithdrawIntentResult:
+        if not payload_signature:
+            raise PolyesterValidationError("payload_signature is required for trading withdraw")
         payload = trading_withdraw_payload_to_proto(
             action=action,
             asset_id=asset_id,

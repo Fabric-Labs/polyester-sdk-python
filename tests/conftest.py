@@ -80,6 +80,17 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     """Tag live integration tests as credentialed; smoke subset as public_smoke."""
     del config
     for item in items:
+        if item.get_closest_marker("jwt_session") is not None and not _env_truthy(
+            "POLYESTER_TEST_JWT_SESSION"
+        ):
+            item.add_marker(
+                pytest.mark.skip(
+                    reason=(
+                        "JWT/session route is outside API-key SDK acceptance; "
+                        "set POLYESTER_TEST_JWT_SESSION=1 with session credentials"
+                    )
+                )
+            )
         if item.get_closest_marker("integration") is None:
             continue
         if item.get_closest_marker("credentialed") is None:

@@ -8,7 +8,12 @@ import pytest
 
 from polyester.auth import ApiKeyCredentials
 from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
-from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription, is_private_channel
+from polyester.realtime.client import (
+    AsyncRealtimeClient,
+    AsyncSubscription,
+    _ReconnectBackoff,
+    is_private_channel,
+)
 from polyester.realtime.protocol import (
     Ping,
     Publication,
@@ -40,6 +45,31 @@ async def test_async_subscription_context_manager_closes_subscription() -> None:
         assert not close.is_set()
 
     assert close.is_set()
+
+
+def test_async_subscription_error_callback_is_observable_and_isolated() -> None:
+    queue: asyncio.Queue[object | None] = asyncio.Queue()
+    close = asyncio.Event()
+    subscription = AsyncSubscription[object](queue=queue, close=close)
+    observed: list[str] = []
+    subscription.set_on_error(lambda exc: observed.append(str(exc)))
+    subscription._set_error(PolyesterRealtimeError("feed stopped"))
+    assert observed == ["feed stopped"]
+    assert str(subscription.error) == "feed stopped"
+
+    subscription.set_on_error(lambda _exc: (_ for _ in ()).throw(RuntimeError("callback")))
+    subscription._notify_error(PolyesterRealtimeError("ignored callback failure"))
+
+
+def test_reconnect_backoff_is_bounded_exponential_and_jittered() -> None:
+    backoff = _ReconnectBackoff()
+    delays = [backoff.next_delay() for _ in range(10)]
+    caps = [0.5, 1, 2, 4, 8, 16, 30, 30, 30, 30]
+    for delay, cap in zip(delays, caps, strict=True):
+        assert cap / 2 <= delay <= cap
+    assert len(set(delays)) > 1
+    backoff.reset()
+    assert 0.25 <= backoff.next_delay() <= 0.5
 
 
 @pytest.mark.asyncio
@@ -296,7 +326,7 @@ async def test_subscribe_proto_read_timeout_reconnects_when_enabled() -> None:
 
     with (
         patch("polyester.realtime.client.CENTRIFUGO_READ_TIMEOUT", 0.05),
-        patch("polyester.realtime.client.CENTRIFUGO_RECONNECT_DELAY", 0.01),
+        patch.object(_ReconnectBackoff, "next_delay", return_value=0.01),
         patch("polyester.realtime.client.websockets.connect", side_effect=fake_connect),
     ):
         subscription = await client.subscribe_proto(
@@ -343,7 +373,7 @@ async def test_subscribe_proto_resubscribed_increments_after_forced_reconnect() 
         return FakeWS()
 
     with (
-        patch("polyester.realtime.client.CENTRIFUGO_RECONNECT_DELAY", 0.01),
+        patch.object(_ReconnectBackoff, "next_delay", return_value=0.01),
         patch("polyester.realtime.client.websockets.connect", side_effect=fake_connect),
     ):
         subscription = await client.subscribe_proto(

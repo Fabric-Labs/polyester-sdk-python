@@ -23,6 +23,7 @@ async def test_create_to_funding_builds_signed_request() -> None:
             quantity="10",
             payload_signature=b"\x01\x02",
             idempotency_key="idem-1",
+            nonce=42,
         )
     assert isinstance(capture.request, withdraw_pb2.CreateTradingWithdrawRequest)
     assert capture.request.payload.action == withdraw_pb2.TO_FUNDING
@@ -36,7 +37,13 @@ async def test_create_to_funding_builds_signed_request() -> None:
 async def test_create_to_funding_rejects_missing_signature() -> None:
     service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
     with pytest.raises(PolyesterValidationError, match="payload_signature is required"):
-        await service.create_to_funding(asset_id=1, quantity="1", payload_signature=b"")
+        await service.create_to_funding(
+            asset_id=1,
+            quantity="1",
+            payload_signature=b"",
+            idempotency_key="missing-signature",
+            nonce=42,
+        )
 
 
 @pytest.mark.asyncio
@@ -49,6 +56,8 @@ async def test_create_to_external_chain_requires_destination() -> None:
             payload_signature=b"\xaa",
             destination_chain_id=1,
             destination_address="",
+            idempotency_key="missing-destination",
+            nonce=42,
         )
 
 
@@ -64,6 +73,7 @@ async def test_create_to_external_chain_builds_payload() -> None:
             destination_chain_id=42161,
             destination_address="0xabc",
             idempotency_key="ext-1",
+            nonce=42,
         )
     assert capture.request.payload.action == withdraw_pb2.TO_EXTERNAL_CHAIN
     assert capture.request.payload.destination_chain_id == 42161
@@ -85,7 +95,34 @@ async def test_create_wallet_trading_withdraw_sets_subaccount_id() -> None:
             idempotency_key="wallet-1",
             payload_signature=b"\xcc",
             signer_wallet="0xsigner",
+            nonce=42,
         )
     assert isinstance(capture.request, withdraw_pb2.CreateWalletTradingWithdrawRequest)
     assert capture.request.signer_wallet == "0xsigner"
     assert capture.request.subaccount_id == 12
+
+
+@pytest.mark.asyncio
+async def test_create_to_funding_rejects_empty_idempotency_key() -> None:
+    service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+    with pytest.raises(PolyesterValidationError, match="idempotency_key"):
+        await service.create_to_funding(
+            asset_id=1,
+            quantity="1",
+            payload_signature=b"\x01",
+            idempotency_key="",
+            nonce=42,
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_to_funding_rejects_zero_nonce() -> None:
+    service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+    with pytest.raises(PolyesterValidationError, match="nonce"):
+        await service.create_to_funding(
+            asset_id=1,
+            quantity="1",
+            payload_signature=b"\x01",
+            idempotency_key="stable-withdraw",
+            nonce=0,
+        )

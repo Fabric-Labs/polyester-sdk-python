@@ -12,6 +12,7 @@ def test_create_trigger_stop_loss_maps_core_fields() -> None:
         trigger_price="50000",
         side="sell",
         qty="0.1",
+        quantity_scale=8,
         order_type="limit",
         limit_price="49900",
         tif="gtc",
@@ -38,6 +39,7 @@ def test_create_trigger_rejects_post_only_on_non_gtc_child() -> None:
             trigger_price="50000",
             side="sell",
             qty="0.1",
+            quantity_scale=8,
             order_type="limit",
             limit_price="49900",
             tif="ioc",
@@ -52,6 +54,7 @@ def test_create_trigger_stop_loss_market_child() -> None:
         trigger_price="60000",
         side="sell",
         qty="0.1",
+        quantity_scale=8,
         order_type="market",
     )
     trigger = proto.trigger
@@ -66,6 +69,7 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
         trigger_type="trailing_stop",
         side="sell",
         qty="0.1",
+        quantity_scale=8,
         trailing_distance_ticks=500_000,
         activation_price="51000",
         max_slippage_bps=25,
@@ -89,6 +93,7 @@ def test_create_trigger_trailing_stop_rejects_buy() -> None:
             trigger_type="trailing_stop",
             side="buy",
             qty="0.1",
+            quantity_scale=8,
             trailing_distance_bps=100,
         )
 
@@ -99,6 +104,7 @@ def test_create_trigger_twap_maps_window_fields() -> None:
         trigger_type="twap",
         side="buy",
         qty="1",
+        quantity_scale=8,
         twap_duration_ms=60_000,
         twap_slice_interval_ms=5_000,
     )
@@ -117,6 +123,7 @@ def test_create_trigger_ladder_maps_range_fields() -> None:
         trigger_type="ladder",
         side="buy",
         qty="1",
+        quantity_scale=8,
         ladder_price_min="48000",
         ladder_price_max="52000",
         ladder_levels=5,
@@ -139,6 +146,7 @@ def test_create_trigger_rejects_non_linear_ladder_distribution() -> None:
                 trigger_type="ladder",
                 side="buy",
                 qty="1",
+                quantity_scale=8,
                 ladder_distribution=distribution,
             )
         except PolyesterValidationError as exc:

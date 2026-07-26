@@ -75,8 +75,8 @@ def side_to_levels(
     *,
     side: str,
     limit: int,
+    quantity_scale: int,
     bucket_ticks: int | None = None,
-    quantity_scale: int = 8,
 ) -> list[OrderbookLevel]:
     view = bucket_side(book, bucket_ticks)
     entries = list(view.items())
@@ -101,8 +101,8 @@ def build_orderbook_data(
     book_seq: int,
     bids: BookSide,
     asks: BookSide,
+    quantity_scale: int,
     bucket_ticks: int | None = None,
-    quantity_scale: int = 8,
 ) -> OrderbookData:
     return OrderbookData(
         symbol=symbol,

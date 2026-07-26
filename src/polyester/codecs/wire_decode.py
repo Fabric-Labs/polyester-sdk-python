@@ -175,7 +175,7 @@ def decode_user_trades_list(data: dict[str, Any]) -> UserTradesList:
     )
 
 
-def decode_market_trade(data: dict[str, Any]) -> MarketTrade:
+def decode_market_trade(data: dict[str, Any], *, quantity_scale: int) -> MarketTrade:
     from polyester.types.money import Price, Quantity
 
     symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
@@ -186,14 +186,14 @@ def decode_market_trade(data: dict[str, Any]) -> MarketTrade:
         match_id=str(_field(data, "matchId", "match_id", default="") or ""),
         is_buy=bool(_field(data, "isBuy", "is_buy", default=False)),
         price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
-        qty=Quantity.from_scaled(int(qty_raw), symbol_id=symbol_id),
+        qty=Quantity.from_scaled(int(qty_raw), scale=quantity_scale, symbol_id=symbol_id),
         ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
     )
 
 
-def decode_market_trades_list(data: dict[str, Any]) -> MarketTradesResult:
+def decode_market_trades_list(data: dict[str, Any], *, quantity_scale: int) -> MarketTradesResult:
     trades = [
-        decode_market_trade(item)
+        decode_market_trade(item, quantity_scale=quantity_scale)
         for item in _field(data, "trades", default=[]) or []
         if isinstance(item, dict)
     ]
@@ -203,7 +203,7 @@ def decode_market_trades_list(data: dict[str, Any]) -> MarketTradesResult:
     )
 
 
-def decode_candle(data: dict[str, Any], *, volume_scale: int = 8) -> Candle:
+def decode_candle(data: dict[str, Any], *, volume_scale: int) -> Candle:
     return Candle(
         ts_sec=int(_field(data, "tsSec", "ts_sec", default=0) or 0),
         open=_decode_price_field(_field(data, "open", default="") or ""),
@@ -218,7 +218,7 @@ def decode_candle(data: dict[str, Any], *, volume_scale: int = 8) -> Candle:
     )
 
 
-def decode_candles_list(data: dict[str, Any], *, volume_scale: int = 8) -> CandlesResult:
+def decode_candles_list(data: dict[str, Any], *, volume_scale: int) -> CandlesResult:
     candles = [
         decode_candle(item, volume_scale=volume_scale)
         for item in _field(data, "candles", default=[]) or []
@@ -233,7 +233,7 @@ def decode_candles_list(data: dict[str, Any], *, volume_scale: int = 8) -> Candl
     )
 
 
-def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int = 8) -> list[Candle]:
+def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int) -> list[Candle]:
     ts_list = _field(data, "tsSec", "ts_sec", default=[]) or []
     opens = _field(data, "open", default=[]) or []
     highs = _field(data, "high", default=[]) or []
@@ -615,13 +615,13 @@ def decode_holds_list(data: dict[str, Any]) -> HoldsList:
     return HoldsList(holds=holds)
 
 
-def decode_market_trade_bytes(payload: bytes) -> MarketTrade:
+def decode_market_trade_bytes(payload: bytes, *, quantity_scale: int) -> MarketTrade:
     from polyester._wire import protobuf_to_public_dict
     from polyester.gen.marketdata.v1.marketdata_pb2 import MarketTrade as MarketTradePb
 
     message = MarketTradePb()
     message.ParseFromString(payload)
-    return decode_market_trade(protobuf_to_public_dict(message))
+    return decode_market_trade(protobuf_to_public_dict(message), quantity_scale=quantity_scale)
 
 
 def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:

@@ -1,8 +1,13 @@
+import pytest
+
 from polyester.codecs.decode.lifecycle import (
+    flow_detail_from_proto,
     flow_from_get_response,
     flow_summary_from_proto,
     flows_list_from_proto,
 )
+from polyester.codecs.realtime_decode import decode_flow_detail_bytes
+from polyester.errors import PolyesterRealtimeError, PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
 
 
@@ -51,3 +56,13 @@ def test_flows_list_from_proto() -> None:
     result = flows_list_from_proto(msg)
     assert len(result.flows) == 2
     assert result.next_page_token == "next"
+
+
+def test_flow_detail_missing_summary_fails_closed() -> None:
+    with pytest.raises(PolyesterTransportError, match="missing summary"):
+        flow_detail_from_proto(lifecycle_read_pb2.FlowDetailView(from_live_state=True))
+
+
+def test_realtime_decoder_rejects_empty_payload() -> None:
+    with pytest.raises(PolyesterRealtimeError, match="empty publication"):
+        decode_flow_detail_bytes(b"")

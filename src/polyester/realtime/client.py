@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import secrets
 from collections.abc import AsyncIterator, Callable
 from typing import Any, Generic, TypeVar
 
@@ -30,7 +31,8 @@ T = TypeVar("T")
 
 # Match Go: long read deadline so Centrifugo ping/pong completes without reconnect churn.
 CENTRIFUGO_READ_TIMEOUT = 30.0
-CENTRIFUGO_RECONNECT_DELAY = 1.0
+CENTRIFUGO_RECONNECT_INITIAL_CAP = 0.5
+CENTRIFUGO_RECONNECT_MAX_CAP = 30.0
 CENTRIFUGO_PROTOBUF_SUBPROTOCOL = "centrifuge-protobuf"
 # Bound inbound websocket frames (DoS / memory); Centrifugo pubs stay well below this.
 WS_MAX_MESSAGE_BYTES = 4 * 1024 * 1024
@@ -38,6 +40,22 @@ WS_MAX_MESSAGE_BYTES = 4 * 1024 * 1024
 
 class _TerminalRealtimeError(PolyesterRealtimeError):
     """Protocol/data failure that reconnecting cannot repair."""
+
+
+class _ReconnectBackoff:
+    """Exponential reconnect backoff with full-width cryptographic jitter."""
+
+    def __init__(self) -> None:
+        self._cap = CENTRIFUGO_RECONNECT_INITIAL_CAP
+
+    def reset(self) -> None:
+        self._cap = CENTRIFUGO_RECONNECT_INITIAL_CAP
+
+    def next_delay(self) -> float:
+        half = self._cap / 2
+        delay = half + (secrets.randbelow(1_000_001) / 1_000_000) * half
+        self._cap = min(self._cap * 2, CENTRIFUGO_RECONNECT_MAX_CAP)
+        return delay
 
 
 def _is_oversized_websocket_error(exc: BaseException) -> bool:
@@ -85,6 +103,7 @@ class AsyncSubscription(Generic[T]):
         self._close = close
         self._task = task
         self._error: BaseException | None = None
+        self._on_error: Callable[[BaseException], None] | None = None
         # Successful reconnects after the initial handshake. Each increment means
         # the consumer must treat prior stream continuity as lost (possible gap).
         self._resubscribed = 0
@@ -128,6 +147,23 @@ class AsyncSubscription(Generic[T]):
     def _set_error(self, exc: BaseException) -> None:
         if self._error is None:
             self._error = exc
+        self._notify_error(exc)
+
+    def _notify_error(self, exc: BaseException) -> None:
+        if self._on_error is not None:
+            with contextlib.suppress(BaseException):
+                self._on_error(exc)
+
+    def set_on_error(self, callback: Callable[[BaseException], None] | None) -> None:
+        """Set a callback for background transport and terminal stream errors.
+
+        Callback exceptions are isolated from the subscription worker. If a
+        terminal error already occurred, the callback is invoked immediately.
+        """
+        self._on_error = callback
+        if callback is not None and self._error is not None:
+            with contextlib.suppress(BaseException):
+                callback(self._error)
 
     def __aiter__(self) -> AsyncIterator[T]:
         return self
@@ -202,9 +238,16 @@ class AsyncRealtimeClient:
 
         sub._on_closed = _untrack
 
-    async def subscribe_market_trades(self, symbol_id: int) -> AsyncSubscription[Any]:
+    async def subscribe_market_trades(
+        self, symbol_id: int, *, quantity_scale: int
+    ) -> AsyncSubscription[Any]:
         channel = f"public:spot:market:trades:{symbol_id}:proto"
-        return await self.subscribe_proto(channel, decode=self._decode_market_trade)
+        return await self.subscribe_proto(
+            channel,
+            decode=lambda payload: self._decode_market_trade(
+                payload, quantity_scale=quantity_scale
+            ),
+        )
 
     async def subscribe_proto(
         self,
@@ -229,6 +272,7 @@ class AsyncRealtimeClient:
         sub = AsyncSubscription[T](queue=queue, close=close, task=None)
         ready: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         handshake_count = 0
+        backoff = _ReconnectBackoff()
 
         def signal_ready(exc: BaseException | None = None) -> None:
             if ready.done():
@@ -241,6 +285,7 @@ class AsyncRealtimeClient:
         def on_ready() -> None:
             nonlocal handshake_count
             handshake_count += 1
+            backoff.reset()
             if handshake_count > 1:
                 sub._mark_resubscribed()
             signal_ready(None)
@@ -288,6 +333,7 @@ class AsyncRealtimeClient:
                         if not auto_reconnect:
                             sub._set_error(exc)
                             break
+                        sub._notify_error(exc)
                     else:
                         if close.is_set():
                             break
@@ -297,7 +343,7 @@ class AsyncRealtimeClient:
                         break
                     if not auto_reconnect:
                         break
-                    await asyncio.sleep(CENTRIFUGO_RECONNECT_DELAY)
+                    await asyncio.sleep(backoff.next_delay())
             finally:
                 if not ready.done():
                     signal_ready(
@@ -427,10 +473,10 @@ class AsyncRealtimeClient:
         return self._http
 
     @staticmethod
-    def _decode_market_trade(payload: bytes):
+    def _decode_market_trade(payload: bytes, *, quantity_scale: int):
         from polyester.codecs.wire_decode import decode_market_trade_bytes
 
-        return decode_market_trade_bytes(payload)
+        return decode_market_trade_bytes(payload, quantity_scale=quantity_scale)
 
     async def _centrifugo_connect(
         self,

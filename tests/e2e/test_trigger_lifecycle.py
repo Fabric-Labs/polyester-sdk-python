@@ -6,20 +6,29 @@ from polyester.errors import PolyesterApiError
 from tests.e2e.helpers import unique_client_order_id, usdt_funded_buy_stop_params
 
 
-async def _wait_for_trigger(client, trigger_id: str, *, timeout: float = 10):
+async def _wait_for_trigger(
+    client,
+    trigger_id: str,
+    *,
+    desired_status: str | None = None,
+    timeout: float = 10,
+):
     attempts = max(1, int(timeout / 0.5))
     last_error: Exception | None = None
     for _ in range(attempts):
         try:
             trigger = await client.triggers.get(trigger_id=trigger_id)
-            if trigger is not None:
+            if trigger is not None and (desired_status is None or trigger.status == desired_status):
                 return trigger
         except PolyesterApiError as exc:
             if str(exc.code or "").lower() != "not_found":
                 raise
             last_error = exc
         await asyncio.sleep(0.5)
-    raise AssertionError(f"Trigger {trigger_id} was not readable within {timeout}s") from last_error
+    condition = f"status {desired_status!r}" if desired_status is not None else "a readable state"
+    raise AssertionError(
+        f"Trigger {trigger_id} did not reach {condition} within {timeout}s"
+    ) from last_error
 
 
 async def _wait_for_trigger_events(client, trigger_id: str, *, timeout: float = 10):
@@ -58,7 +67,11 @@ async def test_trigger_pause_resume_cancel(
 
     cancelled_ok = False
     try:
-        trigger = await _wait_for_trigger(live_client, created.trigger_id)
+        trigger = await _wait_for_trigger(
+            live_client,
+            created.trigger_id,
+            desired_status="armed",
+        )
         assert trigger.trigger_id == created.trigger_id
         assert trigger.client_trigger_id == client_trigger_id
         assert trigger.status == "armed"

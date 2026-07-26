@@ -22,9 +22,7 @@ def test_trigger_from_proto_maps_stop_price() -> None:
             trigger_price_ticks=50_000_000_000,
             side=orders_pb2.SELL,
             child=triggers_pb2.ConditionalChildExecution(
-                limit_gtc=triggers_pb2.TriggerLimitGtc(
-                    price_ticks=49_900_000_000, post_only=True
-                )
+                limit_gtc=triggers_pb2.TriggerLimitGtc(price_ticks=49_900_000_000, post_only=True)
             ),
         ),
         # Runtime details drive the discriminated details payload.
@@ -68,9 +66,7 @@ def test_triggers_list_from_proto() -> None:
 
 
 def test_get_trigger_from_proto() -> None:
-    msg = triggers_pb2.GetTriggerResponse(
-        trigger=triggers_pb2.Trigger(trigger_id=3, symbol_id=1)
-    )
+    msg = triggers_pb2.GetTriggerResponse(trigger=triggers_pb2.Trigger(trigger_id=3, symbol_id=1))
     trigger = get_trigger_from_proto(msg)
     assert trigger is not None
     assert trigger.trigger_id == format_id(3)

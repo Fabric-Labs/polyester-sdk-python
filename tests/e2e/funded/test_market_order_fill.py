@@ -21,6 +21,11 @@ from tests.helpers import (
     trading_balance_decimal,
 )
 
+pytestmark = [
+    pytest.mark.account_wide_cleanup,
+    pytest.mark.usefixtures("account_wide_cleanup_enabled"),
+]
+
 
 def _trade_e2e_enabled() -> bool:
     return os.getenv("POLYESTER_TEST_TRADE_E2E", "").lower() in {"1", "true", "yes"}

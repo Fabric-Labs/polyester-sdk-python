@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from polyester.errors import PolyesterValidationError
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 
@@ -18,7 +20,7 @@ EQUITY_GROUP_BY_TO_PROTO = {
 }
 
 
-def resolve_balance_range(range_key: str) -> int:
+def resolve_balance_range(range_key: str) -> Any:
     key = range_key.lower().strip()
     if key not in BALANCE_RANGE_TO_PROTO:
         raise PolyesterValidationError(
@@ -27,7 +29,7 @@ def resolve_balance_range(range_key: str) -> int:
     return BALANCE_RANGE_TO_PROTO[key]
 
 
-def resolve_equity_group_by(group_by: str) -> int:
+def resolve_equity_group_by(group_by: str) -> Any:
     key = group_by.lower().strip()
     if key not in EQUITY_GROUP_BY_TO_PROTO:
         raise PolyesterValidationError("group_by must be 'account' or 'asset'")

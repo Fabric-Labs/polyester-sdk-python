@@ -48,12 +48,15 @@ def test_chain_analytics_range_aliases_cover_common_windows() -> None:
         "365d": analytics_read_pb2.DAY_365,
     }
     for label in aliases:
-        assert resolve_proto_enum(
-            analytics_read_pb2,
-            label,
-            aliases=aliases,
-            field_name="range",
-        ) == aliases[label]
+        assert (
+            resolve_proto_enum(
+                analytics_read_pb2,
+                label,
+                aliases=aliases,
+                field_name="range",
+            )
+            == aliases[label]
+        )
 
 
 def test_repeated_acl_entries_from_mappings() -> None:

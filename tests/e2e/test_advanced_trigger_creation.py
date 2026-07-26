@@ -24,6 +24,11 @@ from tests.helpers import (
     resolve_far_below_buy_limit_price,
 )
 
+pytestmark = [
+    pytest.mark.account_wide_cleanup,
+    pytest.mark.usefixtures("account_wide_cleanup_enabled"),
+]
+
 
 def _skip_on_devnet_quirk(exc: BaseException) -> None:
     if is_devnet_order_internal_error(exc):

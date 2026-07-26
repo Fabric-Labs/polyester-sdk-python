@@ -12,9 +12,7 @@ T = TypeVar("T")
 
 def require_realtime(realtime: AsyncRealtimeClient | None) -> AsyncRealtimeClient:
     if realtime is None:
-        raise PolyesterRealtimeError(
-            "Realtime client is not configured on this Polyester instance"
-        )
+        raise PolyesterRealtimeError("Realtime client is not configured on this Polyester instance")
     return realtime
 
 

@@ -97,9 +97,7 @@ class AsyncOrderbookService(BaseService):
             )
 
         ws_depth = min(500, max(1, int(depth)))
-        channel = (
-            f"public:spot:orderbook:deltas:depth:{ws_depth}:{resolved_symbol_id}:proto"
-        )
+        channel = f"public:spot:orderbook:deltas:depth:{ws_depth}:{resolved_symbol_id}:proto"
 
         bids_map: dict[int, int] = {}
         asks_map: dict[int, int] = {}
@@ -107,9 +105,7 @@ class AsyncOrderbookService(BaseService):
         bucket_ticks: int | None = parse_bucket_ticks(bucket)
         queue: asyncio.Queue[OrderbookData | None] = asyncio.Queue(maxsize=200)
         close = asyncio.Event()
-        stream_holder: dict[str, AsyncSnapshotThenStreamSubscription | None] = {
-            "stream": None
-        }
+        stream_holder: dict[str, AsyncSnapshotThenStreamSubscription | None] = {"stream": None}
 
         def emit() -> None:
             if close.is_set():

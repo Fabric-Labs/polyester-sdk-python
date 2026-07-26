@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from polyester.errors import PolyesterValidationError
 
 
@@ -7,9 +10,9 @@ def resolve_proto_enum(
     module,
     label: str,
     *,
-    aliases: dict[str, int] | None = None,
+    aliases: Mapping[str, int] | None = None,
     field_name: str = "value",
-) -> int:
+) -> Any:
     key = label.lower().replace("-", "_")
     if aliases and key in aliases:
         return aliases[key]

@@ -7,10 +7,13 @@ def test_encode_withdraw_destination_lowercases_case_insensitive() -> None:
         is_case_sensitive=False,
     )
     assert raw == b"0xabcdef0123456789abcdef0123456789abcdef01"
-    assert encode_withdraw_destination_hex(
-        address="0xAbCdEf0123456789AbCdEf0123456789AbCdEf01",
-        is_case_sensitive=False,
-    ) == "0x" + raw.hex()
+    assert (
+        encode_withdraw_destination_hex(
+            address="0xAbCdEf0123456789AbCdEf0123456789AbCdEf01",
+            is_case_sensitive=False,
+        )
+        == "0x" + raw.hex()
+    )
 
 
 def test_encode_withdraw_destination_preserves_case_sensitive() -> None:

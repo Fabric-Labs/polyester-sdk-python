@@ -171,7 +171,7 @@ def decode_heatmap_live_bucket_bytes(payload: bytes) -> ApiData:
     from polyester.gen.marketdata.v1.heatmap_pb2 import HeatmapLiveBucket
 
     msg = _parse_proto(payload, HeatmapLiveBucket)
-    return ApiData(protobuf_to_public_dict(msg))
+    return ApiData(raw=protobuf_to_public_dict(msg))
 
 
 def decode_zipped_asset_supply_batch_bytes(payload: bytes) -> ApiData:
@@ -179,4 +179,4 @@ def decode_zipped_asset_supply_batch_bytes(payload: bytes) -> ApiData:
     from polyester.gen.chain.zipper.v1.zipper_pb2 import ZippedAssetSupplyBatch
 
     msg = _parse_proto(payload, ZippedAssetSupplyBatch)
-    return ApiData(protobuf_to_public_dict(msg))
+    return ApiData(raw=protobuf_to_public_dict(msg))

@@ -267,12 +267,8 @@ class PolyesterSmartAccount:
             [user_op, entry_point],
         )
         call_gas = add_user_operation_gas_buffer(_as_int(sponsored["callGasLimit"]))
-        verification_gas = add_user_operation_gas_buffer(
-            _as_int(sponsored["verificationGasLimit"])
-        )
-        pre_verification = add_user_operation_gas_buffer(
-            _as_int(sponsored["preVerificationGas"])
-        )
+        verification_gas = add_user_operation_gas_buffer(_as_int(sponsored["verificationGasLimit"]))
+        pre_verification = add_user_operation_gas_buffer(_as_int(sponsored["preVerificationGas"]))
         pm_ver = max(
             add_user_operation_gas_buffer(
                 _as_int(sponsored.get("paymasterVerificationGasLimit", 0))
@@ -280,9 +276,7 @@ class PolyesterSmartAccount:
             USER_OPERATION_MIN_GAS_BUFFER,
         )
         pm_post = max(
-            add_user_operation_gas_buffer(
-                _as_int(sponsored.get("paymasterPostOpGasLimit", 0))
-            ),
+            add_user_operation_gas_buffer(_as_int(sponsored.get("paymasterPostOpGasLimit", 0))),
             USER_OPERATION_MIN_GAS_BUFFER * 2,
         )
 
@@ -392,6 +386,4 @@ class PolyesterSmartAccount:
                     f"bundler rejected UserOperation {user_operation_hash}: {status}"
                 )
             time.sleep(poll_interval_s)
-        raise TimeoutError(
-            f"timed out waiting for UserOperation receipt {user_operation_hash}"
-        )
+        raise TimeoutError(f"timed out waiting for UserOperation receipt {user_operation_hash}")

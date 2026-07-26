@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from collections.abc import Awaitable, Callable, Coroutine
+from concurrent.futures import Future
+from typing import Any, TypeVar
 
 from polyester.realtime.client import AsyncSubscription
 
@@ -17,7 +18,7 @@ class SyncSubscription:
         self,
         loop: asyncio.AbstractEventLoop,
         *,
-        close_coro: Callable[[], Awaitable[None]],
+        close_coro: Callable[[], Coroutine[Any, Any, None]],
         holder: dict[str, object | None] | None = None,
     ) -> None:
         self._loop = loop
@@ -40,7 +41,7 @@ class SyncSubscription:
         if self._closed:
             return
         self._closed = True
-        future = asyncio.run_coroutine_threadsafe(self._close_coro(), self._loop)
+        future: Future[None] = asyncio.run_coroutine_threadsafe(self._close_coro(), self._loop)
         future.result(timeout=10)
 
 

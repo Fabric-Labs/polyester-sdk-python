@@ -34,6 +34,7 @@ from polyester.gen.orders.v1 import orders_read_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncRealtimeClient
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
+from polyester.transport import MAX_CONNECT_RESPONSE_BYTES
 from tests.hardening_support import (
     HttpScript,
     MockHttpServer,
@@ -518,9 +519,7 @@ def test_l2_jsonrpc_25_concurrent_reordered_responses_succeed() -> None:
                     random.shuffle(release_order)
                 idx = release_order.index(req_id)
             time.sleep(idx * 0.005)
-            resp = json.dumps(
-                {"jsonrpc": "2.0", "id": req_id, "result": f"0x{req_id:x}"}
-            ).encode()
+            resp = json.dumps({"jsonrpc": "2.0", "id": req_id, "result": f"0x{req_id:x}"}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(resp)))
@@ -589,9 +588,7 @@ async def test_l2_hundred_sub_close_returns_conn_count_to_baseline() -> None:
 
 @pytest.mark.asyncio
 async def test_l2_realtime_oversized_binary_message_fails_closed() -> None:
-    ws = await MockWsServer.spawn_centrifugo_oversized_after_handshake(
-        WS_MAX_MESSAGE_BYTES + 1
-    )
+    ws = await MockWsServer.spawn_centrifugo_oversized_after_handshake(WS_MAX_MESSAGE_BYTES + 1)
     rt = AsyncRealtimeClient(ws.ws_url())
     try:
         sub = await rt.subscribe_proto(PUBLIC_CHANNEL, decode=_identity_decode)
@@ -619,9 +616,7 @@ async def test_l2_cancel_during_token_body_stall_no_orphan() -> None:
     ws = await MockWsServer.spawn_hang_after_accept()
     rt, client_http = await _private_rt(ws=ws, http=http, timeout=30.0)
     try:
-        task = asyncio.create_task(
-            rt.subscribe_proto(PRIVATE_CHANNEL, decode=_identity_decode)
-        )
+        task = asyncio.create_task(rt.subscribe_proto(PRIVATE_CHANNEL, decode=_identity_decode))
         await wait_until(lambda: http.active >= 1, 2.0)
         started = time.monotonic()
         task.cancel()
@@ -653,9 +648,7 @@ async def test_l2_cancel_during_chunked_token_body_no_orphan() -> None:
     ws = await MockWsServer.spawn_hang_after_accept()
     rt, client_http = await _private_rt(ws=ws, http=http, timeout=30.0)
     try:
-        task = asyncio.create_task(
-            rt.subscribe_proto(PRIVATE_CHANNEL, decode=_identity_decode)
-        )
+        task = asyncio.create_task(rt.subscribe_proto(PRIVATE_CHANNEL, decode=_identity_decode))
         await wait_until(lambda: http.active >= 1, 2.0)
         # Let at least one chunk land so cancel hits mid-body, not headers-only.
         await asyncio.sleep(0.08)
@@ -679,9 +672,7 @@ async def test_l2_cancel_during_centrifugo_wait_no_orphan() -> None:
     ws = await MockWsServer.spawn_hang_after_accept()
     rt = AsyncRealtimeClient(ws.ws_url())
     try:
-        task = asyncio.create_task(
-            rt.subscribe_proto(PUBLIC_CHANNEL, decode=_identity_decode)
-        )
+        task = asyncio.create_task(rt.subscribe_proto(PUBLIC_CHANNEL, decode=_identity_decode))
         await wait_until(lambda: ws.active >= 1, 2.0)
         started = time.monotonic()
         task.cancel()
@@ -730,7 +721,6 @@ async def test_l2_wait_for_catalogs_fail_closed_on_http_500() -> None:
             api_url=http.base_url,
             hydrate_catalogs=True,
             timeout=0.5,
-            max_retries=0,
         )
         with pytest.raises(Exception) as exc_info:
             await client.wait_for_catalogs()
@@ -759,10 +749,47 @@ async def test_l2_wait_for_catalogs_fail_closed_on_empty_or_malformed() -> None:
             api_url=http.base_url,
             hydrate_catalogs=True,
             timeout=2.0,
-            max_retries=0,
         )
         with pytest.raises(PolyesterValidationError, match="empty"):
             await client.wait_for_catalogs()
+        assert client.catalogs.is_unusable
+        await client.aclose()
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("body", "label"),
+    [
+        (b"\x0f", "malformed protobuf"),
+        (b"x" * (MAX_CONNECT_RESPONSE_BYTES + 1), "oversized protobuf"),
+    ],
+)
+async def test_l2_wait_for_catalogs_rejects_bad_wire_response(body: bytes, label: str) -> None:
+    async def handler(req: ParsedRequest) -> HttpScript:
+        if "GetSpotConfig" in req.path:
+            return HttpScript.raw(
+                200,
+                headers=[
+                    ("Content-Type", "application/proto"),
+                    ("Content-Length", str(len(body))),
+                ],
+                body=body,
+            )
+        return HttpScript.not_found()
+
+    http = await MockHttpServer.spawn(handler)
+    try:
+        client = AsyncPolyester(
+            api_url=http.base_url,
+            hydrate_catalogs=True,
+            timeout=2.0,
+        )
+        with pytest.raises(Exception) as exc_info:
+            await client.wait_for_catalogs()
+        assert str(exc_info.value), label
+        assert client.catalogs_last_error is not None
         assert client.catalogs.is_unusable
         await client.aclose()
     finally:
@@ -793,7 +820,6 @@ async def test_l2_concurrent_wait_for_catalogs_share_one_attempt() -> None:
             api_url=http.base_url,
             hydrate_catalogs=True,
             timeout=5.0,
-            max_retries=0,
         )
         await asyncio.gather(*[client.wait_for_catalogs() for _ in range(10)])
         assert http.request_count <= 2, f"expected spot+zipper once, got {http.request_count}"
@@ -831,7 +857,6 @@ async def test_l2_scale_hydrate_via_wait_for_catalogs_then_place_resolve() -> No
             api_url=http.base_url,
             hydrate_catalogs=True,
             timeout=5.0,
-            max_retries=0,
         )
         await client.wait_for_catalogs()
         scale = quantity_scale_for_symbol(client.catalogs, "ETH-USDT")
@@ -1036,7 +1061,6 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
             api_private_key=creds.private_key,
             hydrate_catalogs=False,
             timeout=5.0,
-            max_retries=0,
         )
         result = await client.orders.wait_for_order_trades_complete(
             order_id=1,
@@ -1088,7 +1112,6 @@ async def test_l2_m5_balances_list_preserves_1e18_scaled_string() -> None:
             api_private_key=creds.private_key,
             hydrate_catalogs=False,
             timeout=5.0,
-            max_retries=0,
         )
         listed = await client.balances.list()
         assert len(listed.balances) == 1

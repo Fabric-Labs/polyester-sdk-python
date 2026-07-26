@@ -32,9 +32,7 @@ class AsyncSocialVerificationService(BaseService):
             provider=resolve_proto_enum(
                 sv_pb2, provider, aliases=_PROVIDER_ALIASES, field_name="provider"
             ),
-            method=resolve_proto_enum(
-                sv_pb2, method, aliases=_METHOD_ALIASES, field_name="method"
-            ),
+            method=resolve_proto_enum(sv_pb2, method, aliases=_METHOD_ALIASES, field_name="method"),
             handle=handle,
         )
         return await unary_auth_decoded(

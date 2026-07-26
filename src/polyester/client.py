@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import os
 import threading
-from typing import Literal
+from typing import Any, Literal, cast
 
 from polyester.auth import (
     ACCOUNT_ID_ENV,
@@ -65,7 +65,6 @@ class AsyncPolyester:
         default_sub_account_id: str | None = None,
         default_account_id: str | int | None = None,
         timeout: float = 10.0,
-        max_retries: int = 2,
         wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
     ) -> None:
@@ -83,7 +82,6 @@ class AsyncPolyester:
             TransportConfig(
                 api_url=api_url,
                 timeout=timeout,
-                max_retries=max_retries,
                 wire_format=wire_format,
             ),
             credentials=credentials,
@@ -193,6 +191,7 @@ class AsyncPolyester:
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
         self._catalog_last_error: BaseException | None = None
+        self._catalog_task: asyncio.Task[None] | None
         if hydrate_catalogs:
             self._catalog_task = asyncio.create_task(self._hydrate_catalogs())
         else:
@@ -294,13 +293,11 @@ class Polyester:
                 await client.wait_for_catalogs()
             return client
 
-        self._client = asyncio.run_coroutine_threadsafe(_bootstrap(), self._loop).result(
-            timeout=60
-        )
+        self._client = asyncio.run_coroutine_threadsafe(_bootstrap(), self._loop).result(timeout=60)
         self.catalogs = self._client.catalogs
         self.catalog = self.catalogs
         self.realtime = _SyncService(self._loop, self._client.realtime)
-        self.auth = _SyncService(self._loop, self._client.auth)
+        self.auth = cast(Any, _SyncService(self._loop, self._client.auth))
         self.auth.profile = _SyncSubscribeService(
             self._loop,
             self._client.auth.profile,
@@ -459,6 +456,7 @@ class _SyncService:
         if not callable(attr) and type(attr).__name__.endswith("Service"):
             return _SyncService(self._loop, attr)
         if asyncio.iscoroutinefunction(attr):
+
             def async_call(*args, **kwargs):
                 future = asyncio.run_coroutine_threadsafe(attr(*args, **kwargs), self._loop)
                 return future.result(timeout=60)
@@ -466,6 +464,7 @@ class _SyncService:
             return async_call
 
         if callable(attr):
+
             def call(*args, **kwargs):
                 result = attr(*args, **kwargs)
                 if asyncio.iscoroutine(result):

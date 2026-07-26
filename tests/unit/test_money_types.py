@@ -83,6 +83,4 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
 
 def test_create_order_rejects_float_qty() -> None:
     with pytest.raises(PolyesterValidationError):
-        normalize_create_order_request(
-            symbol="BTC-USD", side="buy", order_type="limit", qty=0.1
-        )
+        normalize_create_order_request(symbol="BTC-USD", side="buy", order_type="limit", qty=0.1)

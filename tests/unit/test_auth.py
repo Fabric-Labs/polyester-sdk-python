@@ -14,8 +14,7 @@ from polyester.auth import (
 
 def test_canonical_query_sorts_and_encodes_values() -> None:
     assert (
-        canonical_query("https://api.example.test/path?b=2&a=hello world")
-        == "a=hello%20world&b=2"
+        canonical_query("https://api.example.test/path?b=2&a=hello world") == "a=hello%20world&b=2"
     )
 
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "polyester-sdk"
-version = "0.1.0a19"
+version = "0.1.0a20"
 description = "Official Python SDK for Polyester APIs."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -109,6 +109,12 @@ markers = [
   "credentialed: live tests that require API-key credentials",
   "public_smoke: public/read-only smoke selection (no mutation/funded)",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+exclude = ["^src/polyester/gen/"]
+follow_imports = "skip"
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["src/polyester"]

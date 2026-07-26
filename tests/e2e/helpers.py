@@ -105,9 +105,7 @@ async def wait_for_no_open_order(
 far_below_market_limit_params = usdt_funded_buy_limit_params
 
 
-async def wait_for_terminal_order(
-    client, client_order_id: str, *, timeout: float = 20
-):
+async def wait_for_terminal_order(client, client_order_id: str, *, timeout: float = 20):
     attempts = max(1, int(timeout / 0.5))
     last_detail = None
     for _ in range(attempts):

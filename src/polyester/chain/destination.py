@@ -18,7 +18,10 @@ def encode_withdraw_destination(*, address: str, is_case_sensitive: bool) -> byt
 
 def encode_withdraw_destination_hex(*, address: str, is_case_sensitive: bool) -> str:
     """0x-prefixed hex of UTF-8 destination bytes (TS ``evmUtf8ToHex``)."""
-    return "0x" + encode_withdraw_destination(
-        address=address,
-        is_case_sensitive=is_case_sensitive,
-    ).hex()
+    return (
+        "0x"
+        + encode_withdraw_destination(
+            address=address,
+            is_case_sensitive=is_case_sensitive,
+        ).hex()
+    )

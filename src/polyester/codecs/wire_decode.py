@@ -203,7 +203,6 @@ def decode_market_trades_list(data: dict[str, Any]) -> MarketTradesResult:
     )
 
 
-
 def decode_candle(data: dict[str, Any], *, volume_scale: int = 8) -> Candle:
     return Candle(
         ts_sec=int(_field(data, "tsSec", "ts_sec", default=0) or 0),
@@ -302,12 +301,8 @@ def decode_asset_balance(data: dict[str, Any]) -> AssetBalance:
         funding=_u128_str(_field(data, "funding")),
         reserved=_u128_str(_field(data, "reserved")),
         available=_u128_str(_field(data, "available")),
-        trading_revision=int(
-            _field(data, "tradingRevision", "trading_revision", default=0) or 0
-        ),
-        funding_revision=int(
-            _field(data, "fundingRevision", "funding_revision", default=0) or 0
-        ),
+        trading_revision=int(_field(data, "tradingRevision", "trading_revision", default=0) or 0),
+        funding_revision=int(_field(data, "fundingRevision", "funding_revision", default=0) or 0),
     )
 
 
@@ -415,9 +410,7 @@ def decode_triggers_list(data: dict[str, Any]) -> TriggersList:
     return TriggersList(
         triggers=triggers,
         total=int(_field(data, "total", default=0) or 0),
-        next_page_token=str(
-            _field(data, "nextPageToken", "next_page_token", default="") or ""
-        ),
+        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
     )
 
 
@@ -465,9 +458,7 @@ def decode_internal_transfer_result(data: dict[str, Any]) -> InternalTransferRes
         transfer_id=str(_field(data, "transferId", "transfer_id", default="") or ""),
         asset_id=asset_id,
         asset_code=str(_field(data, "assetCode", "asset_code", default="") or ""),
-        quantity=AssetAmount.from_scaled(
-            scaled, domain=QuantityDomain.ASSET, asset_id=asset_id
-        )
+        quantity=AssetAmount.from_scaled(scaled, domain=QuantityDomain.ASSET, asset_id=asset_id)
         if scaled
         else None,
     )
@@ -492,9 +483,12 @@ def decode_deposit_addresses_list(data: dict[str, Any]) -> DepositAddressesList:
 def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
     from polyester.types.money import Price
 
-    fire_raw = _field(
-        data, "firePriceTicks", "fire_price_ticks", "firePxTicks", "fire_px_ticks", default=0
-    ) or 0
+    fire_raw = (
+        _field(
+            data, "firePriceTicks", "fire_price_ticks", "firePxTicks", "fire_px_ticks", default=0
+        )
+        or 0
+    )
     return TriggerEvent(
         trigger_id=_id_str(_field(data, "triggerId", "trigger_id")),
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
@@ -514,9 +508,7 @@ def decode_trigger_events_list(data: dict[str, Any]) -> TriggerEventsList:
     ]
     return TriggerEventsList(
         events=events,
-        next_page_token=str(
-            _field(data, "nextPageToken", "next_page_token", default="") or ""
-        ),
+        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
     )
 
 
@@ -659,9 +651,7 @@ def decode_resolved_account(data: dict[str, Any]) -> ResolvedAccount:
         ),
         kind=str(_field(data, "kind", default="") or ""),
         root_username=str(_field(data, "rootUsername", "root_username", default="") or ""),
-        subaccount_label=str(
-            _field(data, "subaccountLabel", "subaccount_label", default="") or ""
-        ),
+        subaccount_label=str(_field(data, "subaccountLabel", "subaccount_label", default="") or ""),
         account_id=_id_str(_field(data, "accountId", "account_id")),
     )
 
@@ -699,9 +689,7 @@ def decode_batch_modify_result(data: dict[str, Any]) -> BatchModifyOrdersResult:
     results = [
         BatchModifyResultItem(
             status=str(_field(item, "status", default="") or ""),
-            client_order_id=str(
-                _field(item, "clientOrderId", "client_order_id", default="") or ""
-            ),
+            client_order_id=str(_field(item, "clientOrderId", "client_order_id", default="") or ""),
             final_order_id=_id_str(_field(item, "finalOrderId", "final_order_id")),
             code=str(_field(item, "code", default="") or ""),
         )

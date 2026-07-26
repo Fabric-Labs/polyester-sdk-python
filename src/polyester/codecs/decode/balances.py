@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from google.protobuf.message import Message
+
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, u128_to_str
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.models import (
@@ -13,7 +15,7 @@ from polyester.models import (
     HoldsList,
 )
 
-_BALANCE_RANGE_LABELS = {
+_BALANCE_RANGE_LABELS: dict[int, str] = {
     ledger_read_pb2.DAY_1: "1d",
     ledger_read_pb2.DAY_7: "7d",
     ledger_read_pb2.DAY_30: "30d",
@@ -23,8 +25,8 @@ _BALANCE_RANGE_LABELS = {
 }
 
 
-def u128_from_proto(msg: ledger_read_pb2.U128) -> str:
-    return u128_to_str(msg.hi, msg.lo)
+def u128_from_proto(msg: Message) -> str:
+    return u128_to_str(int(getattr(msg, "hi", 0)), int(getattr(msg, "lo", 0)))
 
 
 def _balance_range_label(value: int) -> str:

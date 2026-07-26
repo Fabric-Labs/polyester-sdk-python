@@ -154,9 +154,7 @@ class CatalogManager:
                 if not isinstance(row, dict):
                     continue
                 ledger_id_raw = (
-                    row.get("ledgerId")
-                    if row.get("ledgerId") is not None
-                    else row.get("ledger_id")
+                    row.get("ledgerId") if row.get("ledgerId") is not None else row.get("ledger_id")
                 )
                 _parse_u32_field(
                     ledger_id_raw,

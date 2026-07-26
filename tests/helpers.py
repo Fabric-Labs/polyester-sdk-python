@@ -321,13 +321,13 @@ async def resolve_market_ref_price(client, symbol: str, pair: dict, *, side: str
         asks = book.asks or []
         if side_norm == "sell":
             if bids and bids[0].price:
-                return bids[0].price
+                return bids[0].price.format()
         elif asks and asks[0].price:
-            return asks[0].price
+            return asks[0].price.format()
         if asks and asks[0].price:
-            return asks[0].price
+            return asks[0].price.format()
         if bids and bids[0].price:
-            return bids[0].price
+            return bids[0].price.format()
     except Exception:
         pass
     try:
@@ -372,8 +372,7 @@ def batch_results_are_all_internal_error(results) -> bool:
 
 def devnet_order_skip_message() -> str:
     return (
-        "Devnet order placement returned INTERNAL_ERROR for USDT-funded buys; "
-        "check OMS on devnet"
+        "Devnet order placement returned INTERNAL_ERROR for USDT-funded buys; check OMS on devnet"
     )
 
 

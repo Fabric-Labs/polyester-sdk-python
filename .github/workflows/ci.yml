@@ -82,6 +82,9 @@ jobs:
       - name: Ruff
         run: ruff check src tests scripts
 
+      - name: Mypy
+        run: mypy src
+
       - name: Compile generated modules
         run: python -m compileall src/polyester
 

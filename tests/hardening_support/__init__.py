@@ -268,9 +268,7 @@ async def _write_http_script(
         return
 
     if script.kind is HttpScriptKind.NOT_FOUND:
-        writer.write(
-            b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-        )
+        writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
         await writer.drain()
         return
 
@@ -391,9 +389,7 @@ class MockWsServer:
         return self
 
     @classmethod
-    async def spawn_centrifugo_oversized_after_handshake(
-        cls, message_bytes: int
-    ) -> MockWsServer:
+    async def spawn_centrifugo_oversized_after_handshake(cls, message_bytes: int) -> MockWsServer:
         self = cls()
         self._mode = "oversized"
         self._message_bytes = message_bytes

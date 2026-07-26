@@ -387,15 +387,11 @@ class AsyncRealtimeClient:
                         ) from exc
                     raise PolyesterRealtimeError(str(exc)) from exc
                 if not isinstance(raw, bytes):
-                    raise _TerminalRealtimeError(
-                        "received JSON text frame on protobuf websocket"
-                    )
+                    raise _TerminalRealtimeError("received JSON text frame on protobuf websocket")
                 try:
                     incoming_messages = decode_replies(raw)
                 except Exception as exc:
-                    raise _TerminalRealtimeError(
-                        f"invalid realtime protobuf frame: {exc}"
-                    ) from exc
+                    raise _TerminalRealtimeError(f"invalid realtime protobuf frame: {exc}") from exc
                 for incoming in incoming_messages:
                     if isinstance(incoming, Ping):
                         await ws.send(pong_command())

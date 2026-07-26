@@ -35,6 +35,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "funded: balance-changing devnet tests (POLYESTER_TEST_FUNDED=1)",
     )
+    config.addinivalue_line(
+        "markers",
+        "account_wide_cleanup: calls non-dry-run cancel_all and requires a dedicated test account",
+    )
     config.addinivalue_line("markers", "treasury: withdraw/guard ops (POLYESTER_TEST_TREASURY=1)")
     config.addinivalue_line("markers", "realtime: Centrifugo subscriptions")
     config.addinivalue_line("markers", "optional: may skip when route unavailable on devnet")
@@ -102,9 +106,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
     def _count(key: str) -> int:
         return sum(
-            1
-            for report in stats.get(key, [])
-            if getattr(report, "nodeid", None) in live_nodeids
+            1 for report in stats.get(key, []) if getattr(report, "nodeid", None) in live_nodeids
         )
 
     passed = _count("passed")
@@ -159,6 +161,12 @@ def mutation_enabled() -> None:
 def funded_enabled() -> None:
     if not _env_truthy("POLYESTER_TEST_FUNDED"):
         pytest.skip("Set POLYESTER_TEST_FUNDED=1 to run funded tests")
+
+
+@pytest.fixture(scope="session")
+def account_wide_cleanup_enabled() -> None:
+    if not _env_truthy("POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP"):
+        pytest.skip("Set POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP=1 only for a dedicated test account")
 
 
 @pytest.fixture(scope="session")

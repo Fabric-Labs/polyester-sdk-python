@@ -13,6 +13,7 @@ from polyester.auth import (
     load_api_key_credentials,
 )
 from polyester.catalogs import CatalogManager
+from polyester.errors import PolyesterError, PolyesterTransportError, PolyesterValidationError
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -191,8 +192,9 @@ class AsyncPolyester:
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
+        self._catalog_last_error: BaseException | None = None
         if hydrate_catalogs:
-            self._catalog_task = asyncio.create_task(self._hydrate_catalogs_best_effort())
+            self._catalog_task = asyncio.create_task(self._hydrate_catalogs())
         else:
             self._catalog_task = None
 
@@ -213,23 +215,51 @@ class AsyncPolyester:
                 overrides["default_account_id"] = account_id.strip()
         return cls(**overrides)
 
-    async def _hydrate_catalogs_best_effort(self) -> None:
+    @property
+    def catalogs_last_error(self) -> BaseException | None:
+        """Last catalog hydration failure, if any (also raised by ``wait_for_catalogs``)."""
+        return self._catalog_last_error
+
+    async def _hydrate_catalogs(self) -> None:
+        """Hydrate spot + zipper catalogs. Records failure on ``catalogs_last_error``."""
         try:
             spot_config = await self.market_data.get_spot_config()
-            self.catalogs.hydrate_spot_config(spot_config.raw)
-        except Exception:
-            pass
-        try:
+            raw = spot_config.raw if hasattr(spot_config, "raw") else spot_config
+            if not isinstance(raw, dict):
+                raise PolyesterValidationError("spot catalog response is not an object")
+            self.catalogs.hydrate_spot_config(raw)
             zipper_config = await self.zipper.get_deposit_withdraw_config()
             self.catalogs.hydrate_zipper_config(zipper_config)
-        except Exception:
-            pass
+            self._catalog_last_error = None
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if not self.catalogs.is_unusable:
+                self.catalogs.mark_unusable(f"catalog hydration failed: {exc}")
+            if isinstance(exc, PolyesterError):
+                self._catalog_last_error = exc
+            else:
+                wrapped = PolyesterTransportError(f"catalog hydration failed: {exc}")
+                wrapped.__cause__ = exc
+                self._catalog_last_error = wrapped
 
     async def wait_for_catalogs(self) -> None:
+        """Await construction-time catalog hydration.
+
+        Raises when hydration failed (HTTP errors, empty/malformed catalogs, bad
+        scales/ids). Previously returned successfully after a failed best-effort
+        attempt — that behavior is removed (POLY-3746).
+        """
         if self._catalog_task is None:
             return
-        with contextlib.suppress(asyncio.CancelledError):
+        try:
             await self._catalog_task
+        except asyncio.CancelledError:
+            if self._catalog_last_error is not None:
+                raise self._catalog_last_error from None
+            raise
+        if self._catalog_last_error is not None:
+            raise self._catalog_last_error
 
     async def __aenter__(self) -> AsyncPolyester:
         return self
@@ -240,6 +270,9 @@ class AsyncPolyester:
     async def aclose(self) -> None:
         if self._catalog_task is not None and not self._catalog_task.done():
             self._catalog_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._catalog_task
+        await self.realtime.aclose()
         await self._transport.aclose()
 
 

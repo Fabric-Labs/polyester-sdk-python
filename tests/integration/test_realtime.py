@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from polyester import AsyncPolyester
-from tests.helpers import live_client_kwargs_from_env, pick_smoke_symbol
+from tests.helpers import live_client_kwargs_from_env, pick_trade_symbol
 from tests.integration.support import call_optional
 
 # Centrifugo default ping interval is 25s; hold the subscription a bit longer.
@@ -20,7 +20,9 @@ async def test_public_trades_subscription_survives_centrifugo_ping(live_credenti
     try:
         await client.wait_for_catalogs()
         spot = await client.market_data.get_spot_config()
-        symbol = pick_smoke_symbol(spot.raw)
+        # Heartbeat / mutation paths honor POLYESTER_TEST_TRADE_SYMBOL (F-23).
+        symbol = pick_trade_symbol(spot.raw)
+        print(f"trade_symbol={symbol}", flush=True)
 
         subscription = await client.market_data.subscribe_trades(symbol=symbol)
         try:

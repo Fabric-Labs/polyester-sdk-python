@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from urllib.parse import quote
 
 import httpx
@@ -8,6 +10,8 @@ from polyester.auth import ApiKeyCredentials, sign_request
 from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
 
 MAX_TOKEN_RESPONSE_BYTES = 64 * 1024
+_MAX_ERROR_BODY_CHARS = 512
+_DEFAULT_TIMEOUT_SECONDS = 10.0
 
 
 def connection_token_url(api_url: str) -> str:
@@ -17,6 +21,20 @@ def connection_token_url(api_url: str) -> str:
 def subscription_token_url(api_url: str, channel: str) -> str:
     base = f"{api_url.rstrip('/')}/v1/rt/subscribe"
     return f"{base}?channel={quote(channel, safe='')}"
+
+
+def _client_timeout_seconds(http: httpx.AsyncClient) -> float:
+    """Resolve the SDK-configured timeout as one absolute wall-clock budget."""
+    timeout = http.timeout
+    if timeout is None:
+        return _DEFAULT_TIMEOUT_SECONDS
+    if isinstance(timeout, (int, float)):
+        return float(timeout)
+    for name in ("read", "write", "connect", "pool"):
+        value = getattr(timeout, name, None)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return _DEFAULT_TIMEOUT_SECONDS
 
 
 def _content_length_exceeds_limit(response: httpx.Response, max_bytes: int) -> bool:
@@ -29,6 +47,45 @@ def _content_length_exceeds_limit(response: httpx.Response, max_bytes: int) -> b
         return False
 
 
+def _truncate_body(raw: bytes) -> str:
+    text = raw.decode("utf-8", errors="replace").strip()
+    if len(text) > _MAX_ERROR_BODY_CHARS:
+        return text[:_MAX_ERROR_BODY_CHARS] + "…"
+    return text
+
+
+async def _read_limited(response: httpx.Response, max_bytes: int, *, label: str) -> bytes:
+    if _content_length_exceeds_limit(response, max_bytes):
+        raise PolyesterRealtimeError(f"{label}: response exceeds {max_bytes} bytes")
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > max_bytes:
+            raise PolyesterRealtimeError(f"{label}: response exceeds {max_bytes} bytes")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _auth_http_error(
+    *,
+    status_code: int,
+    label: str,
+    body: bytes,
+) -> PolyesterAuthError:
+    truncated = _truncate_body(body)
+    kind = "permission denied" if status_code == 403 else "authentication failed"
+    message = f"{label}: {kind} (HTTP {status_code})"
+    if truncated:
+        message = f"{message}: {truncated}"
+    return PolyesterAuthError(
+        message,
+        status_code=status_code,
+        label=label,
+        body=truncated or None,
+    )
+
+
 async def fetch_rt_token(
     http: httpx.AsyncClient,
     credentials: ApiKeyCredentials,
@@ -37,20 +94,39 @@ async def fetch_rt_token(
     label: str,
 ) -> str:
     headers = sign_request(credentials, method="GET", url=url, body=b"")
-    response = await http.get(url, headers=headers)
-    if _content_length_exceeds_limit(response, MAX_TOKEN_RESPONSE_BYTES):
-        raise PolyesterRealtimeError(
-            f"{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
-        )
-    if len(response.content) > MAX_TOKEN_RESPONSE_BYTES:
-        raise PolyesterRealtimeError(
-            f"{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
-        )
-    if response.status_code == 401:
-        raise PolyesterAuthError(f"{label}: authentication failed")
-    if response.status_code >= 400:
-        raise PolyesterRealtimeError(f"{label}: HTTP {response.status_code}")
-    payload = response.json()
+    # One absolute wall-clock deadline covers request headers + bounded body.
+    # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
+    # arrive within the read timeout while the total exceeds the SDK budget.
+    timeout = _client_timeout_seconds(http)
+    try:
+        async with asyncio.timeout(timeout):
+            async with http.stream("GET", url, headers=headers) as response:
+                try:
+                    raw = await _read_limited(
+                        response, MAX_TOKEN_RESPONSE_BYTES, label=label
+                    )
+                except asyncio.CancelledError:
+                    # Ensure the streamed peer is aborted promptly on cancel (E6).
+                    await response.aclose()
+                    raise
+                if response.status_code in (401, 403):
+                    raise _auth_http_error(
+                        status_code=response.status_code,
+                        label=label,
+                        body=raw,
+                    )
+                if response.status_code >= 400:
+                    truncated = _truncate_body(raw)
+                    detail = f": {truncated}" if truncated else ""
+                    raise PolyesterRealtimeError(f"{label}: HTTP {response.status_code}{detail}")
+    except TimeoutError as exc:
+        raise PolyesterRealtimeError(f"{label}: timed out") from exc
+    except httpx.TimeoutException as exc:
+        raise PolyesterRealtimeError(f"{label}: timed out") from exc
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise PolyesterRealtimeError(f"{label}: response is not valid JSON") from exc
     token = payload.get("token") if isinstance(payload, dict) else None
     if not token:
         raise PolyesterRealtimeError(f"{label}: response missing token")

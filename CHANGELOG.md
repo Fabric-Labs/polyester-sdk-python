@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 0.1.0a18
+
+### Breaking
+- `wait_for_catalogs()` now raises when catalog hydration fails (HTTP errors, empty/malformed spot or zipper, out-of-range scales/ids). Previously returned successfully after a best-effort failure. Use `catalogs_last_error` to inspect the failure (POLY-3746).
+- `format_qty_scaled` / `format_ledger_u128` / `Quantity.format` / `AssetAmount.format` raise `PolyesterValidationError` when `scale > MAX_PROTOCOL_SCALE` (36) instead of allocating pathological padding (POLY-3746).
+- Realtime token HTTP 403 maps to `PolyesterAuthError` with `status_code`, `label`, and truncated `body` (not opaque `PolyesterRealtimeError("… HTTP 403")`) (POLY-3746).
+
+### Features
+- `MAX_PROTOCOL_SCALE = 36` exported; catalog hydrate rejects `u64→u32` truncation and scales above the protocol max (POLY-3746).
+- `CatalogManager.hydrate_zipper_config_typed` accepts typed `DepositWithdrawConfig` without a consumer JSON round-trip (POLY-3746 / D-05).
+- `wait_for_order_trades_complete` / `orders.wait_for_order_trades_complete` poll until sum(trade qtys) equals order `cum_qty` or timeout (POLY-3746 / D1).
+- JSON-RPC client enforces a 1 MiB response body cap and validates `jsonrpc=="2.0"`, matching `id`, and exactly one of `result`|`error` (POLY-3746).
+- `AsyncSnapshotThenStreamSubscription.last_error` / `err()` surfaces snapshot refresh failures; one bounded reconnect retry then fail-closed (POLY-3746).
+- `AsyncRealtimeClient.aclose` cancels tracked subscriptions; WebSocket inbound frames bounded by `WS_MAX_MESSAGE_BYTES` (POLY-3746).
+
+### Fixed
+- Realtime token fetch and JSON-RPC request/arequest now enforce one absolute wall-clock deadline across headers + bounded body collect (slow-drip safe). Sync JSON-RPC uses a deadline closer that aborts the client without leaking worker threads (POLY-3746 / F-18 / E5).
+- Realtime token exchange streams and size-caps the body under the HTTP client timeout (POLY-3746 / F-18).
+- `TransportFactory` / `TransportConfig` `__repr__` redacts credentials (parity with credential repr) (POLY-3746 / A6).
+
+### Testing
+- Local public-API hardening L2 suite (`tests/hardening/`) for token stall/403, JSON-RPC, catalogs, snapshot, and scale.
+- Live harness: STRICT_LIVE fail-on-skip + executed/skipped/failed counts; `POLYESTER_TEST_TRADE_SYMBOL`; market BUY→SELL roundtrip carries filled qty; BatchModify 5×40 regression (gated).
+
 ## 0.1.0a17
 
 ### Breaking

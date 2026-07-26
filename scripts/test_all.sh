@@ -14,8 +14,8 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-echo "==> unit (${PYTEST[*]})"
-"${PYTEST[@]}" tests/unit -q
+echo "==> unit + hardening L2 (${PYTEST[*]})"
+"${PYTEST[@]}" tests/unit tests/hardening -q
 
 if [[ -z "${POLYESTER_API_KEY_ID:-}" || -z "${POLYESTER_API_PRIVATE_KEY:-}" ]]; then
   echo "Skipping live tests (set POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY in .env)"

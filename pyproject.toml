@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "polyester-sdk"
-version = "0.1.0a17"
+version = "0.1.0a18"
 description = "Official Python SDK for Polyester APIs."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,6 +43,7 @@ dev = [
   "pytest>=8",
   "pytest-asyncio>=0.23",
   "pytest-cov>=5",
+  "pytest-httpserver>=1.1",
   "python-dotenv>=1.0",
   "ruff>=0.8",
   "mypy>=1.13",
@@ -88,7 +89,7 @@ exclude = ["src/polyester/gen"]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
-addopts = ["-ra"]
+addopts = ["-ra", "--import-mode=importlib"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 pythonpath = ["."]
@@ -105,6 +106,8 @@ markers = [
   "optional: may skip when route unavailable",
   "jwt_session: JWT/session or app-user route; not part of API-key SDK acceptance",
   "smoke: shallow live RPC check (shape only; empty results OK)",
+  "credentialed: live tests that require API-key credentials",
+  "public_smoke: public/read-only smoke selection (no mutation/funded)",
 ]
 
 [tool.coverage.run]

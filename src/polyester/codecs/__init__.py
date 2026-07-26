@@ -1,4 +1,5 @@
 from polyester.codecs.scalars import (
+    MAX_PROTOCOL_SCALE,
     align_price_ticks,
     datetime_to_timestamp_dict,
     format_id,
@@ -10,9 +11,11 @@ from polyester.codecs.scalars import (
     parse_qty_scaled,
     parse_required_uint64_decimal,
     timestamp_dict_to_datetime,
+    validate_protocol_scale,
 )
 
 __all__ = [
+    "MAX_PROTOCOL_SCALE",
     "align_price_ticks",
     "datetime_to_timestamp_dict",
     "format_id",
@@ -24,6 +27,7 @@ __all__ = [
     "parse_qty_scaled",
     "parse_required_uint64_decimal",
     "timestamp_dict_to_datetime",
+    "validate_protocol_scale",
 ]
 
 

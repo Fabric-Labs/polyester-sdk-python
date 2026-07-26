@@ -32,6 +32,8 @@ T = TypeVar("T")
 CENTRIFUGO_READ_TIMEOUT = 30.0
 CENTRIFUGO_RECONNECT_DELAY = 1.0
 CENTRIFUGO_PROTOBUF_SUBPROTOCOL = "centrifuge-protobuf"
+# Bound inbound websocket frames (DoS / memory); Centrifugo pubs stay well below this.
+WS_MAX_MESSAGE_BYTES = 4 * 1024 * 1024
 
 
 def normalize_ws_url(ws_url: str) -> str:
@@ -78,11 +80,21 @@ class AsyncSubscription(Generic[T]):
         # the consumer must treat prior stream continuity as lost (possible gap).
         self._resubscribed = 0
         self._resubscribed_pending = False
+        self._on_closed: Callable[[AsyncSubscription[Any]], None] | None = None
 
     @property
     def error(self) -> BaseException | None:
         """Terminal subscription error, if the stream failed."""
         return self._error
+
+    @property
+    def is_alive(self) -> bool:
+        """True while the subscription task is still running and not closed."""
+        if self._close.is_set():
+            return False
+        if self._task is None:
+            return True
+        return not self._task.done()
 
     @property
     def resubscribed(self) -> int:
@@ -130,9 +142,13 @@ class AsyncSubscription(Generic[T]):
         if self._task is not None and not self._task.done():
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
-                await asyncio.wait_for(self._task, timeout=3.0)
+                # Cancel must unwind promptly (in-flight token HTTP + WS).
+                await asyncio.wait_for(self._task, timeout=1.0)
         with contextlib.suppress(asyncio.QueueFull):
             self._queue.put_nowait(None)
+        if self._on_closed is not None:
+            with contextlib.suppress(Exception):
+                self._on_closed(self)
 
     async def __aenter__(self) -> AsyncSubscription[T]:
         return self
@@ -158,6 +174,24 @@ class AsyncRealtimeClient:
         self._credentials = credentials
         self._http = http
         self._max_queue_size = max_queue_size
+        self._active_subs: set[AsyncSubscription[Any]] = set()
+        self._closed = False
+
+    async def aclose(self) -> None:
+        """Cancel all active subscriptions and await their tasks."""
+        self._closed = True
+        subs = list(self._active_subs)
+        self._active_subs.clear()
+        for sub in subs:
+            await sub.aclose()
+
+    def _track_sub(self, sub: AsyncSubscription[Any]) -> None:
+        self._active_subs.add(sub)
+
+        def _untrack(closed: AsyncSubscription[Any]) -> None:
+            self._active_subs.discard(closed)
+
+        sub._on_closed = _untrack
 
     async def subscribe_market_trades(self, symbol_id: int) -> AsyncSubscription[Any]:
         channel = f"public:spot:market:trades:{symbol_id}:proto"
@@ -176,6 +210,8 @@ class AsyncRealtimeClient:
         to succeed before returning. Initial auth/handshake failures raise and do
         not reconnect in the background.
         """
+        if self._closed:
+            raise PolyesterRealtimeError("realtime client is closed")
         if is_private_channel(channel):
             self._require_private_auth(channel)
         queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self._max_queue_size)
@@ -259,8 +295,19 @@ class AsyncRealtimeClient:
 
         task = asyncio.create_task(runner())
         sub._task = task
+        self._track_sub(sub)
         try:
             await ready
+        except asyncio.CancelledError:
+            # Cancellation is sticky: shield teardown so in-flight token HTTP / WS
+            # peers are aborted promptly (E6 cancel-during-token-stall).
+            close.set()
+            if not task.done():
+                task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await asyncio.shield(asyncio.wait_for(task, timeout=1.0))
+            self._active_subs.discard(sub)
+            raise
         except BaseException:
             await sub.aclose()
             raise
@@ -278,7 +325,7 @@ class AsyncRealtimeClient:
         async with websockets.connect(
             self._ws_url,
             open_timeout=10,
-            max_size=None,
+            max_size=WS_MAX_MESSAGE_BYTES,
             subprotocols=[CENTRIFUGO_PROTOBUF_SUBPROTOCOL],
         ) as ws:
             if ws.subprotocol != CENTRIFUGO_PROTOBUF_SUBPROTOCOL:

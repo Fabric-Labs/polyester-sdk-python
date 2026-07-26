@@ -28,6 +28,11 @@ class OrderbookSubscription:
     def set_bucket(self, bucket: str | None) -> None:
         self._set_bucket(bucket)
 
+    @property
+    def last_error(self) -> BaseException | None:
+        stream = self._stream
+        return getattr(stream, "last_error", None)
+
     async def refresh_snapshot(self) -> None:
         await self._stream.refresh_snapshot()
 

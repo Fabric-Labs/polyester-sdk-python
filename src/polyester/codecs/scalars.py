@@ -10,12 +10,29 @@ import base58
 from polyester.errors import PolyesterValidationError
 
 UINT64_MAX = 2**64 - 1
+UINT32_MAX = 2**32 - 1
 INT64_MAX = 2**63 - 1
 INT64_MIN = -(2**63)
 PRICE_TICK_SCALE = 6
+# Maximum accepted quantity/ledger scale for public formatters and catalog hydration.
+# Values above this are rejected instead of allocating pathological padding (scale ≥ 65535).
+MAX_PROTOCOL_SCALE = 36
 
 # Strict non-negative decimal: digits with optional fractional part (TS-aligned).
 _STRICT_DECIMAL = re.compile(r"^\d+(?:\.\d+)?$")
+
+
+def validate_protocol_scale(scale: int, *, field_name: str = "scale") -> int:
+    """Reject scales that would panic or allocate pathological padding."""
+    if isinstance(scale, bool) or not isinstance(scale, int):
+        raise PolyesterValidationError(f"{field_name} must be an int")
+    if scale < 0:
+        raise PolyesterValidationError(f"{field_name} must be non-negative")
+    if scale > MAX_PROTOCOL_SCALE:
+        raise PolyesterValidationError(
+            f"{field_name} {scale} exceeds maximum protocol scale {MAX_PROTOCOL_SCALE}"
+        )
+    return scale
 
 
 def _decimal_string_from_input(raw: str | Decimal, field_name: str) -> str:
@@ -40,6 +57,8 @@ def _decimal_string_from_input(raw: str | Decimal, field_name: str) -> str:
 
 def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, str | None]:
     """Strict decimal→scaled. Returns (ok, scaled, failure_reason). Never rounds."""
+    if scale < 0 or scale > MAX_PROTOCOL_SCALE:
+        return False, None, "scale"
     raw = decimal.strip()
     if not _STRICT_DECIMAL.match(raw):
         return False, None, "invalid"
@@ -57,12 +76,17 @@ def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, s
 
 
 def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
+    validate_protocol_scale(scale, field_name=f"{field_name} scale")
     text = _decimal_string_from_input(raw, field_name)
     ok, scaled, reason = try_decimal_to_scaled(text, scale)
     if not ok or scaled is None:
         if reason == "precision":
             raise PolyesterValidationError(
                 f"{field_name} supports at most {scale} decimal places: {text}"
+            )
+        if reason == "scale":
+            raise PolyesterValidationError(
+                f"{field_name} scale {scale} exceeds maximum protocol scale {MAX_PROTOCOL_SCALE}"
             )
         raise PolyesterValidationError(f"{field_name} must be a valid decimal string")
     return scaled
@@ -90,7 +114,11 @@ def format_price_ticks(ticks: int) -> str:
 
 
 def format_qty_scaled(qty_scaled: int, scale: int) -> str:
-    """Convert scaled integer quantity to a decimal string."""
+    """Convert scaled integer quantity to a decimal string.
+
+    Raises PolyesterValidationError when ``scale`` exceeds ``MAX_PROTOCOL_SCALE``.
+    """
+    validate_protocol_scale(scale)
     if scale <= 0:
         return str(int(qty_scaled))
     neg = qty_scaled < 0

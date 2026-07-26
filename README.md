@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a17`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a18`). Proprietary license (not open source).
 API-key only — no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -65,7 +65,7 @@ normal trading and ledger streams.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a17"
+pip install "polyester-sdk==0.1.0a18"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -379,7 +379,24 @@ client. Private API-key policy snapshots use
 
 ## Testing (contributors)
 
-**CI (no network):** `python -m pytest tests/unit -q`
+**CI (no network):**
+
+```bash
+python -m pytest tests/unit tests/hardening -q
+```
+
+**Live selection (A7):** public smoke vs credentialed suites are selectable via markers.
+
+```bash
+# Public smoke (read-only smoke; no mutation/funded)
+python -m pytest -m "public_smoke" -q
+
+# Credentialed live integration (requires API-key env)
+python -m pytest -m "credentialed and not mutation and not funded" -q
+
+# Local L2 hardening only (no network)
+python -m pytest tests/hardening -q
+```
 
 **Live devnet tests** use a local `.env` file in the test harness only. Fixtures
 load values from env and pass them as explicit constructor parameters — the same
@@ -390,7 +407,7 @@ cp .env.example .env
 # fill in POLYESTER_API_KEY_ID, POLYESTER_API_PRIVATE_KEY, POLYESTER_ACCOUNT_ID
 
 pip install -e ".[dev]"
-python -m pytest tests/unit -q
+python -m pytest tests/unit tests/hardening -q
 ./scripts/test_all.sh   # optional: unit + live tiers
 ./scripts/smoke_realtime.sh   # realtime unit + live heartbeat before release
 ```
@@ -399,7 +416,11 @@ Use `python -m pytest` (not bare `pytest`) so tests run in the same venv as `pip
 Set `POLYESTER_TEST_MUTATION=1` for state-changing tests. Funded mutations
 require both `POLYESTER_TEST_MUTATION=1` and `POLYESTER_TEST_FUNDED=1`. For a
 release-certification run, set `POLYESTER_TEST_STRICT_LIVE=1`; any skipped test
-then fails instead of making an incomplete live run appear green.
+then fails instead of making an incomplete live run appear green. Missing or
+malformed credentials must fail under strict live (not soft-skip as green). The
+session printer scopes executed/skipped/failed counts to `@pytest.mark.integration`
+tests and enforces `POLYESTER_TEST_MIN_EXECUTED` (default 5) when credentials are
+present.
 
 CI requires every public Connect RPC in gen to be wrapped or listed in
 `sdk-coverage.toml`. Contributors: `python scripts/check_sdk_coverage.py`.

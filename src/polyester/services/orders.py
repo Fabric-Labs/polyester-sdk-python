@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -29,6 +31,7 @@ from polyester.codecs.orders import (
 )
 from polyester.codecs.realtime_decode import decode_order_bytes
 from polyester.codecs.scalars import id_to_int
+from polyester.errors import PolyesterTransportError, PolyesterValidationError
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
@@ -454,3 +457,78 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             default_account_id=self._default_account_id,
             decode=decode_order_bytes,
         )
+
+    async def wait_for_order_trades_complete(
+        self,
+        *,
+        order_id: str | int | None = None,
+        client_order_id: str | None = None,
+        account: AccountScope | None = None,
+        sub_account_id: str | None = None,
+        timeout: float = 10.0,
+        poll_interval: float = 0.1,
+    ) -> GetOrderResult:
+        """Poll ``get`` until projected trade qtys sum to order ``cum_qty`` or timeout.
+
+        GetOrder can report ``cum_qty`` before every fill is visible on the trades
+        list (eventual consistency). Prefer this helper after fills instead of
+        treating a single get as final trade projection.
+        """
+        return await wait_for_order_trades_complete(
+            self,
+            order_id=order_id,
+            client_order_id=client_order_id,
+            account=account,
+            sub_account_id=sub_account_id,
+            timeout=timeout,
+            poll_interval=poll_interval,
+        )
+
+
+async def wait_for_order_trades_complete(
+    orders: AsyncOrdersService,
+    *,
+    order_id: str | int | None = None,
+    client_order_id: str | None = None,
+    account: AccountScope | None = None,
+    sub_account_id: str | None = None,
+    timeout: float = 10.0,
+    poll_interval: float = 0.1,
+) -> GetOrderResult:
+    """Poll until ``sum(trade.qty) == order.cum_qty`` or ``timeout`` elapses."""
+    if order_id is None and client_order_id is None:
+        raise PolyesterValidationError(
+            "wait_for_order_trades_complete requires order_id or client_order_id"
+        )
+    deadline = time.monotonic() + max(timeout, 0.0)
+    last: GetOrderResult | None = None
+    while True:
+        last = await orders.get(
+            account=account,
+            order_id=order_id,
+            client_order_id=client_order_id,
+            sub_account_id=sub_account_id,
+        )
+        if _order_trades_projection_complete(last):
+            return last
+        if time.monotonic() >= deadline:
+            raise PolyesterTransportError(
+                "timed out waiting for order trades to match cum_qty "
+                f"(order_id={order_id!r}, client_order_id={client_order_id!r})"
+            )
+        await asyncio.sleep(max(poll_interval, 0.0))
+
+
+def _order_trades_projection_complete(result: GetOrderResult) -> bool:
+    order = result.order
+    if order is None or order.cum_qty is None:
+        return False
+    cum = order.cum_qty.scaled
+    if cum == 0:
+        return True
+    trade_sum = 0
+    for trade in result.trades:
+        if trade.qty is None:
+            return False
+        trade_sum += trade.qty.scaled
+    return trade_sum == cum

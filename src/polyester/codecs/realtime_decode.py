@@ -14,6 +14,7 @@ from polyester.codecs.decode.sub_accounts import subaccount_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto
 from polyester.codecs.decode.triggers import trigger_event_from_proto, trigger_from_proto
 from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterRealtimeError
 from polyester.models import ApiData, AssetBalance, LedgerTransfer, Order, UserTrade
 from polyester.models.auth import AccountIdentity
 from polyester.models.market import Candle, MarketOverviewList
@@ -23,11 +24,21 @@ from polyester.models.sub_accounts import SubAccount
 from polyester.models.trading import ApiKeySummary, LifecycleFlowSummary, Trigger, TriggerEvent
 
 T = TypeVar("T")
+MAX_REALTIME_MESSAGE_BYTES = 4 * 1024 * 1024
 
 
 def _parse_proto(payload: bytes, message_cls):
+    if not payload:
+        raise PolyesterRealtimeError("proto decode: empty publication payload")
+    if len(payload) > MAX_REALTIME_MESSAGE_BYTES:
+        raise PolyesterRealtimeError(
+            f"proto decode: publication exceeds {MAX_REALTIME_MESSAGE_BYTES} bytes"
+        )
     message = message_cls()
-    message.ParseFromString(payload)
+    try:
+        message.ParseFromString(payload)
+    except Exception as exc:
+        raise PolyesterRealtimeError(f"proto decode: {exc}") from exc
     return message
 
 
@@ -154,7 +165,7 @@ def decode_candle_point_bytes(
     *,
     symbol_id: int,
     timeframe: str,
-    volume_scale: int = 8,
+    volume_scale: int,
 ) -> Callable[[bytes], Candle]:
     from polyester.gen.marketdata.v1.marketdata_pb2 import CandlePoint
 

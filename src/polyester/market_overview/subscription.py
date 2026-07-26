@@ -16,7 +16,7 @@ class MarketOverviewSubscription:
         queue: asyncio.Queue[list[MarketOverviewEntry] | None],
         close: asyncio.Event,
         stream,
-        start_task: asyncio.Task[None],
+        start_task: asyncio.Task[None] | None = None,
     ) -> None:
         self._queue = queue
         self._close = close
@@ -34,7 +34,7 @@ class MarketOverviewSubscription:
     async def aclose(self) -> None:
         self._close.set()
         await self._stream.aclose()
-        if not self._start_task.done():
+        if self._start_task is not None and not self._start_task.done():
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._start_task
         await self._queue.put(None)

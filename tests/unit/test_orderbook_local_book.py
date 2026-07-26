@@ -88,6 +88,7 @@ def test_build_orderbook_data_sorts_sides() -> None:
         book_seq=3,
         bids={100: 1, 200: 2, 300: 3},
         asks={150: 1, 120: 2, 110: 3},
+        quantity_scale=8,
     )
     assert data.book_seq == "3"
     assert [level.price.ticks for level in data.bids] == [300, 200]

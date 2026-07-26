@@ -66,6 +66,17 @@ class CatalogManager:
         self.deposit_withdraw_config = None
         self._legacy_zipper_raw = {}
 
+    def _reject_refresh(self, reason: str) -> None:
+        """Keep a previously valid snapshot intact when a refresh is invalid."""
+        if (
+            self.spot_config
+            or self.zipper is not None
+            or self.deposit_withdraw_config is not None
+            or self._legacy_zipper_raw
+        ):
+            return
+        self.mark_unusable(reason)
+
     @property
     def zipper_config(self) -> dict[str, Any]:
         """Backward-compatible raw dict view of the typed zipper catalog."""
@@ -89,13 +100,15 @@ class CatalogManager:
     def hydrate_spot_config(self, config: dict[str, Any]) -> None:
         """Hydrate spot pairs; reject out-of-range ids/scales (no silent truncation)."""
         if not isinstance(config, dict):
-            self.mark_unusable("spot catalog is not an object")
+            self._reject_refresh("spot catalog is not an object")
             raise PolyesterValidationError("spot catalog is not an object")
         pairs = config.get("pairs") or config.get("symbols") or []
         if not isinstance(pairs, list) or not pairs:
-            self.mark_unusable("spot catalog empty or missing pairs")
+            self._reject_refresh("spot catalog empty or missing pairs")
             raise PolyesterValidationError("spot catalog empty or missing pairs")
         cleaned_pairs: list[dict[str, Any]] = []
+        symbols_seen: set[str] = set()
+        symbol_ids_seen: set[int] = set()
         try:
             for pair in pairs:
                 if not isinstance(pair, dict):
@@ -119,17 +132,28 @@ class CatalogManager:
                     field_name="base_quantity_scale",
                 )
                 row = dict(pair)
-                if symbol_id is not None:
-                    row["symbol_id"] = symbol_id
-                if scale is not None:
-                    row["base_quantity_scale"] = scale
-                if symbol:
-                    cleaned_pairs.append(row)
+                if not isinstance(symbol, str) or not symbol.strip():
+                    raise PolyesterValidationError("catalog symbol is required")
+                if symbol_id is None or symbol_id == 0:
+                    raise PolyesterValidationError("catalog symbol_id must be non-zero")
+                if scale is None:
+                    raise PolyesterValidationError("catalog base_quantity_scale is required")
+                if symbol in symbols_seen:
+                    raise PolyesterValidationError(f"catalog contains duplicate symbol {symbol!r}")
+                if symbol_id in symbol_ids_seen:
+                    raise PolyesterValidationError(
+                        f"catalog contains duplicate symbol_id {symbol_id}"
+                    )
+                symbols_seen.add(symbol)
+                symbol_ids_seen.add(symbol_id)
+                row["symbol_id"] = symbol_id
+                row["base_quantity_scale"] = scale
+                cleaned_pairs.append(row)
         except PolyesterValidationError as exc:
-            self.mark_unusable(str(exc))
+            self._reject_refresh(str(exc))
             raise
         if not cleaned_pairs:
-            self.mark_unusable("spot catalog contained no usable pairs")
+            self._reject_refresh("spot catalog contained no usable pairs")
             raise PolyesterValidationError("spot catalog contained no usable pairs")
         self._unusable = False
         self._unusable_reason = None
@@ -143,12 +167,15 @@ class CatalogManager:
             self.hydrate_zipper_config_typed(config)
             return
         if not isinstance(config, dict):
-            self.mark_unusable("zipper catalog is not an object")
+            self._reject_refresh("zipper catalog is not an object")
             raise PolyesterValidationError("zipper catalog is not an object")
         assets = config.get("assets") or []
         if not isinstance(assets, list):
-            self.mark_unusable("zipper catalog assets must be a list")
+            self._reject_refresh("zipper catalog assets must be a list")
             raise PolyesterValidationError("zipper catalog assets must be a list")
+        assets_seen: set[str] = set()
+        ledger_ids_seen: set[int] = set()
+        zipped_ids_seen: set[int] = set()
         try:
             for row in assets:
                 if not isinstance(row, dict):
@@ -156,19 +183,49 @@ class CatalogManager:
                 ledger_id_raw = (
                     row.get("ledgerId") if row.get("ledgerId") is not None else row.get("ledger_id")
                 )
-                _parse_u32_field(
+                asset = row.get("asset") or row.get("code")
+                if not isinstance(asset, str) or not asset.strip():
+                    raise PolyesterValidationError("catalog asset is required")
+                ledger_id = _parse_u32_field(
                     ledger_id_raw,
                     field_name="ledger_id",
                 )
+                if ledger_id is None or ledger_id == 0:
+                    raise PolyesterValidationError("catalog ledger_id must be non-zero")
                 scale_raw = (
                     row.get("quantityScale")
                     if row.get("quantityScale") is not None
                     else row.get("quantity_scale")
                 )
-                if scale_raw is not None:
-                    _parse_protocol_scale(scale_raw, field_name="quantity_scale")
+                if scale_raw is None:
+                    raise PolyesterValidationError("catalog quantity_scale is required")
+                _parse_protocol_scale(scale_raw, field_name="quantity_scale")
+                if asset in assets_seen:
+                    raise PolyesterValidationError(f"catalog contains duplicate asset {asset!r}")
+                if ledger_id in ledger_ids_seen:
+                    raise PolyesterValidationError(
+                        f"catalog contains duplicate ledger_id {ledger_id}"
+                    )
+                assets_seen.add(asset)
+                ledger_ids_seen.add(ledger_id)
+                for variant in row.get("variants") or []:
+                    if not isinstance(variant, dict):
+                        raise PolyesterValidationError("catalog variant must be an object")
+                    zipped_id = _parse_u32_field(
+                        variant.get("zippedAssetId")
+                        if variant.get("zippedAssetId") is not None
+                        else variant.get("zipped_asset_id"),
+                        field_name="zipped_asset_id",
+                    )
+                    if zipped_id is None or zipped_id == 0:
+                        raise PolyesterValidationError("catalog zipped_asset_id must be non-zero")
+                    if zipped_id in zipped_ids_seen:
+                        raise PolyesterValidationError(
+                            f"catalog contains duplicate zipped_asset_id {zipped_id}"
+                        )
+                    zipped_ids_seen.add(zipped_id)
         except PolyesterValidationError as exc:
-            self.mark_unusable(str(exc))
+            self._reject_refresh(str(exc))
             raise
         self.deposit_withdraw_config = None
         self.zipper = None
@@ -178,17 +235,43 @@ class CatalogManager:
 
     def hydrate_zipper_config_typed(self, config: DepositWithdrawConfig) -> None:
         """Hydrate from the typed deposit/withdraw config (no consumer JSON round-trip)."""
+        assets_seen: set[str] = set()
+        ledger_ids_seen: set[int] = set()
+        zipped_ids_seen: set[int] = set()
         try:
             for asset in config.assets:
-                if asset.ledger_id is not None:
-                    _parse_u32_field(asset.ledger_id, field_name="ledger_id")
-                if asset.quantity_scale is not None:
-                    validate_protocol_scale(
-                        int(asset.quantity_scale),
-                        field_name="catalog quantity_scale",
+                if not asset.asset.strip():
+                    raise PolyesterValidationError("catalog asset is required")
+                ledger_id = _parse_u32_field(asset.ledger_id, field_name="ledger_id")
+                if ledger_id is None or ledger_id == 0:
+                    raise PolyesterValidationError("catalog ledger_id must be non-zero")
+                validate_protocol_scale(
+                    int(asset.quantity_scale),
+                    field_name="catalog quantity_scale",
+                )
+                if asset.asset in assets_seen:
+                    raise PolyesterValidationError(
+                        f"catalog contains duplicate asset {asset.asset!r}"
                     )
+                if ledger_id in ledger_ids_seen:
+                    raise PolyesterValidationError(
+                        f"catalog contains duplicate ledger_id {ledger_id}"
+                    )
+                assets_seen.add(asset.asset)
+                ledger_ids_seen.add(ledger_id)
+                for variant in asset.variants:
+                    zipped_id = _parse_u32_field(
+                        variant.zipped_asset_id, field_name="zipped_asset_id"
+                    )
+                    if zipped_id is None or zipped_id == 0:
+                        raise PolyesterValidationError("catalog zipped_asset_id must be non-zero")
+                    if zipped_id in zipped_ids_seen:
+                        raise PolyesterValidationError(
+                            f"catalog contains duplicate zipped_asset_id {zipped_id}"
+                        )
+                    zipped_ids_seen.add(zipped_id)
         except PolyesterValidationError as exc:
-            self.mark_unusable(str(exc))
+            self._reject_refresh(str(exc))
             raise
         self.deposit_withdraw_config = config
         self.zipper = build_zipper_catalog_data(config)
@@ -218,11 +301,11 @@ class CatalogManager:
             return None
         for pair in self._pairs():
             if pair.get("symbol") == symbol:
-                value = (
-                    pair.get("base_quantity_scale")
-                    or pair.get("baseQuantityScale")
-                    or pair.get("qtyScale")
-                )
+                value = pair.get("base_quantity_scale")
+                if value is None:
+                    value = pair.get("baseQuantityScale")
+                if value is None:
+                    value = pair.get("qtyScale")
                 return int(value) if value is not None else None
         return None
 
@@ -285,18 +368,20 @@ class CatalogManager:
         for row in raw.get("assets") or []:
             symbol = row.get("asset") or row.get("code")
             if symbol == asset_symbol:
-                value = row.get("quantityScale") or row.get("quantity_scale")
+                value = row.get("quantityScale")
+                if value is None:
+                    value = row.get("quantity_scale")
                 return int(value) if value is not None else None
         return None
 
-    def quantity_scale_for_zipped_asset_id(self, zipped_asset_id: int) -> int:
+    def quantity_scale_for_zipped_asset_id(self, zipped_asset_id: int) -> int | None:
         catalog = self.zipper
         if catalog is not None:
             for asset in catalog.assets:
                 for chain in asset.chains:
                     if chain.zipped_asset_id == zipped_asset_id:
                         return asset.quantity_scale
-        return 18
+        return None
 
     def patch_zipper_supply(self, updates: list[ZippedAssetSupplyUpdate]) -> bool:
         if self.zipper is None or not updates:

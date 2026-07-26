@@ -10,6 +10,7 @@ from google.protobuf.message import Message
 from polyester.errors import (
     PolyesterApiError,
     PolyesterAuthError,
+    PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
     PolyesterTransportError,
@@ -70,6 +71,10 @@ def map_connect_error(exc: ConnectError):
         return PolyesterAuthError(error_message)
     if code in ("unavailable", "internal"):
         return PolyesterServerError(error_message)
+    if code == "resource_exhausted":
+        # connectrpc-python does not currently retain response metadata on
+        # ConnectError, so retry_after cannot be recovered on this path.
+        return PolyesterRateLimitError(error_message)
     if code == "deadline_exceeded":
         return PolyesterTransportError(error_message)
     message = (exc.message or "").strip().lower()

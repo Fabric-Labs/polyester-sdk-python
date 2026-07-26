@@ -83,6 +83,9 @@ class AsyncMarketDataService(BaseService):
             symbol_id=symbol_id,
             label="get_trades",
         )
+        quantity_scale = _quantity_scale_for_symbol_id(
+            self._catalogs, resolved_symbol_id, label="get_trades"
+        )
         request = GetTradesRequest(symbol_id=resolved_symbol_id, limit=limit)
         if from_match_id is not None:
             request.from_match_id = from_match_id
@@ -91,7 +94,7 @@ class AsyncMarketDataService(BaseService):
             MarketDataServiceClient,
             lambda client, req: client.get_trades(req),
             request,
-            market_trades_from_proto,
+            lambda msg: market_trades_from_proto(msg, quantity_scale=quantity_scale),
         )
 
     async def get_current_candle(
@@ -190,7 +193,12 @@ class AsyncMarketDataService(BaseService):
             symbol_id=symbol_id,
             label="subscribe_trades",
         )
-        return self._realtime.subscribe_market_trades(resolved_symbol_id)
+        quantity_scale = _quantity_scale_for_symbol_id(
+            self._catalogs, resolved_symbol_id, label="subscribe_trades"
+        )
+        return self._realtime.subscribe_market_trades(
+            resolved_symbol_id, quantity_scale=quantity_scale
+        )
 
     async def subscribe_candles(
         self,
@@ -279,7 +287,15 @@ def _datetime_to_timestamp(value: datetime) -> Timestamp:
 
 
 def _volume_scale_for_symbol_id(catalogs: CatalogManager | None, symbol_id: int) -> int:
-    if catalogs is None:
-        return 8
-    # Decode-only fallback when the spot catalog has not resolved this id yet.
-    return catalogs.base_quantity_scale_for_symbol_id(symbol_id) or 8
+    return _quantity_scale_for_symbol_id(catalogs, symbol_id, label="candle volume")
+
+
+def _quantity_scale_for_symbol_id(
+    catalogs: CatalogManager | None, symbol_id: int, *, label: str
+) -> int:
+    scale = catalogs.base_quantity_scale_for_symbol_id(symbol_id) if catalogs is not None else None
+    if scale is None:
+        raise PolyesterValidationError(
+            f"{label} requires a hydrated catalog quantity scale for symbol_id {symbol_id}"
+        )
+    return scale

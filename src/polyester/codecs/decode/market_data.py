@@ -49,9 +49,13 @@ def market_trade_from_proto(
     )
 
 
-def market_trades_from_proto(msg: marketdata_pb2.GetTradesResponse) -> MarketTradesResult:
+def market_trades_from_proto(
+    msg: marketdata_pb2.GetTradesResponse, *, quantity_scale: int
+) -> MarketTradesResult:
     return MarketTradesResult(
-        trades=[market_trade_from_proto(item) for item in msg.trades],
+        trades=[
+            market_trade_from_proto(item, quantity_scale=quantity_scale) for item in msg.trades
+        ],
         next_match_id=msg.next_page_token,
     )
 
@@ -77,7 +81,7 @@ def _decode_volume_field(value: object, *, scale: int) -> str:
 def candle_point_from_proto(
     msg: marketdata_pb2.CandlePoint,
     *,
-    volume_scale: int = 8,
+    volume_scale: int,
 ) -> Candle:
     return Candle(
         ts_sec=int(msg.ts_sec),
@@ -93,7 +97,7 @@ def candle_point_from_proto(
 def candles_from_proto(
     msg: marketdata_pb2.GetCandlesResponse,
     *,
-    volume_scale: int = 8,
+    volume_scale: int,
 ) -> CandlesResult:
     return CandlesResult(
         symbol_id=int(msg.symbol_id),
@@ -105,7 +109,7 @@ def candles_from_proto(
 def candles_columns_from_proto(
     msg: marketdata_pb2.GetCandlesColumnsResponse,
     *,
-    volume_scale: int = 8,
+    volume_scale: int,
 ) -> CandlesResult:
     candles: list[Candle] = []
     for index, ts in enumerate(msg.ts_sec):

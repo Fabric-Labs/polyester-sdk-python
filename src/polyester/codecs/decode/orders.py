@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
+from polyester.errors import PolyesterTransportError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOpenOrdersResponse,
@@ -225,8 +226,7 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
 
 
 def _batch_create_result_item(item) -> BatchCreateResultItem:
-    # POLY-3701: each item carries an accepted/rejected oneof instead of flat
-    # status/order_id/code fields.
+    # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
         return BatchCreateResultItem(
             status="accepted",
@@ -234,20 +234,46 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             client_order_id=item.client_order_id,
         )
     if item.HasField("rejected"):
+        raw_code = int(item.rejected.error.code)
+        if raw_code == 0:
+            code = "error_code_unspecified"
+        try:
+            if raw_code:
+                code = proto_enum_name(orders_pb2.ErrorCode, raw_code)
+        except (ValueError, TypeError):
+            code = f"unknown_error_code({raw_code})"
+        if raw_code and code == str(raw_code):
+            code = f"unknown_error_code({raw_code})"
         return BatchCreateResultItem(
             status="rejected",
             client_order_id=item.client_order_id,
-            code=proto_enum_name(orders_pb2.ErrorCode, item.rejected.error.code),
+            code=code,
         )
-    return BatchCreateResultItem(client_order_id=item.client_order_id)
+    raise PolyesterTransportError(
+        "batch create response item has neither accepted nor rejected outcome"
+    )
 
 
 def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchCreateOrdersResult:
     results = [_batch_create_result_item(item) for item in msg.results]
+    accepted_count = int(msg.accepted_count)
+    rejected_count = int(msg.rejected_count)
+    decoded_accepted = sum(item.status == "accepted" for item in results)
+    decoded_rejected = sum(item.status == "rejected" for item in results)
+    if (
+        accepted_count != decoded_accepted
+        or rejected_count != decoded_rejected
+        or accepted_count + rejected_count != len(results)
+    ):
+        raise PolyesterTransportError(
+            "batch create response counts do not match decoded outcomes: "
+            f"accepted={accepted_count}/{decoded_accepted} "
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
+        )
     return BatchCreateOrdersResult(
         results=results,
-        accepted_count=int(msg.accepted_count),
-        rejected_count=int(msg.rejected_count),
+        accepted_count=accepted_count,
+        rejected_count=rejected_count,
     )
 
 

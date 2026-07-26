@@ -21,6 +21,16 @@ CONNECT_JSON_CONTENT_TYPE = "application/json"
 CONNECT_PROTO_CONTENT_TYPE = "application/connect+proto"
 
 
+def _retry_after_seconds(raw: str | None) -> float | None:
+    if raw is None:
+        return None
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return None
+    return parsed if parsed >= 0 else None
+
+
 def connect_content_type(wire_format: WireFormat) -> str:
     if wire_format == "json":
         return CONNECT_JSON_CONTENT_TYPE
@@ -52,7 +62,7 @@ def raise_for_status(response: httpx.Response) -> None:
         retry_after = response.headers.get("retry-after")
         raise PolyesterRateLimitError(
             message,
-            retry_after=float(retry_after) if retry_after else None,
+            retry_after=_retry_after_seconds(retry_after),
         )
     if response.status_code >= 500:
         raise PolyesterServerError(message)

@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a20`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a21`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a20"
+pip install "polyester-sdk==0.1.0a21"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -327,16 +327,20 @@ current = await client.market_data.get_current_candle(symbol="BTC-USDT", timefra
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 
 subscription = await client.market_data.subscribe_trades(symbol="BNB-USDT")
+subscription.set_on_error(lambda error: print(f"realtime interruption: {error}"))
 async with subscription:
     async for trade in subscription:
         print(trade.price.ticks if trade.price else None, trade.qty.scaled if trade.qty else None)
         break
 ```
 
-Merged market overview stream (snapshot + live updates):
+Merged market overview stream (snapshot + live updates). The create call waits
+for the WebSocket handshake and initial snapshot:
 
 ```python
-sub = await client.market_overview.create_subscription()
+sub = await client.market_overview.create_subscription(
+    on_error=lambda error: print(f"managed overview failed: {error}")
+)
 async with sub:
     async for markets in sub:
         print(len(markets), "rows")
@@ -352,13 +356,17 @@ async with sub:
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
   `PolyesterRealtimeOverflowError` and faults the subscription; it does **not**
   silently drop updates.
+- Reconnects use capped exponential backoff with per-subscription jitter.
+  `set_on_error(...)` observes background feed interruptions; async iteration
+  still raises terminal failures.
 - Orderbook sequence gaps trigger a REST snapshot refresh. Use
   `on_sequence_gap` / `on_reconnect` / `on_snapshot_refresh` on
   `orderbook.create_subscription(...)` for recovery observability.
 - Managed snapshot-then-stream subscriptions disable transport auto-reconnect
   so they can rebuild REST state between reconnect attempts. Buffered
   publications survive a failed snapshot retry and are merged exactly once
-  after recovery; cancellation closes the replacement socket.
+  after recovery; cancellation closes the replacement socket. Managed create
+  methods await the handshake and initial snapshot before returning.
 
 ## Sync client
 

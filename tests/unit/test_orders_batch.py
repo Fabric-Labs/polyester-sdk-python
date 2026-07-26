@@ -12,7 +12,7 @@ from polyester.codecs.orders import (
     normalize_create_order_request,
 )
 from polyester.codecs.scalars import format_id, id_to_int
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterTransportError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import CreateOrderRequest
 
@@ -154,6 +154,39 @@ def test_batch_create_from_proto() -> None:
     assert result.results[1].status == "rejected"
     assert result.results[1].client_order_id == "cid-b"
     assert result.results[1].code == "error_code_bad_qty"
+
+
+def test_batch_create_rejects_missing_outcome() -> None:
+    msg = orders_pb2.BatchCreateOrdersResponse(
+        results=[orders_pb2.BatchCreateResultItem(client_order_id="missing")]
+    )
+    with pytest.raises(PolyesterTransportError, match="neither accepted nor rejected"):
+        batch_create_from_proto(msg)
+
+
+def test_batch_create_preserves_unknown_rejection_code() -> None:
+    msg = orders_pb2.BatchCreateOrdersResponse(
+        results=[
+            orders_pb2.BatchCreateResultItem(
+                client_order_id="rejected",
+                rejected=orders_pb2.BatchCreateRejected(error=orders_pb2.ErrorDetail(code=99_999)),
+            )
+        ],
+        rejected_count=1,
+    )
+    result = batch_create_from_proto(msg)
+    assert result.results[0].code == "unknown_error_code(99999)"
+
+
+def test_batch_create_rejects_count_mismatch() -> None:
+    msg = orders_pb2.BatchCreateOrdersResponse(
+        results=[
+            orders_pb2.BatchCreateResultItem(accepted=orders_pb2.BatchCreateAccepted(order_id=1))
+        ],
+        rejected_count=1,
+    )
+    with pytest.raises(PolyesterTransportError, match="counts do not match"):
+        batch_create_from_proto(msg)
 
 
 def test_batch_cancel_from_proto() -> None:

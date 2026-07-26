@@ -63,6 +63,44 @@ def test_hydrate_spot_accepts_valid_pair() -> None:
     assert catalogs.base_quantity_scale_for_symbol("ETH-USDT") == 6
 
 
+def test_rejected_spot_refresh_preserves_previous_valid_snapshot() -> None:
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {
+            "pairs": [
+                {
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 1,
+                    "base_quantity_scale": 0,
+                }
+            ]
+        }
+    )
+
+    with pytest.raises(PolyesterValidationError, match="duplicate symbol_id"):
+        catalogs.hydrate_spot_config(
+            {
+                "pairs": [
+                    {
+                        "symbol": "BTC-USDT",
+                        "symbol_id": 2,
+                        "base_quantity_scale": 8,
+                    },
+                    {
+                        "symbol": "ETH-USDT",
+                        "symbol_id": 2,
+                        "base_quantity_scale": 6,
+                    },
+                ]
+            }
+        )
+
+    assert not catalogs.is_unusable
+    assert catalogs.symbol_id_for_symbol("BTC-USDT") == 1
+    assert catalogs.base_quantity_scale_for_symbol("BTC-USDT") == 0
+    assert catalogs.symbol_id_for_symbol("ETH-USDT") is None
+
+
 def test_hydrate_zipper_rejects_bad_scale() -> None:
     catalogs = CatalogManager()
     with pytest.raises(PolyesterValidationError, match="maximum protocol scale"):
@@ -96,3 +134,29 @@ def test_hydrate_zipper_config_typed_rejects_bad_scale() -> None:
             )
         )
     assert catalogs.is_unusable
+
+
+def test_rejected_zipper_refresh_preserves_previous_valid_snapshot() -> None:
+    catalogs = CatalogManager()
+    catalogs.hydrate_zipper_config(
+        {
+            "assets": [
+                {"asset": "USDT", "ledgerId": 99, "quantityScale": 0},
+            ]
+        }
+    )
+
+    with pytest.raises(PolyesterValidationError, match="duplicate ledger_id"):
+        catalogs.hydrate_zipper_config(
+            {
+                "assets": [
+                    {"asset": "USDT", "ledgerId": 7, "quantityScale": 6},
+                    {"asset": "USDC", "ledgerId": 7, "quantityScale": 6},
+                ]
+            }
+        )
+
+    assert not catalogs.is_unusable
+    assert catalogs.ledger_id_for_asset("USDT") == 99
+    assert catalogs.quantity_scale_for_asset("USDT") == 0
+    assert catalogs.ledger_id_for_asset("USDC") is None

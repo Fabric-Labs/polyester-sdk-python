@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.1.0a21
+
+### Breaking
+- Trading withdrawals require explicit non-empty `idempotency_key` and non-zero `nonce` values.
+- Scale-dependent market data, orderbook, and Zipper supply paths require hydrated catalog scales instead of guessing.
+- Low-level trigger, candle, realtime-candle, and local-orderbook codecs require an explicit quantity scale.
+
+### Features
+- `AsyncSubscription.set_on_error` exposes background transport and terminal feed errors.
+- Retry classifiers and cryptographically random withdrawal key/nonce helpers are exported.
+
+### Fixed
+- Batch-create decoding rejects missing outcomes and inconsistent aggregate counts; unknown rejection enum values retain their numeric code.
+- Realtime reconnects use capped exponential backoff with per-subscription jitter.
+- Signing timestamps stay on wall clock during large concurrent bursts and malformed absolute URLs fail before send.
+- Catalog hydration rejects conflicting symbol/asset identities atomically, preserves the previous valid snapshot after a rejected refresh, and accepts valid scale `0`; REST and realtime public trades carry catalog quantity-scale metadata.
+
 ## 0.1.0a20
 
 ### Breaking

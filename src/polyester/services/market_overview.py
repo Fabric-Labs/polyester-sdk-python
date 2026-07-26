@@ -132,13 +132,14 @@ class AsyncMarketOverviewService(BaseService):
             on_error=on_error,
         )
 
-        async def start() -> None:
-            await stream.start()
-
-        start_task = asyncio.create_task(start())
-        return MarketOverviewSubscription(
+        subscription = MarketOverviewSubscription(
             queue=queue,
             close=close,
             stream=stream,
-            start_task=start_task,
         )
+        try:
+            await stream.start()
+        except BaseException:
+            await subscription.aclose()
+            raise
+        return subscription

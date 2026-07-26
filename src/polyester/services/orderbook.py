@@ -39,6 +39,14 @@ class AsyncOrderbookService(BaseService):
         self._catalogs = catalogs or CatalogManager()
         self._realtime = realtime
 
+    def _require_quantity_scale(self, symbol: str) -> int:
+        scale = self._catalogs.base_quantity_scale_for_symbol(symbol)
+        if scale is None:
+            raise PolyesterValidationError(
+                f"orderbook decoding requires a hydrated catalog quantity scale for {symbol!r}"
+            )
+        return scale
+
     async def get(self, *, symbol: str, depth: int = 50) -> OrderbookData:
         from polyester.gen.orderbook.v1 import orderbook_pb2
 
@@ -53,7 +61,7 @@ class AsyncOrderbookService(BaseService):
                 msg,
                 symbol=symbol,
                 depth=depth,
-                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol) or 8,
+                quantity_scale=self._require_quantity_scale(symbol),
             ),
         )
 
@@ -117,7 +125,7 @@ class AsyncOrderbookService(BaseService):
                 bids=bids_map,
                 asks=asks_map,
                 bucket_ticks=bucket_ticks,
-                quantity_scale=self._catalogs.base_quantity_scale_for_symbol(symbol) or 8,
+                quantity_scale=self._require_quantity_scale(symbol),
             )
             if on_event is not None:
                 on_event(data)
@@ -134,7 +142,8 @@ class AsyncOrderbookService(BaseService):
                 )
             except Exception as exc:
                 if on_error is not None:
-                    on_error(exc)
+                    with contextlib.suppress(BaseException):
+                        on_error(exc)
                 close.set()
                 with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(None)
@@ -208,22 +217,18 @@ class AsyncOrderbookService(BaseService):
         )
         stream_holder["stream"] = stream
 
-        async def start() -> None:
-            try:
-                await stream.start()
-            except Exception as exc:
-                if on_error is not None:
-                    on_error(exc)
-                await queue.put(None)
-
-        start_task = asyncio.create_task(start())
-        return OrderbookSubscription(
+        subscription = OrderbookSubscription(
             queue=queue,
             close=close,
             stream=stream,
             set_bucket=set_bucket,
-            start_task=start_task,
         )
+        try:
+            await stream.start()
+        except BaseException:
+            await subscription.aclose()
+            raise
+        return subscription
 
     async def subscribe(
         self,

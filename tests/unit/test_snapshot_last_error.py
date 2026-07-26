@@ -98,3 +98,38 @@ async def test_failed_refresh_retains_publications_for_successful_retry() -> Non
     assert merged == [[b"before", b"during"]]
     assert sub.last_error is None
     await sub.aclose()
+
+
+@pytest.mark.asyncio
+async def test_consumer_callback_failure_is_observable_and_fail_closed() -> None:
+    realtime = AsyncRealtimeClient("wss://example.invalid")
+    errors: list[Exception] = []
+
+    async def fetch_snapshot() -> str:
+        return "ready"
+
+    def apply_live(_publications: list[bytes]) -> None:
+        raise RuntimeError("consumer bug")
+
+    sub = AsyncSnapshotThenStreamSubscription(
+        realtime=realtime,
+        channel="public:test",
+        decode=lambda b: b,
+        fetch_snapshot=fetch_snapshot,
+        read_publication=lambda p: [p],
+        apply_snapshot=lambda _snapshot, _pending: None,
+        apply_live_publications=apply_live,
+        on_error=errors.append,
+    )
+    assert await sub.refresh_snapshot() is True
+
+    sub._handle_publication(b"message")
+
+    assert sub.is_disposed()
+    assert not sub.is_ready()
+    assert sub.last_error is not None
+    assert "apply_live_publications callback failed" in str(sub.last_error)
+    assert errors and errors[-1] is sub.last_error
+    sub._on_error = lambda _error: (_ for _ in ()).throw(RuntimeError("error callback bug"))
+    sub._report_snapshot_error(PolyesterRealtimeError("reported safely"))
+    await sub.aclose()

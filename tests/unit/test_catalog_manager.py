@@ -9,6 +9,7 @@ def test_orderbook_price_buckets_for_symbol_reads_spot_marketdata() -> None:
                 {
                     "symbol": "BTC-USDT",
                     "symbol_id": 1,
+                    "base_quantity_scale": 8,
                     "marketdata": {"orderbook_price_buckets": [0.01, 0.1, 1.0]},
                 }
             ]

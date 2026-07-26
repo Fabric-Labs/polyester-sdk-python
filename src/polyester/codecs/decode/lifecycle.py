@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.proto_helpers import proto_enum_name
+from polyester.errors import PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
 from polyester.models import LifecycleFlowsList, LifecycleFlowSummary
 from polyester.services._scope import lifecycle_account_fields
@@ -13,7 +14,7 @@ FlowTxMatchView = lifecycle_read_pb2.FlowTxMatchView
 def _summary_from_detail(msg: FlowDetailView) -> FlowSummaryView:
     if msg.HasField("summary"):
         return msg.summary
-    return lifecycle_read_pb2.FlowSummaryView()
+    raise PolyesterTransportError("flow detail response is missing summary")
 
 
 def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> LifecycleFlowSummary:
@@ -61,7 +62,7 @@ def flows_by_tx_list_from_proto(
 def flow_from_get_response(msg: lifecycle_read_pb2.GetFlowResponse) -> LifecycleFlowSummary:
     if msg.HasField("flow"):
         return flow_detail_from_proto(msg.flow)
-    return LifecycleFlowSummary(intent_id="")
+    raise PolyesterTransportError("get flow response is missing flow")
 
 
 def flow_from_get_by_tx_response(

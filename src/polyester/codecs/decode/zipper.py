@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from polyester.codecs.ledger_amounts import format_ledger_u128
+from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.zipper.v1 import zipper_pb2
 from polyester.models.zipper import (
     DepositWithdrawConfig,
@@ -68,11 +69,11 @@ def deposit_withdraw_config_from_proto(
             ledger_id=int(item.ledger_id),
             name=item.name,
             icon=item.icon,
-            quantity_scale=int(item.quantity_scale) if item.quantity_scale else 18,
+            quantity_scale=int(item.quantity_scale),
             quantity_display_decimals=int(item.quantity_display_decimals),
             u_asset_id=item.u_asset_id,
             variants=[
-                _variant_from_proto(variant, quantity_scale=int(item.quantity_scale) or 18)
+                _variant_from_proto(variant, quantity_scale=int(item.quantity_scale))
                 for variant in item.variants
             ],
         )
@@ -101,12 +102,19 @@ def deposit_withdraw_config_from_proto(
 def zipped_asset_supply_batch_from_proto(
     msg: zipper_pb2.ZippedAssetSupplyBatch,
     *,
-    quantity_scale_for_zipped_asset_id: Callable[[int], int] | None = None,
+    quantity_scale_for_zipped_asset_id: Callable[[int], int | None] | None = None,
 ) -> ZippedAssetSupplyBatch:
-    scale_lookup = quantity_scale_for_zipped_asset_id or (lambda _zipped_asset_id: 18)
+    if quantity_scale_for_zipped_asset_id is None:
+        raise PolyesterValidationError(
+            "zipped asset supply decoding requires a hydrated catalog scale"
+        )
     updates: list[ZippedAssetSupplyUpdate] = []
     for item in msg.updates:
-        scale = scale_lookup(int(item.zipped_asset_id))
+        scale = quantity_scale_for_zipped_asset_id(int(item.zipped_asset_id))
+        if scale is None:
+            raise PolyesterValidationError(
+                f"unknown quantity scale for zipped_asset_id {int(item.zipped_asset_id)}"
+            )
         updates.append(
             ZippedAssetSupplyUpdate(
                 zipped_asset_id=int(item.zipped_asset_id),

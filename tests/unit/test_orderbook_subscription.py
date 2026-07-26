@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from polyester.catalogs import CatalogManager
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.subscription import OrderbookSubscription
@@ -127,7 +128,19 @@ async def test_create_subscription_requires_symbol_id_when_unknown() -> None:
 async def test_create_subscription_uses_capped_depth_channel(monkeypatch) -> None:
     transport = MagicMock()
     realtime = MagicMock()
-    service = AsyncOrderbookService(transport, realtime=realtime)
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {
+            "pairs": [
+                {
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 101,
+                    "base_quantity_scale": 8,
+                }
+            ]
+        }
+    )
+    service = AsyncOrderbookService(transport, catalogs=catalogs, realtime=realtime)
 
     snapshot = orderbook_pb2.GetOrderBookResponse(book_seq=1)
     captured_channel: dict[str, str] = {}

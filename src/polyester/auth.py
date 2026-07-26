@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import threading
 import time
 from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, quote, urlsplit
@@ -16,25 +15,10 @@ API_PRIVATE_KEY_ENV = "POLYESTER_API_PRIVATE_KEY"
 ACCOUNT_ID_ENV = "POLYESTER_ACCOUNT_ID"
 
 
-class _TimestampSequencer:
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._last = 0
-
-    def next(self) -> int:
-        with self._lock:
-            now = int(time.time() * 1000)
-            self._last = max(now, self._last + 1)
-            return self._last
-
-
 @dataclass(frozen=True, slots=True)
 class ApiKeyCredentials:
     key_id: str
     private_key: bytes = field(repr=False)
-    _timestamps: _TimestampSequencer = field(
-        default_factory=_TimestampSequencer, repr=False, compare=False
-    )
 
     def __repr__(self) -> str:
         return f"ApiKeyCredentials(key_id={self.key_id!r}, private_key='[REDACTED]')"
@@ -89,6 +73,7 @@ def sha256_hex(body: bytes) -> str:
 
 
 def canonical_query(url: str) -> str:
+    _validated_url(url)
     pairs = []
     for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True):
         pairs.append(f"{quote(key, safe='')}={quote(value, safe='')}")
@@ -103,7 +88,7 @@ def canonical_signing_string(
     url: str,
     body: bytes,
 ) -> str:
-    pathname = urlsplit(url).path or "/"
+    pathname = _validated_url(url).path or "/"
     return "\n".join(
         [timestamp_ms, method.upper(), pathname, canonical_query(url), sha256_hex(body)]
     )
@@ -117,7 +102,7 @@ def sign_request(
     body: bytes = b"",
     timestamp_ms: str | None = None,
 ) -> dict[str, str]:
-    timestamp = timestamp_ms or str(credentials._timestamps.next())
+    timestamp = timestamp_ms or str(int(time.time() * 1000))
     canonical = canonical_signing_string(
         timestamp_ms=timestamp,
         method=method,
@@ -131,3 +116,10 @@ def sign_request(
         "X-API-TIMESTAMP": timestamp,
         "X-API-SIGNATURE": signature,
     }
+
+
+def _validated_url(url: str):
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise PolyesterAuthError(f"Cannot sign malformed absolute HTTP URL: {url!r}")
+    return parsed

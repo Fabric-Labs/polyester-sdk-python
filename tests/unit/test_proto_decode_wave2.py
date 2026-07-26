@@ -128,7 +128,7 @@ def test_market_trades_from_proto() -> None:
         ],
         next_page_token="56",
     )
-    result = market_trades_from_proto(msg)
+    result = market_trades_from_proto(msg, quantity_scale=8)
     assert len(result.trades) == 1
     trade = market_trade_from_proto(msg.trades[0])
     assert trade.match_id == "55"

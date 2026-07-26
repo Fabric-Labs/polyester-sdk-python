@@ -10,7 +10,7 @@ from polyester.models.market import (
     MarketTradesResult,
 )
 
-_TIMEFRAME_LABELS = {
+_TIMEFRAME_LABELS: dict[int, str] = {
     marketdata_pb2.SEC_1: "1s",
     marketdata_pb2.MIN_1: "1m",
     marketdata_pb2.MIN_5: "5m",
@@ -98,9 +98,7 @@ def candles_from_proto(
     return CandlesResult(
         symbol_id=int(msg.symbol_id),
         timeframe=_timeframe_label(msg.timeframe),
-        candles=[
-            candle_point_from_proto(item, volume_scale=volume_scale) for item in msg.candles
-        ],
+        candles=[candle_point_from_proto(item, volume_scale=volume_scale) for item in msg.candles],
     )
 
 

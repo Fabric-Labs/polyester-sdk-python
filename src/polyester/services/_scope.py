@@ -43,9 +43,7 @@ def resolve_sub_account_from_scope(
     if isinstance(account, dict):
         scoped = account.get("subaccountId") or account.get("sub_account_id")
         if not scoped:
-            raise PolyesterValidationError(
-                "account dict requires subaccountId or sub_account_id"
-            )
+            raise PolyesterValidationError("account dict requires subaccountId or sub_account_id")
         return str(scoped)
     if isinstance(account, str):
         return resolve_sub_account_id(account, default)

@@ -13,5 +13,5 @@ class OrderBookDeltaUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):
     book_seq_start: str = ""
     book_seq_end: str = ""
     reset: bool = False
-    bids: list[tuple[str, str]] = ()
-    asks: list[tuple[str, str]] = ()
+    bids: list[tuple[str, str]] = msgspec.field(default_factory=list)
+    asks: list[tuple[str, str]] = msgspec.field(default_factory=list)

@@ -139,11 +139,7 @@ class Quantity:
             raise PolyesterValidationError(
                 f"quantity symbol mismatch: value is for {self.symbol}, destination is {symbol}"
             )
-        if (
-            self.symbol_id is not None
-            and symbol_id is not None
-            and self.symbol_id != symbol_id
-        ):
+        if self.symbol_id is not None and symbol_id is not None and self.symbol_id != symbol_id:
             raise PolyesterValidationError(
                 f"quantity symbol_id mismatch: value is for {self.symbol_id}, "
                 f"destination is {symbol_id}"
@@ -215,8 +211,7 @@ class AssetAmount:
             )
         if self.asset_id is not None and asset_id is not None and self.asset_id != asset_id:
             raise PolyesterValidationError(
-                f"amount asset_id mismatch: value is for {self.asset_id}, "
-                f"destination is {asset_id}"
+                f"amount asset_id mismatch: value is for {self.asset_id}, destination is {asset_id}"
             )
 
 
@@ -281,9 +276,7 @@ def resolve_asset_amount_scaled(
             raise PolyesterValidationError(f"{field_name} must be positive")
         return value.scaled
     if isinstance(value, Quantity):
-        raise PolyesterValidationError(
-            f"{field_name} expects AssetAmount, not order Quantity"
-        )
+        raise PolyesterValidationError(f"{field_name} expects AssetAmount, not order Quantity")
     if isinstance(value, (int, float, bool)) and not isinstance(value, Decimal):
         raise PolyesterValidationError(
             f"{field_name} must be a decimal string, Decimal, or AssetAmount "

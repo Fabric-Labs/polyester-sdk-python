@@ -271,9 +271,7 @@ def withdraw_whitelist_view_from_proto(
         scope=scope,
         external_whitelist_required=bool(msg.external_whitelist_required),
         internal_whitelist_required=bool(msg.internal_whitelist_required),
-        active_entries=[
-            mirrored_whitelist_entry_from_proto(item) for item in msg.active_entries
-        ],
+        active_entries=[mirrored_whitelist_entry_from_proto(item) for item in msg.active_entries],
     )
 
 

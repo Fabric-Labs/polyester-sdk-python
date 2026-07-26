@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import contextlib
 from collections.abc import Callable
 
@@ -25,7 +26,7 @@ class AsyncMarketOverviewService(BaseService):
     async def list(
         self,
         *,
-        symbols: list[str] | None = None,
+        symbols: builtins.list[str] | None = None,
         limit: int = 50,
         page_token: str = "",
         include_sparklines: bool = False,
@@ -56,10 +57,10 @@ class AsyncMarketOverviewService(BaseService):
     async def create_subscription(
         self,
         *,
-        symbols: list[str] | None = None,
+        symbols: builtins.list[str] | None = None,
         limit: int = 50,
         include_sparklines: bool = False,
-        on_event: Callable[[list[MarketOverviewEntry]], None] | None = None,
+        on_event: Callable[[builtins.list[MarketOverviewEntry]], None] | None = None,
         on_open: Callable[[], None] | None = None,
         on_close: Callable[[], None] | None = None,
         on_error: Callable[[Exception], None] | None = None,

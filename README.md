@@ -3,8 +3,8 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a19`). Proprietary license (not open source).
-API-key only — no browser login or JWT flows.
+**Status:** Alpha (`0.1.0a20`). Proprietary license (not open source).
+API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
 
@@ -23,9 +23,9 @@ Requires **Python 3.11+**.
 | Wallet / browser login | No |
 | Session MFA enrollment and challenges | No |
 | Profile (identity subscribe) | Yes |
-| API keys (list/get/subscribe/generate_keypair) | Yes |
-| Subaccounts (reads/subscribe) | Yes |
-| Address book (reads/subscribe) | Yes |
+| API keys (list/get/subscribe/local keypair generation) | Yes |
+| Subaccounts (list/get/members/invites/activity/subscribe) | Yes |
+| Address book (list/view/subscribe) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
 | Balances, holds, equity history | Yes |
@@ -56,16 +56,17 @@ Full cross-language comparison:
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, whiteboard/social-verification and some
 layout/polychart routes may require a JWT session or may not be mounted.
-Current devnet testing verifies API-key subscription handshakes for API keys,
-API policies, subaccount policies, subaccounts, address-book invalidations, and
-normal trading and ledger streams.
+Private streams require an Account ID and the corresponding API-key permission.
+A successful subscribe call means the token exchange and realtime handshake
+completed. Treat a structured permission denial as non-transient and update the
+API-key policy before retrying.
 
 ## Install
 
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a19"
+pip install "polyester-sdk==0.1.0a20"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -83,7 +84,7 @@ pip install -e ".[dev]"
 ## Quickstart
 
 Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
-and private key when shown — the private key is only displayed once.
+and private key when shown. The private key is only displayed once.
 Open the key's **Permissions**, enable **Spot trading**, select the markets it
 may trade, and set a maximum order size appropriate for the strategy.
 
@@ -119,7 +120,7 @@ asyncio.run(main())
 
 Pass all credentials as **constructor parameters**. The SDK does not read
 environment variables unless you pass them in yourself (or use `from_env()` in
-scripts — see below).
+scripts; see below).
 
 `api_private_key` accepts the 64-character hex Ed25519 secret from key creation,
 or raw 32-byte key material.
@@ -133,7 +134,7 @@ some ledger writes.
 
 ## Authentication patterns
 
-**Recommended — explicit parameters:**
+**Recommended: explicit parameters**
 
 ```python
 from polyester import AsyncPolyester
@@ -163,7 +164,7 @@ client = AsyncPolyester(
 The plain `AsyncPolyester(...)` / `Polyester(...)` constructors never implicitly
 read `os.environ`.
 
-**Scripts and local tests only** — `AsyncPolyester.from_env()` and
+**Scripts and local tests only:** `AsyncPolyester.from_env()` and
 `Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,
 and `POLYESTER_ACCOUNT_ID` from the process environment. This is a convenience
 helper, not the primary integration pattern.
@@ -205,7 +206,7 @@ Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
 
 ### For bots (scaled integers)
 
-Stay in integer space — no string round-trip:
+Stay in integer space; no string round-trip:
 
 ```python
 from polyester import Price, Quantity
@@ -256,7 +257,7 @@ SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
   Either encode calldata or submit a UserOp: pass an owner EOA private key to
-  `PolyesterSmartAccount` (SDK derives the Polyester Safe — no UI-exported owner key).
+  `PolyesterSmartAccount` (SDK derives the Polyester Safe; no UI-exported owner key).
 - **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `polyester.chain`).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
   via wallet/smart-account signing in the Polyester app (not an API-key RPC).
@@ -349,7 +350,7 @@ async with sub:
   channels. ConnectRPC's optional JSON wire mode does not apply to realtime.
   Inbound WebSocket messages are capped at 4 MiB.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
-  `PolyesterRealtimeOverflowError` and faults the subscription — it does **not**
+  `PolyesterRealtimeOverflowError` and faults the subscription; it does **not**
   silently drop updates.
 - Orderbook sequence gaps trigger a REST snapshot refresh. Use
   `on_sequence_gap` / `on_reconnect` / `on_snapshot_refresh` on
@@ -402,7 +403,7 @@ python -m pytest tests/hardening -q
 ```
 
 **Live devnet tests** use a local `.env` file in the test harness only. Fixtures
-load values from env and pass them as explicit constructor parameters — the same
+load values from env and pass them as explicit constructor parameters; the same
 pattern application code should use.
 
 ```bash
@@ -424,6 +425,10 @@ malformed credentials must fail under strict live (not soft-skip as green). The
 session printer scopes executed/skipped/failed counts to `@pytest.mark.integration`
 tests and enforces `POLYESTER_TEST_MIN_EXECUTED` (default 5) when credentials are
 present.
+
+Legacy stress tests that use non-dry-run `cancel_all` require
+`POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP=1`. Set it only for a dedicated test
+account; those tests may cancel every open order in their selected symbol.
 
 CI requires every public Connect RPC in gen to be wrapped or listed in
 `sdk-coverage.toml`. Contributors: `python scripts/check_sdk_coverage.py`.

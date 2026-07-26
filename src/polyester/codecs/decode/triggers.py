@@ -52,9 +52,7 @@ _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
 def _trigger_status_label(value: int) -> str:
     if value == 0:
         return ""
-    return _TRIGGER_STATUS_LABELS.get(
-        value, proto_enum_name(triggers_pb2.TriggerStatus, value)
-    )
+    return _TRIGGER_STATUS_LABELS.get(value, proto_enum_name(triggers_pb2.TriggerStatus, value))
 
 
 def trigger_status_from_label(label: str) -> int:
@@ -127,9 +125,7 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
                 trough_price=_price(trailing.trough_price_ticks, symbol=symbol),
                 max_slippage=_price(int(trailing.max_slippage_ticks), symbol=symbol),
                 max_slippage_bps=int(trailing.max_slippage_bps),
-                trigger_price_source=_trigger_price_source_label(
-                    trailing.trigger_price_source
-                ),
+                trigger_price_source=_trigger_price_source_label(trailing.trigger_price_source),
                 trigger_direction=proto_enum_name(
                     orders_pb2.TriggerDirection, trailing.trigger_direction
                 ),
@@ -186,8 +182,8 @@ class _TriggerConfig:
         self.order_type = ""
         self.time_in_force = ""
         self.post_only = False
-        self.limit_price = None
-        self.trigger_price = None
+        self.limit_price: Price | None = None
+        self.trigger_price: Price | None = None
 
 
 def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | None) -> None:

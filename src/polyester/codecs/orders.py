@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import msgspec
 from google.protobuf.json_format import ParseDict
@@ -65,9 +65,7 @@ def create_order_to_wire(
         "side": ORDER_SIDE_TO_PROTO[request.side],
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
         "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
-        "qty_scaled": resolve_qty_scaled(
-            request.qty, quantity_scale, symbol=request.symbol
-        ),
+        "qty_scaled": resolve_qty_scaled(request.qty, quantity_scale, symbol=request.symbol),
         "limit_price_ticks": (
             resolve_price_ticks(request.price, "price", symbol=request.symbol)
             if request.price
@@ -102,9 +100,7 @@ def order_intent_from_request(
     intent = orders_pb2.OrderIntent(
         symbol=request.symbol or "",
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
-        qty_scaled=resolve_qty_scaled(
-            request.qty, quantity_scale, symbol=request.symbol
-        ),
+        qty_scaled=resolve_qty_scaled(request.qty, quantity_scale, symbol=request.symbol),
     )
     if request.client_order_id:
         intent.client_order_id = request.client_order_id
@@ -135,9 +131,7 @@ def order_intent_from_request(
                 intent.limit_gtc.post_only = True
         else:
             if request.post_only:
-                raise PolyesterValidationError(
-                    "post_only is only valid for limit GTC orders"
-                )
+                raise PolyesterValidationError("post_only is only valid for limit GTC orders")
             if tif == "ioc":
                 intent.limit_ioc.SetInParent()
                 if price_ticks is not None:
@@ -240,10 +234,8 @@ def batch_create_orders_to_proto(
         if isinstance(item, CreateOrderRequest):
             normalized = item
         else:
-            normalized = normalize_create_order_request(item)
-        proto.items.append(
-            order_intent_from_request(normalized, quantity_scale=quantity_scale)
-        )
+            normalized = normalize_create_order_request(cast(Any, item))
+        proto.items.append(order_intent_from_request(normalized, quantity_scale=quantity_scale))
     return proto
 
 

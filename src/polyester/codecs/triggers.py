@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
@@ -42,7 +44,7 @@ def _conditional_child(
     *,
     order_type: str,
     tif: str,
-    limit_price: object | None,
+    limit_price: Any | None,
     post_only: bool,
     symbol: str,
 ) -> triggers_pb2.ConditionalChildExecution:
@@ -92,9 +94,9 @@ def create_trigger_to_proto(
     trigger_type: str,
     side: str,
     qty: object,
-    trigger_price: object | None = None,
+    trigger_price: Any | None = None,
     order_type: str = "market",
-    limit_price: object | None = None,
+    limit_price: Any | None = None,
     trigger_price_source: str = "last",
     tif: str = "gtc",
     sub_account_id: str | int | None = None,
@@ -104,13 +106,13 @@ def create_trigger_to_proto(
     self_trade_prevention_mode: str | None = None,
     trailing_distance_ticks: int | None = None,
     trailing_distance_bps: int | None = None,
-    activation_price: object | None = None,
+    activation_price: Any | None = None,
     max_slippage_ticks: int | None = None,
     max_slippage_bps: int | None = None,
     twap_duration_ms: int | None = None,
     twap_slice_interval_ms: int | None = None,
-    ladder_price_min: object | None = None,
-    ladder_price_max: object | None = None,
+    ladder_price_min: Any | None = None,
+    ladder_price_max: Any | None = None,
     ladder_levels: int | None = None,
     ladder_distribution: str | None = None,
     quantity_scale: int = 8,
@@ -249,11 +251,11 @@ def modify_trigger_to_proto(
     *,
     trigger_id: str | int,
     sub_account_id: str | int | None = None,
-    trigger_price: object | None = None,
-    limit_price: object | None = None,
+    trigger_price: Any | None = None,
+    limit_price: Any | None = None,
     trailing_distance_ticks: int | None = None,
     trailing_distance_bps: int | None = None,
-    activation_price: object | None = None,
+    activation_price: Any | None = None,
     max_slippage_ticks: int | None = None,
     max_slippage_bps: int | None = None,
 ) -> triggers_pb2.ModifyTriggerRequest:
@@ -287,9 +289,7 @@ def modify_trigger_to_proto(
     if trailing_distance_bps is not None:
         proto.trailing_distance_bps = trailing_distance_bps
     if activation_price is not None:
-        proto.activation_price_ticks = resolve_price_ticks(
-            activation_price, "activation_price"
-        )  # type: ignore[arg-type]
+        proto.activation_price_ticks = resolve_price_ticks(activation_price, "activation_price")  # type: ignore[arg-type]
     if max_slippage_ticks is not None:
         proto.max_slippage_ticks = max_slippage_ticks
     if max_slippage_bps is not None:

@@ -25,7 +25,6 @@ def test_encode_connect_json_body_empty_object() -> None:
     assert encode_connect_body({}, wire_format="json") == b"{}"
 
 
-
 def test_raise_for_status_404_is_route_not_found() -> None:
     response = httpx.Response(404, text="404 page not found")
     try:

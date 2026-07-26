@@ -63,9 +63,7 @@ def test_order_from_proto_maps_attached_risk() -> None:
             take_profit=AttachedRiskTakeProfit(
                 policy=orders_pb2.TakeProfitPolicy(
                     trigger_price_ticks=6000,
-                    child=orders_pb2.RiskExecution(
-                        market_ioc=orders_pb2.RiskMarketIoc()
-                    ),
+                    child=orders_pb2.RiskExecution(market_ioc=orders_pb2.RiskMarketIoc()),
                 )
             ),
             trailing_stop=AttachedRiskTrailingStop(

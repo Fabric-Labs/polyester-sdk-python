@@ -26,9 +26,7 @@ async def test_snapshot_then_stream_refresh_applies_snapshot() -> None:
         decode=lambda _payload: OrderBookDeltaUpdate(),
         fetch_snapshot=fetch_snapshot,
         read_publication=lambda delta: [delta],
-        apply_snapshot=lambda snap, pending: calls.append(
-            f"apply:{snap['seq']}:{len(pending)}"
-        ),
+        apply_snapshot=lambda snap, pending: calls.append(f"apply:{snap['seq']}:{len(pending)}"),
         apply_live_publications=lambda pubs: calls.append(f"live:{len(pubs)}"),
     )
 

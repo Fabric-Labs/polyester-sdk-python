@@ -58,9 +58,7 @@ def load_api_key_credentials(
             message = "Both POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY are required"
         else:
             message = "Both api_key_id and api_private_key are required"
-        raise PolyesterAuthError(
-            message
-        )
+        raise PolyesterAuthError(message)
     return ApiKeyCredentials(key_id=key_id, private_key=normalize_private_key(private))
 
 

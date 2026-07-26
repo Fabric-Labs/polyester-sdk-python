@@ -122,9 +122,7 @@ async def fetch_rt_token(
         async with asyncio.timeout(timeout):
             async with http.stream("GET", url, headers=headers) as response:
                 try:
-                    raw = await _read_limited(
-                        response, MAX_TOKEN_RESPONSE_BYTES, label=label
-                    )
+                    raw = await _read_limited(response, MAX_TOKEN_RESPONSE_BYTES, label=label)
                 except asyncio.CancelledError:
                     # Ensure the streamed peer is aborted promptly on cancel (E6).
                     await response.aclose()

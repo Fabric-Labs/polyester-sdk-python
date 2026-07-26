@@ -17,6 +17,11 @@ from tests.helpers import (
     min_base_qty_for_pair,
 )
 
+pytestmark = [
+    pytest.mark.account_wide_cleanup,
+    pytest.mark.usefixtures("account_wide_cleanup_enabled"),
+]
+
 
 def _assert_complete_batch_result(result, *, expected_cids: set[str], round_i: int) -> None:
     assert len(result.results) == 40, (
@@ -26,11 +31,10 @@ def _assert_complete_batch_result(result, *, expected_cids: set[str], round_i: i
         pytest.skip(devnet_order_skip_message())
     assert result.rejected_count == 0, (
         f"round {round_i}: expected no rejected, got {result.rejected_count}; "
-        f"sample={[ (r.client_order_id, r.code) for r in result.results[:3] ]}"
+        f"sample={[(r.client_order_id, r.code) for r in result.results[:3]]}"
     )
     assert result.amended_count + result.replaced_count == 40, (
-        f"round {round_i}: amended+replaced="
-        f"{result.amended_count}+{result.replaced_count} != 40"
+        f"round {round_i}: amended+replaced={result.amended_count}+{result.replaced_count} != 40"
     )
     seen = {item.client_order_id for item in result.results if item.client_order_id}
     missing = expected_cids - seen

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.balances import (
     balance_history_from_proto,
@@ -74,7 +76,7 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         range: str = "7d",
         sub_account_id: str | None = None,
         ledger: int = 0,
-        account_codes: list[int] | None = None,
+        account_codes: builtins.list[int] | None = None,
     ) -> BalanceHistory:
         request = GetBalanceHistoryRequest(
             range=resolve_balance_range(range),
@@ -101,7 +103,7 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         range: str = "7d",
         sub_account_id: str | None = None,
-        account_codes: list[int] | None = None,
+        account_codes: builtins.list[int] | None = None,
         group_by: str = "account",
     ) -> EquityHistory:
         request = GetEquityHistorySeriesRequest(

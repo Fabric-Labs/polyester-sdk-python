@@ -72,8 +72,12 @@ async def test_l1_token_headers_then_stalled_body_times_out(stall_server: str) -
     elapsed = time.monotonic() - started
     assert elapsed < 1.2, f"body likely outside timeout; elapsed={elapsed}"
     msg = str(exc_info.value).lower()
-    assert "timeout" in msg or "timed out" in msg or isinstance(
-        exc_info.value, (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectTimeout)
+    assert (
+        "timeout" in msg
+        or "timed out" in msg
+        or isinstance(
+            exc_info.value, (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectTimeout)
+        )
     )
 
 

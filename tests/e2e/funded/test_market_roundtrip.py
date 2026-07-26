@@ -7,6 +7,7 @@ optional mode may structured-skip only that known blocker. Strict mode fails.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 
 import pytest
@@ -21,6 +22,7 @@ from tests.helpers import (
     quote_asset_id_for_symbol,
     reserved_balance_raw,
     resolve_far_below_buy_limit_price,
+    resolve_market_ref_price,
     trading_balance_raw,
 )
 
@@ -63,12 +65,32 @@ async def _wait_no_open_cids(client, cids: set[str], *, timeout: float = 20) -> 
     raise AssertionError(f"test orders still open after cleanup: {sorted(remaining)}")
 
 
-async def _holds_route_mounted(client) -> bool:
-    try:
+async def _exercise_holds_route(client) -> None:
+    # Reserved balances remain the required reconciliation signal when this
+    # optional detailed route is not mounted in the target environment.
+    with contextlib.suppress(Exception):
         await client.balances.list_holds(limit=1)
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+
+
+async def _cancel_open_test_orders(client, cids: set[str]) -> list[str]:
+    """Cancel only this fixture's open orders, never unrelated account orders."""
+    errors: list[str] = []
+    try:
+        open_orders = await client.orders.list_open(limit=100)
+    except Exception as exc:  # noqa: BLE001
+        return [f"list_open before targeted cleanup: {exc}"]
+
+    for order in open_orders.orders:
+        if order.client_order_id not in cids:
+            continue
+        try:
+            await client.orders.cancel(
+                client_order_id=order.client_order_id,
+                symbol=order.symbol,
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"cancel {order.client_order_id}: {exc}")
+    return errors
 
 
 @pytest.mark.integration
@@ -85,32 +107,31 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         pytest.skip("Set POLYESTER_TEST_TRADE_E2E=1 to run market roundtrip e2e")
 
     maker_credentials = _maker_credentials()
-    if maker_credentials is None:
-        pytest.skip(
-            "Set POLYESTER_TEST_MAKER_API_KEY_ID and "
-            "POLYESTER_TEST_MAKER_API_PRIVATE_KEY for market roundtrip"
+    maker = None
+    if maker_credentials is not None:
+        maker_key_id, maker_private_key = maker_credentials
+        maker = AsyncPolyester(
+            api_key_id=maker_key_id,
+            api_private_key=maker_private_key,
+            api_url=live_client.api_url,
+            hydrate_catalogs=True,
         )
-
-    maker_key_id, maker_private_key = maker_credentials
-    maker = AsyncPolyester(
-        api_key_id=maker_key_id,
-        api_private_key=maker_private_key,
-        api_url=live_client.api_url,
-        hydrate_catalogs=True,
-    )
 
     buy_cid = unique_client_order_id("rt-buy")
     sell_cid = unique_client_order_id("rt-sell")
     maker_sell_cid = unique_client_order_id("rt-maker")
     maker_buy_cid = unique_client_order_id("rt-maker-buy")
     test_cids = {buy_cid, sell_cid}
+    maker_test_cids = {maker_sell_cid, maker_buy_cid}
     roundtrip_ok = False
 
-    print(f"trade_symbol={trade_symbol}", flush=True)
+    liquidity = "dedicated-maker" if maker is not None else "external-orderbook"
+    print(f"trade_symbol={trade_symbol} liquidity={liquidity}", flush=True)
 
     try:
         spot_raw, zipper_raw = await _hydrate_catalogs(live_client)
-        await _hydrate_catalogs(maker)
+        if maker is not None:
+            await _hydrate_catalogs(maker)
         pair = next(
             (p for p in spot_raw.get("pairs") or [] if p.get("symbol") == trade_symbol),
             None,
@@ -118,12 +139,8 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         if not pair:
             pytest.skip(f"Trade symbol {trade_symbol} is not in spot config")
 
-        base_asset_id = base_asset_id_for_symbol(
-            spot_raw, trade_symbol, zipper_raw=zipper_raw
-        )
-        quote_asset_id = quote_asset_id_for_symbol(
-            spot_raw, trade_symbol, zipper_raw=zipper_raw
-        )
+        base_asset_id = base_asset_id_for_symbol(spot_raw, trade_symbol, zipper_raw=zipper_raw)
+        quote_asset_id = quote_asset_id_for_symbol(spot_raw, trade_symbol, zipper_raw=zipper_raw)
         assert base_asset_id is not None
         assert quote_asset_id is not None
 
@@ -131,30 +148,33 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         base_before = trading_balance_raw(before, base_asset_id)
         quote_reserved_before = reserved_balance_raw(before, quote_asset_id)
         base_reserved_before = reserved_balance_raw(before, base_asset_id)
-        holds_mounted = await _holds_route_mounted(live_client)
 
-        price = (
-            os.getenv("POLYESTER_TEST_TRADE_PRICE")
-            or FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(trade_symbol)
-            or "50000"
-        )
+        buy_ref_price = await resolve_market_ref_price(live_client, trade_symbol, pair, side="buy")
+        price = buy_ref_price
+        if maker is not None:
+            price = (
+                os.getenv("POLYESTER_TEST_TRADE_PRICE")
+                or FAR_ABOVE_BUY_STOP_PRICE_HINTS.get(trade_symbol)
+                or "50000"
+            )
         qty = os.getenv("POLYESTER_TEST_TRADE_QTY") or min_base_qty_for_pair(pair, price)
 
-        try:
-            await maker.orders.create(
-                symbol=trade_symbol,
-                side="sell",
-                order_type="limit",
-                tif="gtc",
-                qty=qty,
-                price=price,
-                post_only=True,
-                client_order_id=maker_sell_cid,
-            )
-        except Exception as exc:  # noqa: BLE001
-            if is_devnet_order_internal_error(exc):
-                pytest.skip(f"maker create unavailable: {exc}")
-            raise
+        if maker is not None:
+            try:
+                await maker.orders.create(
+                    symbol=trade_symbol,
+                    side="sell",
+                    order_type="limit",
+                    tif="gtc",
+                    qty=qty,
+                    price=price,
+                    post_only=True,
+                    client_order_id=maker_sell_cid,
+                )
+            except Exception as exc:  # noqa: BLE001
+                if is_devnet_order_internal_error(exc):
+                    pytest.skip(f"maker create unavailable: {exc}")
+                raise
 
         try:
             await live_client.orders.create(
@@ -164,6 +184,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
                 tif="ioc",
                 qty=qty,
                 client_order_id=buy_cid,
+                market_client_ref_price=buy_ref_price,
             )
         except Exception as exc:  # noqa: BLE001
             msg = str(exc).lower()
@@ -181,32 +202,34 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         buy_order = buy_detail.order
         assert buy_order is not None
         assert buy_order.status in {"filled", "canceled", "rejected"}
-        if buy_order.status != "filled" or buy_order.cum_qty is None:
+        if buy_order.cum_qty is None:
             _poly3028_skip(f"buy produced no fill (status={buy_order.status})")
         filled = buy_order.cum_qty.scaled
         if filled <= 0:
             _poly3028_skip("buy produced no fill (cum_qty<=0)")
 
-        maker_buy_price = await resolve_far_below_buy_limit_price(
-            maker, trade_symbol, pair
-        )
-        try:
-            await maker.orders.create(
-                symbol=trade_symbol,
-                side="buy",
-                order_type="limit",
-                tif="gtc",
-                qty=buy_order.cum_qty,
-                price=maker_buy_price,
-                post_only=True,
-                client_order_id=maker_buy_cid,
-            )
-        except Exception as exc:  # noqa: BLE001
-            if is_devnet_order_internal_error(exc):
-                pytest.skip(f"maker buy unavailable: {exc}")
-            raise
+        if maker is not None:
+            maker_buy_price = await resolve_far_below_buy_limit_price(maker, trade_symbol, pair)
+            try:
+                await maker.orders.create(
+                    symbol=trade_symbol,
+                    side="buy",
+                    order_type="limit",
+                    tif="gtc",
+                    qty=buy_order.cum_qty,
+                    price=maker_buy_price,
+                    post_only=True,
+                    client_order_id=maker_buy_cid,
+                )
+            except Exception as exc:  # noqa: BLE001
+                if is_devnet_order_internal_error(exc):
+                    pytest.skip(f"maker buy unavailable: {exc}")
+                raise
 
         # Carry exact filled base qty into cleanup SELL (no larger independent size).
+        sell_ref_price = await resolve_market_ref_price(
+            live_client, trade_symbol, pair, side="sell"
+        )
         try:
             await live_client.orders.create(
                 symbol=trade_symbol,
@@ -215,6 +238,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
                 tif="ioc",
                 qty=buy_order.cum_qty,
                 client_order_id=sell_cid,
+                market_client_ref_price=sell_ref_price,
             )
         except Exception as exc:  # noqa: BLE001
             if is_devnet_order_internal_error(exc):
@@ -246,32 +270,31 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
             f"residual base position not zero: before={base_before} after={base_after}"
         )
 
-        if holds_mounted:
-            quote_reserved_after = reserved_balance_raw(after, quote_asset_id)
-            base_reserved_after = reserved_balance_raw(after, base_asset_id)
-            assert quote_reserved_after == quote_reserved_before, (
-                f"quote reserved not reconciled: before={quote_reserved_before} "
-                f"after={quote_reserved_after}"
-            )
-            assert base_reserved_after == base_reserved_before, (
-                f"base reserved not reconciled: before={base_reserved_before} "
-                f"after={base_reserved_after}"
-            )
+        quote_reserved_after = reserved_balance_raw(after, quote_asset_id)
+        base_reserved_after = reserved_balance_raw(after, base_asset_id)
+        assert quote_reserved_after == quote_reserved_before, (
+            f"quote reserved not reconciled: before={quote_reserved_before} "
+            f"after={quote_reserved_after}"
+        )
+        assert base_reserved_after == base_reserved_before, (
+            f"base reserved not reconciled: before={base_reserved_before} "
+            f"after={base_reserved_after}"
+        )
+        await _exercise_holds_route(live_client)
         roundtrip_ok = True
     finally:
         cleanup_errors: list[str] = []
-        for label, client in (("taker", live_client), ("maker", maker)):
-            try:
-                await client.orders.cancel_all(symbol=trade_symbol, dry_run=False)
-            except Exception as exc:  # noqa: BLE001
-                cleanup_errors.append(f"{label} cancel_all: {exc}")
+        cleanup_errors.extend(await _cancel_open_test_orders(live_client, test_cids))
+        if maker is not None:
+            cleanup_errors.extend(await _cancel_open_test_orders(maker, maker_test_cids))
         try:
             await _wait_no_open_cids(live_client, test_cids)
         except Exception as exc:  # noqa: BLE001
             cleanup_errors.append(f"taker open poll: {exc}")
-        try:
-            await maker.aclose()
-        except Exception as exc:  # noqa: BLE001
-            cleanup_errors.append(f"maker aclose: {exc}")
+        if maker is not None:
+            try:
+                await maker.aclose()
+            except Exception as exc:  # noqa: BLE001
+                cleanup_errors.append(f"maker aclose: {exc}")
         if cleanup_errors and roundtrip_ok:
             pytest.fail("cleanup failed: " + "; ".join(cleanup_errors))

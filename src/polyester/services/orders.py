@@ -218,9 +218,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     market_client_ref_price=normalized.market_client_ref_price,
                 )
         await self._ensure_catalogs()
-        quantity_scale = resolve_quantity_scale(
-            self._catalogs, normalized.symbol, normalized.qty
-        )
+        quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
         proto_request = create_order_to_proto(normalized, quantity_scale=quantity_scale)
         return await unary_auth_decoded(
             self._transport,

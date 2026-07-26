@@ -13,6 +13,7 @@ from polyester.connect_transport import connect_headers as build_connect_headers
 from polyester.errors import PolyesterAuthError, PolyesterTransportError
 
 WireFormat = Literal["binary", "json"]
+MAX_CONNECT_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
 def codec_for_config(config: TransportConfig):
@@ -22,21 +23,15 @@ def codec_for_config(config: TransportConfig):
 
 
 @dataclass(frozen=True, slots=True)
-class RetryPolicy:
-    max_retries: int = 2
-
-
-@dataclass(frozen=True, slots=True)
 class TransportConfig:
     api_url: str
     timeout: float = 10.0
-    max_retries: int = 2
     wire_format: WireFormat = "binary"
 
     def __repr__(self) -> str:
         return (
             f"TransportConfig(api_url={self.api_url!r}, timeout={self.timeout!r}, "
-            f"max_retries={self.max_retries!r}, wire_format={self.wire_format!r})"
+            f"wire_format={self.wire_format!r})"
         )
 
 
@@ -74,6 +69,7 @@ class TransportFactory:
         return {
             "codec": self._codec,
             "timeout_ms": int(self.config.timeout * 1000),
+            "read_max_bytes": MAX_CONNECT_RESPONSE_BYTES,
             # Signing hashes the protobuf/JSON body; gzip would break API-key auth.
             "send_compression": None,
         }

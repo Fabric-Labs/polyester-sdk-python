@@ -22,7 +22,8 @@ async def unary_public_message(
 ) -> TResponse:
     client = transport.create_public_client(client_cls)
     try:
-        return await call(client, request)
+        response: TResponse = await call(client, request)
+        return response
     except ConnectError as exc:
         raise map_connect_error(exc) from exc
 
@@ -35,7 +36,8 @@ async def unary_auth_message(
 ) -> TResponse:
     client = transport.create_auth_client(client_cls)
     try:
-        return await call(client, request)
+        response: TResponse = await call(client, request)
+        return response
     except ConnectError as exc:
         raise map_connect_error(exc) from exc
 
@@ -47,7 +49,7 @@ async def unary_public(
     request: TRequest,
 ) -> dict[str, Any]:
     """Legacy dict bridge for services not yet on proto decoders."""
-    response = await unary_public_message(transport, client_cls, call, request)
+    response: Message = await unary_public_message(transport, client_cls, call, request)
     return protobuf_to_public_dict(response)
 
 
@@ -58,7 +60,7 @@ async def unary_auth(
     request: TRequest,
 ) -> dict[str, Any]:
     """Legacy dict bridge for services not yet on proto decoders."""
-    response = await unary_auth_message(transport, client_cls, call, request)
+    response: Message = await unary_auth_message(transport, client_cls, call, request)
     return protobuf_to_public_dict(response)
 
 
@@ -69,7 +71,7 @@ async def unary_public_decoded(
     request: TRequest,
     decoder: Callable[[TResponse], R],
 ) -> R:
-    response = await unary_public_message(transport, client_cls, call, request)
+    response: TResponse = await unary_public_message(transport, client_cls, call, request)
     return decoder(response)
 
 
@@ -80,5 +82,5 @@ async def unary_auth_decoded(
     request: TRequest,
     decoder: Callable[[TResponse], R],
 ) -> R:
-    response = await unary_auth_message(transport, client_cls, call, request)
+    response: TResponse = await unary_auth_message(transport, client_cls, call, request)
     return decoder(response)

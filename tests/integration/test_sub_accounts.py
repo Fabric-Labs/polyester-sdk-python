@@ -39,9 +39,7 @@ async def test_sub_accounts_list_members(live_client):
     listed = await live_client.sub_accounts.list()
     if not listed.subaccounts:
         pytest.skip("no subaccounts on devnet")
-    result = await live_client.sub_accounts.list_members(
-        sub_account_id=listed.subaccounts[0].id
-    )
+    result = await live_client.sub_accounts.list_members(sub_account_id=listed.subaccounts[0].id)
     assert isinstance(result.members, list)
 
 

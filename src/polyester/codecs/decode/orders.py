@@ -230,9 +230,7 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
     if item.HasField("accepted"):
         return BatchCreateResultItem(
             status="accepted",
-            order_id=(
-                format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""
-            ),
+            order_id=(format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""),
             client_order_id=item.client_order_id,
         )
     if item.HasField("rejected"):

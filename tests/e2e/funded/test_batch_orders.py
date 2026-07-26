@@ -13,6 +13,11 @@ from tests.helpers import (
     devnet_order_skip_message,
 )
 
+pytestmark = [
+    pytest.mark.account_wide_cleanup,
+    pytest.mark.usefixtures("account_wide_cleanup_enabled"),
+]
+
 
 @pytest.mark.integration
 @pytest.mark.funded

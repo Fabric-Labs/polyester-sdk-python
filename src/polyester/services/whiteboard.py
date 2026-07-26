@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from typing import Any
 
 from google.protobuf import struct_pb2
@@ -26,11 +27,11 @@ _ROLE_ALIASES = {
 }
 
 
-def _board_audience(value: str) -> int:
+def _board_audience(value: str) -> Any:
     return resolve_proto_enum(wb_pb2, value, aliases=_AUDIENCE_ALIASES, field_name="audience")
 
 
-def _board_role(value: str) -> int:
+def _board_role(value: str) -> Any:
     return resolve_proto_enum(wb_pb2, value, aliases=_ROLE_ALIASES, field_name="role")
 
 
@@ -107,7 +108,7 @@ class AsyncWhiteboardService(BaseService):
         self,
         *,
         board_id: str,
-        acl_entries: list[dict[str, Any]],
+        acl_entries: builtins.list[dict[str, Any]],
     ) -> ApiData:
         return await self._call(
             wb_pb2.UpdateBoardAclRequest(

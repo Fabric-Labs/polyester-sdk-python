@@ -39,9 +39,7 @@ def test_decode_orders_list() -> None:
 
 
 def test_decode_order_mutation() -> None:
-    result = decode_order_mutation(
-        {"status": "accepted", "orderId": "99", "clientOrderId": "cid"}
-    )
+    result = decode_order_mutation({"status": "accepted", "orderId": "99", "clientOrderId": "cid"})
     assert result.status == "accepted"
     assert result.client_order_id == "cid"
 

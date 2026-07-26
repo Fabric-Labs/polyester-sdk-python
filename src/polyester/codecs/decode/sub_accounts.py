@@ -116,9 +116,9 @@ def subaccount_activity_event_from_proto(
         event_action=proto_enum_name(
             subaccounts_pb2.ActivityEventAction, msg.event_action
         ).removeprefix("activity_action_"),
-        source=proto_enum_name(
-            subaccounts_pb2.ActivityEventSource, msg.source
-        ).removeprefix("activity_source_"),
+        source=proto_enum_name(subaccounts_pb2.ActivityEventSource, msg.source).removeprefix(
+            "activity_source_"
+        ),
         ip=msg.ip,
         user_agent=msg.user_agent,
         actor_account_id=format_uint64_id(msg.actor_account_id),
@@ -145,4 +145,3 @@ def get_subaccount_from_proto(msg: subaccounts_pb2.GetSubaccountResponse) -> Get
         invites=[subaccount_invite_from_proto(item) for item in msg.invites],
         policy=policy,
     )
-

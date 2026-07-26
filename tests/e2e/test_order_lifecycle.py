@@ -13,6 +13,11 @@ from tests.helpers import (
     is_devnet_order_internal_error,
 )
 
+pytestmark = [
+    pytest.mark.account_wide_cleanup,
+    pytest.mark.usefixtures("account_wide_cleanup_enabled"),
+]
+
 
 @pytest.mark.integration
 @pytest.mark.mutation
@@ -61,8 +66,7 @@ async def test_order_round_trip(
         )
         assert cancelled.status
         assert (
-            cancelled.client_order_id == client_order_id
-            or cancelled.order_id == created.order_id
+            cancelled.client_order_id == client_order_id or cancelled.order_id == created.order_id
         )
         await wait_for_no_open_order(live_client, client_order_id)
     finally:

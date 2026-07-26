@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.1.0a20
+
+### Breaking
+- Removed the unused `max_retries` constructor/transport option. The SDK never performed automatic unary retries; applications must retry eligible transport/rate-limit failures with stable idempotency keys and reconcile mutation outcomes.
+
+### Fixed
+- ConnectRPC responses are capped at 4 MiB explicitly, including catalog hydration.
+- The funded market roundtrip can use external order-book liquidity when dedicated maker credentials are unavailable, carries partial BUY fills into cleanup, and cancels only its own client order IDs.
+- Live market reference-price helpers format typed `Price` values before decimal sizing.
+- Removed an unused legacy JSON unary bridge that referenced a nonexistent authenticated transport method; all service calls remain generated binary ConnectRPC.
+- Corrected kw-only `ApiData` construction in heatmap and zipped-supply realtime decoders.
+
+### Testing
+- Hardening coverage now injects corrupt and oversized protobuf catalog responses.
+- Whole-source `mypy` is now a required CI gate for the advertised typed package.
+- Tests that use non-dry-run `cancel_all` require an explicit dedicated-account cleanup gate.
+
 ## 0.1.0a19
 
 ### Fixed
@@ -16,22 +33,22 @@
 ## 0.1.0a18
 
 ### Breaking
-- `wait_for_catalogs()` now raises when catalog hydration fails (HTTP errors, empty/malformed spot or zipper, out-of-range scales/ids). Previously returned successfully after a best-effort failure. Use `catalogs_last_error` to inspect the failure (POLY-3746).
-- `format_qty_scaled` / `format_ledger_u128` / `Quantity.format` / `AssetAmount.format` raise `PolyesterValidationError` when `scale > MAX_PROTOCOL_SCALE` (36) instead of allocating pathological padding (POLY-3746).
-- Realtime token HTTP 403 maps to `PolyesterAuthError` with `status_code`, `label`, and truncated `body` (not opaque `PolyesterRealtimeError("… HTTP 403")`) (POLY-3746).
+- `wait_for_catalogs()` now raises when catalog hydration fails (HTTP errors, empty/malformed spot or zipper, out-of-range scales/ids). Previously returned successfully after a best-effort failure. Use `catalogs_last_error` to inspect the failure.
+- `format_qty_scaled` / `format_ledger_u128` / `Quantity.format` / `AssetAmount.format` raise `PolyesterValidationError` when `scale > MAX_PROTOCOL_SCALE` (36) instead of allocating pathological padding.
+- Realtime token HTTP 403 maps to `PolyesterAuthError` with `status_code`, `label`, and truncated `body` (not opaque `PolyesterRealtimeError("… HTTP 403")`).
 
 ### Features
-- `MAX_PROTOCOL_SCALE = 36` exported; catalog hydrate rejects `u64→u32` truncation and scales above the protocol max (POLY-3746).
-- `CatalogManager.hydrate_zipper_config_typed` accepts typed `DepositWithdrawConfig` without a consumer JSON round-trip (POLY-3746 / D-05).
-- `wait_for_order_trades_complete` / `orders.wait_for_order_trades_complete` poll until sum(trade qtys) equals order `cum_qty` or timeout (POLY-3746 / D1).
-- JSON-RPC client enforces a 1 MiB response body cap and validates `jsonrpc=="2.0"`, matching `id`, and exactly one of `result`|`error` (POLY-3746).
-- `AsyncSnapshotThenStreamSubscription.last_error` / `err()` surfaces snapshot refresh failures; one bounded reconnect retry then fail-closed (POLY-3746).
-- `AsyncRealtimeClient.aclose` cancels tracked subscriptions; WebSocket inbound frames bounded by `WS_MAX_MESSAGE_BYTES` (POLY-3746).
+- `MAX_PROTOCOL_SCALE = 36` exported; catalog hydrate rejects `u64→u32` truncation and scales above the protocol max.
+- `CatalogManager.hydrate_zipper_config_typed` accepts typed `DepositWithdrawConfig` without a consumer JSON round-trip.
+- `wait_for_order_trades_complete` / `orders.wait_for_order_trades_complete` poll until sum(trade qtys) equals order `cum_qty` or timeout.
+- JSON-RPC client enforces a 1 MiB response body cap and validates `jsonrpc=="2.0"`, matching `id`, and exactly one of `result`|`error`.
+- `AsyncSnapshotThenStreamSubscription.last_error` / `err()` surfaces snapshot refresh failures; one bounded reconnect retry then fail-closed.
+- `AsyncRealtimeClient.aclose` cancels tracked subscriptions; WebSocket inbound frames bounded by `WS_MAX_MESSAGE_BYTES`.
 
 ### Fixed
-- Realtime token fetch and JSON-RPC request/arequest now enforce one absolute wall-clock deadline across headers + bounded body collect (slow-drip safe). Sync JSON-RPC uses a deadline closer that aborts the client without leaking worker threads (POLY-3746 / F-18 / E5).
-- Realtime token exchange streams and size-caps the body under the HTTP client timeout (POLY-3746 / F-18).
-- `TransportFactory` / `TransportConfig` `__repr__` redacts credentials (parity with credential repr) (POLY-3746 / A6).
+- Realtime token fetch and JSON-RPC request/arequest now enforce one absolute wall-clock deadline across headers + bounded body collect (slow-drip safe). Sync JSON-RPC uses a deadline closer that aborts the client without leaking worker threads.
+- Realtime token exchange streams and size-caps the body under the HTTP client timeout.
+- `TransportFactory` / `TransportConfig` `__repr__` redacts credentials (parity with credential repr).
 
 ### Testing
 - Local public-API hardening L2 suite (`tests/hardening/`) for token stall/403, JSON-RPC, catalogs, snapshot, and scale.
@@ -40,11 +57,11 @@
 ## 0.1.0a17
 
 ### Breaking
-- `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead (POLY-3668).
-- `CatalogManager.base_quantity_scale_for_symbol` / `_id` return `None` when unknown/unhydrated instead of inventing scale `8` (POLY-3549). Decode-only paths (orderbook/market data) keep an explicit `or 8` fallback.
+- `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead.
+- `CatalogManager.base_quantity_scale_for_symbol` / `_id` return `None` when unknown/unhydrated instead of inventing scale `8`. Decode-only paths (orderbook/market data) keep an explicit `or 8` fallback.
 
 ### Fixed
-- Order/trigger write paths auto-await `wait_for_catalogs` before resolving pair quantity scale, preventing first-order false `INSUFFICIENT_FUNDS` when ETH-USDT (scale 6) was encoded at invented scale 8 (POLY-3549).
+- Order/trigger write paths auto-await `wait_for_catalogs` before resolving pair quantity scale, preventing first-order false `INSUFFICIENT_FUNDS` when ETH-USDT (scale 6) was encoded at invented scale 8.
 
 ## 0.1.0a16
 
@@ -74,7 +91,7 @@
 ## 0.1.0a14
 
 ### Breaking
-- Stable MFA auth error codes (POLY-2919): `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
+- Stable MFA auth error codes: `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
 - Removed JWT/session-only account-admin RPCs from the API-key SDK surface. Use the TypeScript browser client for interactive account administration.
   - Policies: unary create/update/delete/list/get/set removed; keep `subscribe_subaccount_policies` / `subscribe_api_policies`
   - API keys: `create` / `update` / `delete` removed; keep `list` / `get` / `subscribe` / `generate_keypair`
@@ -86,12 +103,12 @@
 ### Features
 - `is_mfa_enrollment_required` / `is_step_up_required` / `is_mfa_elevation_required` / `is_mfa_last_factor_required` classify MFA control flow from structured auth codes only (no message heuristics)
 - Public method options expose `polyester.api.MFARequirement` documentation metadata
-- POLY-3739: `policies.subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account_id}:proto` (sync: `subscribe_api_policies_sync`)
+- `policies.subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account_id}:proto` (sync: `subscribe_api_policies_sync`)
 
 ### Testing
 - Unit coverage for MFA auth-code mapping and predicates
 - Unit coverage for API/subaccount policy realtime protobuf decode
-- Live trigger create asserts `status == "accepted"` (POLY-3701 synthesized admission status)
+- Live trigger create asserts `status == "accepted"`
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.
@@ -101,7 +118,7 @@
 ## 0.1.0a13
 
 ### Breaking
-- POLY-3701 wire break: order and trigger creation now target explicit execution variants. The flat `order_type`/`tif`/`post_only`/`price` inputs are still accepted on `CreateOrderRequest` but are mapped onto the new `OrderIntent` execution oneof (`market_ioc`/`limit_gtc`/`limit_ioc`/`limit_fok`); `post_only` is only valid for limit-GTC and is rejected otherwise
+- wire break: order and trigger creation now target explicit execution variants. The flat `order_type`/`tif`/`post_only`/`price` inputs are still accepted on `CreateOrderRequest` but are mapped onto the new `OrderIntent` execution oneof (`market_ioc`/`limit_gtc`/`limit_ioc`/`limit_fok`); `post_only` is only valid for limit-GTC and is rejected otherwise
 - `CreateOrderRequest` now wraps an `OrderIntent` (`subaccount_id` + `order`); batch create items are `OrderIntent`s and the removed `allow_partial` argument is accepted but ignored
 - `triggers.create` maps flat params onto the new `TriggerIntent` strategy oneof (`stop_loss`/`take_profit` conditional, `trailing_stop`, `twap`, `ladder`); trailing stops are always SELL market-IOC, ladder distribution only accepts `linear`, and `trigger_price_source` is dropped from the wire
 - `CreateOrderResponse` / `CreateTriggerResponse` no longer carry a `status` field; admitted mutations synthesize `status="accepted"`
@@ -111,7 +128,7 @@
 - `triggers.list` accepts validated `status` filter labels (`created`/`armed`/`running`/`completed`/`cancelled`/`failed`/`paused`)
 
 ### Fixed
-- Order/trigger decode reads the POLY-3701 shapes: attached-risk legs derive `order_type`/`limit_price` from their `RiskExecution` child, and the thick `Trigger` projection is rebuilt from the configuration oneof + runtime detail blocks
+- Order/trigger decode reads the shapes: attached-risk legs derive `order_type`/`limit_price` from their `RiskExecution` child, and the thick `Trigger` projection is rebuilt from the configuration oneof + runtime detail blocks
 - `orders.get` / list with `include_attached_risk=True` now returns policy data on `Order.attached_risk`
 
 ## 0.1.0a12
@@ -240,7 +257,7 @@
 - Withdraw: `create_wallet_trading_withdraw`
 - Address book: full CRUD, views, whitelist, counterparties
 - New services: `policies`, `sub_accounts`, `guard_signer`
-- `market_overview.create_subscription()` — snapshot-then-stream merge (TS parity)
+- `market_overview.create_subscription()`: snapshot-then-stream merge (TS parity)
 
 ### Codecs
 - Proto decode migration for balances history/equity/holds, triggers, transfers, deposit, withdraw, internal transfers, api keys, resolve, and public market services
@@ -258,9 +275,9 @@
 - Pytest markers: `integration`, `smoke`, `mutation`, `funded`, `treasury`, `optional`, `realtime`
 - `POLYESTER_TEST_TRADE_SYMBOL` for order/trigger mutation (separate from `POLYESTER_TEST_SMOKE_SYMBOL`)
 - Dynamic mutation pricing from `market_overview` (~2% of last trade)
-- `test_orders_get_round_trips_list_open` — proof-style when open orders exist
+- `test_orders_get_round_trips_list_open`: proof-style when open orders exist
 - `scripts/test_all.sh` and `scripts/smoke_test.py` (pytest wrapper)
-- `scripts/smoke_realtime.sh` — unit realtime tests + live Centrifugo heartbeat (~35s)
+- `scripts/smoke_realtime.sh`: unit realtime tests + live Centrifugo heartbeat (~35s)
 - Unit tests for Centrifugo ping/pong and batched frames
 - Integration test holds a public trades subscription past Centrifugo heartbeat interval
 - CI: `pytest tests/unit` with coverage on non-`gen/` code

@@ -23,12 +23,15 @@ def test_api_keys_generate_keypair_wrapper() -> None:
 
 
 def test_analytics_range_alias() -> None:
-    assert resolve_proto_enum(
-        analytics_read_pb2,
-        "7d",
-        aliases={"7d": analytics_read_pb2.DAY_7},
-        field_name="range",
-    ) == analytics_read_pb2.DAY_7
+    assert (
+        resolve_proto_enum(
+            analytics_read_pb2,
+            "7d",
+            aliases={"7d": analytics_read_pb2.DAY_7},
+            field_name="range",
+        )
+        == analytics_read_pb2.DAY_7
+    )
 
 
 def test_message_from_mapping_builds_proto() -> None:

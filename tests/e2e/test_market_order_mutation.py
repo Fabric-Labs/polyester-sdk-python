@@ -13,6 +13,11 @@ from tests.helpers import (
     trading_balance_decimal,
 )
 
+pytestmark = [
+    pytest.mark.account_wide_cleanup,
+    pytest.mark.usefixtures("account_wide_cleanup_enabled"),
+]
+
 
 async def _require_trading_base_balance(live_client, symbol: str, qty: str) -> None:
     from tests.helpers import skip_funding_check
@@ -43,9 +48,7 @@ async def _require_trading_base_balance(live_client, symbol: str, qty: str) -> N
 
 @pytest.mark.integration
 @pytest.mark.mutation
-async def test_market_buy_mutation(
-    live_client, mutation_enabled, require_trade_trading_balance
-):
+async def test_market_buy_mutation(live_client, mutation_enabled, require_trade_trading_balance):
     symbol = "BTC-USDT"
     spot = await live_client.market_data.get_spot_config()
     live_client.catalogs.hydrate_spot_config(spot.raw)

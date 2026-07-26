@@ -192,9 +192,7 @@ def id_to_int(value: str | int, label: str = "id") -> int:
             try:
                 parsed = _base58_to_int(value)
             except ValueError as exc:
-                raise PolyesterValidationError(
-                    f"{label} must be base58 or decimal uint64"
-                ) from exc
+                raise PolyesterValidationError(f"{label} must be base58 or decimal uint64") from exc
     else:
         raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if parsed < 0 or parsed > UINT64_MAX:

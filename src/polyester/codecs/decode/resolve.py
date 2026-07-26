@@ -16,6 +16,4 @@ def resolved_account_from_proto(msg: resolve_pb2.ResolvedAccount) -> ResolvedAcc
 
 
 def resolved_accounts_from_proto(msg: resolve_pb2.ResolveAccountResponse) -> ResolvedAccountsList:
-    return ResolvedAccountsList(
-        matches=[resolved_account_from_proto(item) for item in msg.matches]
-    )
+    return ResolvedAccountsList(matches=[resolved_account_from_proto(item) for item in msg.matches])

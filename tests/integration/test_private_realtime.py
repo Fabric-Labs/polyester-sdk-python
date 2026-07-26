@@ -47,11 +47,7 @@ PERMISSION_REQUIREMENTS: dict[str, str] = {
 
 def _is_permission_denied(exc: BaseException) -> bool:
     msg = str(exc).lower()
-    permissionish = (
-        "permission denied" in msg
-        or "permission_denied" in msg
-        or "http 403" in msg
-    )
+    permissionish = "permission denied" in msg or "permission_denied" in msg or "http 403" in msg
     if isinstance(exc, PolyesterAuthError):
         return permissionish or str(exc.code or "").lower() == "permission_denied"
     if isinstance(exc, PolyesterApiError):

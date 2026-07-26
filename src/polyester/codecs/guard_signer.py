@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.guard.v1 import guard_signer_pb2
 
 
-def protected_action_from_label(action: str) -> int:
+def protected_action_from_label(action: str) -> Any:
     aliases = {
         "funding_set_external_whitelist_required": (
             guard_signer_pb2.PROTECTED_ACTION_FUNDING_SET_EXTERNAL_WHITELIST_REQUIRED

@@ -50,9 +50,7 @@ def test_jsonrpc_success(jsonrpc_server: str) -> None:
 
 
 def test_jsonrpc_rejects_wrong_version(jsonrpc_server: str) -> None:
-    _Handler.responses = [
-        json.dumps({"jsonrpc": "1.0", "id": 1, "result": 1}).encode()
-    ]
+    _Handler.responses = [json.dumps({"jsonrpc": "1.0", "id": 1, "result": 1}).encode()]
     client = JsonRpcClient(jsonrpc_server, timeout=2.0)
     with pytest.raises(JsonRpcError, match='jsonrpc="2.0"'):
         client.request("eth_chainId")
@@ -115,17 +113,13 @@ async def test_jsonrpc_arequest_error_object(jsonrpc_server: str) -> None:
 
 
 def test_jsonrpc_accepts_null_result(jsonrpc_server: str) -> None:
-    _Handler.responses = [
-        json.dumps({"jsonrpc": "2.0", "id": 1, "result": None}).encode()
-    ]
+    _Handler.responses = [json.dumps({"jsonrpc": "2.0", "id": 1, "result": None}).encode()]
     client = JsonRpcClient(jsonrpc_server, timeout=2.0)
     assert client.request("eth_call") is None
 
 
 def test_jsonrpc_rejects_malformed_error_object(jsonrpc_server: str) -> None:
-    _Handler.responses = [
-        json.dumps({"jsonrpc": "2.0", "id": 1, "error": "boom"}).encode()
-    ]
+    _Handler.responses = [json.dumps({"jsonrpc": "2.0", "id": 1, "error": "boom"}).encode()]
     client = JsonRpcClient(jsonrpc_server, timeout=2.0)
     with pytest.raises(JsonRpcError, match="error must be an object"):
         client.request("eth_call")

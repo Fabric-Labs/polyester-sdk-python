@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.enums import resolve_proto_enum
 from polyester.errors import PolyesterValidationError
@@ -19,7 +21,7 @@ _ANALYTICS_RANGE_ALIASES = {
 }
 
 
-def _analytics_range(value: str) -> int:
+def _analytics_range(value: str) -> Any:
     return resolve_proto_enum(
         analytics_read_pb2,
         value,

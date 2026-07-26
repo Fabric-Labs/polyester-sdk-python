@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import address_book_pb2
 
 
-def address_book_entry_kind_from_label(kind: str) -> int:
+def address_book_entry_kind_from_label(kind: str) -> Any:
     aliases = {
         "external": address_book_pb2.EXTERNAL_CHAIN,
         "external_chain": address_book_pb2.EXTERNAL_CHAIN,
@@ -28,7 +30,7 @@ def address_book_entry_kind_from_label(kind: str) -> int:
     return value
 
 
-def transfer_counterparty_direction_from_label(direction: str) -> int:
+def transfer_counterparty_direction_from_label(direction: str) -> Any:
     aliases = {
         "deposit_from": address_book_pb2.DEPOSIT_FROM,
         "withdraw_to": address_book_pb2.WITHDRAW_TO,

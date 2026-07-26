@@ -39,9 +39,7 @@ async def test_trigger_pause_resume_cancel(
     live_client, trade_symbol, mutation_enabled, require_trade_trading_balance
 ):
     """USDT-funded buy stop on the trade symbol (limit child reserves quote balance)."""
-    trigger_price, limit_price, qty = await usdt_funded_buy_stop_params(
-        live_client, trade_symbol
-    )
+    trigger_price, limit_price, qty = await usdt_funded_buy_stop_params(live_client, trade_symbol)
     client_trigger_id = unique_client_order_id("trg")
 
     created = await live_client.triggers.create(

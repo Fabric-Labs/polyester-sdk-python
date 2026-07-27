@@ -1,6 +1,7 @@
+import asyncio
 import time
-from concurrent.futures import ThreadPoolExecutor
 
+import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from polyester.auth import (
@@ -11,7 +12,9 @@ from polyester.auth import (
     canonical_signing_string,
     load_api_key_credentials,
     sign_request,
+    sign_request_async,
 )
+from polyester.errors import PolyesterRateLimitError
 
 
 def test_canonical_query_sorts_and_encodes_values() -> None:
@@ -133,14 +136,15 @@ def test_ed25519_keypair_repr_redacts_secret() -> None:
     assert secret.hex() not in rendered
 
 
-def test_ten_thousand_identical_requests_get_unique_bounded_auth_tuples() -> None:
+@pytest.mark.asyncio
+async def test_concurrent_identical_requests_get_unique_bounded_auth_tuples() -> None:
     credentials = ApiKeyCredentials(
         key_id="key_123",
         private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
     )
 
-    def sign(_: int) -> tuple[dict[str, str], int]:
-        headers = sign_request(
+    async def sign() -> tuple[dict[str, str], int]:
+        headers = await sign_request_async(
             credentials,
             method="POST",
             url="https://api.example.test/foo",
@@ -149,8 +153,7 @@ def test_ten_thousand_identical_requests_get_unique_bounded_auth_tuples() -> Non
         return headers, time.time_ns() // 1_000_000
 
     before = time.time_ns() // 1_000_000
-    with ThreadPoolExecutor(max_workers=32) as executor:
-        signed = list(executor.map(sign, range(10_000)))
+    signed = await asyncio.gather(*(sign() for _ in range(1_000)))
     headers = [item[0] for item in signed]
     timestamps = [int(item["X-API-TIMESTAMP"]) for item in headers]
     assert min(timestamps) >= before
@@ -158,8 +161,30 @@ def test_ten_thousand_identical_requests_get_unique_bounded_auth_tuples() -> Non
         int(headers["X-API-TIMESTAMP"]) <= observed_at + MAX_SIGNING_FUTURE_SKEW_MS
         for headers, observed_at in signed
     )
-    assert len(set(timestamps)) == 10_000
-    assert len({item["X-API-SIGNATURE"] for item in headers}) == 10_000
+    assert len(set(timestamps)) == 1_000
+    assert len({item["X-API-SIGNATURE"] for item in headers}) == 1_000
+
+
+def test_sync_signing_capacity_fails_immediately_without_sleeping() -> None:
+    credentials = ApiKeyCredentials(
+        key_id="key_123",
+        private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
+    )
+    allocator = credentials._timestamp_allocator
+    with allocator._lock:
+        allocator._last_timestamp_ms = time.time_ns() // 1_000_000 + MAX_SIGNING_FUTURE_SKEW_MS
+
+    started = time.monotonic()
+    with pytest.raises(PolyesterRateLimitError) as captured:
+        sign_request(
+            credentials,
+            method="POST",
+            url="https://api.example.test/foo",
+            body=b"{}",
+        )
+
+    assert time.monotonic() - started < 0.05
+    assert captured.value.retry_after is not None
 
 
 def test_signing_rejects_malformed_absolute_url() -> None:

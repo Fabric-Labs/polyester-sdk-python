@@ -52,6 +52,8 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     qty: Any
     price: Any | None = None
     sub_account_id: str | None = None
+    # Optional. Set a stable non-empty value when you may retry after an
+    # ambiguous failure, and reuse that same id on retry/reconciliation.
     client_order_id: str | None = None
     post_only: bool = False
     expires_at: str | None = None

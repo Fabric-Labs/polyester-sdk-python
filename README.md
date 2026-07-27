@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a22`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a23`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a22"
+pip install "polyester-sdk==0.1.0a23"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -133,8 +133,11 @@ account-scoped operations such as private realtime channels, bucket transfers, a
 some ledger writes.
 
 Automatic request signing gives concurrent identical calls distinct authentication tuples.
-Timestamps can lead the local clock by at most five seconds; larger bursts are backpressured
-instead of reusing a signature or drifting outside the API's 10-second freshness window.
+Timestamps can lead the local clock by at most five seconds. The async client applies bounded,
+cooperative backpressure without blocking the event loop. The low-level synchronous
+`polyester.auth.sign_request` helper instead raises `PolyesterRateLimitError` immediately when
+capacity is exhausted; honor `retry_after`. Neither path reuses a signature or drifts outside the
+API's 10-second freshness window.
 
 ## Authentication patterns
 
@@ -199,6 +202,10 @@ async with AsyncPolyester(
     await client.orders.cancel(client_order_id="my-bot-001")
 ```
 
+`client_order_id` is **optional** (matches the API). Omit it for one-shot
+creates. **Set a stable non-empty value when you may retry** after an ambiguous
+transport/server failure, and reuse that same id on retry / reconciliation -
+without it you cannot safely tell whether the first attempt admitted the order.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create accepts at most 20 orders. Treat a cancel response as an
 admission acknowledgement and reconcile with `list_open` before releasing local

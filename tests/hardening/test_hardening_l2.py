@@ -17,6 +17,11 @@ import httpx
 import pytest
 
 from polyester import AsyncPolyester, Quantity
+from polyester.auth import (
+    MAX_SIGNING_FUTURE_SKEW_MS,
+    ApiKeyCredentials,
+    sign_request_async,
+)
 from polyester.catalogs import CatalogManager
 from polyester.chain.rpc import MAX_JSONRPC_RESPONSE_BYTES, JsonRpcClient, JsonRpcError
 from polyester.codecs import MAX_PROTOCOL_SCALE, format_qty_scaled
@@ -78,6 +83,57 @@ async def _assert_peers_idle(http: MockHttpServer | None, ws: MockWsServer) -> N
         lambda: (http is None or http.active == 0) and ws.active == 0,
         0.75,
     )
+
+
+# ---------------------------------------------------------------------------
+# Authentication burst capacity through the public async signer
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_l2_auth_10k_identical_requests_are_unique_bounded_and_runtime_safe() -> None:
+    source = make_test_credentials()
+    credentials = ApiKeyCredentials(
+        key_id=source.key_id,
+        private_key=source.private_key,
+    )
+    timer_ticks: list[float] = []
+    ticker_running = True
+
+    async def ticker() -> None:
+        while ticker_running:
+            timer_ticks.append(asyncio.get_running_loop().time())
+            await asyncio.sleep(0.01)
+
+    async def sign() -> tuple[dict[str, str], int]:
+        headers = await sign_request_async(
+            credentials,
+            method="POST",
+            url="https://api.example.test/foo",
+            body=b"{}",
+        )
+        return headers, time.time_ns() // 1_000_000
+
+    ticker_task = asyncio.create_task(ticker())
+    await asyncio.sleep(0)
+    before = time.time_ns() // 1_000_000
+    try:
+        signed = await asyncio.gather(*(sign() for _ in range(10_000)))
+    finally:
+        ticker_running = False
+        await ticker_task
+
+    headers = [item[0] for item in signed]
+    timestamps = [int(item["X-API-TIMESTAMP"]) for item in headers]
+    assert min(timestamps) >= before
+    assert all(
+        int(item["X-API-TIMESTAMP"]) <= observed_at + MAX_SIGNING_FUTURE_SKEW_MS
+        for item, observed_at in signed
+    )
+    assert len(set(timestamps)) == 10_000
+    assert len({item["X-API-SIGNATURE"] for item in headers}) == 10_000
+    assert len(timer_ticks) > 100
+    assert max(b - a for a, b in zip(timer_ticks, timer_ticks[1:], strict=False)) < 1.0
 
 
 # ---------------------------------------------------------------------------

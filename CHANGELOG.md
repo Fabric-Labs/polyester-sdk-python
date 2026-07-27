@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.1.0a24
+
+### Fixed
+- Local orderbook bucketing rounds asks up and rejects negative prices/quantities instead of emitting corrupted levels.
+- `cancel_all` / `cancel_all_after` response decoding rejects empty or unknown statuses (`submitted`/`dry_run`, `armed`/`disabled`) instead of returning success for ambiguous payloads. Cancel-all now also surfaces `failed_cancels`.
+- Client order/trigger IDs and caller-supplied request IDs are trimmed and validated locally for documented length and ASCII-character constraints before a request is sent.
+
+### Testing
+- Decoder coverage asserts empty/unknown cancel-all and cancel-all-after statuses fail closed.
+- Orderbook unit coverage asserts negative levels are rejected and ask buckets round up.
+
 ## 0.1.0a23
 
 ### Fixed

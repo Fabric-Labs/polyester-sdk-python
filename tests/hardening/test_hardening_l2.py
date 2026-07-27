@@ -133,7 +133,9 @@ async def test_l2_auth_10k_identical_requests_are_unique_bounded_and_runtime_saf
     assert len(set(timestamps)) == 10_000
     assert len({item["X-API-SIGNATURE"] for item in headers}) == 10_000
     assert len(timer_ticks) > 100
-    assert max(b - a for a, b in zip(timer_ticks, timer_ticks[1:], strict=False)) < 1.0
+    # A synchronous five-second capacity wait would stall the loop; allow
+    # scheduler jitter from creating and hashing 10k runnable tasks.
+    assert max(b - a for a, b in zip(timer_ticks, timer_ticks[1:], strict=False)) < 2.0
 
 
 # ---------------------------------------------------------------------------

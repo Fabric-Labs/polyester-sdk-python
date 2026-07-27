@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.scalars import parse_price_ticks
+from polyester.errors import PolyesterValidationError
 from polyester.models import OrderbookData, OrderbookLevel
 from polyester.models.realtime import OrderBookDeltaUpdate
 
@@ -12,7 +13,7 @@ def levels_to_map(levels: list[tuple[str, str]] | None) -> BookSide:
     for price_ticks, qty_scaled in levels or []:
         price = int(price_ticks)
         qty = int(qty_scaled)
-        if qty == 0:
+        if price < 0 or qty <= 0:
             continue
         book[price] = qty
     return book
@@ -26,10 +27,11 @@ def levels_from_proto_levels(
 ) -> BookSide:
     book: BookSide = {}
     for level in levels or []:
+        price = int(getattr(level, price_attr))
         qty = int(getattr(level, qty_attr))
-        if qty == 0:
+        if price < 0 or qty <= 0:
             continue
-        book[int(getattr(level, price_attr))] = qty
+        book[price] = qty
     return book
 
 
@@ -37,20 +39,33 @@ def apply_side_delta(book: BookSide, levels: list[tuple[str, str]] | None) -> No
     for price_ticks, qty_scaled in levels or []:
         price = int(price_ticks)
         qty = int(qty_scaled)
+        # Negative price/qty is wire corruption; never materialize it into the book.
+        if price < 0 or qty < 0:
+            continue
         if qty == 0:
             book.pop(price, None)
         else:
             book[price] = qty
 
 
-def bucket_side(book: BookSide, bucket_ticks: int | None) -> BookSide:
+def bucket_side(book: BookSide, bucket_ticks: int | None, *, asks: bool = False) -> BookSide:
     if not bucket_ticks or bucket_ticks <= 0:
+        for price_ticks, qty_scaled in book.items():
+            if price_ticks < 0:
+                raise PolyesterValidationError("orderbook price ticks must be non-negative")
+            if qty_scaled < 0:
+                raise PolyesterValidationError("orderbook quantity must be non-negative")
         return book
     aggregated: BookSide = {}
     for price_ticks, qty_scaled in book.items():
+        if price_ticks < 0:
+            raise PolyesterValidationError("orderbook price ticks must be non-negative")
         if qty_scaled <= 0:
             continue
-        bucket_price = (price_ticks // bucket_ticks) * bucket_ticks
+        floor = (price_ticks // bucket_ticks) * bucket_ticks
+        bucket_price = floor
+        if asks and price_ticks % bucket_ticks != 0:
+            bucket_price = floor + bucket_ticks
         aggregated[bucket_price] = aggregated.get(bucket_price, 0) + qty_scaled
     return aggregated
 
@@ -64,6 +79,10 @@ def format_orderbook_level(
 ) -> OrderbookLevel:
     from polyester.types.money import Price, Quantity
 
+    if price_ticks < 0:
+        raise PolyesterValidationError("orderbook level has invalid or missing price")
+    if qty_scaled <= 0:
+        raise PolyesterValidationError("orderbook level has invalid or missing quantity")
     return OrderbookLevel(
         price=Price.from_ticks(price_ticks, symbol=symbol),
         qty=Quantity.from_scaled(qty_scaled, scale=quantity_scale, symbol=symbol),
@@ -78,7 +97,7 @@ def side_to_levels(
     quantity_scale: int,
     bucket_ticks: int | None = None,
 ) -> list[OrderbookLevel]:
-    view = bucket_side(book, bucket_ticks)
+    view = bucket_side(book, bucket_ticks, asks=side == "asks")
     entries = list(view.items())
     entries.sort(
         key=lambda item: item[0],

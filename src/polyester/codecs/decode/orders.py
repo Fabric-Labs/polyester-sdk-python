@@ -202,10 +202,16 @@ def modify_order_from_proto(msg: orders_pb2.ModifyOrderResponse) -> ModifyOrderR
 
 
 def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllOrdersResult:
+    status = (msg.status or "").strip()
+    if not status or status.lower() not in {"submitted", "dry_run"}:
+        raise PolyesterTransportError(
+            f"invalid CancelAllOrders response: unknown status {msg.status!r}"
+        )
     return CancelAllOrdersResult(
         status=msg.status,
         matched_orders=int(msg.matched_orders),
         submitted_cancels=int(msg.submitted_cancels),
+        failed_cancels=int(msg.failed_cancels),
     )
 
 
@@ -361,6 +367,11 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
 
 
 def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> CancelAllAfterResult:
+    status = (msg.status or "").strip()
+    if not status or status.lower() not in {"armed", "disabled"}:
+        raise PolyesterTransportError(
+            f"invalid CancelAllAfter response: unknown status {msg.status!r}"
+        )
     return CancelAllAfterResult(
         status=msg.status,
         effective_timeout_sec=int(msg.effective_timeout_sec),

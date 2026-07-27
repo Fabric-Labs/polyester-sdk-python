@@ -25,12 +25,15 @@ from polyester.codecs.orders import quantity_scale_for_symbol, resolve_quantity_
 from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
+    PolyesterTransportError,
     PolyesterValidationError,
 )
+from polyester.gen.chain.deposit.v1 import deposit_pb2
+from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
 from polyester.gen.chain.zipper.v1 import zipper_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.marketdata.v1 import marketdata_pb2
-from polyester.gen.orders.v1 import orders_read_pb2
+from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncRealtimeClient
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
@@ -1026,6 +1029,179 @@ async def test_l2_close_during_snapshot_retry_cancels_fetch_and_socket() -> None
 
 
 @pytest.mark.asyncio
+async def test_l2_batch_cancel_rejects_inconsistent_counts_via_public_service() -> None:
+    response = orders_pb2.BatchCancelOrdersResponse(
+        results=[orders_pb2.BatchCancelResultItem(status="accepted", order_id=9)],
+        accepted_count=0,
+        rejected_count=1,
+    )
+    body = response.SerializeToString()
+
+    async def handler(req: ParsedRequest) -> HttpScript:
+        if "BatchCancelOrders" in req.path:
+            return connect_proto_response(body)
+        return HttpScript.not_found()
+
+    http = await MockHttpServer.spawn(handler)
+    creds = make_test_credentials()
+    try:
+        client = AsyncPolyester(
+            api_url=http.base_url,
+            api_key_id=creds.key_id,
+            api_private_key=creds.private_key,
+            hydrate_catalogs=False,
+        )
+        with pytest.raises(PolyesterTransportError, match="counts do not match"):
+            await client.orders.batch_cancel(items=[{"order_id": "9"}])
+        await client.aclose()
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() -> None:
+    spot = marketdata_pb2.GetSpotConfigResponse(
+        pairs=[
+            marketdata_pb2.PairConfig(
+                symbol="BTC-USDT",
+                symbol_id=1,
+                base_quantity_scale=8,
+            )
+        ]
+    )
+    zipper = zipper_pb2.GetDepositWithdrawConfigResponse(
+        assets=[zipper_pb2.AssetConfig(asset="USDT", ledger_id=99, quantity_scale=6)]
+    )
+    response = orders_pb2.BatchModifyOrdersResponse(
+        results=[
+            orders_pb2.BatchModifyResultItem(
+                status="modified",
+                action_taken=orders_pb2.AMENDED,
+                final_order_id=9,
+            )
+        ],
+        rejected_count=1,
+    )
+
+    async def handler(req: ParsedRequest) -> HttpScript:
+        if "GetSpotConfig" in req.path:
+            return connect_proto_response(spot.SerializeToString())
+        if "GetDepositWithdrawConfig" in req.path:
+            return connect_proto_response(zipper.SerializeToString())
+        if "BatchModifyOrders" in req.path:
+            return connect_proto_response(response.SerializeToString())
+        return HttpScript.not_found()
+
+    http = await MockHttpServer.spawn(handler)
+    creds = make_test_credentials()
+    try:
+        client = AsyncPolyester(
+            api_url=http.base_url,
+            api_key_id=creds.key_id,
+            api_private_key=creds.private_key,
+            hydrate_catalogs=True,
+        )
+        await client.wait_for_catalogs()
+        with pytest.raises(PolyesterTransportError, match="counts do not match"):
+            await client.orders.batch_modify(
+                items=[{"order_id": "9", "new_price": "1"}],
+                symbol="BTC-USDT",
+            )
+        await client.aclose()
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_l2_columnar_candles_reject_misaligned_columns_via_public_service() -> None:
+    spot = marketdata_pb2.GetSpotConfigResponse(
+        pairs=[
+            marketdata_pb2.PairConfig(
+                symbol="BTC-USDT",
+                symbol_id=1,
+                base_quantity_scale=8,
+            )
+        ]
+    )
+    zipper = zipper_pb2.GetDepositWithdrawConfigResponse(
+        assets=[zipper_pb2.AssetConfig(asset="USDT", ledger_id=99, quantity_scale=6)]
+    )
+    candles = marketdata_pb2.GetCandlesColumnsResponse(
+        symbol_id=1,
+        timeframe=marketdata_pb2.MIN_1,
+        ts_sec=[10, 20],
+        open=[1, 2],
+        high=[1],
+        low=[1, 2],
+        close=[1, 2],
+        volume=[1, 2],
+    )
+
+    async def handler(req: ParsedRequest) -> HttpScript:
+        if "GetSpotConfig" in req.path:
+            return connect_proto_response(spot.SerializeToString())
+        if "GetDepositWithdrawConfig" in req.path:
+            return connect_proto_response(zipper.SerializeToString())
+        if "GetCandlesColumns" in req.path:
+            return connect_proto_response(candles.SerializeToString())
+        return HttpScript.not_found()
+
+    http = await MockHttpServer.spawn(handler)
+    try:
+        client = AsyncPolyester(api_url=http.base_url, hydrate_catalogs=True)
+        await client.wait_for_catalogs()
+        with pytest.raises(PolyesterTransportError, match="response lengths"):
+            await client.market_data.get_candles_columns(symbol="BTC-USDT")
+        await client.aclose()
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_l2_create_deposit_address_rejects_missing_entity_via_public_service() -> None:
+    body = deposit_pb2.CreateDepositAddressResponse().SerializeToString()
+
+    async def handler(req: ParsedRequest) -> HttpScript:
+        if "CreateDepositAddress" in req.path:
+            return connect_proto_response(body)
+        return HttpScript.not_found()
+
+    http = await MockHttpServer.spawn(handler)
+    creds = make_test_credentials()
+    try:
+        client = AsyncPolyester(
+            api_url=http.base_url,
+            api_key_id=creds.key_id,
+            api_private_key=creds.private_key,
+            hydrate_catalogs=False,
+        )
+        with pytest.raises(PolyesterTransportError, match="missing deposit_address"):
+            await client.deposit.create_address(chain_id=1)
+        await client.aclose()
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_l2_get_flow_by_tx_rejects_missing_match_via_public_service() -> None:
+    body = lifecycle_read_pb2.ListFlowsByTxResponse().SerializeToString()
+
+    async def handler(req: ParsedRequest) -> HttpScript:
+        if "ListFlowsByTx" in req.path:
+            return connect_proto_response(body)
+        return HttpScript.not_found()
+
+    http = await MockHttpServer.spawn(handler)
+    try:
+        client = AsyncPolyester(api_url=http.base_url, hydrate_catalogs=False)
+        with pytest.raises(PolyesterTransportError, match="no matching flow"):
+            await client.lifecycle.get_flow_by_tx(tx_hash="0x01")
+        await client.aclose()
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
 async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> None:
     calls = {"n": 0}
 
@@ -1046,7 +1222,14 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
             body = orders_read_pb2.GetOrderResponse(
                 order=order,
                 trades=[
-                    orders_read_pb2.UserTrade(symbol_id=1, order_id=1, qty_scaled=40),
+                    orders_read_pb2.UserTrade(
+                        symbol_id=1,
+                        order_id=1,
+                        qty_scaled=40,
+                        fee_scaled=1,
+                        fee_source=orders_pb2.RECEIVED,
+                        referral_share_scaled=1,
+                    ),
                     orders_read_pb2.UserTrade(symbol_id=1, order_id=1, qty_scaled=60),
                 ],
             ).SerializeToString()
@@ -1072,6 +1255,9 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
         assert result.order.cum_qty is not None
         assert result.order.cum_qty.scaled == 100
         assert sum(t.qty.scaled for t in result.trades if t.qty is not None) == 100
+        assert result.trades[0].fee_source == "received"
+        assert result.trades[0].fee_scaled == "1"
+        assert result.trades[0].referral_share_scaled == "1"
         await client.aclose()
     finally:
         await http.aclose()

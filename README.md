@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a21`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a22`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a21"
+pip install "polyester-sdk==0.1.0a22"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -131,6 +131,10 @@ value exactly as shown in the app. Do not use an internal numeric id.
 `default_account_id` is optional for public market-data calls. It is required for
 account-scoped operations such as private realtime channels, bucket transfers, and
 some ledger writes.
+
+Automatic request signing gives concurrent identical calls distinct authentication tuples.
+Timestamps can lead the local clock by at most five seconds; larger bursts are backpressured
+instead of reusing a signature or drifting outside the API's 10-second freshness window.
 
 ## Authentication patterns
 

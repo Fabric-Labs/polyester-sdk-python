@@ -55,13 +55,10 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        result = await unary_auth_decoded(
+        return await unary_auth_decoded(
             self._transport,
             DepositAddressServiceClient,
             lambda client, req: client.create_deposit_address(req),
             request,
             create_deposit_address_from_proto,
         )
-        if result.deposit_address:
-            return result
-        return DepositAddress(chain_id=chain_id)

@@ -2,6 +2,7 @@ import pytest
 
 from polyester.codecs.decode.lifecycle import (
     flow_detail_from_proto,
+    flow_from_get_by_tx_response,
     flow_from_get_response,
     flow_summary_from_proto,
     flows_list_from_proto,
@@ -61,6 +62,11 @@ def test_flows_list_from_proto() -> None:
 def test_flow_detail_missing_summary_fails_closed() -> None:
     with pytest.raises(PolyesterTransportError, match="missing summary"):
         flow_detail_from_proto(lifecycle_read_pb2.FlowDetailView(from_live_state=True))
+
+
+def test_get_by_transaction_missing_match_fails_closed() -> None:
+    with pytest.raises(PolyesterTransportError, match="no matching flow"):
+        flow_from_get_by_tx_response(lifecycle_read_pb2.ListFlowsByTxResponse())
 
 
 def test_realtime_decoder_rejects_empty_payload() -> None:

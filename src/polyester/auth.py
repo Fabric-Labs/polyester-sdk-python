@@ -2,23 +2,57 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, quote, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from polyester.errors import PolyesterAuthError
+from polyester.errors import PolyesterAuthError, PolyesterRateLimitError, PolyesterTransportError
 
 API_KEY_ID_ENV = "POLYESTER_API_KEY_ID"
 API_PRIVATE_KEY_ENV = "POLYESTER_API_PRIVATE_KEY"
 ACCOUNT_ID_ENV = "POLYESTER_ACCOUNT_ID"
+MAX_SIGNING_FUTURE_SKEW_MS = 5_000
+_MAX_SIGNING_BACKPRESSURE_SECONDS = 10.0
+
+
+class _SigningTimestampAllocator:
+    """Allocate distinct millisecond timestamps without exceeding clock skew."""
+
+    def __init__(self) -> None:
+        self._last_timestamp_ms = 0
+        self._lock = threading.Lock()
+
+    def next(self) -> int:
+        started = time.monotonic()
+        while True:
+            now = time.time_ns() // 1_000_000
+            if now < 0:
+                raise PolyesterTransportError("system clock is before UNIX_EPOCH")
+            with self._lock:
+                candidate = max(now, self._last_timestamp_ms + 1)
+                if candidate <= now + MAX_SIGNING_FUTURE_SKEW_MS:
+                    self._last_timestamp_ms = candidate
+                    return candidate
+            if time.monotonic() - started >= _MAX_SIGNING_BACKPRESSURE_SECONDS:
+                raise PolyesterRateLimitError(
+                    "signing timestamp capacity exhausted; retry after clock advances",
+                    retry_after=0.001,
+                )
+            time.sleep(0.001)
 
 
 @dataclass(frozen=True, slots=True)
 class ApiKeyCredentials:
     key_id: str
     private_key: bytes = field(repr=False)
+    _timestamp_allocator: _SigningTimestampAllocator = field(
+        default_factory=_SigningTimestampAllocator,
+        repr=False,
+        compare=False,
+    )
 
     def __repr__(self) -> str:
         return f"ApiKeyCredentials(key_id={self.key_id!r}, private_key='[REDACTED]')"
@@ -102,7 +136,7 @@ def sign_request(
     body: bytes = b"",
     timestamp_ms: str | None = None,
 ) -> dict[str, str]:
-    timestamp = timestamp_ms or str(int(time.time() * 1000))
+    timestamp = timestamp_ms or str(credentials._timestamp_allocator.next())
     canonical = canonical_signing_string(
         timestamp_ms=timestamp,
         method=method,

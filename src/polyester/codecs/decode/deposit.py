@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.proto_helpers import has_field
+from polyester.errors import PolyesterTransportError
 from polyester.gen.chain.deposit.v1 import deposit_pb2
 from polyester.models import DepositAddress, DepositAddressesList
 
@@ -24,5 +25,12 @@ def create_deposit_address_from_proto(
     msg: deposit_pb2.CreateDepositAddressResponse,
 ) -> DepositAddress:
     if has_field(msg, "deposit_address"):
-        return deposit_address_from_proto(msg.deposit_address)
-    return DepositAddress()
+        result = deposit_address_from_proto(msg.deposit_address)
+        if not result.deposit_address.strip():
+            raise PolyesterTransportError(
+                "invalid CreateDepositAddress response: empty deposit address"
+            )
+        return result
+    raise PolyesterTransportError(
+        "invalid CreateDepositAddress response: missing deposit_address"
+    )

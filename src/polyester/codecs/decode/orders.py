@@ -158,6 +158,8 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         qty=_qty(msg.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         fee_scaled=str(msg.fee_scaled),
+        fee_source=proto_enum_name(orders_pb2.FeeSource, msg.fee_source),
+        referral_share_scaled=str(msg.referral_share_scaled),
         ts_ns=str(msg.ts_ns),
     )
 
@@ -208,6 +210,30 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
 
 
 def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchModifyOrdersResult:
+    decoded_amended = 0
+    decoded_replaced = 0
+    decoded_rejected = 0
+    for item in msg.results:
+        status = item.status.lower()
+        if status == "rejected":
+            if int(item.action_taken) != 0:
+                raise PolyesterTransportError(
+                    "batch modify rejected result unexpectedly carries an action"
+                )
+            decoded_rejected += 1
+        elif status == "modified":
+            action = proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken)
+            if action == "amended":
+                decoded_amended += 1
+            elif action == "replaced":
+                decoded_replaced += 1
+            else:
+                raise PolyesterTransportError(f"batch modify response has unknown action: {action}")
+        else:
+            raise PolyesterTransportError(
+                f"batch modify response has unknown status: {item.status}"
+            )
+
     results = [
         BatchModifyResultItem(
             status=item.status,
@@ -217,11 +243,26 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
         )
         for item in msg.results
     ]
+    amended_count = int(msg.amended_count)
+    replaced_count = int(msg.replaced_count)
+    rejected_count = int(msg.rejected_count)
+    if (
+        amended_count != decoded_amended
+        or replaced_count != decoded_replaced
+        or rejected_count != decoded_rejected
+        or amended_count + replaced_count + rejected_count != len(results)
+    ):
+        raise PolyesterTransportError(
+            "batch modify response counts do not match decoded outcomes: "
+            f"amended={amended_count}/{decoded_amended} "
+            f"replaced={replaced_count}/{decoded_replaced} "
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
+        )
     return BatchModifyOrdersResult(
         results=results,
-        amended_count=int(msg.amended_count),
-        replaced_count=int(msg.replaced_count),
-        rejected_count=int(msg.rejected_count),
+        amended_count=amended_count,
+        replaced_count=replaced_count,
+        rejected_count=rejected_count,
     )
 
 
@@ -278,6 +319,19 @@ def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchC
 
 
 def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchCancelOrdersResult:
+    decoded_accepted = 0
+    decoded_rejected = 0
+    for item in msg.results:
+        status = item.status.lower()
+        if status == "accepted":
+            decoded_accepted += 1
+        elif status == "rejected":
+            decoded_rejected += 1
+        else:
+            raise PolyesterTransportError(
+                f"batch cancel response has unknown status: {item.status}"
+            )
+
     results = [
         BatchCancelResultItem(
             status=item.status,
@@ -287,10 +341,22 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
         )
         for item in msg.results
     ]
+    accepted_count = int(msg.accepted_count)
+    rejected_count = int(msg.rejected_count)
+    if (
+        accepted_count != decoded_accepted
+        or rejected_count != decoded_rejected
+        or accepted_count + rejected_count != len(results)
+    ):
+        raise PolyesterTransportError(
+            "batch cancel response counts do not match decoded outcomes: "
+            f"accepted={accepted_count}/{decoded_accepted} "
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
+        )
     return BatchCancelOrdersResult(
         results=results,
-        accepted_count=int(msg.accepted_count),
-        rejected_count=int(msg.rejected_count),
+        accepted_count=accepted_count,
+        rejected_count=rejected_count,
     )
 
 

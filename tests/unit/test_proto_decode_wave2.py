@@ -1,7 +1,11 @@
+import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs.decode.api_keys import api_key_from_proto, api_keys_list_from_proto
-from polyester.codecs.decode.deposit import deposit_address_from_proto
+from polyester.codecs.decode.deposit import (
+    create_deposit_address_from_proto,
+    deposit_address_from_proto,
+)
 from polyester.codecs.decode.internal_transfers import internal_transfer_from_proto
 from polyester.codecs.decode.market_data import market_trade_from_proto, market_trades_from_proto
 from polyester.codecs.decode.market_overview import market_overview_list_from_proto
@@ -10,6 +14,7 @@ from polyester.codecs.decode.resolve import resolved_accounts_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto, transfers_list_from_proto
 from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
 from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterTransportError
 from polyester.gen.auth.v1 import api_keys_pb2, resolve_pb2
 from polyester.gen.chain.deposit.v1 import deposit_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
@@ -53,6 +58,11 @@ def test_deposit_address_from_proto() -> None:
     result = deposit_address_from_proto(msg)
     assert result.chain_id == 1
     assert result.deposit_address == "0xabc"
+
+
+def test_create_deposit_address_missing_entity_fails_closed() -> None:
+    with pytest.raises(PolyesterTransportError, match="missing deposit_address"):
+        create_deposit_address_from_proto(deposit_pb2.CreateDepositAddressResponse())
 
 
 def test_withdraw_intent_from_proto() -> None:

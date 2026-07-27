@@ -1,8 +1,4 @@
-"""F-22 self-contained market BUY → SELL roundtrip (carry filled qty).
-
-Live acceptance may still be blocked by backend reserve corruption (POLY-3028);
-optional mode may structured-skip only that known blocker. Strict mode fails.
-"""
+"""Self-contained market BUY → SELL roundtrip using net received quantity."""
 
 from __future__ import annotations
 
@@ -13,6 +9,7 @@ import os
 import pytest
 
 from polyester import AsyncPolyester
+from polyester.types.money import Quantity
 from tests.e2e.helpers import unique_client_order_id, wait_for_terminal_order
 from tests.helpers import (
     FAR_ABOVE_BUY_STOP_PRICE_HINTS,
@@ -207,6 +204,23 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         filled = buy_order.cum_qty.scaled
         if filled <= 0:
             _poly3028_skip("buy produced no fill (cum_qty<=0)")
+        buy_projection = await live_client.orders.wait_for_order_trades_complete(
+            client_order_id=buy_cid,
+            timeout=20,
+        )
+        received_fee = sum(
+            int(trade.fee_scaled or "0")
+            for trade in buy_projection.trades
+            if trade.fee_source == "received"
+        )
+        net_received = filled - received_fee
+        assert net_received > 0, "BUY net received quantity must be positive"
+        cleanup_qty = Quantity.from_scaled(
+            net_received,
+            scale=buy_order.cum_qty.scale,
+            symbol=buy_order.cum_qty.symbol,
+            symbol_id=buy_order.cum_qty.symbol_id,
+        )
 
         if maker is not None:
             maker_buy_price = await resolve_far_below_buy_limit_price(maker, trade_symbol, pair)
@@ -216,7 +230,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
                     side="buy",
                     order_type="limit",
                     tif="gtc",
-                    qty=buy_order.cum_qty,
+                    qty=cleanup_qty,
                     price=maker_buy_price,
                     post_only=True,
                     client_order_id=maker_buy_cid,
@@ -226,7 +240,8 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
                     pytest.skip(f"maker buy unavailable: {exc}")
                 raise
 
-        # Carry exact filled base qty into cleanup SELL (no larger independent size).
+        # A BUY that pays fees from the received asset cannot safely sell its
+        # gross cum_qty; carry the exact net base received into cleanup.
         sell_ref_price = await resolve_market_ref_price(
             live_client, trade_symbol, pair, side="sell"
         )
@@ -236,7 +251,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
                 side="sell",
                 order_type="market",
                 tif="ioc",
-                qty=buy_order.cum_qty,
+                qty=cleanup_qty,
                 client_order_id=sell_cid,
                 market_client_ref_price=sell_ref_price,
             )
@@ -256,8 +271,9 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         assert sell_order.status == "filled", f"cleanup SELL not filled: {sell_order.status}"
         assert sell_order.cum_qty is not None
         sell_filled = sell_order.cum_qty.scaled
-        assert sell_filled == filled, (
-            f"cleanup SELL must use BUY filled qty (F-22): sell={sell_filled} buy={filled}"
+        assert sell_filled == net_received, (
+            "cleanup SELL must use BUY net received qty: "
+            f"sell={sell_filled} net_received={net_received}"
         )
 
         open_orders = await live_client.orders.list_open(limit=100)

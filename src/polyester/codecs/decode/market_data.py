@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.codecs.scalars import format_price_ticks, format_qty_scaled
+from polyester.errors import PolyesterTransportError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.models.market import (
     Candle,
@@ -111,17 +112,33 @@ def candles_columns_from_proto(
     *,
     volume_scale: int,
 ) -> CandlesResult:
+    row_count = len(msg.ts_sec)
+    lengths = {
+        "open": len(msg.open),
+        "high": len(msg.high),
+        "low": len(msg.low),
+        "close": len(msg.close),
+        "volume": len(msg.volume),
+    }
+    if any(length != row_count for length in lengths.values()):
+        rendered = ", ".join(
+            [f"ts_sec={row_count}", *(f"{name}={length}" for name, length in lengths.items())]
+        )
+        raise PolyesterTransportError(
+            f"invalid GetCandlesColumns response lengths: {rendered}"
+        )
+
     candles: list[Candle] = []
     for index, ts in enumerate(msg.ts_sec):
         candles.append(
             Candle(
                 ts_sec=int(ts),
-                open=_decode_price_field(msg.open[index]) if index < len(msg.open) else "",
-                high=_decode_price_field(msg.high[index]) if index < len(msg.high) else "",
-                low=_decode_price_field(msg.low[index]) if index < len(msg.low) else "",
-                close=_decode_price_field(msg.close[index]) if index < len(msg.close) else "",
+                open=_decode_price_field(msg.open[index]),
+                high=_decode_price_field(msg.high[index]),
+                low=_decode_price_field(msg.low[index]),
+                close=_decode_price_field(msg.close[index]),
                 volume=_decode_volume_field(
-                    msg.volume[index] if index < len(msg.volume) else "",
+                    msg.volume[index],
                     scale=volume_scale,
                 ),
             )

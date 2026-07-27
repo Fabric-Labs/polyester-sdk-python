@@ -70,4 +70,4 @@ def flow_from_get_by_tx_response(
 ) -> LifecycleFlowSummary:
     if msg.matches:
         return flow_tx_match_from_proto(msg.matches[0])
-    return LifecycleFlowSummary(intent_id="")
+    raise PolyesterTransportError("get flow by transaction response has no matching flow")

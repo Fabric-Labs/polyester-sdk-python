@@ -50,10 +50,20 @@ def normalize_create_order_request(
     return normalized
 
 
+def _codec_quantity_scale(value: object | None, quantity_scale: int | None) -> int:
+    if quantity_scale is not None:
+        return quantity_scale
+    if isinstance(value, Quantity):
+        return value.scale if value.scale is not None else 0
+    raise PolyesterValidationError(
+        "decimal quantity encoding requires an explicit quantity_scale resolved from catalogs"
+    )
+
+
 def create_order_to_wire(
     request: CreateOrderRequest,
     *,
-    quantity_scale: int = 8,
+    quantity_scale: int | None = None,
 ) -> dict[str, Any]:
     if request.symbol is None and request.symbol_id is None:
         raise PolyesterValidationError("orders.create requires symbol or symbol_id")
@@ -70,7 +80,11 @@ def create_order_to_wire(
         "side": ORDER_SIDE_TO_PROTO[request.side],
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
         "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
-        "qty_scaled": resolve_qty_scaled(request.qty, quantity_scale, symbol=request.symbol),
+        "qty_scaled": resolve_qty_scaled(
+            request.qty,
+            _codec_quantity_scale(request.qty, quantity_scale),
+            symbol=request.symbol,
+        ),
         "limit_price_ticks": (
             resolve_price_ticks(request.price, "price", symbol=request.symbol)
             if request.price
@@ -85,7 +99,7 @@ def create_order_to_wire(
 def order_intent_from_request(
     request: CreateOrderRequest,
     *,
-    quantity_scale: int = 8,
+    quantity_scale: int | None = None,
 ) -> orders_pb2.OrderIntent:
     """Build an :class:`OrderIntent` from the flat public request shape.
 
@@ -105,7 +119,11 @@ def order_intent_from_request(
     intent = orders_pb2.OrderIntent(
         symbol=request.symbol or "",
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
-        qty_scaled=resolve_qty_scaled(request.qty, quantity_scale, symbol=request.symbol),
+        qty_scaled=resolve_qty_scaled(
+            request.qty,
+            _codec_quantity_scale(request.qty, quantity_scale),
+            symbol=request.symbol,
+        ),
     )
     client_order_id = optional_client_id(request.client_order_id)
     if client_order_id:
@@ -156,7 +174,7 @@ def order_intent_from_request(
 def create_order_to_proto(
     request: CreateOrderRequest,
     *,
-    quantity_scale: int = 8,
+    quantity_scale: int | None = None,
 ) -> orders_pb2.CreateOrderRequest:
     proto = orders_pb2.CreateOrderRequest(
         order=order_intent_from_request(request, quantity_scale=quantity_scale)
@@ -169,6 +187,19 @@ def create_order_to_proto(
 def risk_policy_from_dict(data: dict[str, Any] | None) -> orders_pb2.RiskPolicy | None:
     if not data:
         return None
+    stack: list[object] = [data]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"trigger_price_source", "triggerPriceSource"}:
+                    raise PolyesterValidationError(
+                        "attached risk always uses last trade; "
+                        "trigger_price_source cannot be supplied"
+                    )
+                stack.append(child)
+        elif isinstance(value, list):
+            stack.extend(value)
     risk = orders_pb2.RiskPolicy()
     ParseDict(data, risk, ignore_unknown_fields=True)
     return risk
@@ -227,7 +258,7 @@ def batch_create_orders_to_proto(
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
     allow_partial: bool = False,
-    quantity_scale: int = 8,
+    quantity_scale: int | None = None,
 ) -> orders_pb2.BatchCreateOrdersRequest:
     # ``allow_partial`` was removed from the wire in POLY-3701; it is accepted
     # for backwards compatibility but ignored.
@@ -316,7 +347,7 @@ def batch_modify_orders_to_proto(
     request_id: str | None = None,
     behavior_default: str | None = None,
     allow_partial: bool = False,
-    quantity_scale: int = 8,
+    quantity_scale: int | None = None,
 ) -> orders_pb2.BatchModifyOrdersRequest:
     if not items:
         raise PolyesterValidationError("batch_modify requires at least one item")
@@ -334,7 +365,9 @@ def batch_modify_orders_to_proto(
             )
         proto.behavior_default = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
     for item in items:
-        proto.items.append(batch_modify_item_to_proto(item, quantity_scale=quantity_scale))
+        new_qty = item.get("new_qty")
+        item_scale = _codec_quantity_scale(new_qty, quantity_scale) if new_qty is not None else 0
+        proto.items.append(batch_modify_item_to_proto(item, quantity_scale=item_scale))
     return proto
 
 
@@ -350,7 +383,7 @@ def modify_order_to_proto(
     new_attached_risk: dict[str, Any] | None = None,
     behavior: str | None = None,
     new_client_order_id: str | None = None,
-    quantity_scale: int = 8,
+    quantity_scale: int | None = None,
 ) -> orders_pb2.ModifyOrderRequest:
     has_order_id = order_id is not None
     has_client_order_id = bool(client_order_id)
@@ -373,7 +406,11 @@ def modify_order_to_proto(
     if new_price is not None:
         proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")  # type: ignore[arg-type]
     if new_qty is not None:
-        proto.new_qty_scaled = resolve_qty_scaled(new_qty, quantity_scale, "new_qty")  # type: ignore[arg-type]
+        proto.new_qty_scaled = resolve_qty_scaled(
+            new_qty,  # type: ignore[arg-type]
+            _codec_quantity_scale(new_qty, quantity_scale),
+            "new_qty",
+        )
     if behavior:
         key = behavior.lower()
         if key not in MODIFY_BEHAVIOR_TO_PROTO:

@@ -10,16 +10,26 @@ from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
 from polyester.types.money import (
     AssetAmount,
-    QuantityDomain,
-    resolve_asset_amount_scaled,
+    resolve_asset_amount_scaled_with_input_scale,
 )
 
 DEFAULT_TRADING_WITHDRAW_DEADLINE_SECONDS = 5 * 60
 
 
-def str_to_u128_proto(value: str | Decimal | AssetAmount, *, scale: int = 18) -> u128_pb2.U128:
-    domain = QuantityDomain.LEDGER_E18 if scale == 18 else QuantityDomain.ASSET
-    big = resolve_asset_amount_scaled(value, scale, "amount", domain=domain)
+def str_to_u128_proto(
+    value: str | Decimal | AssetAmount,
+    *,
+    scale: int = 18,
+    asset_id: int | None = None,
+) -> u128_pb2.U128:
+    """Encode an amount declared at ``scale`` into exact ledger scale-18 units."""
+    big = resolve_asset_amount_scaled_with_input_scale(
+        value,
+        scale,
+        18,
+        "amount",
+        asset_id=asset_id,
+    )
     return u128_pb2.U128(hi=big >> 64, lo=big & ((1 << 64) - 1))
 
 
@@ -60,16 +70,17 @@ def trading_withdraw_payload_to_proto(
     action_key = action.lower().replace("-", "_")
     action_enum = action_aliases.get(action_key)
     if action_enum is None:
-        enum_name = action_key.upper()
-        if not enum_name.startswith("TO_"):
-            enum_name = f"TO_{enum_name}"
-        action_enum = getattr(withdraw_pb2, enum_name, withdraw_pb2.ACTION_UNSPECIFIED)
-    resolved_deadline = deadline_ts_sec if deadline_ts_sec else _default_deadline_ts_sec()
+        raise PolyesterValidationError(f"unknown trading withdraw action: {action}")
+    resolved_deadline = (
+        _default_deadline_ts_sec() if deadline_ts_sec is None else int(deadline_ts_sec)
+    )
+    if resolved_deadline <= 0:
+        raise PolyesterValidationError("deadline_ts_sec must be non-zero")
     return withdraw_pb2.TradingWithdrawIntentPayload(
         action=action_enum,
         asset_id=asset_id,
         destination_chain_id=destination_chain_id,
-        amount_e18=str_to_u128_proto(amount, scale=amount_scale),
+        amount_e18=str_to_u128_proto(amount, scale=amount_scale, asset_id=asset_id),
         deadline_ts_sec=resolved_deadline,
         nonce=_nonce_to_u128(nonce),
         destination_address=destination_address,

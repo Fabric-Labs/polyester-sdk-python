@@ -86,6 +86,13 @@ class ApiKeyCredentials:
     def __repr__(self) -> str:
         return f"ApiKeyCredentials(key_id={self.key_id!r}, private_key='[REDACTED]')"
 
+    def sign_payload(self, payload: bytes) -> bytes:
+        """Sign exact protocol-defined business-payload bytes with Ed25519."""
+        if not isinstance(payload, bytes):
+            raise TypeError("payload must be bytes")
+        key = Ed25519PrivateKey.from_private_bytes(self.private_key)
+        return key.sign(payload)
+
 
 def load_api_key_credentials(
     *,

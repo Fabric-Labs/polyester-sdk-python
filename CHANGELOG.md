@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.1.0a25
+
+### Breaking
+- `get_current_candle` returns `None` when no candle rows exist, matching Rust `Option<Candle>` instead of a synthetic empty `Candle`.
+
+### Fixed
+- Outbound HTTP/Connect/JSON-RPC requests send an explicit `User-Agent: polyester-sdk-python/<version>` instead of the default `python-httpx/*` / library identity, so edge WAF rules that ban browser signatures (Cloudflare error 1010) do not block the SDK before authentication.
+- Cloudflare error 1010 responses are mapped to `PolyesterTransportError` with an explicit WAF message instead of being misclassified as `PolyesterAuthError`.
+- Orderbook snapshots reject missing or invalid levels, and managed books reject malformed levels and invalid sequence ranges atomically without advancing.
+- Regression coverage preserves the protocol's exact depth `1` and `1000` mappings.
+- Singular cancel and lookup by client-order-id validate the documented identifier constraints before contacting the transport.
+- API-key trading withdraws can be prepared, signed over exact deterministic protobuf bytes, persisted, restored, and submitted unchanged.
+- Withdraw and internal-transfer amounts rescale exactly from their declared input scale to `amount_e18`.
+- Mutation response-contract violations fail closed with `PolyesterResponseContractError`.
+- Snapshot recovery drains post-snapshot publications atomically and coalesces orderbook gap refreshes into a bounded single-flight worker.
+
 ## 0.1.0a24
 
 ### Fixed

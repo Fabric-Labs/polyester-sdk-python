@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import threading
 from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
@@ -12,6 +13,9 @@ TSnapshot = TypeVar("TSnapshot")
 TPublication = TypeVar("TPublication")
 
 _RECONNECT_SNAPSHOT_RETRIES = 1
+_REQUEST_REFRESH_MAX_ATTEMPTS = 4
+_REQUEST_REFRESH_INITIAL_BACKOFF = 0.05
+_REQUEST_REFRESH_MAX_BACKOFF = 0.4
 
 
 class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
@@ -53,8 +57,11 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         self._generation = 0
         self._pending: list[TPublication] = []
         self._lock = asyncio.Lock()
+        self._state_lock = threading.Lock()
         self._ws_sub: AsyncSubscription[TPublication] | None = None
         self._runner_task: asyncio.Task[None] | None = None
+        self._request_refresh_task: asyncio.Task[None] | None = None
+        self._refresh_requested = False
         self._last_error: BaseException | None = None
         self._initial_handshake: asyncio.Future[None] | None = None
 
@@ -98,7 +105,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         async with self._lock:
             generation = self._generation + 1
             self._generation = generation
-            self._ready = False
+            with self._state_lock:
+                self._ready = False
             # Publications buffered during a failed refresh must survive for
             # the next successful retry and be merged exactly once.
             try:
@@ -118,9 +126,21 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     PolyesterRealtimeError(f"apply_snapshot callback failed: {exc}")
                 )
                 return False
-            if self._disposed or generation != self._generation:
-                return False
-            self._ready = True
+            while True:
+                next_buffered = self._take_pending_or_mark_ready(generation)
+                if next_buffered is None:
+                    return False
+                if not next_buffered:
+                    break
+                try:
+                    self._apply_live_publications(next_buffered)
+                except Exception as exc:
+                    self._fail_closed(
+                        PolyesterRealtimeError(
+                            f"apply_live_publications callback failed: {exc}"
+                        )
+                    )
+                    return False
             self._last_error = None
             self._notify(self._on_snapshot_refresh)
             return True
@@ -128,7 +148,11 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
     async def aclose(self) -> None:
         self._disposed = True
         self._generation += 1
-        self._pending.clear()
+        with self._state_lock:
+            self._ready = False
+            self._pending.clear()
+        if self._request_refresh_task is not None and not self._request_refresh_task.done():
+            self._request_refresh_task.cancel()
         if self._runner_task is not None and not self._runner_task.done():
             self._runner_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -137,9 +161,23 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             await self._ws_sub.aclose()
 
     def _take_pending(self) -> list[TPublication]:
-        buffered = self._pending
-        self._pending = []
-        return buffered
+        with self._state_lock:
+            buffered = self._pending
+            self._pending = []
+            return buffered
+
+    def _take_pending_or_mark_ready(
+        self, generation: int
+    ) -> list[TPublication] | None:
+        with self._state_lock:
+            if self._disposed or generation != self._generation:
+                return None
+            if self._pending:
+                buffered = self._pending
+                self._pending = []
+                return buffered
+            self._ready = True
+            return []
 
     def _handle_publication(self, message: TPublication) -> None:
         try:
@@ -151,14 +189,21 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             return
         if not publications:
             return
-        if not self._ready:
-            self._pending.extend(publications)
-            if len(self._pending) > self._max_buffered_publications:
-                self._pending.clear()
-                overflow = PolyesterRealtimeOverflowError(
-                    "snapshot recovery buffer full; recreate the subscription"
-                )
-                self._fail_closed(overflow)
+        overflow: PolyesterRealtimeOverflowError | None = None
+        buffered = False
+        with self._state_lock:
+            if not self._ready:
+                buffered = True
+                self._pending.extend(publications)
+                if len(self._pending) > self._max_buffered_publications:
+                    self._pending.clear()
+                    overflow = PolyesterRealtimeOverflowError(
+                        "snapshot recovery buffer full; recreate the subscription"
+                    )
+        if overflow is not None:
+            self._fail_closed(overflow)
+            return
+        if buffered:
             return
         try:
             self._apply_live_publications(publications)
@@ -166,6 +211,53 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             self._fail_closed(
                 PolyesterRealtimeError(f"apply_live_publications callback failed: {exc}")
             )
+
+    def request_refresh(self) -> None:
+        """Coalesce refresh requests into one bounded fail-closed worker."""
+        if self._disposed:
+            return
+        self._refresh_requested = True
+        self._generation += 1
+        with self._state_lock:
+            self._ready = False
+        if self._request_refresh_task is None or self._request_refresh_task.done():
+            self._request_refresh_task = asyncio.get_running_loop().create_task(
+                self._run_requested_refreshes()
+            )
+
+    async def _run_requested_refreshes(self) -> None:
+        attempts = 0
+        try:
+            while not self._disposed:
+                self._refresh_requested = False
+                attempts += 1
+                succeeded = await self.refresh_snapshot()
+                follow_up = self._refresh_requested
+                if succeeded and not follow_up:
+                    return
+                if attempts >= _REQUEST_REFRESH_MAX_ATTEMPTS:
+                    if succeeded:
+                        self._fail_closed(
+                            PolyesterRealtimeError(
+                                "snapshot refresh did not converge after repeated "
+                                "publication gaps"
+                            )
+                        )
+                    else:
+                        error = self._last_error
+                        if not isinstance(error, Exception):
+                            error = PolyesterRealtimeError(
+                                "snapshot refresh failed after bounded retries"
+                            )
+                        self._fail_closed(error)
+                    return
+                delay = min(
+                    _REQUEST_REFRESH_INITIAL_BACKOFF * (2 ** (attempts - 1)),
+                    _REQUEST_REFRESH_MAX_BACKOFF,
+                )
+                await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            return
 
     async def _refresh_after_reconnect(self) -> None:
         """One bounded retry on reconnect, then fail-closed."""
@@ -267,8 +359,9 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
 
     def _fail_closed(self, error: Exception) -> None:
         self._last_error = error
-        self._ready = False
         self._disposed = True
         self._generation += 1
-        self._pending.clear()
+        with self._state_lock:
+            self._ready = False
+            self._pending.clear()
         self._report_snapshot_error(error)

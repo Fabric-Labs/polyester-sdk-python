@@ -4,7 +4,7 @@ import asyncio
 import os
 import uuid
 
-from polyester.errors import PolyesterApiError
+from polyester.errors import PolyesterApiError, is_not_found
 from tests.helpers import (
     DevnetOrderNotIndexedError,
     min_base_qty_for_pair,
@@ -64,7 +64,7 @@ async def wait_for_open_order(
         try:
             detail = await client.orders.get(client_order_id=client_order_id)
         except PolyesterApiError as exc:
-            if str(exc.code or "").lower() != "not_found":
+            if not is_not_found(exc):
                 raise
         else:
             if detail.order is not None and detail.order.client_order_id == client_order_id:
@@ -112,7 +112,7 @@ async def wait_for_terminal_order(client, client_order_id: str, *, timeout: floa
         try:
             detail = await client.orders.get(client_order_id=client_order_id)
         except PolyesterApiError as exc:
-            if str(exc.code or "").lower() != "not_found":
+            if not is_not_found(exc):
                 raise
         else:
             last_detail = detail

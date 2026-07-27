@@ -8,6 +8,20 @@ from connectrpc.request import RequestContext
 from google.protobuf.message import Message
 
 from polyester.auth import ApiKeyCredentials, sign_request_async
+from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
+
+
+class UserAgentUnaryInterceptor(UnaryInterceptor):
+    """Attach the Polyester SDK User-Agent on every Connect unary call."""
+
+    async def intercept_unary(
+        self,
+        call_next: Callable[[Message, RequestContext], Awaitable[Message]],
+        request: Message,
+        ctx: RequestContext,
+    ) -> Message:
+        ctx.request_headers()[USER_AGENT_HEADER] = USER_AGENT
+        return await call_next(request, ctx)
 
 
 class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):

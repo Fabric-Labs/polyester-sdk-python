@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
-from polyester.errors import PolyesterTransportError
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOpenOrdersResponse,
@@ -185,6 +185,16 @@ def order_mutation_from_proto(msg) -> OrderMutationResult:
         status = msg.status
     else:
         status = "accepted"
+    message_name = msg.DESCRIPTOR.name
+    if message_name == "CreateOrderResponse":
+        if not msg.order_id:
+            raise PolyesterResponseContractError("CreateOrder", "missing order_id")
+    elif message_name == "CancelOrderResponse" and (
+        not msg.order_id or not str(status).strip()
+    ):
+        raise PolyesterResponseContractError(
+            "CancelOrder", "missing order_id or status"
+        )
     return OrderMutationResult(
         status=status,
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
@@ -193,8 +203,13 @@ def order_mutation_from_proto(msg) -> OrderMutationResult:
 
 
 def modify_order_from_proto(msg: orders_pb2.ModifyOrderResponse) -> ModifyOrderResult:
+    action_taken = proto_enum_name(orders_pb2.ModifyActionTaken, msg.action_taken)
+    if not action_taken or not msg.old_order_id or not msg.final_order_id:
+        raise PolyesterResponseContractError(
+            "ModifyOrder", "missing action_taken, old_order_id, or final_order_id"
+        )
     return ModifyOrderResult(
-        action_taken=proto_enum_name(orders_pb2.ModifyActionTaken, msg.action_taken),
+        action_taken=action_taken,
         old_order_id=format_uint64_id(msg.old_order_id) if msg.old_order_id else "",
         final_order_id=format_uint64_id(msg.final_order_id) if msg.final_order_id else "",
         code=msg.code,
@@ -204,8 +219,23 @@ def modify_order_from_proto(msg: orders_pb2.ModifyOrderResponse) -> ModifyOrderR
 def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllOrdersResult:
     status = (msg.status or "").strip()
     if not status or status.lower() not in {"submitted", "dry_run"}:
-        raise PolyesterTransportError(
+        raise PolyesterResponseContractError(
+            "CancelAllOrders",
             f"invalid CancelAllOrders response: unknown status {msg.status!r}"
+        )
+    if status.lower() == "submitted" and (
+        int(msg.submitted_cancels) + int(msg.failed_cancels) != int(msg.matched_orders)
+    ):
+        raise PolyesterResponseContractError(
+            "CancelAllOrders",
+            "response counts mismatch: "
+            f"matched={msg.matched_orders} submitted={msg.submitted_cancels} "
+            f"failed={msg.failed_cancels}",
+        )
+    if status.lower() == "dry_run" and (msg.submitted_cancels or msg.failed_cancels):
+        raise PolyesterResponseContractError(
+            "CancelAllOrders",
+            "dry_run response unexpectedly reports submitted or failed cancels",
         )
     return CancelAllOrdersResult(
         status=msg.status,
@@ -223,7 +253,8 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
         status = item.status.lower()
         if status == "rejected":
             if int(item.action_taken) != 0:
-                raise PolyesterTransportError(
+                raise PolyesterResponseContractError(
+                    "BatchModifyOrders",
                     "batch modify rejected result unexpectedly carries an action"
                 )
             decoded_rejected += 1
@@ -234,9 +265,13 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
             elif action == "replaced":
                 decoded_replaced += 1
             else:
-                raise PolyesterTransportError(f"batch modify response has unknown action: {action}")
+                raise PolyesterResponseContractError(
+                    "BatchModifyOrders",
+                    f"batch modify response has unknown action: {action}",
+                )
         else:
-            raise PolyesterTransportError(
+            raise PolyesterResponseContractError(
+                "BatchModifyOrders",
                 f"batch modify response has unknown status: {item.status}"
             )
 
@@ -258,7 +293,8 @@ def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchM
         or rejected_count != decoded_rejected
         or amended_count + replaced_count + rejected_count != len(results)
     ):
-        raise PolyesterTransportError(
+        raise PolyesterResponseContractError(
+            "BatchModifyOrders",
             "batch modify response counts do not match decoded outcomes: "
             f"amended={amended_count}/{decoded_amended} "
             f"replaced={replaced_count}/{decoded_replaced} "
@@ -296,7 +332,8 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             client_order_id=item.client_order_id,
             code=code,
         )
-    raise PolyesterTransportError(
+    raise PolyesterResponseContractError(
+        "BatchCreateOrders",
         "batch create response item has neither accepted nor rejected outcome"
     )
 
@@ -312,7 +349,8 @@ def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchC
         or rejected_count != decoded_rejected
         or accepted_count + rejected_count != len(results)
     ):
-        raise PolyesterTransportError(
+        raise PolyesterResponseContractError(
+            "BatchCreateOrders",
             "batch create response counts do not match decoded outcomes: "
             f"accepted={accepted_count}/{decoded_accepted} "
             f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
@@ -334,7 +372,8 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
         elif status == "rejected":
             decoded_rejected += 1
         else:
-            raise PolyesterTransportError(
+            raise PolyesterResponseContractError(
+                "BatchCancelOrders",
                 f"batch cancel response has unknown status: {item.status}"
             )
 
@@ -354,7 +393,8 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
         or rejected_count != decoded_rejected
         or accepted_count + rejected_count != len(results)
     ):
-        raise PolyesterTransportError(
+        raise PolyesterResponseContractError(
+            "BatchCancelOrders",
             "batch cancel response counts do not match decoded outcomes: "
             f"accepted={accepted_count}/{decoded_accepted} "
             f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
@@ -369,7 +409,8 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
 def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> CancelAllAfterResult:
     status = (msg.status or "").strip()
     if not status or status.lower() not in {"armed", "disabled"}:
-        raise PolyesterTransportError(
+        raise PolyesterResponseContractError(
+            "CancelAllAfter",
             f"invalid CancelAllAfter response: unknown status {msg.status!r}"
         )
     return CancelAllAfterResult(

@@ -47,5 +47,7 @@ async def test_get_current_candle(live_client, smoke_symbol, capabilities):
     if not capabilities["get_current_candle"]:
         pytest.skip("get_current_candle unavailable on devnet")
     candle = await live_client.market_data.get_current_candle(symbol=smoke_symbol)
+    if candle is None:
+        pytest.skip("no candle rows returned for smoke symbol")
     assert candle.ts_sec >= 0
     assert Decimal(candle.high or "0") >= Decimal(candle.low or "0")

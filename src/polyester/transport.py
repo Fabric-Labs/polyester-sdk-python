@@ -8,9 +8,10 @@ from connectrpc.codec import proto_binary_codec, proto_json_codec
 from connectrpc.interceptor import UnaryInterceptor
 
 from polyester.auth import ApiKeyCredentials
-from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor
+from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
 from polyester.connect_transport import connect_headers as build_connect_headers
 from polyester.errors import PolyesterAuthError, PolyesterTransportError
+from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
 
 WireFormat = Literal["binary", "json"]
 MAX_CONNECT_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -46,9 +47,14 @@ class TransportFactory:
     ) -> None:
         self.config = config
         self.credentials = credentials
-        self.public_http = httpx.AsyncClient(base_url=config.api_url, timeout=config.timeout)
+        self.public_http = httpx.AsyncClient(
+            base_url=config.api_url,
+            timeout=config.timeout,
+            headers={USER_AGENT_HEADER: USER_AGENT},
+        )
         self._codec = codec_for_config(config)
-        self._auth_interceptors: list[UnaryInterceptor] = []
+        self._user_agent_interceptor = UserAgentUnaryInterceptor()
+        self._auth_interceptors: list[UnaryInterceptor] = [self._user_agent_interceptor]
         if credentials is not None:
             self._auth_interceptors.append(
                 ApiKeyAuthUnaryInterceptor(
@@ -77,7 +83,7 @@ class TransportFactory:
     def create_public_client(self, client_cls: type):
         return client_cls(
             self.config.api_url,
-            interceptors=[],
+            interceptors=[self._user_agent_interceptor],
             **self._client_kwargs(),
         )
 

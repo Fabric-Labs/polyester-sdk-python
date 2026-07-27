@@ -103,7 +103,7 @@ class AsyncMarketDataService(BaseService):
         symbol: str | None = None,
         symbol_id: int | None = None,
         timeframe: str = "1m",
-    ) -> Candle:
+    ) -> Candle | None:
         result = await self.get_candles(
             symbol=symbol,
             symbol_id=symbol_id,
@@ -112,8 +112,9 @@ class AsyncMarketDataService(BaseService):
             include_incomplete=True,
         )
         if result.candles:
-            return result.candles[-1]
-        return Candle(ts_sec=0)
+            # GetCandles rows are newest-first; an open candle is prepended.
+            return result.candles[0]
+        return None
 
     async def get_candles(
         self,

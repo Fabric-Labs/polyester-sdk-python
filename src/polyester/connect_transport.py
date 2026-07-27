@@ -11,7 +11,14 @@ from polyester.errors import (
     PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
+    PolyesterTransportError,
     PolyesterValidationError,
+)
+from polyester.user_agent import (
+    USER_AGENT,
+    USER_AGENT_HEADER,
+    cloudflare_1010_message,
+    is_cloudflare_browser_ban,
 )
 
 WireFormat = Literal["binary", "json"]
@@ -41,6 +48,7 @@ def connect_headers(*, wire_format: WireFormat) -> dict[str, str]:
     return {
         "Content-Type": connect_content_type(wire_format),
         "Connect-Protocol-Version": CONNECT_PROTOCOL_VERSION,
+        USER_AGENT_HEADER: USER_AGENT,
     }
 
 
@@ -56,6 +64,8 @@ def raise_for_status(response: httpx.Response) -> None:
     if response.status_code < 400:
         return
     message = response.text or "API error"
+    if response.status_code == 403 and is_cloudflare_browser_ban(message):
+        raise PolyesterTransportError(cloudflare_1010_message())
     if response.status_code in (401, 403):
         raise PolyesterAuthError(message)
     if response.status_code == 429:

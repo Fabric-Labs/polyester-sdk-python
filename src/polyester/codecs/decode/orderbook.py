@@ -8,7 +8,7 @@ from polyester.orderbook.local_book import format_orderbook_level
 def orderbook_level_from_proto(
     msg: orderbook_pb2.PriceLevel,
     *,
-    quantity_scale: int = 8,
+    quantity_scale: int,
 ) -> OrderbookLevel:
     return format_orderbook_level(
         price_ticks=int(msg.price_ticks),
@@ -22,7 +22,7 @@ def orderbook_from_proto(
     *,
     symbol: str,
     depth: int,
-    quantity_scale: int = 8,
+    quantity_scale: int,
 ) -> OrderbookData:
     return OrderbookData(
         symbol=symbol,

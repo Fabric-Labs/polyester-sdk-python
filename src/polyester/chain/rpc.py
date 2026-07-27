@@ -13,8 +13,11 @@ from typing import Any
 
 import httpx
 
+from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
+
 # Reject oversized JSON-RPC bodies before decode (DoS / memory).
 MAX_JSONRPC_RESPONSE_BYTES = 1 * 1024 * 1024
+_HTTP_HEADERS = {USER_AGENT_HEADER: USER_AGENT}
 
 
 class JsonRpcError(RuntimeError):
@@ -45,7 +48,10 @@ class JsonRpcClient:
         # deadline via a closer that aborts the client at ``deadline`` plus
         # between-chunk checks (covers stall and slow-drip without worker threads).
         with (
-            httpx.Client(timeout=httpx.Timeout(self._timeout)) as client,
+            httpx.Client(
+                timeout=httpx.Timeout(self._timeout),
+                headers=_HTTP_HEADERS,
+            ) as client,
             _deadline_client_close(client, deadline),
         ):
             try:
@@ -74,7 +80,10 @@ class JsonRpcClient:
         }
         try:
             async with asyncio.timeout(self._timeout):
-                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                async with httpx.AsyncClient(
+                    timeout=self._timeout,
+                    headers=_HTTP_HEADERS,
+                ) as client:
                     async with client.stream("POST", self._url, json=payload) as response:
                         response.raise_for_status()
                         raw = await _read_limited(response, MAX_JSONRPC_RESPONSE_BYTES)

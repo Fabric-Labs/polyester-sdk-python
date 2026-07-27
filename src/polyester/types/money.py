@@ -11,6 +11,7 @@ from polyester.codecs.scalars import (
     INT64_MAX,
     INT64_MIN,
     PRICE_TICK_SCALE,
+    decimal_to_scaled,
     format_price_ticks,
     format_qty_scaled,
     parse_price_ticks,
@@ -285,6 +286,53 @@ def resolve_asset_amount_scaled(
     return parse_qty_scaled(value, scale, field_name)
 
 
+def resolve_asset_amount_scaled_with_input_scale(
+    value: str | Decimal | AssetAmount,
+    input_scale: int | None,
+    target_scale: int,
+    field_name: str = "amount",
+    *,
+    asset_id: int | None = None,
+) -> int:
+    """Rescale an asset amount exactly from its declared scale to ``target_scale``."""
+    validate_protocol_scale(target_scale)
+    if isinstance(value, AssetAmount):
+        if value.asset_id is not None and asset_id is not None and value.asset_id != asset_id:
+            raise PolyesterValidationError(
+                f"amount asset_id mismatch: value is for {value.asset_id}, "
+                f"destination is {asset_id}"
+            )
+        source_scale = value.scale if value.scale is not None else input_scale
+        if source_scale is None:
+            raise PolyesterValidationError(
+                f"{field_name} requires a declared input scale on AssetAmount or input_scale="
+            )
+        validate_protocol_scale(source_scale)
+        scaled = value.scaled
+    else:
+        if input_scale is None:
+            raise PolyesterValidationError(f"{field_name} requires input_scale")
+        validate_protocol_scale(input_scale)
+        source_scale = input_scale
+        scaled = decimal_to_scaled(value, source_scale, field_name)
+
+    if scaled <= 0:
+        raise PolyesterValidationError(f"{field_name} must be positive")
+    if source_scale < target_scale:
+        scaled *= 10 ** (target_scale - source_scale)
+    elif source_scale > target_scale:
+        divisor = 10 ** (source_scale - target_scale)
+        scaled, remainder = divmod(scaled, divisor)
+        if remainder:
+            raise PolyesterValidationError(
+                f"{field_name} cannot be rescaled exactly from scale {source_scale} "
+                f"to {target_scale}"
+            )
+    if scaled >= 1 << 128:
+        raise PolyesterValidationError(f"{field_name} exceeds uint128 range")
+    return scaled
+
+
 __all__ = [
     "AssetAmount",
     "PRICE_TICK_SCALE",
@@ -292,6 +340,7 @@ __all__ = [
     "Quantity",
     "QuantityDomain",
     "resolve_asset_amount_scaled",
+    "resolve_asset_amount_scaled_with_input_scale",
     "resolve_price_ticks",
     "resolve_qty_scaled",
 ]

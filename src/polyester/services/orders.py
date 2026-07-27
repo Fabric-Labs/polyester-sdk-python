@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.correlation_id import required_client_id
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
     batch_create_from_proto,
@@ -177,7 +178,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if order_id is not None:
             request.order_id = id_to_int(order_id, "order_id")
         if client_order_id:
-            request.client_order_id = client_order_id
+            request.client_order_id = required_client_id(client_order_id, "client_order_id")
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
@@ -244,14 +245,21 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         sub_account_id: str | None = None,
     ) -> OrderMutationResult:
         if order_id is None and client_order_id is None:
-            raise ValueError("cancel requires order_id or client_order_id")
-        if symbol_id is None and symbol:
-            symbol_id = self._catalogs.symbol_id_for_symbol(symbol)
+            raise PolyesterValidationError("cancel requires order_id or client_order_id")
+        if symbol is not None and symbol_id is not None:
+            raise PolyesterValidationError("cancel accepts only one of symbol or symbol_id")
+        if symbol is not None:
+            symbol_id = resolve_symbol_id(
+                self._catalogs,
+                symbol=symbol,
+                symbol_id=None,
+                label="cancel",
+            )
         request = CancelOrderRequest()
         if order_id is not None:
             request.order_id = id_to_int(order_id, "order_id")
         if client_order_id:
-            request.client_order_id = client_order_id
+            request.client_order_id = required_client_id(client_order_id, "client_order_id")
         if symbol_id is not None:
             request.symbol_id = symbol_id
         parsed_sub = parse_optional_subaccount_id(

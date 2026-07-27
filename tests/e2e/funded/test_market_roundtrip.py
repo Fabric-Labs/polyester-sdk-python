@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from polyester import AsyncPolyester
+from polyester import AsyncPolyester, is_not_found
 from polyester.types.money import Quantity
 from tests.e2e.helpers import unique_client_order_id, wait_for_terminal_order
 from tests.helpers import (
@@ -86,6 +86,8 @@ async def _cancel_open_test_orders(client, cids: set[str]) -> list[str]:
                 symbol=order.symbol,
             )
         except Exception as exc:  # noqa: BLE001
+            if is_not_found(exc):
+                continue
             errors.append(f"cancel {order.client_order_id}: {exc}")
     return errors
 

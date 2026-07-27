@@ -13,8 +13,10 @@ def levels_to_map(levels: list[tuple[str, str]] | None) -> BookSide:
     for price_ticks, qty_scaled in levels or []:
         price = int(price_ticks)
         qty = int(qty_scaled)
-        if price < 0 or qty <= 0:
-            continue
+        if price <= 0:
+            raise PolyesterValidationError("orderbook level has invalid or missing price")
+        if qty <= 0:
+            raise PolyesterValidationError("orderbook level has invalid or missing quantity")
         book[price] = qty
     return book
 
@@ -29,8 +31,10 @@ def levels_from_proto_levels(
     for level in levels or []:
         price = int(getattr(level, price_attr))
         qty = int(getattr(level, qty_attr))
-        if price < 0 or qty <= 0:
-            continue
+        if price <= 0:
+            raise PolyesterValidationError("orderbook level has invalid or missing price")
+        if qty <= 0:
+            raise PolyesterValidationError("orderbook level has invalid or missing quantity")
         book[price] = qty
     return book
 
@@ -79,7 +83,7 @@ def format_orderbook_level(
 ) -> OrderbookLevel:
     from polyester.types.money import Price, Quantity
 
-    if price_ticks < 0:
+    if price_ticks <= 0:
         raise PolyesterValidationError("orderbook level has invalid or missing price")
     if qty_scaled <= 0:
         raise PolyesterValidationError("orderbook level has invalid or missing quantity")
@@ -161,19 +165,31 @@ def apply_delta(
     delta: OrderBookDeltaUpdate,
 ) -> tuple[int, bool]:
     """Apply one delta. Returns (new_book_seq, needs_snapshot_refresh)."""
+    # Reject the whole update atomically. Skipping corrupt rows while advancing
+    # the sequence permanently leaves stale quantity in the local book.
+    pairs = [*delta.bids, *delta.asks]
+    if any(int(price) < 0 or int(qty) < 0 for price, qty in pairs):
+        return current_book_seq, True
+
+    try:
+        seq_start = int(delta.book_seq_start)
+        seq_end = int(delta.book_seq_end)
+    except (TypeError, ValueError):
+        return current_book_seq, True
+    if seq_start < 0 or seq_end < seq_start:
+        return current_book_seq, True
+
+    comparison_seq = 0 if delta.reset else current_book_seq
+    if comparison_seq != 0 and seq_start > comparison_seq + 1:
+        return current_book_seq, True
+
+    if not delta.reset and seq_end <= current_book_seq:
+        return current_book_seq, False
+
     if delta.reset:
         bids.clear()
         asks.clear()
         current_book_seq = 0
-
-    seq_start = int(delta.book_seq_start or 0)
-    seq_end = int(delta.book_seq_end or 0)
-
-    if current_book_seq != 0 and seq_start > current_book_seq + 1:
-        return current_book_seq, True
-
-    if seq_end <= current_book_seq:
-        return current_book_seq, False
 
     apply_side_delta(bids, list(delta.bids))
     apply_side_delta(asks, list(delta.asks))

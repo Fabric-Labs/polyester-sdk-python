@@ -1,5 +1,6 @@
 import pytest
 
+from polyester.codecs.orderbook import depth_to_connect_enum
 from polyester.errors import PolyesterValidationError
 from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.local_book import (
@@ -13,9 +14,18 @@ from polyester.orderbook.local_book import (
 )
 
 
-def test_levels_to_map_skips_zero_qty() -> None:
-    book = levels_to_map([("100", "5"), ("101", "0"), ("102", "3")])
-    assert book == {100: 5, 102: 3}
+def test_levels_to_map_rejects_missing_price_or_quantity() -> None:
+    with pytest.raises(PolyesterValidationError, match="missing quantity"):
+        levels_to_map([("100", "5"), ("101", "0")])
+    with pytest.raises(PolyesterValidationError, match="missing price"):
+        levels_to_map([("0", "5")])
+
+
+def test_depth_mapping_preserves_protocol_boundaries() -> None:
+    assert depth_to_connect_enum(1) == "DEPTH_1"
+    assert depth_to_connect_enum(5) == "DEPTH_5"
+    assert depth_to_connect_enum(500) == "DEPTH_500"
+    assert depth_to_connect_enum(1000) == "DEPTH_1000"
 
 
 def test_apply_delta_updates_and_deletes_levels() -> None:
@@ -36,6 +46,51 @@ def test_apply_delta_updates_and_deletes_levels() -> None:
     assert seq == 2
     assert bids == {100500: 25}
     assert asks == {102: 4}
+
+
+def test_apply_delta_rejects_malformed_levels_without_advancing_or_mutating() -> None:
+    bids = {100: 5}
+    asks = {200: 3}
+    seq, refresh = apply_delta(
+        bids=bids,
+        asks=asks,
+        current_book_seq=1,
+        delta=OrderBookDeltaUpdate(
+            book_seq_start="2",
+            book_seq_end="2",
+            bids=[("100", "-1"), ("101", "4")],
+        ),
+    )
+    assert refresh is True
+    assert seq == 1
+    assert bids == {100: 5}
+    assert asks == {200: 3}
+
+
+@pytest.mark.parametrize(
+    ("seq_start", "seq_end"),
+    [("9", "2"), ("bad", "2"), ("-1", "2")],
+)
+def test_apply_delta_rejects_invalid_sequences_without_mutating(
+    seq_start: str, seq_end: str
+) -> None:
+    bids = {100: 5}
+    asks = {200: 3}
+    seq, refresh = apply_delta(
+        bids=bids,
+        asks=asks,
+        current_book_seq=3,
+        delta=OrderBookDeltaUpdate(
+            reset=True,
+            book_seq_start=seq_start,
+            book_seq_end=seq_end,
+            bids=[("101", "4")],
+        ),
+    )
+    assert refresh is True
+    assert seq == 3
+    assert bids == {100: 5}
+    assert asks == {200: 3}
 
 
 def test_apply_delta_reset_clears_book() -> None:

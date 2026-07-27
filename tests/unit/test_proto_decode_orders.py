@@ -102,13 +102,26 @@ def test_orders_list_from_proto() -> None:
 def test_get_order_from_proto_includes_trades() -> None:
     msg = GetOrderResponse(
         order=Order(order_id=7, symbol_id=2),
-        trades=[UserTrade(symbol_id=2, match_id=99, order_id=7, side=orders_pb2.BUY)],
+        trades=[
+            UserTrade(
+                symbol_id=2,
+                match_id=99,
+                order_id=7,
+                side=orders_pb2.BUY,
+                fee_scaled=5,
+                fee_source=orders_pb2.RECEIVED,
+                referral_share_scaled=2,
+            )
+        ],
     )
     result = get_order_from_proto(msg)
     assert result.order is not None
     assert result.order.order_id == format_id(7)
     assert len(result.trades) == 1
     assert result.trades[0].match_id == "99"
+    assert result.trades[0].fee_scaled == "5"
+    assert result.trades[0].fee_source == "received"
+    assert result.trades[0].referral_share_scaled == "2"
 
 
 def test_modify_order_from_proto_action_taken_enum() -> None:

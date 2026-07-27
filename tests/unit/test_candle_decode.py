@@ -1,4 +1,11 @@
-from polyester.codecs.decode.market_data import candle_point_from_proto, candles_from_proto
+import pytest
+
+from polyester.codecs.decode.market_data import (
+    candle_point_from_proto,
+    candles_columns_from_proto,
+    candles_from_proto,
+)
+from polyester.errors import PolyesterTransportError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 
 
@@ -45,3 +52,18 @@ def test_candles_from_proto_uses_volume_scale() -> None:
     assert result.timeframe == "1m"
     assert result.candles[0].close == "2"
     assert result.candles[0].volume == "10"
+
+
+def test_candles_columns_rejects_short_parallel_arrays() -> None:
+    response = marketdata_pb2.GetCandlesColumnsResponse(
+        symbol_id=42,
+        timeframe=marketdata_pb2.MIN_1,
+        ts_sec=[1, 2],
+        open=[1, 2],
+        high=[1],
+        low=[1, 2],
+        close=[1, 2],
+        volume=[1, 2],
+    )
+    with pytest.raises(PolyesterTransportError, match="response lengths"):
+        candles_columns_from_proto(response, volume_scale=8)

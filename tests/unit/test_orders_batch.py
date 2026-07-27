@@ -3,6 +3,7 @@ import pytest
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
     batch_create_from_proto,
+    batch_modify_from_proto,
     cancel_all_after_from_proto,
 )
 from polyester.codecs.orders import (
@@ -207,6 +208,45 @@ def test_batch_cancel_from_proto() -> None:
     assert result.rejected_count == 0
     assert result.results[0].order_id == format_id(55)
     assert result.results[0].client_order_id == "cid-x"
+
+
+def test_batch_cancel_rejects_count_mismatch_and_unknown_status() -> None:
+    mismatch = orders_pb2.BatchCancelOrdersResponse(
+        results=[orders_pb2.BatchCancelResultItem(status="accepted")],
+        rejected_count=1,
+    )
+    with pytest.raises(PolyesterTransportError, match="counts do not match"):
+        batch_cancel_from_proto(mismatch)
+
+    unknown = orders_pb2.BatchCancelOrdersResponse(
+        results=[orders_pb2.BatchCancelResultItem(status="maybe")],
+        accepted_count=1,
+    )
+    with pytest.raises(PolyesterTransportError, match="unknown status"):
+        batch_cancel_from_proto(unknown)
+
+
+def test_batch_modify_reconciles_actions_and_counts() -> None:
+    valid = orders_pb2.BatchModifyOrdersResponse(
+        results=[
+            orders_pb2.BatchModifyResultItem(
+                status="modified", action_taken=orders_pb2.AMENDED
+            ),
+            orders_pb2.BatchModifyResultItem(
+                status="modified", action_taken=orders_pb2.REPLACED
+            ),
+            orders_pb2.BatchModifyResultItem(status="rejected"),
+        ],
+        amended_count=1,
+        replaced_count=1,
+        rejected_count=1,
+    )
+    result = batch_modify_from_proto(valid)
+    assert (result.amended_count, result.replaced_count, result.rejected_count) == (1, 1, 1)
+
+    valid.amended_count = 2
+    with pytest.raises(PolyesterTransportError, match="counts do not match"):
+        batch_modify_from_proto(valid)
 
 
 def test_cancel_all_after_from_proto() -> None:

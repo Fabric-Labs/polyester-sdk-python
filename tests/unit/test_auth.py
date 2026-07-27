@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from polyester.auth import (
     API_PRIVATE_KEY_ENV,
+    MAX_SIGNING_FUTURE_SKEW_MS,
     ApiKeyCredentials,
     canonical_query,
     canonical_signing_string,
@@ -132,27 +133,33 @@ def test_ed25519_keypair_repr_redacts_secret() -> None:
     assert secret.hex() not in rendered
 
 
-def test_automatic_timestamps_track_wall_clock_under_concurrency() -> None:
+def test_ten_thousand_identical_requests_get_unique_bounded_auth_tuples() -> None:
     credentials = ApiKeyCredentials(
         key_id="key_123",
         private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
     )
 
-    def sign(_: int) -> dict[str, str]:
-        return sign_request(
+    def sign(_: int) -> tuple[dict[str, str], int]:
+        headers = sign_request(
             credentials,
             method="POST",
             url="https://api.example.test/foo",
             body=b"{}",
         )
+        return headers, time.time_ns() // 1_000_000
 
-    before = int(time.time() * 1000)
+    before = time.time_ns() // 1_000_000
     with ThreadPoolExecutor(max_workers=32) as executor:
-        headers = list(executor.map(sign, range(100_000)))
-    after = int(time.time() * 1000)
+        signed = list(executor.map(sign, range(10_000)))
+    headers = [item[0] for item in signed]
     timestamps = [int(item["X-API-TIMESTAMP"]) for item in headers]
     assert min(timestamps) >= before
-    assert max(timestamps) <= after
+    assert all(
+        int(headers["X-API-TIMESTAMP"]) <= observed_at + MAX_SIGNING_FUTURE_SKEW_MS
+        for headers, observed_at in signed
+    )
+    assert len(set(timestamps)) == 10_000
+    assert len({item["X-API-SIGNATURE"] for item in headers}) == 10_000
 
 
 def test_signing_rejects_malformed_absolute_url() -> None:

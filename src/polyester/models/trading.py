@@ -75,6 +75,8 @@ class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     price: Price | None = None
     qty: Quantity | None = None
     fee_scaled: str = ""
+    fee_source: str = ""
+    referral_share_scaled: str = ""
     ts_ns: str = ""
 
 

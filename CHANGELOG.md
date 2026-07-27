@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.1.0a23
+
+### Fixed
+- Concurrent identical requests receive unique authentication timestamps with a five-second future-skew ceiling. Async Connect/realtime signing uses bounded cooperative backpressure; the synchronous low-level signer returns an immediate retryable capacity error instead of sleeping the caller's thread.
+
+### Clarified
+- Document that `client_order_id` on order create is API-optional; set a stable value when retrying after ambiguous mutation failures.
+
+### Testing
+- A 10,000-identical-request hardening probe verifies unique bounded authentication tuples while an independent event-loop timer continues to run.
+
 ## 0.1.0a22
 
 ### Fixed

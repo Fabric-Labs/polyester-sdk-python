@@ -193,6 +193,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         account: str | dict[str, str] | None = None,
         **kwargs: Any,
     ) -> OrderMutationResult:
+        """Create an order.
+
+        ``client_order_id`` is optional. Set a stable non-empty value when you
+        may retry after an ambiguous failure, and reuse that same id on retry.
+        """
         if account is not None:
             kwargs = {
                 **kwargs,

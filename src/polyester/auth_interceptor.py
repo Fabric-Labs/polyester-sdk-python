@@ -7,7 +7,7 @@ from connectrpc.interceptor import UnaryInterceptor
 from connectrpc.request import RequestContext
 from google.protobuf.message import Message
 
-from polyester.auth import ApiKeyCredentials, sign_request
+from polyester.auth import ApiKeyCredentials, sign_request_async
 
 
 class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
@@ -33,7 +33,7 @@ class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
         info = ctx.method()
         url = f"{self._base_url}/{info.service_name}/{info.name}"
         body = self._codec.encode(request)
-        headers = sign_request(
+        headers = await sign_request_async(
             self._credentials,
             method=ctx.http_method(),
             url=url,

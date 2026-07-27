@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 import threading
@@ -24,24 +25,52 @@ class _SigningTimestampAllocator:
     def __init__(self) -> None:
         self._last_timestamp_ms = 0
         self._lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
 
     def next(self) -> int:
-        started = time.monotonic()
-        while True:
-            now = time.time_ns() // 1_000_000
-            if now < 0:
-                raise PolyesterTransportError("system clock is before UNIX_EPOCH")
-            with self._lock:
-                candidate = max(now, self._last_timestamp_ms + 1)
-                if candidate <= now + MAX_SIGNING_FUTURE_SKEW_MS:
-                    self._last_timestamp_ms = candidate
-                    return candidate
-            if time.monotonic() - started >= _MAX_SIGNING_BACKPRESSURE_SECONDS:
-                raise PolyesterRateLimitError(
-                    "signing timestamp capacity exhausted; retry after clock advances",
-                    retry_after=0.001,
-                )
-            time.sleep(0.001)
+        """Allocate immediately or fail with retryable capacity backpressure.
+
+        Synchronous callers must never sleep an async executor thread. Async
+        SDK transports use :meth:`next_async`, which waits cooperatively.
+        """
+        return self._try_next()
+
+    async def next_async(self) -> int:
+        """Allocate with bounded, cooperative backpressure."""
+
+        async def allocate() -> int:
+            async with self._async_lock:
+                while True:
+                    try:
+                        return self._try_next()
+                    except PolyesterRateLimitError as exc:
+                        await asyncio.sleep(exc.retry_after or 0.001)
+
+        try:
+            return await asyncio.wait_for(
+                allocate(),
+                timeout=_MAX_SIGNING_BACKPRESSURE_SECONDS,
+            )
+        except TimeoutError as exc:
+            raise PolyesterRateLimitError(
+                "signing timestamp capacity exhausted; retry after clock advances",
+                retry_after=0.001,
+            ) from exc
+
+    def _try_next(self) -> int:
+        now = time.time_ns() // 1_000_000
+        if now < 0:
+            raise PolyesterTransportError("system clock is before UNIX_EPOCH")
+        with self._lock:
+            candidate = max(now, self._last_timestamp_ms + 1)
+            if candidate <= now + MAX_SIGNING_FUTURE_SKEW_MS:
+                self._last_timestamp_ms = candidate
+                return candidate
+            wait_seconds = max(0.001, (candidate - (now + MAX_SIGNING_FUTURE_SKEW_MS)) / 1_000)
+        raise PolyesterRateLimitError(
+            "signing timestamp capacity exhausted; retry after clock advances",
+            retry_after=wait_seconds,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +166,42 @@ def sign_request(
     timestamp_ms: str | None = None,
 ) -> dict[str, str]:
     timestamp = timestamp_ms or str(credentials._timestamp_allocator.next())
+    return _sign_request_at_timestamp(
+        credentials,
+        method=method,
+        url=url,
+        body=body,
+        timestamp=timestamp,
+    )
+
+
+async def sign_request_async(
+    credentials: ApiKeyCredentials,
+    *,
+    method: str,
+    url: str,
+    body: bytes = b"",
+    timestamp_ms: str | None = None,
+) -> dict[str, str]:
+    """Sign without blocking an async runtime while timestamp capacity recovers."""
+    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async())
+    return _sign_request_at_timestamp(
+        credentials,
+        method=method,
+        url=url,
+        body=body,
+        timestamp=timestamp,
+    )
+
+
+def _sign_request_at_timestamp(
+    credentials: ApiKeyCredentials,
+    *,
+    method: str,
+    url: str,
+    body: bytes,
+    timestamp: str,
+) -> dict[str, str]:
     canonical = canonical_signing_string(
         timestamp_ms=timestamp,
         method=method,

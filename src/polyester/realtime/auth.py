@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 import httpx
 
-from polyester.auth import ApiKeyCredentials, sign_request
+from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
 
 MAX_TOKEN_RESPONSE_BYTES = 64 * 1024
@@ -113,7 +113,7 @@ async def fetch_rt_token(
     url: str,
     label: str,
 ) -> str:
-    headers = sign_request(credentials, method="GET", url=url, body=b"")
+    headers = await sign_request_async(credentials, method="GET", url=url, body=b"")
     # One absolute wall-clock deadline covers request headers + bounded body.
     # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
     # arrive within the read timeout while the total exceeds the SDK budget.

@@ -37,6 +37,9 @@ jobs:
             exit 1
           fi
 
+      - name: Public disclosure (README / CHANGELOG)
+        run: python scripts/check_public_disclosure.py
+
       # Capability artifacts: refresh + optional bot commit only on main (never on PRs).
       - name: Refresh SDK capability artifacts
         if: >

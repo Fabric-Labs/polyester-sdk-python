@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.correlation_id import optional_client_id
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
@@ -134,8 +135,9 @@ def create_trigger_to_proto(
         symbol=symbol,
         qty_scaled=resolve_qty_scaled(qty, quantity_scale, "qty", symbol=symbol),  # type: ignore[arg-type]
     )
-    if client_trigger_id:
-        intent.client_trigger_id = client_trigger_id
+    validated_trigger_id = optional_client_id(client_trigger_id, "client_trigger_id")
+    if validated_trigger_id:
+        intent.client_trigger_id = validated_trigger_id
     if fee_source is not None:
         fee_key = fee_source.lower()
         if fee_key not in FEE_SOURCE_TO_PROTO:

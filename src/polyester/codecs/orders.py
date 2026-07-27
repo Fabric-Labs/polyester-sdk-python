@@ -7,6 +7,11 @@ import msgspec
 from google.protobuf.json_format import ParseDict
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.correlation_id import (
+    optional_client_id,
+    optional_request_id,
+    required_client_id,
+)
 from polyester.codecs.scalars import id_to_int, omit_none
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
@@ -72,7 +77,7 @@ def create_order_to_wire(
             else None
         ),
         "sub_account_id": request.sub_account_id or None,
-        "client_order_id": request.client_order_id,
+        "client_order_id": optional_client_id(request.client_order_id),
     }
     return omit_none(payload)
 
@@ -102,8 +107,9 @@ def order_intent_from_request(
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
         qty_scaled=resolve_qty_scaled(request.qty, quantity_scale, symbol=request.symbol),
     )
-    if request.client_order_id:
-        intent.client_order_id = request.client_order_id
+    client_order_id = optional_client_id(request.client_order_id)
+    if client_order_id:
+        intent.client_order_id = client_order_id
 
     price_ticks = (
         resolve_price_ticks(request.price, "price", symbol=request.symbol)
@@ -192,7 +198,7 @@ def batch_modify_item_to_proto(
     if order_id is not None:
         proto.order_id = id_to_int(order_id, "order_id")
     if client_order_id:
-        proto.client_order_id = str(client_order_id)
+        proto.client_order_id = required_client_id(str(client_order_id), "client_order_id")
     if new_price is not None:
         proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")
     if new_qty is not None:
@@ -209,7 +215,9 @@ def batch_modify_item_to_proto(
             )
         proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
     if item.get("new_client_order_id"):
-        proto.new_client_order_id = str(item["new_client_order_id"])
+        proto.new_client_order_id = required_client_id(
+            str(item["new_client_order_id"]), "new_client_order_id"
+        )
     return proto
 
 
@@ -226,7 +234,7 @@ def batch_create_orders_to_proto(
     if not items:
         raise PolyesterValidationError("batch_create requires at least one item")
     proto = orders_pb2.BatchCreateOrdersRequest(
-        request_id=request_id or f"batch-create-{uuid.uuid4().hex[:12]}",
+        request_id=optional_request_id(request_id) or f"batch-create-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
@@ -253,7 +261,7 @@ def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelIt
     if order_id is not None:
         proto.order_id = id_to_int(order_id, "order_id")
     if client_order_id:
-        proto.client_order_id = str(client_order_id)
+        proto.client_order_id = required_client_id(str(client_order_id), "client_order_id")
     if symbol_id is not None:
         proto.symbol_id = int(symbol_id)
     return proto
@@ -268,7 +276,7 @@ def batch_cancel_orders_to_proto(
     if not items:
         raise PolyesterValidationError("batch_cancel requires at least one item")
     proto = orders_pb2.BatchCancelOrdersRequest(
-        request_id=request_id or f"batch-cancel-{uuid.uuid4().hex[:12]}",
+        request_id=optional_request_id(request_id) or f"batch-cancel-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
@@ -286,7 +294,7 @@ def cancel_all_after_to_proto(
     request_id: str | None = None,
 ) -> orders_pb2.CancelAllAfterRequest:
     proto = orders_pb2.CancelAllAfterRequest(
-        request_id=request_id or f"cancel-after-{uuid.uuid4().hex[:12]}",
+        request_id=optional_request_id(request_id) or f"cancel-after-{uuid.uuid4().hex[:12]}",
         timeout_sec=timeout_sec,
     )
     if sub_account_id is not None:
@@ -313,7 +321,7 @@ def batch_modify_orders_to_proto(
     if not items:
         raise PolyesterValidationError("batch_modify requires at least one item")
     proto = orders_pb2.BatchModifyOrdersRequest(
-        request_id=request_id or f"batch-mod-{uuid.uuid4().hex[:12]}",
+        request_id=optional_request_id(request_id) or f"batch-mod-{uuid.uuid4().hex[:12]}",
         allow_partial=allow_partial,
     )
     if sub_account_id is not None:
@@ -354,12 +362,12 @@ def modify_order_to_proto(
         )
 
     proto = orders_pb2.ModifyOrderRequest(
-        request_id=request_id or f"mod-{uuid.uuid4().hex[:12]}",
+        request_id=optional_request_id(request_id) or f"mod-{uuid.uuid4().hex[:12]}",
     )
     if order_id is not None:
         proto.order_id = id_to_int(order_id, "order_id")
     if client_order_id:
-        proto.client_order_id = client_order_id
+        proto.client_order_id = required_client_id(client_order_id, "client_order_id")
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if new_price is not None:
@@ -374,7 +382,9 @@ def modify_order_to_proto(
             )
         proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
     if new_client_order_id:
-        proto.new_client_order_id = new_client_order_id
+        proto.new_client_order_id = required_client_id(
+            new_client_order_id, "new_client_order_id"
+        )
     risk = risk_policy_from_dict(new_attached_risk)
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
@@ -390,7 +400,7 @@ def cancel_all_orders_to_proto(
     request_id: str | None = None,
 ) -> orders_pb2.CancelAllOrdersRequest:
     proto = orders_pb2.CancelAllOrdersRequest(
-        request_id=request_id or f"cancel-all-{uuid.uuid4().hex[:12]}",
+        request_id=optional_request_id(request_id) or f"cancel-all-{uuid.uuid4().hex[:12]}",
         dry_run=dry_run,
     )
     if sub_account_id is not None:

@@ -5,6 +5,7 @@ from polyester.codecs.decode.orders import (
     batch_create_from_proto,
     batch_modify_from_proto,
     cancel_all_after_from_proto,
+    cancel_all_from_proto,
 )
 from polyester.codecs.orders import (
     batch_cancel_orders_to_proto,
@@ -259,3 +260,32 @@ def test_cancel_all_after_from_proto() -> None:
     assert result.status == "armed"
     assert result.effective_timeout_sec == 120
     assert result.expires_at_ts_ns == "1700000000000"
+
+
+def test_cancel_all_requires_known_status() -> None:
+    ok = cancel_all_from_proto(
+        orders_pb2.CancelAllOrdersResponse(
+            status="submitted",
+            matched_orders=2,
+            submitted_cancels=2,
+            failed_cancels=1,
+        )
+    )
+    assert ok.status == "submitted"
+    assert ok.failed_cancels == 1
+    assert cancel_all_from_proto(orders_pb2.CancelAllOrdersResponse(status="dry_run")).status == (
+        "dry_run"
+    )
+    for status in ("", "ok", "maybe", "accepted"):
+        with pytest.raises(PolyesterTransportError, match="unknown status"):
+            cancel_all_from_proto(
+                orders_pb2.CancelAllOrdersResponse(status=status, matched_orders=1)
+            )
+
+
+def test_cancel_all_after_rejects_unknown_status() -> None:
+    for status in ("", "ok", "submitted", "maybe"):
+        with pytest.raises(PolyesterTransportError, match="unknown status"):
+            cancel_all_after_from_proto(
+                orders_pb2.CancelAllAfterResponse(status=status, effective_timeout_sec=10)
+            )

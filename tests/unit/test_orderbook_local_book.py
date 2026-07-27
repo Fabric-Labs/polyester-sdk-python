@@ -1,6 +1,11 @@
+import pytest
+
+from polyester.errors import PolyesterValidationError
 from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.local_book import (
     apply_delta,
+    apply_side_delta,
+    bucket_side,
     build_orderbook_data,
     levels_to_map,
     parse_bucket_ticks,
@@ -113,3 +118,32 @@ def test_parse_bucket_ticks() -> None:
     assert parse_bucket_ticks("0.01") == 10_000
     assert parse_bucket_ticks(None) is None
     assert parse_bucket_ticks("not-a-price") is None
+
+
+def test_bucket_side_rounds_asks_up() -> None:
+    book = {101: 2, 105: 3}
+    assert bucket_side(book, 10, asks=False) == {100: 5}
+    assert bucket_side(book, 10, asks=True) == {110: 5}
+
+
+def test_bucket_side_rejects_negative_price() -> None:
+    with pytest.raises(PolyesterValidationError, match="non-negative"):
+        bucket_side({-1: 1}, 10)
+
+
+def test_apply_side_delta_ignores_negative_levels() -> None:
+    book = {100: 5}
+    apply_side_delta(book, [("-1", "3"), ("100", "-2"), ("101", "4")])
+    assert book == {100: 5, 101: 4}
+
+
+def test_build_orderbook_data_rejects_negative_levels() -> None:
+    with pytest.raises(PolyesterValidationError):
+        build_orderbook_data(
+            symbol="ETH-USDT",
+            depth=2,
+            book_seq=3,
+            bids={-5: 1},
+            asks={110: 1},
+            quantity_scale=8,
+        )

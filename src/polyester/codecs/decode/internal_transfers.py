@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.ledger_amounts import LEDGER_SCALE
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.transfer.v1 import internal_transfer_pb2
 from polyester.models import InternalTransferResult
 from polyester.types.money import AssetAmount, QuantityDomain
@@ -15,6 +16,10 @@ def _u128_scaled(msg) -> int:
 def internal_transfer_from_proto(
     msg: internal_transfer_pb2.CreateInternalTransferResponse,
 ) -> InternalTransferResult:
+    if not msg.request_id.strip() or not msg.transfer_id.strip():
+        raise PolyesterResponseContractError(
+            "CreateInternalTransfer", "missing request_id or transfer_id"
+        )
     return InternalTransferResult(
         request_id=msg.request_id,
         transfer_id=msg.transfer_id,

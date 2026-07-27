@@ -40,19 +40,26 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         destination_smart_account_address: str | None = None,
         quantity_scale: int | None = None,
     ) -> InternalTransferResult:
-        if (
-            destination_account_id is None
-            and destination_subaccount_id is None
-            and not destination_smart_account_address
-        ):
+        destination_count = sum(
+            (
+                destination_account_id is not None,
+                destination_subaccount_id is not None,
+                bool(destination_smart_account_address),
+            )
+        )
+        if destination_count != 1:
             raise PolyesterValidationError(
-                "create requires destination_account_id, destination_subaccount_id, "
-                "or destination_smart_account_address"
+                "create requires exactly one of destination_account_id, "
+                "destination_subaccount_id, or destination_smart_account_address"
+            )
+        if not idempotency_key.strip():
+            raise PolyesterValidationError(
+                "create requires a non-empty idempotency_key reused across retries"
             )
         scale = quantity_scale if quantity_scale is not None else LEDGER_SCALE
         request = CreateInternalTransferRequest(
             asset_id=asset_id,
-            amount_e18=str_to_u128_proto(quantity, scale=scale),
+            amount_e18=str_to_u128_proto(quantity, scale=scale, asset_id=asset_id),
             idempotency_key=idempotency_key,
         )
         parsed_sub = parse_optional_subaccount_id(

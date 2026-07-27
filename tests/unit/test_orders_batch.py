@@ -14,7 +14,7 @@ from polyester.codecs.orders import (
     normalize_create_order_request,
 )
 from polyester.codecs.scalars import format_id, id_to_int
-from polyester.errors import PolyesterTransportError, PolyesterValidationError
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import CreateOrderRequest
 
@@ -67,7 +67,7 @@ def test_batch_create_orders_to_proto_from_create_order_request() -> None:
         qty="0.5",
         price="100",
     )
-    proto = batch_create_orders_to_proto(items=[item])
+    proto = batch_create_orders_to_proto(items=[item], quantity_scale=8)
     assert len(proto.items) == 1
     assert proto.items[0].qty_scaled == 50_000_000
     assert proto.items[0].limit_gtc.price_ticks == 100_000_000
@@ -162,7 +162,7 @@ def test_batch_create_rejects_missing_outcome() -> None:
     msg = orders_pb2.BatchCreateOrdersResponse(
         results=[orders_pb2.BatchCreateResultItem(client_order_id="missing")]
     )
-    with pytest.raises(PolyesterTransportError, match="neither accepted nor rejected"):
+    with pytest.raises(PolyesterResponseContractError, match="neither accepted nor rejected"):
         batch_create_from_proto(msg)
 
 
@@ -187,7 +187,7 @@ def test_batch_create_rejects_count_mismatch() -> None:
         ],
         rejected_count=1,
     )
-    with pytest.raises(PolyesterTransportError, match="counts do not match"):
+    with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
         batch_create_from_proto(msg)
 
 
@@ -216,14 +216,14 @@ def test_batch_cancel_rejects_count_mismatch_and_unknown_status() -> None:
         results=[orders_pb2.BatchCancelResultItem(status="accepted")],
         rejected_count=1,
     )
-    with pytest.raises(PolyesterTransportError, match="counts do not match"):
+    with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
         batch_cancel_from_proto(mismatch)
 
     unknown = orders_pb2.BatchCancelOrdersResponse(
         results=[orders_pb2.BatchCancelResultItem(status="maybe")],
         accepted_count=1,
     )
-    with pytest.raises(PolyesterTransportError, match="unknown status"):
+    with pytest.raises(PolyesterResponseContractError, match="unknown status"):
         batch_cancel_from_proto(unknown)
 
 
@@ -246,7 +246,7 @@ def test_batch_modify_reconciles_actions_and_counts() -> None:
     assert (result.amended_count, result.replaced_count, result.rejected_count) == (1, 1, 1)
 
     valid.amended_count = 2
-    with pytest.raises(PolyesterTransportError, match="counts do not match"):
+    with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
         batch_modify_from_proto(valid)
 
 
@@ -266,7 +266,7 @@ def test_cancel_all_requires_known_status() -> None:
     ok = cancel_all_from_proto(
         orders_pb2.CancelAllOrdersResponse(
             status="submitted",
-            matched_orders=2,
+            matched_orders=3,
             submitted_cancels=2,
             failed_cancels=1,
         )
@@ -277,7 +277,7 @@ def test_cancel_all_requires_known_status() -> None:
         "dry_run"
     )
     for status in ("", "ok", "maybe", "accepted"):
-        with pytest.raises(PolyesterTransportError, match="unknown status"):
+        with pytest.raises(PolyesterResponseContractError, match="unknown status"):
             cancel_all_from_proto(
                 orders_pb2.CancelAllOrdersResponse(status=status, matched_orders=1)
             )
@@ -285,7 +285,7 @@ def test_cancel_all_requires_known_status() -> None:
 
 def test_cancel_all_after_rejects_unknown_status() -> None:
     for status in ("", "ok", "submitted", "maybe"):
-        with pytest.raises(PolyesterTransportError, match="unknown status"):
+        with pytest.raises(PolyesterResponseContractError, match="unknown status"):
             cancel_all_after_from_proto(
                 orders_pb2.CancelAllAfterResponse(status=status, effective_timeout_sec=10)
             )

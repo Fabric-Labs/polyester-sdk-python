@@ -24,6 +24,7 @@ async def test_create_to_funding_builds_signed_request() -> None:
             payload_signature=b"\x01\x02",
             idempotency_key="idem-1",
             nonce=42,
+            deadline_ts_sec=1_800_000_000,
         )
     assert isinstance(capture.request, withdraw_pb2.CreateTradingWithdrawRequest)
     assert capture.request.payload.action == withdraw_pb2.TO_FUNDING
@@ -58,6 +59,7 @@ async def test_create_to_external_chain_requires_destination() -> None:
             destination_address="",
             idempotency_key="missing-destination",
             nonce=42,
+            deadline_ts_sec=1_800_000_000,
         )
 
 
@@ -74,6 +76,7 @@ async def test_create_to_external_chain_builds_payload() -> None:
             destination_address="0xabc",
             idempotency_key="ext-1",
             nonce=42,
+            deadline_ts_sec=1_800_000_000,
         )
     assert capture.request.payload.action == withdraw_pb2.TO_EXTERNAL_CHAIN
     assert capture.request.payload.destination_chain_id == 42161
@@ -96,6 +99,7 @@ async def test_create_wallet_trading_withdraw_sets_subaccount_id() -> None:
             payload_signature=b"\xcc",
             signer_wallet="0xsigner",
             nonce=42,
+            deadline_ts_sec=1_800_000_000,
         )
     assert isinstance(capture.request, withdraw_pb2.CreateWalletTradingWithdrawRequest)
     assert capture.request.signer_wallet == "0xsigner"
@@ -112,6 +116,7 @@ async def test_create_to_funding_rejects_empty_idempotency_key() -> None:
             payload_signature=b"\x01",
             idempotency_key="",
             nonce=42,
+            deadline_ts_sec=1_800_000_000,
         )
 
 
@@ -125,4 +130,5 @@ async def test_create_to_funding_rejects_zero_nonce() -> None:
             payload_signature=b"\x01",
             idempotency_key="stable-withdraw",
             nonce=0,
+            deadline_ts_sec=1_800_000_000,
         )

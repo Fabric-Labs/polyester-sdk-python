@@ -17,6 +17,7 @@ from polyester.errors import (
 )
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 _ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
 _EMPTY_ERROR_MESSAGE = "request failed without server error details"
@@ -67,6 +68,8 @@ def map_connect_error(exc: ConnectError):
                 if code_name.startswith("ERROR_CODE_"):
                     return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
+    if is_cloudflare_browser_ban(error_message):
+        return PolyesterTransportError(cloudflare_1010_message())
     if code in ("unauthenticated", "permission_denied"):
         return PolyesterAuthError(error_message)
     if code in ("unavailable", "internal"):

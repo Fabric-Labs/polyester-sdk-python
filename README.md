@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a24`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a25`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a24"
+pip install "polyester-sdk==0.1.0a25"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -87,6 +87,11 @@ Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
 and private key when shown. The private key is only displayed once.
 Open the key's **Permissions**, enable **Spot trading**, select the markets it
 may trade, and set a maximum order size appropriate for the strategy.
+For a subaccount-scoped key, attach an **API-key policy** that grants ledger
+reads for balances and private balance streams, plus Spot trading for order
+mutations. This is separate from the **subaccount policy**: authorization is the
+intersection of both policies, so configuring only the subaccount policy is
+insufficient.
 
 ```python
 import asyncio
@@ -127,6 +132,8 @@ or raw 32-byte key material.
 
 `default_account_id` is the **Account ID** string from your Profile page. Use the
 value exactly as shown in the app. Do not use an internal numeric id.
+An account username is optional; Account-ID-based authentication and private
+channel scoping are valid without one.
 
 `default_account_id` is optional for public market-data calls. It is required for
 account-scoped operations such as private realtime channels, bucket transfers, and
@@ -272,8 +279,9 @@ SDK notes:
 - **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `polyester.chain`).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
   via wallet/smart-account signing in the Polyester app (not an API-key RPC).
-- **Trading → funding:** `client.trading_withdraws.create_to_funding(...)` with a
-  signed intent payload.
+- **Trading → funding:** prepare and persist an exact API-key signature with
+  `client.trading_withdraws.prepare_api_key_to_funding(...)`, then call
+  `submit_prepared(...)`. One-call `create_api_key_to_funding(...)` is also available.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
 
 ```python
@@ -335,6 +343,8 @@ credentials above.
 ```python
 candles = await client.market_data.get_candles(symbol="BTC-USDT", timeframe="1m", limit=50)
 current = await client.market_data.get_current_candle(symbol="BTC-USDT", timeframe="1m")
+if current is not None:
+    print(current.close, current.is_closed)
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 
 subscription = await client.market_data.subscribe_trades(symbol="BNB-USDT")
@@ -344,6 +354,11 @@ async with subscription:
         print(trade.price.ticks if trade.price else None, trade.qty.scaled if trade.qty else None)
         break
 ```
+
+`get_candles()` returns row-oriented candles newest-first (an incomplete open
+candle, when requested, is prepended). `get_candles_columns()` normalizes its
+column response oldest-first. Sort explicitly by `ts_sec` before feeding a
+chronological indicator.
 
 Merged market overview stream (snapshot + live updates). The create call waits
 for the WebSocket handshake and initial snapshot:
@@ -378,6 +393,10 @@ async with sub:
   publications survive a failed snapshot retry and are merged exactly once
   after recovery; cancellation closes the replacement socket. Managed create
   methods await the handshake and initial snapshot before returning.
+- Private order stream quantities are raw scaled values. Their
+  `Quantity.scale` may be `None`; resolve the hydrated catalog scale with
+  `client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)` (or by
+  symbol), then call `quantity.format(scale)`. Never guess or inject scale 8.
 
 ## Sync client
 

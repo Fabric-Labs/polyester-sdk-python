@@ -43,6 +43,14 @@ class PolyesterTransportError(PolyesterError):
     """Raised for network, timeout, or transport/runtime failures."""
 
 
+class PolyesterResponseContractError(PolyesterError):
+    """Raised when a successful mutation response violates its wire contract."""
+
+    def __init__(self, context: str, message: str) -> None:
+        super().__init__(f"{context}: {message}")
+        self.context = context
+
+
 class PolyesterRateLimitError(PolyesterTransportError):
     """Raised when the API returns a rate-limit response."""
 
@@ -111,6 +119,18 @@ class PolyesterRouteNotFoundError(PolyesterApiError):
         self.procedure = procedure
 
 
+def is_not_found(err: BaseException) -> bool:
+    """Return whether an API error means the requested resource is absent.
+
+    Gateway route 404s are intentionally excluded: an unavailable RPC is not a
+    successful idempotent delete/cancel.
+    """
+    if not isinstance(err, PolyesterApiError) or isinstance(err, PolyesterRouteNotFoundError):
+        return False
+    code = str(err.code or "").strip().lower().replace("-", "_")
+    return code == "not_found" or code.endswith("_not_found")
+
+
 class PolyesterRealtimeError(PolyesterError):
     """Raised for realtime connection, subscription, or decode failures."""
 
@@ -138,6 +158,7 @@ def is_retryable_error(err: BaseException) -> bool:
 
 def mutation_outcome_unknown(err: BaseException) -> bool:
     """Return whether the server may have applied a failed mutation."""
-    return isinstance(err, (PolyesterTransportError, PolyesterServerError)) and not isinstance(
-        err, PolyesterRateLimitError
+    return isinstance(err, PolyesterResponseContractError) or (
+        isinstance(err, (PolyesterTransportError, PolyesterServerError))
+        and not isinstance(err, PolyesterRateLimitError)
     )

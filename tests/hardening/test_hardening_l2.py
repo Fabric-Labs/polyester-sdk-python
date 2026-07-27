@@ -30,6 +30,7 @@ from polyester.codecs.orders import quantity_scale_for_symbol, resolve_quantity_
 from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
+    PolyesterResponseContractError,
     PolyesterTransportError,
     PolyesterValidationError,
 )
@@ -1109,7 +1110,7 @@ async def test_l2_batch_cancel_rejects_inconsistent_counts_via_public_service() 
             api_private_key=creds.private_key,
             hydrate_catalogs=False,
         )
-        with pytest.raises(PolyesterTransportError, match="counts do not match"):
+        with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
             await client.orders.batch_cancel(items=[{"order_id": "9"}])
         await client.aclose()
     finally:
@@ -1160,7 +1161,7 @@ async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() 
             hydrate_catalogs=True,
         )
         await client.wait_for_catalogs()
-        with pytest.raises(PolyesterTransportError, match="counts do not match"):
+        with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
             await client.orders.batch_modify(
                 items=[{"order_id": "9", "new_price": "1"}],
                 symbol="BTC-USDT",

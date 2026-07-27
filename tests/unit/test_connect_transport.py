@@ -24,6 +24,7 @@ def test_connect_json_headers() -> None:
     headers = connect_headers(wire_format="json")
     assert headers["Content-Type"] == "application/json"
     assert headers["Connect-Protocol-Version"] == "1"
+    assert headers["User-Agent"].startswith("polyester-sdk-python/")
 
 
 def test_encode_connect_json_body_empty_object() -> None:

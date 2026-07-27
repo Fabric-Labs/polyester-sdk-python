@@ -7,7 +7,8 @@ from urllib.parse import quote
 import httpx
 
 from polyester.auth import ApiKeyCredentials, sign_request_async
-from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
+from polyester.errors import PolyesterAuthError, PolyesterRealtimeError, PolyesterTransportError
+from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 MAX_TOKEN_RESPONSE_BYTES = 64 * 1024
 _MAX_ERROR_BODY_CHARS = 512
@@ -127,6 +128,10 @@ async def fetch_rt_token(
                     # Ensure the streamed peer is aborted promptly on cancel (E6).
                     await response.aclose()
                     raise
+                if response.status_code == 403 and is_cloudflare_browser_ban(
+                    raw.decode("utf-8", errors="replace")
+                ):
+                    raise PolyesterTransportError(cloudflare_1010_message())
                 if response.status_code in (401, 403):
                     raise _auth_http_error(
                         status_code=response.status_code,

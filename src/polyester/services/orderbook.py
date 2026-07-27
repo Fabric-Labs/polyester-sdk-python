@@ -197,7 +197,7 @@ class AsyncOrderbookService(BaseService):
                     on_sequence_gap()
                 stream = stream_holder["stream"]
                 if stream is not None and not stream.is_disposed():
-                    asyncio.get_running_loop().create_task(stream.refresh_snapshot())
+                    stream.request_refresh()
                 return
             emit()
 

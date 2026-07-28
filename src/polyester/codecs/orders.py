@@ -268,12 +268,12 @@ def batch_modify_item_to_proto(
         proto.new_attached_risk.CopyFrom(risk)
     behavior = item.get("behavior")
     if behavior:
-        key = str(behavior).lower()
-        if key not in MODIFY_BEHAVIOR_TO_PROTO:
+        behavior_key = str(behavior).lower()
+        if behavior_key not in MODIFY_BEHAVIOR_TO_PROTO:
             raise PolyesterValidationError(
                 "behavior must be amend_or_replace, amend_only, or replace_only"
             )
-        proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
+        proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
@@ -423,12 +423,12 @@ def modify_order_to_proto(
             "new_qty",
         )
     if behavior:
-        key = behavior.lower()
-        if key not in MODIFY_BEHAVIOR_TO_PROTO:
+        behavior_key = behavior.lower()
+        if behavior_key not in MODIFY_BEHAVIOR_TO_PROTO:
             raise PolyesterValidationError(
                 "behavior must be amend_or_replace, amend_only, or replace_only"
             )
-        proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
+        proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
     if new_client_order_id:
         proto.new_client_order_id = required_client_id(
             new_client_order_id, "new_client_order_id"

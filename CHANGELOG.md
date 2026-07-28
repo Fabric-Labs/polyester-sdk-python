@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Breaking
+- Order lookup/mutation APIs take a typed `OrderKey` (`OrderId` | `ClientOrderId`) instead of dual optional `order_id` / `client_order_id` kwargs. Affects `orders.get`, `orders.cancel`, `orders.modify`, `wait_for_order_trades_complete`, and batch cancel/modify item dicts (`key=` instead of `order_id`/`client_order_id` fields).
+
 ## 0.1.0a25
 
 ### Breaking

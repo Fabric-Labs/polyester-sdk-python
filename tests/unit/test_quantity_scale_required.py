@@ -15,6 +15,7 @@ from polyester.codecs.orders import (
 )
 from polyester.codecs.triggers import quantity_scale_for_symbol as trigger_quantity_scale
 from polyester.errors import PolyesterValidationError
+from polyester.models import OrderId
 from polyester.types.money import Quantity
 
 
@@ -63,7 +64,7 @@ def test_resolve_quantity_scale_allows_scaled_quantity_without_catalog() -> None
 def test_batch_modify_decimal_qty_without_resolved_scale_raises() -> None:
     with pytest.raises(PolyesterValidationError, match="explicit quantity_scale"):
         batch_modify_orders_to_proto(
-            items=[{"order_id": 10, "new_qty": "0.25"}],
+            items=[{"key": OrderId(10), "new_qty": "0.25"}],
         )
 
 
@@ -86,6 +87,6 @@ def test_modify_decimal_qty_without_resolved_scale_raises() -> None:
     with pytest.raises(PolyesterValidationError, match="explicit quantity_scale"):
         modify_order_to_proto(
             symbol="BTC-USD",
-            order_id=1,
+            key=OrderId(1),
             new_qty="0.5",
         )

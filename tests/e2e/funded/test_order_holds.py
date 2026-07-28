@@ -1,5 +1,6 @@
 import pytest
 
+from polyester.models import ClientOrderId
 from tests.e2e.helpers import (
     unique_client_order_id,
     usdt_funded_buy_limit_params,
@@ -66,6 +67,6 @@ async def test_order_hold_visible_while_open(
         )
     finally:
         await live_client.orders.cancel(
-            client_order_id=client_order_id,
+            key=ClientOrderId(client_order_id),
             symbol=trade_symbol,
         )

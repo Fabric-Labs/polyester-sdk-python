@@ -16,6 +16,7 @@ from polyester.codecs.scalars import id_to_int, omit_none
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import CreateOrderRequest
+from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
 from polyester.types.money import Quantity, resolve_price_ticks, resolve_qty_scaled
 
 ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
@@ -26,6 +27,39 @@ MODIFY_BEHAVIOR_TO_PROTO = {
     "amend_only": "AMEND_ONLY",
     "replace_only": "REPLACE_ONLY",
 }
+
+
+def require_order_key(key: OrderKey, op: str) -> OrderKey:
+    """Validate a typed OrderKey for ``op`` (get/cancel/modify/batch)."""
+    if isinstance(key, OrderId):
+        if key.value is None or (isinstance(key.value, str) and key.value.strip() == ""):
+            raise PolyesterValidationError(f"{op} requires a non-empty OrderId")
+        return key
+    if isinstance(key, ClientOrderId):
+        if not str(key.value).strip():
+            raise PolyesterValidationError(f"{op} requires a non-empty ClientOrderId")
+        return key
+    raise PolyesterValidationError(
+        f"{op} requires an OrderKey (OrderId or ClientOrderId)"
+    )
+
+
+def set_order_key(target: Any, key: OrderKey, *, op: str) -> None:
+    """Set proto ``order_id`` / ``client_order_id`` oneof from a typed OrderKey."""
+    key = require_order_key(key, op)
+    if isinstance(key, OrderId):
+        target.order_id = id_to_int(key.value, "order_id")
+    else:
+        target.client_order_id = required_client_id(key.value, "client_order_id")
+
+
+def _item_order_key(item: dict[str, Any], *, label: str) -> OrderKey:
+    if "order_id" in item or "client_order_id" in item:
+        raise PolyesterValidationError(
+            f"{label} items use key=OrderId(...) or key=ClientOrderId(...); "
+            "order_id/client_order_id fields are not accepted"
+        )
+    return require_order_key(item.get("key"), label)  # type: ignore[arg-type]
 
 
 def normalize_create_order_request(
@@ -215,14 +249,7 @@ def batch_modify_item_to_proto(
     *,
     quantity_scale: int,
 ) -> orders_pb2.BatchModifyItem:
-    order_id = item.get("order_id")
-    client_order_id = item.get("client_order_id")
-    has_order_id = order_id is not None
-    has_client_order_id = bool(client_order_id)
-    if has_order_id == has_client_order_id:
-        raise PolyesterValidationError(
-            "each batch item requires exactly one of order_id or client_order_id"
-        )
+    key = _item_order_key(item, label="each batch modify item")
     new_price = item.get("new_price")
     new_qty = item.get("new_qty")
     new_attached_risk = item.get("new_attached_risk")
@@ -231,10 +258,7 @@ def batch_modify_item_to_proto(
             "each batch item requires new_price, new_qty, and/or new_attached_risk"
         )
     proto = orders_pb2.BatchModifyItem()
-    if order_id is not None:
-        proto.order_id = id_to_int(order_id, "order_id")
-    if client_order_id:
-        proto.client_order_id = required_client_id(str(client_order_id), "client_order_id")
+    set_order_key(proto, key, op="each batch modify item")
     if new_price is not None:
         proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")
     if new_qty is not None:
@@ -284,20 +308,10 @@ def batch_create_orders_to_proto(
 
 
 def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelItem:
-    order_id = item.get("order_id")
-    client_order_id = item.get("client_order_id")
+    key = _item_order_key(item, label="each batch cancel item")
     symbol_id = item.get("symbol_id")
-    has_order_id = order_id is not None
-    has_client_order_id = bool(client_order_id)
-    if has_order_id == has_client_order_id:
-        raise PolyesterValidationError(
-            "each batch cancel item requires exactly one of order_id or client_order_id"
-        )
     proto = orders_pb2.BatchCancelItem()
-    if order_id is not None:
-        proto.order_id = id_to_int(order_id, "order_id")
-    if client_order_id:
-        proto.client_order_id = required_client_id(str(client_order_id), "client_order_id")
+    set_order_key(proto, key, op="each batch cancel item")
     if symbol_id is not None:
         proto.symbol_id = int(symbol_id)
     return proto
@@ -379,8 +393,7 @@ def batch_modify_orders_to_proto(
 def modify_order_to_proto(
     *,
     symbol: str,
-    order_id: str | int | None = None,
-    client_order_id: str | None = None,
+    key: OrderKey,
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
     new_price: object | None = None,
@@ -390,10 +403,6 @@ def modify_order_to_proto(
     new_client_order_id: str | None = None,
     quantity_scale: int | None = None,
 ) -> orders_pb2.ModifyOrderRequest:
-    has_order_id = order_id is not None
-    has_client_order_id = bool(client_order_id)
-    if has_order_id == has_client_order_id:
-        raise PolyesterValidationError("modify requires exactly one of order_id or client_order_id")
     if not new_price and not new_qty and not new_attached_risk:
         raise PolyesterValidationError(
             "modify requires new_price, new_qty, and/or new_attached_risk"
@@ -402,10 +411,7 @@ def modify_order_to_proto(
     proto = orders_pb2.ModifyOrderRequest(
         request_id=optional_request_id(request_id) or f"mod-{uuid.uuid4().hex[:12]}",
     )
-    if order_id is not None:
-        proto.order_id = id_to_int(order_id, "order_id")
-    if client_order_id:
-        proto.client_order_id = required_client_id(client_order_id, "client_order_id")
+    set_order_key(proto, key, op="modify")
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if new_price is not None:

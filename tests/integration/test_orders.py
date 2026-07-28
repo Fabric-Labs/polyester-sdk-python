@@ -1,6 +1,6 @@
 import pytest
 
-from polyester.models import OrdersList
+from polyester.models import ClientOrderId, OrderId, OrdersList
 
 
 @pytest.mark.integration
@@ -22,12 +22,12 @@ async def test_orders_get_round_trips_list_open(live_client):
     if not listed.orders:
         pytest.skip("no open orders on devnet; cannot round-trip orders.get")
     sample = listed.orders[0]
-    by_order_id = await live_client.orders.get(order_id=sample.order_id)
+    by_order_id = await live_client.orders.get(key=OrderId(sample.order_id))
     assert by_order_id.order is not None
     assert by_order_id.order.order_id == sample.order_id
     assert by_order_id.order.symbol_id == sample.symbol_id
     if sample.client_order_id:
-        by_client_id = await live_client.orders.get(client_order_id=sample.client_order_id)
+        by_client_id = await live_client.orders.get(key=ClientOrderId(sample.client_order_id))
         assert by_client_id.order is not None
         assert by_client_id.order.client_order_id == sample.client_order_id
 

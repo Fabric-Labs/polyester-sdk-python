@@ -16,7 +16,7 @@ from polyester.codecs.orders import (
 from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
-from polyester.models import CreateOrderRequest
+from polyester.models import ClientOrderId, CreateOrderRequest, OrderId
 
 
 def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
@@ -82,8 +82,8 @@ def test_batch_cancel_orders_to_proto() -> None:
     proto = batch_cancel_orders_to_proto(
         items=[
             # "10" is pure decimal (not a canonical base58 encoding).
-            {"order_id": "10", "symbol_id": 3},
-            {"client_order_id": "cid-9", "symbol_id": 5},
+            {"key": OrderId("10"), "symbol_id": 3},
+            {"key": ClientOrderId("cid-9"), "symbol_id": 5},
         ],
         sub_account_id="99",
         request_id="req-cancel-1",
@@ -97,11 +97,13 @@ def test_batch_cancel_orders_to_proto() -> None:
     assert proto.items[1].symbol_id == 5
 
 
-def test_batch_cancel_item_requires_one_target() -> None:
+def test_batch_cancel_item_requires_order_key() -> None:
     with pytest.raises(PolyesterValidationError):
         batch_cancel_orders_to_proto(items=[{}])
-    with pytest.raises(PolyesterValidationError):
+    with pytest.raises(PolyesterValidationError, match="not accepted"):
         batch_cancel_orders_to_proto(items=[{"order_id": "1", "client_order_id": "cid"}])
+    with pytest.raises(PolyesterValidationError, match="not accepted"):
+        batch_cancel_orders_to_proto(items=[{"order_id": "1"}])
 
 
 def test_batch_cancel_requires_items() -> None:

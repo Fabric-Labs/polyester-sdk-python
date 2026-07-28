@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 
 from polyester import AsyncPolyester
+from polyester.models import ClientOrderId
 from tests.e2e.helpers import unique_client_order_id
 from tests.helpers import (
     FAR_ABOVE_BUY_STOP_PRICE_HINTS,
@@ -47,7 +48,7 @@ async def _wait_for_filled_order(client, client_order_id: str, *, timeout: float
     attempts = max(1, int(timeout / 0.5))
     last_detail = None
     for _ in range(attempts):
-        detail = await client.orders.get(client_order_id=client_order_id)
+        detail = await client.orders.get(key=ClientOrderId(client_order_id))
         last_detail = detail
         if detail.order is not None and detail.order.status == "filled" and detail.trades:
             return detail

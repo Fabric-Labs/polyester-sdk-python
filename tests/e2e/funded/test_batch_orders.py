@@ -1,5 +1,6 @@
 import pytest
 
+from polyester.models import ClientOrderId
 from tests.e2e.helpers import (
     unique_client_order_id,
     usdt_funded_buy_limit_params,
@@ -74,8 +75,8 @@ async def test_batch_create_and_cancel(
     try:
         cancelled = await live_client.orders.batch_cancel(
             items=[
-                {"client_order_id": cid1, "symbol_id": symbol_id},
-                {"client_order_id": cid2, "symbol_id": symbol_id},
+                {"key": ClientOrderId(cid1), "symbol_id": symbol_id},
+                {"key": ClientOrderId(cid2), "symbol_id": symbol_id},
             ],
         )
         assert cancelled.accepted_count == 2

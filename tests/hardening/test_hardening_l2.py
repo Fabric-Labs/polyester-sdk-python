@@ -22,6 +22,7 @@ from polyester.auth import (
     ApiKeyCredentials,
     sign_request_async,
 )
+from polyester.models import OrderId
 from polyester.catalogs import CatalogManager
 from polyester.chain.rpc import MAX_JSONRPC_RESPONSE_BYTES, JsonRpcClient, JsonRpcError
 from polyester.codecs import MAX_PROTOCOL_SCALE, format_qty_scaled
@@ -1111,7 +1112,7 @@ async def test_l2_batch_cancel_rejects_inconsistent_counts_via_public_service() 
             hydrate_catalogs=False,
         )
         with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
-            await client.orders.batch_cancel(items=[{"order_id": "9"}])
+            await client.orders.batch_cancel(items=[{"key": OrderId("9")}])
         await client.aclose()
     finally:
         await http.aclose()
@@ -1163,7 +1164,7 @@ async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() 
         await client.wait_for_catalogs()
         with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
             await client.orders.batch_modify(
-                items=[{"order_id": "9", "new_price": "1"}],
+                items=[{"key": OrderId("9"), "new_price": "1"}],
                 symbol="BTC-USDT",
             )
         await client.aclose()
@@ -1305,7 +1306,7 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
             timeout=5.0,
         )
         result = await client.orders.wait_for_order_trades_complete(
-            order_id=1,
+            key=OrderId(1),
             timeout=2.0,
             poll_interval=0.05,
         )

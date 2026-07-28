@@ -187,6 +187,7 @@ helper, not the primary integration pattern.
 
 ```python
 from polyester import AsyncPolyester
+from polyester.models import ClientOrderId
 
 async with AsyncPolyester(
     api_key_id="ak_...",
@@ -206,7 +207,7 @@ async with AsyncPolyester(
     )
     print(result.status, result.order_id)
 
-    await client.orders.cancel(client_order_id="my-bot-001")
+    await client.orders.cancel(key=ClientOrderId("my-bot-001"))
 ```
 
 `client_order_id` is **optional** (matches the API). Omit it for one-shot

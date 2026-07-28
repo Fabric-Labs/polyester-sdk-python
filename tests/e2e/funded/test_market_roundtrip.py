@@ -9,6 +9,7 @@ import os
 import pytest
 
 from polyester import AsyncPolyester, is_not_found
+from polyester.models import ClientOrderId
 from polyester.types.money import Quantity
 from tests.e2e.helpers import unique_client_order_id, wait_for_terminal_order
 from tests.helpers import (
@@ -82,7 +83,7 @@ async def _cancel_open_test_orders(client, cids: set[str]) -> list[str]:
             continue
         try:
             await client.orders.cancel(
-                client_order_id=order.client_order_id,
+                key=ClientOrderId(order.client_order_id),
                 symbol=order.symbol,
             )
         except Exception as exc:  # noqa: BLE001
@@ -207,7 +208,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         if filled <= 0:
             _poly3028_skip("buy produced no fill (cum_qty<=0)")
         buy_projection = await live_client.orders.wait_for_order_trades_complete(
-            client_order_id=buy_cid,
+            key=ClientOrderId(buy_cid),
             timeout=20,
         )
         received_fee = sum(

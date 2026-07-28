@@ -1,5 +1,6 @@
 import pytest
 
+from polyester.models import ClientOrderId
 from tests.e2e.helpers import (
     unique_client_order_id,
     usdt_funded_buy_limit_params,
@@ -54,14 +55,14 @@ async def test_order_round_trip(
     assert open_order.order_id == created.order_id
     assert open_order.status
 
-    order_detail = await live_client.orders.get(client_order_id=client_order_id)
+    order_detail = await live_client.orders.get(key=ClientOrderId(client_order_id))
     assert order_detail.order is not None
     assert order_detail.order.client_order_id == client_order_id
     assert order_detail.order.order_id == created.order_id
 
     try:
         cancelled = await live_client.orders.cancel(
-            client_order_id=client_order_id,
+            key=ClientOrderId(client_order_id),
             symbol=trade_symbol,
         )
         assert cancelled.status

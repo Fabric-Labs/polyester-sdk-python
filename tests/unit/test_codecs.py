@@ -19,6 +19,7 @@ from polyester.codecs.orders import (
 from polyester.codecs.triggers import modify_trigger_to_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
+from polyester.models import ClientOrderId
 
 
 def test_decimal_codecs_are_exact_integer_scaled() -> None:
@@ -65,12 +66,12 @@ def test_create_order_rejects_float_qty() -> None:
         normalize_create_order_request(symbol="BTC-USD", side="buy", order_type="limit", qty=0.1)
 
 
-def test_modify_order_to_proto_requires_one_order_key() -> None:
-    with pytest.raises(PolyesterValidationError):
+def test_modify_order_to_proto_requires_order_key() -> None:
+    with pytest.raises(TypeError):
         modify_order_to_proto(symbol="BTC-USD", new_price="100")
     proto = modify_order_to_proto(
         symbol="BTC-USD",
-        client_order_id="cid-1",
+        key=ClientOrderId("cid-1"),
         new_price="100",
     )
     assert proto.client_order_id == "cid-1"

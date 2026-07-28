@@ -6,7 +6,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.correlation_id import required_client_id
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
     batch_create_from_proto,
@@ -29,9 +28,9 @@ from polyester.codecs.orders import (
     normalize_create_order_request,
     parse_optional_subaccount_id,
     resolve_quantity_scale,
+    set_order_key,
 )
 from polyester.codecs.realtime_decode import decode_order_bytes
-from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterTransportError, PolyesterValidationError
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
@@ -51,6 +50,7 @@ from polyester.models import (
     GetOrderResult,
     ModifyOrderResult,
     Order,
+    OrderKey,
     OrderMutationResult,
     OrdersList,
 )
@@ -157,28 +157,22 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     async def get(
         self,
         *,
+        key: OrderKey,
         account: AccountScope | None = None,
-        order_id: str | int | None = None,
-        client_order_id: str | None = None,
         sub_account_id: str | None = None,
         include_attached_risk: bool = False,
         include_attached_risk_state: bool = False,
     ) -> GetOrderResult:
-        if order_id is None and client_order_id is None:
-            raise ValueError("get requires order_id or client_order_id")
         request = GetOrderRequest(
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
         )
+        set_order_key(request, key, op="get")
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        if order_id is not None:
-            request.order_id = id_to_int(order_id, "order_id")
-        if client_order_id:
-            request.client_order_id = required_client_id(client_order_id, "client_order_id")
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
@@ -237,15 +231,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     async def cancel(
         self,
         *,
+        key: OrderKey,
         account: AccountScope | None = None,
-        order_id: str | int | None = None,
-        client_order_id: str | None = None,
         symbol: str | None = None,
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
     ) -> OrderMutationResult:
-        if order_id is None and client_order_id is None:
-            raise PolyesterValidationError("cancel requires order_id or client_order_id")
         if symbol is not None and symbol_id is not None:
             raise PolyesterValidationError("cancel accepts only one of symbol or symbol_id")
         if symbol is not None:
@@ -256,10 +247,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 label="cancel",
             )
         request = CancelOrderRequest()
-        if order_id is not None:
-            request.order_id = id_to_int(order_id, "order_id")
-        if client_order_id:
-            request.client_order_id = required_client_id(client_order_id, "client_order_id")
+        set_order_key(request, key, op="cancel")
         if symbol_id is not None:
             request.symbol_id = symbol_id
         parsed_sub = parse_optional_subaccount_id(
@@ -278,10 +266,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     async def modify(
         self,
         *,
-        account: AccountScope | None = None,
+        key: OrderKey,
         symbol: str,
-        order_id: str | int | None = None,
-        client_order_id: str | None = None,
+        account: AccountScope | None = None,
         sub_account_id: str | None = None,
         request_id: str | None = None,
         new_price: object | None = None,
@@ -294,8 +281,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
         proto_request = modify_order_to_proto(
             symbol=symbol,
-            order_id=order_id,
-            client_order_id=client_order_id,
+            key=key,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             new_price=new_price,
@@ -472,8 +458,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     async def wait_for_order_trades_complete(
         self,
         *,
-        order_id: str | int | None = None,
-        client_order_id: str | None = None,
+        key: OrderKey,
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         timeout: float = 10.0,
@@ -487,8 +472,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         """
         return await wait_for_order_trades_complete(
             self,
-            order_id=order_id,
-            client_order_id=client_order_id,
+            key=key,
             account=account,
             sub_account_id=sub_account_id,
             timeout=timeout,
@@ -499,33 +483,26 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
 async def wait_for_order_trades_complete(
     orders: AsyncOrdersService,
     *,
-    order_id: str | int | None = None,
-    client_order_id: str | None = None,
+    key: OrderKey,
     account: AccountScope | None = None,
     sub_account_id: str | None = None,
     timeout: float = 10.0,
     poll_interval: float = 0.1,
 ) -> GetOrderResult:
     """Poll until ``sum(trade.qty) == order.cum_qty`` or ``timeout`` elapses."""
-    if order_id is None and client_order_id is None:
-        raise PolyesterValidationError(
-            "wait_for_order_trades_complete requires order_id or client_order_id"
-        )
     deadline = time.monotonic() + max(timeout, 0.0)
     last: GetOrderResult | None = None
     while True:
         last = await orders.get(
+            key=key,
             account=account,
-            order_id=order_id,
-            client_order_id=client_order_id,
             sub_account_id=sub_account_id,
         )
         if _order_trades_projection_complete(last):
             return last
         if time.monotonic() >= deadline:
             raise PolyesterTransportError(
-                "timed out waiting for order trades to match cum_qty "
-                f"(order_id={order_id!r}, client_order_id={client_order_id!r})"
+                f"timed out waiting for order trades to match cum_qty (key={key!r})"
             )
         await asyncio.sleep(max(poll_interval, 0.0))
 

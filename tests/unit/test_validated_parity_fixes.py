@@ -30,6 +30,7 @@ from polyester.codecs.withdraw import str_to_u128_proto, trading_withdraw_payloa
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2
+from polyester.models import OrderId
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.orders import AsyncOrdersService
@@ -188,9 +189,20 @@ def test_response_contract_classification_and_required_entities() -> None:
 async def test_cancel_symbol_routing_rejects_both_and_unknown() -> None:
     service = AsyncOrdersService(None, SimpleNamespace(symbol_id_for_symbol=lambda _s: None), None)
     with pytest.raises(PolyesterValidationError, match="only one"):
-        await service.cancel(order_id=1, symbol="BTC-USDT", symbol_id=7)
+        await service.cancel(key=OrderId(1), symbol="BTC-USDT", symbol_id=7)
     with pytest.raises(PolyesterValidationError, match="Unknown symbol"):
-        await service.cancel(order_id=1, symbol="UNKNOWN")
+        await service.cancel(key=OrderId(1), symbol="UNKNOWN")
+
+
+@pytest.mark.asyncio
+async def test_cancel_requires_typed_order_key() -> None:
+    service = AsyncOrdersService(None, SimpleNamespace(symbol_id_for_symbol=lambda _s: 1), None)
+    with pytest.raises(TypeError):
+        await service.cancel()
+    with pytest.raises(PolyesterValidationError, match="OrderKey"):
+        await service.cancel(key="not-a-key")  # type: ignore[arg-type]
+    with pytest.raises(PolyesterValidationError, match="non-empty OrderId"):
+        await service.cancel(key=OrderId(""))
 
 
 def test_attached_risk_rejects_dead_trigger_price_source() -> None:

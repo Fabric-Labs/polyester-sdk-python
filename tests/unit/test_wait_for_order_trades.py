@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from polyester.errors import PolyesterTransportError
+from polyester.models import OrderId
 from polyester.models.trading import GetOrderResult, Order, UserTrade
 from polyester.services.orders import wait_for_order_trades_complete
 from polyester.types.money import Quantity
@@ -37,7 +38,7 @@ async def test_wait_for_order_trades_complete_resolves_when_sum_matches() -> Non
     orders.get = AsyncMock(side_effect=fake_get)
     result = await wait_for_order_trades_complete(
         orders,
-        order_id=1,
+        key=OrderId(1),
         timeout=2.0,
         poll_interval=0.01,
     )
@@ -57,7 +58,7 @@ async def test_wait_for_order_trades_complete_times_out() -> None:
     with pytest.raises(PolyesterTransportError, match="timed out"):
         await wait_for_order_trades_complete(
             orders,
-            order_id=1,
+            key=OrderId(1),
             timeout=0.05,
             poll_interval=0.01,
         )

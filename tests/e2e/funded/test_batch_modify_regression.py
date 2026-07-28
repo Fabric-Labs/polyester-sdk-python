@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import pytest
 
+from polyester.models import ClientOrderId
 from tests.e2e.helpers import unique_client_order_id, wait_for_open_order
 from tests.helpers import (
     FAR_BELOW_BUY_PRICE_HINTS,
@@ -123,7 +124,7 @@ async def test_batch_modify_five_rounds_of_forty(
             new_cids = [unique_client_order_id(f"bm-r{round_i}-{i}") for i in range(40)]
             items = [
                 {
-                    "client_order_id": cid,
+                    "key": ClientOrderId(cid),
                     "new_price": modify_price,
                     "new_client_order_id": new_cid,
                 }

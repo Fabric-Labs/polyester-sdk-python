@@ -42,6 +42,42 @@ def test_trigger_from_proto_maps_stop_price() -> None:
     assert trigger.details is not None and trigger.details.case == "stop"
 
 
+def test_trigger_from_proto_projects_twap_child_orders_and_executed_qty() -> None:
+    msg = triggers_pb2.Trigger(
+        trigger_id=11,
+        symbol_id=1,
+        symbol="BTC-USDT",
+        status=triggers_pb2.STATUS_RUNNING,
+        qty_scaled=100_000_000,
+        twap=triggers_pb2.TwapTrigger(
+            side=orders_pb2.BUY,
+            duration_ms=60_000,
+            slice_interval_ms=5_000,
+            market_ioc=triggers_pb2.TwapMarketIoc(),
+        ),
+        twap_state=triggers_pb2.TwapDetails(
+            twap_duration_ms=60_000,
+            twap_slice_interval_ms=5_000,
+            slice_idx=2,
+            slice_count=12,
+            executed_qty_scaled=25_000_000,
+        ),
+        child_order_ids=[101, 202],
+        client_trigger_id="twap-1",
+    )
+    trigger = trigger_from_proto(msg)
+    assert trigger.trigger_type == "twap"
+    assert trigger.side == "buy"
+    assert trigger.order_type == "market"
+    assert trigger.child_order_ids == [format_id(101), format_id(202)]
+    assert trigger.details is not None and trigger.details.case == "twap"
+    assert trigger.details.twap is not None
+    assert trigger.details.twap.slice_idx == 2
+    assert trigger.details.twap.slice_count == 12
+    assert trigger.details.twap.executed_qty is not None
+    assert trigger.details.twap.executed_qty.scaled == 25_000_000
+
+
 def test_trigger_status_from_label() -> None:
     from polyester.codecs.decode.triggers import trigger_status_from_label
 

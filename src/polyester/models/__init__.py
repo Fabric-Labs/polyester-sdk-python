@@ -57,6 +57,7 @@ from polyester.models.market import (
     MarketTrade,
     MarketTradesResult,
 )
+from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
 from polyester.models.policies import (
     ApiPoliciesList,
     ApiPolicy,
@@ -174,6 +175,7 @@ __all__ = [
     "CancelAllAfterResult",
     "CancelAllOrdersResult",
     "Candle",
+    "ClientOrderId",
     "CreateGuardSignerWalletResult",
     "CreateOrderRequest",
     "CreateOrderResult",
@@ -213,6 +215,8 @@ __all__ = [
     "ModifyOrderResult",
     "OpenOrdersResult",
     "Order",
+    "OrderId",
+    "OrderKey",
     "OrderMutationResult",
     "OrderbookData",
     "OrderbookLevel",

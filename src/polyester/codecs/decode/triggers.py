@@ -133,6 +133,7 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
         )
     if has_field(msg, "twap_state"):
         twap = msg.twap_state
+        executed_scaled = int(twap.executed_qty_scaled)
         return TriggerDetails(
             case="twap",
             twap=TriggerTwapDetails(
@@ -140,10 +141,15 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
                 twap_slice_interval_ms=int(twap.twap_slice_interval_ms),
                 slice_idx=int(twap.slice_idx),
                 slice_count=int(twap.slice_count),
-                executed_qty=Quantity.from_scaled(
-                    int(twap.executed_qty_scaled),
-                    symbol=symbol,
-                    symbol_id=symbol_id,
+                # Match Rust/TS: only surface executed qty when the wire value is set.
+                executed_qty=(
+                    Quantity.from_scaled(
+                        executed_scaled,
+                        symbol=symbol,
+                        symbol_id=symbol_id,
+                    )
+                    if executed_scaled
+                    else None
                 ),
             ),
         )

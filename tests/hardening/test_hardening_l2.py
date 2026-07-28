@@ -41,6 +41,7 @@ from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
+from polyester.models import OrderId
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncRealtimeClient
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.transport import MAX_CONNECT_RESPONSE_BYTES
@@ -1111,7 +1112,7 @@ async def test_l2_batch_cancel_rejects_inconsistent_counts_via_public_service() 
             hydrate_catalogs=False,
         )
         with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
-            await client.orders.batch_cancel(items=[{"order_id": "9"}])
+            await client.orders.batch_cancel(items=[{"key": OrderId("9")}])
         await client.aclose()
     finally:
         await http.aclose()
@@ -1163,7 +1164,7 @@ async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() 
         await client.wait_for_catalogs()
         with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
             await client.orders.batch_modify(
-                items=[{"order_id": "9", "new_price": "1"}],
+                items=[{"key": OrderId("9"), "new_price": "1"}],
                 symbol="BTC-USDT",
             )
         await client.aclose()
@@ -1305,7 +1306,7 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
             timeout=5.0,
         )
         result = await client.orders.wait_for_order_trades_complete(
-            order_id=1,
+            key=OrderId(1),
             timeout=2.0,
             poll_interval=0.05,
         )

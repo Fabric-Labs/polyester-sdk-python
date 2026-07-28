@@ -4,7 +4,7 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.correlation_id import optional_client_id, optional_request_id
 from polyester.codecs.orders import cancel_all_orders_to_proto, create_order_to_proto
 from polyester.errors import PolyesterValidationError
-from polyester.models import CreateOrderRequest
+from polyester.models import ClientOrderId, CreateOrderRequest
 from polyester.services.orders import AsyncOrdersService
 
 
@@ -41,6 +41,6 @@ def test_order_encoders_reject_invalid_correlation_ids() -> None:
 async def test_singular_order_methods_reject_invalid_client_order_id_before_transport() -> None:
     service = AsyncOrdersService(None, CatalogManager(), None)
     with pytest.raises(PolyesterValidationError, match="invalid characters"):
-        await service.cancel(client_order_id="bad id!")
+        await service.cancel(key=ClientOrderId("bad id!"))
     with pytest.raises(PolyesterValidationError, match="invalid characters"):
-        await service.get(client_order_id="bad id!")
+        await service.get(key=ClientOrderId("bad id!"))

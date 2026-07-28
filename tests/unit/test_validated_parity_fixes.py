@@ -30,9 +30,9 @@ from polyester.codecs.withdraw import str_to_u128_proto, trading_withdraw_payloa
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2
+from polyester.models import OrderId
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.services.internal_transfers import AsyncInternalTransfersService
-from polyester.models import OrderId
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.withdraw import AsyncWithdrawService, PreparedTradingWithdraw
 

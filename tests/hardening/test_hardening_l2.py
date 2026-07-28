@@ -22,7 +22,6 @@ from polyester.auth import (
     ApiKeyCredentials,
     sign_request_async,
 )
-from polyester.models import OrderId
 from polyester.catalogs import CatalogManager
 from polyester.chain.rpc import MAX_JSONRPC_RESPONSE_BYTES, JsonRpcClient, JsonRpcError
 from polyester.codecs import MAX_PROTOCOL_SCALE, format_qty_scaled
@@ -42,6 +41,7 @@ from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
+from polyester.models import OrderId
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncRealtimeClient
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.transport import MAX_CONNECT_RESPONSE_BYTES

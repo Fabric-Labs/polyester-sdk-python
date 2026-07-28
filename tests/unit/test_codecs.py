@@ -11,6 +11,7 @@ from polyester.codecs import (
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import (
     cancel_all_orders_to_proto,
+    create_order_to_proto,
     create_order_to_wire,
     modify_order_to_proto,
     normalize_create_order_request,
@@ -23,6 +24,29 @@ from polyester.gen.ledger.read.v1 import ledger_read_pb2
 def test_decimal_codecs_are_exact_integer_scaled() -> None:
     assert parse_price_ticks("50000.123456") == 50_000_123_456
     assert parse_qty_scaled("0.10000000", 8) == 10_000_000
+
+
+def test_price_rejects_trailing_dot_and_accepts_trimmed_whitespace() -> None:
+    with pytest.raises(PolyesterValidationError):
+        parse_price_ticks("65000.")
+    with pytest.raises(PolyesterValidationError):
+        parse_price_ticks("65.")
+    # Leading/trailing whitespace is trimmed (TS value.trim() parity).
+    assert parse_price_ticks(" 65000") == 65_000_000_000
+    assert parse_price_ticks("65000 ") == 65_000_000_000
+    assert parse_price_ticks("65000.0") == 65_000_000_000
+
+
+def test_create_order_rejects_stray_price_on_market() -> None:
+    req = normalize_create_order_request(
+        symbol="BTC-USDT",
+        side="buy",
+        order_type="market",
+        qty="0.01",
+        price="65000",
+    )
+    with pytest.raises(PolyesterValidationError, match="price is not valid for market"):
+        create_order_to_proto(req, quantity_scale=8)
 
 
 def test_price_ticks_round_trip() -> None:

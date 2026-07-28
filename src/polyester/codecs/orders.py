@@ -137,6 +137,11 @@ def order_intent_from_request(
     if request.order_type == "market":
         if request.post_only:
             raise PolyesterValidationError("post_only is only valid for limit GTC orders")
+        if request.price is not None:
+            raise PolyesterValidationError(
+                "price is not valid for market orders; "
+                "use market_client_ref_price for a reservation reference"
+            )
         market = intent.market_ioc
         market.SetInParent()
         if request.market_client_ref_price is not None:

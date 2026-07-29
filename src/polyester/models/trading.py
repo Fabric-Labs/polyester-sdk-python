@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 import msgspec
 
+from polyester.models.order_key import OrderKey
 from polyester.types.money import AssetAmount, Price, Quantity
 
 
@@ -343,18 +345,49 @@ class TransferDestinationsList(msgspec.Struct, kw_only=True, omit_defaults=True)
     destinations: list[TransferDestination]
 
 
-class BatchModifyResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+class BatchReplaceItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    key: OrderKey
+    new_price: Any | None = None
+    new_qty: Any | None = None
+    new_client_order_id: str | None = None
+
+
+class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    item_index: int
     status: str = ""
     client_order_id: str = ""
-    final_order_id: str = ""
+    old_order_id: str = ""
+    replacement_order_id: str = ""
     code: str = ""
 
 
-class BatchModifyOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
-    results: list[BatchModifyResultItem]
-    amended_count: int = 0
-    replaced_count: int = 0
+class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    batch_request_id: str
+    status: str
+    results: list[BatchReplaceAdmissionItem]
+    accepted_count: int = 0
     rejected_count: int = 0
+    accepted_ts_ns: int = 0
+
+
+class BatchReplaceStatusItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    item_index: int
+    phase: str
+    old_order_id: str = ""
+    replacement_order_id: str = ""
+    order_status: str = ""
+    code: str = ""
+    updated_ts_ns: int = 0
+
+
+class BatchReplaceStatusResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    batch_request_id: str
+    admission_status: str
+    items: list[BatchReplaceStatusItem]
+    accepted_count: int = 0
+    rejected_count: int = 0
+    accepted_ts_ns: int = 0
+    updated_ts_ns: int = 0
 
 
 class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):

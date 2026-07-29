@@ -15,7 +15,7 @@ from polyester.codecs.correlation_id import (
 from polyester.codecs.scalars import id_to_int, omit_none
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
-from polyester.models import CreateOrderRequest
+from polyester.models import BatchReplaceItem, CreateOrderRequest
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
 from polyester.types.money import Quantity, resolve_price_ticks, resolve_qty_scaled
 
@@ -244,36 +244,31 @@ def risk_policy_from_dict(data: dict[str, Any] | None) -> orders_pb2.RiskPolicy 
     return risk
 
 
-def batch_modify_item_to_proto(
-    item: dict[str, Any],
+def batch_replace_item_to_proto(
+    item: BatchReplaceItem | dict[str, Any],
     *,
     quantity_scale: int,
-) -> orders_pb2.BatchModifyItem:
-    key = _item_order_key(item, label="each batch modify item")
+) -> orders_pb2.BatchReplaceOrderItem:
+    if isinstance(item, BatchReplaceItem):
+        item = {
+            "key": item.key,
+            "new_price": item.new_price,
+            "new_qty": item.new_qty,
+            "new_client_order_id": item.new_client_order_id,
+        }
+    key = _item_order_key(item, label="each batch replace item")
     new_price = item.get("new_price")
     new_qty = item.get("new_qty")
-    new_attached_risk = item.get("new_attached_risk")
-    if not new_price and not new_qty and not new_attached_risk:
+    if new_price is None and new_qty is None:
         raise PolyesterValidationError(
-            "each batch item requires new_price, new_qty, and/or new_attached_risk"
+            "each batch item requires new_price and/or new_qty"
         )
-    proto = orders_pb2.BatchModifyItem()
-    set_order_key(proto, key, op="each batch modify item")
+    proto = orders_pb2.BatchReplaceOrderItem()
+    set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
         proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")
     if new_qty is not None:
         proto.new_qty_scaled = resolve_qty_scaled(new_qty, quantity_scale, "new_qty")
-    risk = risk_policy_from_dict(new_attached_risk)
-    if risk is not None:
-        proto.new_attached_risk.CopyFrom(risk)
-    behavior = item.get("behavior")
-    if behavior:
-        behavior_key = str(behavior).lower()
-        if behavior_key not in MODIFY_BEHAVIOR_TO_PROTO:
-            raise PolyesterValidationError(
-                "behavior must be amend_or_replace, amend_only, or replace_only"
-            )
-        proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
@@ -359,34 +354,28 @@ def cancel_all_after_to_proto(
     return proto
 
 
-def batch_modify_orders_to_proto(
+def batch_replace_orders_to_proto(
     *,
-    items: list[dict[str, Any]],
+    items: list[BatchReplaceItem | dict[str, Any]],
+    symbol_id: int,
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
-    behavior_default: str | None = None,
-    allow_partial: bool = False,
     quantity_scale: int | None = None,
-) -> orders_pb2.BatchModifyOrdersRequest:
+) -> orders_pb2.BatchReplaceOrdersRequest:
     if not items:
-        raise PolyesterValidationError("batch_modify requires at least one item")
-    proto = orders_pb2.BatchModifyOrdersRequest(
-        request_id=optional_request_id(request_id) or f"batch-mod-{uuid.uuid4().hex[:12]}",
-        allow_partial=allow_partial,
+        raise PolyesterValidationError("batch_replace requires at least one item")
+    if symbol_id <= 0:
+        raise PolyesterValidationError("batch_replace requires a resolved symbol_id")
+    proto = orders_pb2.BatchReplaceOrdersRequest(
+        symbol_id=symbol_id,
+        request_id=optional_request_id(request_id) or f"batch-replace-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
-    if behavior_default:
-        key = behavior_default.lower()
-        if key not in MODIFY_BEHAVIOR_TO_PROTO:
-            raise PolyesterValidationError(
-                "behavior_default must be amend_or_replace, amend_only, or replace_only"
-            )
-        proto.behavior_default = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[key])
     for item in items:
-        new_qty = item.get("new_qty")
+        new_qty = item.new_qty if isinstance(item, BatchReplaceItem) else item.get("new_qty")
         item_scale = _codec_quantity_scale(new_qty, quantity_scale) if new_qty is not None else 0
-        proto.items.append(batch_modify_item_to_proto(item, quantity_scale=item_scale))
+        proto.items.append(batch_replace_item_to_proto(item, quantity_scale=item_scale))
     return proto
 
 

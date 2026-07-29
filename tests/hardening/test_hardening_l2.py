@@ -1119,7 +1119,7 @@ async def test_l2_batch_cancel_rejects_inconsistent_counts_via_public_service() 
 
 
 @pytest.mark.asyncio
-async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() -> None:
+async def test_l2_batch_replace_rejects_inconsistent_counts_via_public_service() -> None:
     spot = marketdata_pb2.GetSpotConfigResponse(
         pairs=[
             marketdata_pb2.PairConfig(
@@ -1132,12 +1132,14 @@ async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() 
     zipper = zipper_pb2.GetDepositWithdrawConfigResponse(
         assets=[zipper_pb2.AssetConfig(asset="USDT", ledger_id=99, quantity_scale=6)]
     )
-    response = orders_pb2.BatchModifyOrdersResponse(
+    response = orders_pb2.BatchReplaceOrdersResponse(
+        batch_request_id=1,
+        status=orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
         results=[
-            orders_pb2.BatchModifyResultItem(
-                status="modified",
-                action_taken=orders_pb2.AMENDED,
-                final_order_id=9,
+            orders_pb2.BatchReplaceAdmissionItem(
+                item_index=0,
+                status=orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED,
+                replacement_order_id=9,
             )
         ],
         rejected_count=1,
@@ -1148,7 +1150,7 @@ async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() 
             return connect_proto_response(spot.SerializeToString())
         if "GetDepositWithdrawConfig" in req.path:
             return connect_proto_response(zipper.SerializeToString())
-        if "BatchModifyOrders" in req.path:
+        if "BatchReplaceOrders" in req.path:
             return connect_proto_response(response.SerializeToString())
         return HttpScript.not_found()
 
@@ -1163,7 +1165,7 @@ async def test_l2_batch_modify_rejects_inconsistent_counts_via_public_service() 
         )
         await client.wait_for_catalogs()
         with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
-            await client.orders.batch_modify(
+            await client.orders.batch_replace(
                 items=[{"key": OrderId("9"), "new_price": "1"}],
                 symbol="BTC-USDT",
             )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
 from polyester.errors import PolyesterResponseContractError
-from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOpenOrdersResponse,
     GetOrderHistoryResponse,
@@ -17,8 +17,10 @@ from polyester.models import (
     BatchCancelResultItem,
     BatchCreateOrdersResult,
     BatchCreateResultItem,
-    BatchModifyOrdersResult,
-    BatchModifyResultItem,
+    BatchReplaceAdmissionItem,
+    BatchReplaceOrdersResult,
+    BatchReplaceStatusItem,
+    BatchReplaceStatusResult,
     CancelAllAfterResult,
     CancelAllOrdersResult,
     GetOrderResult,
@@ -245,66 +247,132 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
     )
 
 
-def batch_modify_from_proto(msg: orders_pb2.BatchModifyOrdersResponse) -> BatchModifyOrdersResult:
-    decoded_amended = 0
-    decoded_replaced = 0
+def _batch_replace_admission_status(value: int) -> str:
+    mapping = {
+        orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED: "admitted",
+        orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED: "partially_admitted",
+        orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_REJECTED: "rejected",
+    }
+    return mapping.get(value, "")
+
+
+def _batch_replace_item_admission_status(value: int) -> str:
+    mapping = {
+        orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED: "admitted",
+        orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED: "rejected",
+    }
+    return mapping.get(value, "")
+
+
+def _batch_replace_phase(value: int) -> str:
+    mapping = {
+        orders_read_pb2.BATCH_REPLACE_PHASE_ADMITTED: "admitted",
+        orders_read_pb2.BATCH_REPLACE_PHASE_WORKING: "working",
+        orders_read_pb2.BATCH_REPLACE_PHASE_REJECTED: "rejected",
+        orders_read_pb2.BATCH_REPLACE_PHASE_TERMINAL: "terminal",
+    }
+    return mapping.get(value, "")
+
+
+def batch_replace_from_proto(
+    msg: orders_pb2.BatchReplaceOrdersResponse,
+) -> BatchReplaceOrdersResult:
+    if not msg.batch_request_id:
+        raise PolyesterResponseContractError("BatchReplaceOrders", "missing batch_request_id")
+    status = _batch_replace_admission_status(msg.status)
+    if not status:
+        raise PolyesterResponseContractError(
+            "BatchReplaceOrders", f"unknown admission status: {msg.status}"
+        )
+    decoded_accepted = 0
     decoded_rejected = 0
     for item in msg.results:
-        status = item.status.lower()
-        if status == "rejected":
-            if int(item.action_taken) != 0:
-                raise PolyesterResponseContractError(
-                    "BatchModifyOrders",
-                    "batch modify rejected result unexpectedly carries an action"
-                )
+        item_status = _batch_replace_item_admission_status(item.status)
+        if item_status == "admitted":
+            decoded_accepted += 1
+        elif item_status == "rejected":
             decoded_rejected += 1
-        elif status == "modified":
-            action = proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken)
-            if action == "amended":
-                decoded_amended += 1
-            elif action == "replaced":
-                decoded_replaced += 1
-            else:
-                raise PolyesterResponseContractError(
-                    "BatchModifyOrders",
-                    f"batch modify response has unknown action: {action}",
-                )
         else:
             raise PolyesterResponseContractError(
-                "BatchModifyOrders",
-                f"batch modify response has unknown status: {item.status}"
+                "BatchReplaceOrders",
+                f"batch replace response has unknown item status: {item.status}",
             )
 
     results = [
-        BatchModifyResultItem(
-            status=item.status,
+        BatchReplaceAdmissionItem(
+            item_index=int(item.item_index),
+            status=_batch_replace_item_admission_status(item.status),
             client_order_id=item.client_order_id,
-            final_order_id=format_uint64_id(item.final_order_id) if item.final_order_id else "",
+            old_order_id=format_uint64_id(item.old_order_id) if item.old_order_id else "",
+            replacement_order_id=(
+                format_uint64_id(item.replacement_order_id) if item.replacement_order_id else ""
+            ),
             code=item.code,
         )
         for item in msg.results
     ]
-    amended_count = int(msg.amended_count)
-    replaced_count = int(msg.replaced_count)
+    accepted_count = int(msg.accepted_count)
     rejected_count = int(msg.rejected_count)
     if (
-        amended_count != decoded_amended
-        or replaced_count != decoded_replaced
+        accepted_count != decoded_accepted
         or rejected_count != decoded_rejected
-        or amended_count + replaced_count + rejected_count != len(results)
+        or accepted_count + rejected_count != len(results)
     ):
         raise PolyesterResponseContractError(
-            "BatchModifyOrders",
-            "batch modify response counts do not match decoded outcomes: "
-            f"amended={amended_count}/{decoded_amended} "
-            f"replaced={replaced_count}/{decoded_replaced} "
+            "BatchReplaceOrders",
+            "batch replace response counts do not match decoded outcomes: "
+            f"accepted={accepted_count}/{decoded_accepted} "
             f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
         )
-    return BatchModifyOrdersResult(
+    return BatchReplaceOrdersResult(
+        batch_request_id=format_uint64_id(msg.batch_request_id),
+        status=status,
         results=results,
-        amended_count=amended_count,
-        replaced_count=replaced_count,
+        accepted_count=accepted_count,
         rejected_count=rejected_count,
+        accepted_ts_ns=int(msg.accepted_ts_ns),
+    )
+
+
+def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
+    if not msg.batch_request_id:
+        raise PolyesterResponseContractError("GetBatchReplaceStatus", "missing batch_request_id")
+    admission_status = _batch_replace_admission_status(msg.admission_status)
+    if not admission_status:
+        raise PolyesterResponseContractError(
+            "GetBatchReplaceStatus",
+            f"unknown admission status: {msg.admission_status}",
+        )
+    items: list[BatchReplaceStatusItem] = []
+    for item in msg.items:
+        phase = _batch_replace_phase(item.phase)
+        if not phase:
+            raise PolyesterResponseContractError(
+                "GetBatchReplaceStatus", f"unknown batch replace phase: {item.phase}"
+            )
+        items.append(
+            BatchReplaceStatusItem(
+                item_index=int(item.item_index),
+                phase=phase,
+                old_order_id=format_uint64_id(item.old_order_id) if item.old_order_id else "",
+                replacement_order_id=(
+                    format_uint64_id(item.replacement_order_id)
+                    if item.replacement_order_id
+                    else ""
+                ),
+                order_status=proto_enum_name(OrderStatus, item.order_status),
+                code=item.code,
+                updated_ts_ns=int(item.updated_ts_ns),
+            )
+        )
+    return BatchReplaceStatusResult(
+        batch_request_id=format_uint64_id(msg.batch_request_id),
+        admission_status=admission_status,
+        items=items,
+        accepted_count=int(msg.accepted_count),
+        rejected_count=int(msg.rejected_count),
+        accepted_ts_ns=int(msg.accepted_ts_ns),
+        updated_ts_ns=int(msg.updated_ts_ns),
     )
 
 

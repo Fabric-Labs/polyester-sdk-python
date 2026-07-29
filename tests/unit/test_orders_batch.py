@@ -3,20 +3,22 @@ import pytest
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
     batch_create_from_proto,
-    batch_modify_from_proto,
+    batch_replace_from_proto,
+    batch_replace_status_from_proto,
     cancel_all_after_from_proto,
     cancel_all_from_proto,
 )
 from polyester.codecs.orders import (
     batch_cancel_orders_to_proto,
     batch_create_orders_to_proto,
+    batch_replace_orders_to_proto,
     cancel_all_after_to_proto,
     normalize_create_order_request,
 )
 from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
-from polyester.gen.orders.v1 import orders_pb2
-from polyester.models import ClientOrderId, CreateOrderRequest, OrderId
+from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
+from polyester.models import BatchReplaceItem, ClientOrderId, CreateOrderRequest, OrderId
 
 
 def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
@@ -229,27 +231,81 @@ def test_batch_cancel_rejects_count_mismatch_and_unknown_status() -> None:
         batch_cancel_from_proto(unknown)
 
 
-def test_batch_modify_reconciles_actions_and_counts() -> None:
-    valid = orders_pb2.BatchModifyOrdersResponse(
-        results=[
-            orders_pb2.BatchModifyResultItem(
-                status="modified", action_taken=orders_pb2.AMENDED
-            ),
-            orders_pb2.BatchModifyResultItem(
-                status="modified", action_taken=orders_pb2.REPLACED
-            ),
-            orders_pb2.BatchModifyResultItem(status="rejected"),
+def test_batch_replace_encodes_admission_request() -> None:
+    proto = batch_replace_orders_to_proto(
+        items=[
+            BatchReplaceItem(
+                key=OrderId(10),
+                new_price="100",
+                new_qty="0.25",
+                new_client_order_id="replacement-cid",
+            )
         ],
-        amended_count=1,
-        replaced_count=1,
+        symbol_id=7,
+        sub_account_id="123",
+        request_id="request-1",
+        quantity_scale=6,
+    )
+    assert proto.symbol_id == 7
+    assert proto.request_id == "request-1"
+    assert proto.subaccount_id == id_to_int("123")
+    assert proto.items[0].order_id == 10
+    assert proto.items[0].new_price_ticks == 100_000_000
+    assert proto.items[0].new_qty_scaled == 250_000
+    assert proto.items[0].new_client_order_id == "replacement-cid"
+
+
+def test_batch_replace_reconciles_admission_counts() -> None:
+    valid = orders_pb2.BatchReplaceOrdersResponse(
+        batch_request_id=77,
+        status=orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED,
+        results=[
+            orders_pb2.BatchReplaceAdmissionItem(
+                item_index=0,
+                status=orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED,
+                old_order_id=10,
+                replacement_order_id=11,
+            ),
+            orders_pb2.BatchReplaceAdmissionItem(
+                item_index=1,
+                status=orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED,
+                code="conflict",
+            ),
+        ],
+        accepted_count=1,
         rejected_count=1,
     )
-    result = batch_modify_from_proto(valid)
-    assert (result.amended_count, result.replaced_count, result.rejected_count) == (1, 1, 1)
+    result = batch_replace_from_proto(valid)
+    assert result.status == "partially_admitted"
+    assert (result.accepted_count, result.rejected_count) == (1, 1)
+    assert result.results[0].old_order_id == format_id(10)
 
-    valid.amended_count = 2
+    valid.accepted_count = 2
     with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
-        batch_modify_from_proto(valid)
+        batch_replace_from_proto(valid)
+
+
+def test_batch_replace_status_decodes_phases() -> None:
+    result = batch_replace_status_from_proto(
+        orders_read_pb2.GetBatchReplaceStatusResponse(
+            batch_request_id=77,
+            admission_status=orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
+            items=[
+                orders_read_pb2.BatchReplaceStatusItem(
+                    item_index=0,
+                    phase=orders_read_pb2.BATCH_REPLACE_PHASE_WORKING,
+                    old_order_id=10,
+                    replacement_order_id=11,
+                    order_status=orders_read_pb2.WORKING,
+                    updated_ts_ns=123,
+                )
+            ],
+        )
+    )
+    assert result.batch_request_id == format_id(77)
+    assert result.admission_status == "admitted"
+    assert result.items[0].phase == "working"
+    assert result.items[0].updated_ts_ns == 123
 
 
 def test_cancel_all_after_from_proto() -> None:

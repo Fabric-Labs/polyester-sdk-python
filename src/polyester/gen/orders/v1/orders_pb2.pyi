@@ -110,6 +110,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_MAX_SLIPPAGE_INVALID: _ClassVar[ErrorCode]
     ERROR_CODE_STALE_QUOTE: _ClassVar[ErrorCode]
     ERROR_CODE_VALIDATION_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_OVERLOADED: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -136,6 +137,19 @@ class ModifyActionTaken(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MODIFY_ACTION_UNSPECIFIED: _ClassVar[ModifyActionTaken]
     AMENDED: _ClassVar[ModifyActionTaken]
     REPLACED: _ClassVar[ModifyActionTaken]
+
+class BatchReplaceAdmissionStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED: _ClassVar[BatchReplaceAdmissionStatus]
+    BATCH_REPLACE_ADMISSION_STATUS_ADMITTED: _ClassVar[BatchReplaceAdmissionStatus]
+    BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED: _ClassVar[BatchReplaceAdmissionStatus]
+    BATCH_REPLACE_ADMISSION_STATUS_REJECTED: _ClassVar[BatchReplaceAdmissionStatus]
+
+class BatchReplaceItemAdmissionStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED: _ClassVar[BatchReplaceItemAdmissionStatus]
+    BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED: _ClassVar[BatchReplaceItemAdmissionStatus]
+    BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED: _ClassVar[BatchReplaceItemAdmissionStatus]
 SIDE_UNSPECIFIED: Side
 BUY: Side
 SELL: Side
@@ -216,6 +230,7 @@ ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID: ErrorCode
 ERROR_CODE_MAX_SLIPPAGE_INVALID: ErrorCode
 ERROR_CODE_STALE_QUOTE: ErrorCode
 ERROR_CODE_VALIDATION_ERROR: ErrorCode
+ERROR_CODE_OVERLOADED: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -230,6 +245,13 @@ REPLACE_ONLY: ModifyBehavior
 MODIFY_ACTION_UNSPECIFIED: ModifyActionTaken
 AMENDED: ModifyActionTaken
 REPLACED: ModifyActionTaken
+BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED: BatchReplaceAdmissionStatus
+BATCH_REPLACE_ADMISSION_STATUS_ADMITTED: BatchReplaceAdmissionStatus
+BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED: BatchReplaceAdmissionStatus
+BATCH_REPLACE_ADMISSION_STATUS_REJECTED: BatchReplaceAdmissionStatus
+BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED: BatchReplaceItemAdmissionStatus
+BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED: BatchReplaceItemAdmissionStatus
+BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED: BatchReplaceItemAdmissionStatus
 
 class MarketIoc(_message.Message):
     __slots__ = ("max_slippage_ticks", "max_slippage_bps", "client_ref_price_ticks")
@@ -569,75 +591,67 @@ class ModifyOrderResponse(_message.Message):
     ts_ns: int
     def __init__(self, action_taken: _Optional[_Union[ModifyActionTaken, str]] = ..., old_order_id: _Optional[int] = ..., final_order_id: _Optional[int] = ..., code: _Optional[str] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
-class BatchModifyItem(_message.Message):
-    __slots__ = ("order_id", "client_order_id", "new_price_ticks", "new_qty_scaled", "new_attached_risk", "behavior", "new_client_order_id")
+class BatchReplaceOrderItem(_message.Message):
+    __slots__ = ("order_id", "client_order_id", "new_price_ticks", "new_qty_scaled", "new_attached_risk", "new_client_order_id")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     NEW_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     NEW_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     NEW_ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
-    BEHAVIOR_FIELD_NUMBER: _ClassVar[int]
     NEW_CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     order_id: int
     client_order_id: str
     new_price_ticks: int
     new_qty_scaled: int
     new_attached_risk: RiskPolicy
-    behavior: ModifyBehavior
     new_client_order_id: str
-    def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., new_price_ticks: _Optional[int] = ..., new_qty_scaled: _Optional[int] = ..., new_attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ..., behavior: _Optional[_Union[ModifyBehavior, str]] = ..., new_client_order_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., new_price_ticks: _Optional[int] = ..., new_qty_scaled: _Optional[int] = ..., new_attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ..., new_client_order_id: _Optional[str] = ...) -> None: ...
 
-class BatchModifyResultItem(_message.Message):
-    __slots__ = ("status", "action_taken", "old_order_id", "final_order_id", "client_order_id", "code", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
+class BatchReplaceAdmissionItem(_message.Message):
+    __slots__ = ("item_index", "status", "old_order_id", "replacement_order_id", "client_order_id", "code")
+    ITEM_INDEX_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    ACTION_TAKEN_FIELD_NUMBER: _ClassVar[int]
     OLD_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    FINAL_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    REPLACEMENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
-    TAKE_PROFIT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    STOP_LOSS_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    TRAILING_STOP_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
-    status: str
-    action_taken: ModifyActionTaken
+    item_index: int
+    status: BatchReplaceItemAdmissionStatus
     old_order_id: int
-    final_order_id: int
+    replacement_order_id: int
     client_order_id: str
     code: str
-    take_profit_trigger_id: int
-    stop_loss_trigger_id: int
-    trailing_stop_trigger_id: int
-    def __init__(self, status: _Optional[str] = ..., action_taken: _Optional[_Union[ModifyActionTaken, str]] = ..., old_order_id: _Optional[int] = ..., final_order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, item_index: _Optional[int] = ..., status: _Optional[_Union[BatchReplaceItemAdmissionStatus, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ...) -> None: ...
 
-class BatchModifyOrdersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "request_id", "items", "behavior_default", "allow_partial")
+class BatchReplaceOrdersRequest(_message.Message):
+    __slots__ = ("subaccount_id", "symbol_id", "request_id", "items")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     ITEMS_FIELD_NUMBER: _ClassVar[int]
-    BEHAVIOR_DEFAULT_FIELD_NUMBER: _ClassVar[int]
-    ALLOW_PARTIAL_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
+    symbol_id: int
     request_id: str
-    items: _containers.RepeatedCompositeFieldContainer[BatchModifyItem]
-    behavior_default: ModifyBehavior
-    allow_partial: bool
-    def __init__(self, subaccount_id: _Optional[int] = ..., request_id: _Optional[str] = ..., items: _Optional[_Iterable[_Union[BatchModifyItem, _Mapping]]] = ..., behavior_default: _Optional[_Union[ModifyBehavior, str]] = ..., allow_partial: _Optional[bool] = ...) -> None: ...
+    items: _containers.RepeatedCompositeFieldContainer[BatchReplaceOrderItem]
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., request_id: _Optional[str] = ..., items: _Optional[_Iterable[_Union[BatchReplaceOrderItem, _Mapping]]] = ...) -> None: ...
 
-class BatchModifyOrdersResponse(_message.Message):
-    __slots__ = ("results", "amended_count", "replaced_count", "rejected_count", "ts", "ts_ns")
+class BatchReplaceOrdersResponse(_message.Message):
+    __slots__ = ("batch_request_id", "status", "results", "accepted_count", "rejected_count", "accepted_ts", "accepted_ts_ns")
+    BATCH_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
     RESULTS_FIELD_NUMBER: _ClassVar[int]
-    AMENDED_COUNT_FIELD_NUMBER: _ClassVar[int]
-    REPLACED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_COUNT_FIELD_NUMBER: _ClassVar[int]
     REJECTED_COUNT_FIELD_NUMBER: _ClassVar[int]
-    TS_FIELD_NUMBER: _ClassVar[int]
-    TS_NS_FIELD_NUMBER: _ClassVar[int]
-    results: _containers.RepeatedCompositeFieldContainer[BatchModifyResultItem]
-    amended_count: int
-    replaced_count: int
+    ACCEPTED_TS_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    batch_request_id: int
+    status: BatchReplaceAdmissionStatus
+    results: _containers.RepeatedCompositeFieldContainer[BatchReplaceAdmissionItem]
+    accepted_count: int
     rejected_count: int
-    ts: _timestamp_pb2.Timestamp
-    ts_ns: int
-    def __init__(self, results: _Optional[_Iterable[_Union[BatchModifyResultItem, _Mapping]]] = ..., amended_count: _Optional[int] = ..., replaced_count: _Optional[int] = ..., rejected_count: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    accepted_ts: _timestamp_pb2.Timestamp
+    accepted_ts_ns: int
+    def __init__(self, batch_request_id: _Optional[int] = ..., status: _Optional[_Union[BatchReplaceAdmissionStatus, str]] = ..., results: _Optional[_Iterable[_Union[BatchReplaceAdmissionItem, _Mapping]]] = ..., accepted_count: _Optional[int] = ..., rejected_count: _Optional[int] = ..., accepted_ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_ts_ns: _Optional[int] = ...) -> None: ...
 
 class BatchCancelItem(_message.Message):
     __slots__ = ("order_id", "client_order_id", "symbol_id")

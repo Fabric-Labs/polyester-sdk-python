@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Breaking
+- Replaced `orders.batch_modify` with `orders.batch_replace`. The new write returns an admission receipt (`batch_request_id`, admission outcomes, and accepted/rejected counts), without behavior or partial-execution options. Poll `orders.get_batch_replace_status(batch_request_id=...)` for execution phases.
+
 ## 0.1.0a26
 
 ### Breaking

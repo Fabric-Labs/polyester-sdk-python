@@ -9,7 +9,8 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
     batch_create_from_proto,
-    batch_modify_from_proto,
+    batch_replace_from_proto,
+    batch_replace_status_from_proto,
     cancel_all_after_from_proto,
     cancel_all_from_proto,
     get_order_from_proto,
@@ -20,7 +21,7 @@ from polyester.codecs.decode.orders import (
 from polyester.codecs.orders import (
     batch_cancel_orders_to_proto,
     batch_create_orders_to_proto,
-    batch_modify_orders_to_proto,
+    batch_replace_orders_to_proto,
     cancel_all_after_to_proto,
     cancel_all_orders_to_proto,
     create_order_to_proto,
@@ -31,11 +32,13 @@ from polyester.codecs.orders import (
     set_order_key,
 )
 from polyester.codecs.realtime_decode import decode_order_bytes
+from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterTransportError, PolyesterValidationError
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import (
+    GetBatchReplaceStatusRequest,
     GetOpenOrdersRequest,
     GetOrderHistoryRequest,
     GetOrderRequest,
@@ -43,7 +46,9 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
 from polyester.models import (
     BatchCancelOrdersResult,
     BatchCreateOrdersResult,
-    BatchModifyOrdersResult,
+    BatchReplaceItem,
+    BatchReplaceOrdersResult,
+    BatchReplaceStatusResult,
     CancelAllAfterResult,
     CancelAllOrdersResult,
     CreateOrderRequest,
@@ -324,37 +329,63 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             cancel_all_from_proto,
         )
 
-    async def batch_modify(
+    async def batch_replace(
         self,
         *,
         account: AccountScope | None = None,
-        items: list[dict],
+        items: list[BatchReplaceItem | dict],
         sub_account_id: str | None = None,
-        symbol: str | None = None,
+        symbol: str,
         request_id: str | None = None,
-        behavior_default: str | None = None,
-        allow_partial: bool = False,
-    ) -> BatchModifyOrdersResult:
+    ) -> BatchReplaceOrdersResult:
         await self._ensure_catalogs()
+        symbol_id = resolve_symbol_id(
+            self._catalogs, symbol=symbol, symbol_id=None, label="batch_replace"
+        )
         scale = resolve_quantity_scale(
             self._catalogs,
             symbol,
-            *(item.get("new_qty") for item in items),
+            *(
+                item.new_qty if isinstance(item, BatchReplaceItem) else item.get("new_qty")
+                for item in items
+            ),
         )
-        proto_request = batch_modify_orders_to_proto(
+        proto_request = batch_replace_orders_to_proto(
             items=items,
+            symbol_id=symbol_id,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
-            behavior_default=behavior_default,
-            allow_partial=allow_partial,
             quantity_scale=scale,
         )
         return await unary_auth_decoded(
             self._transport,
             OrdersServiceClient,
-            lambda client, req: client.batch_modify_orders(req),
+            lambda client, req: client.batch_replace_orders(req),
             proto_request,
-            batch_modify_from_proto,
+            batch_replace_from_proto,
+        )
+
+    async def get_batch_replace_status(
+        self,
+        *,
+        batch_request_id: str,
+        account: AccountScope | None = None,
+        sub_account_id: str | None = None,
+    ) -> BatchReplaceStatusResult:
+        request = GetBatchReplaceStatusRequest(
+            batch_request_id=id_to_int(batch_request_id, "batch_request_id")
+        )
+        parsed_sub = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(sub_account_id, account=account)
+        )
+        if parsed_sub is not None:
+            request.subaccount_id = parsed_sub
+        return await unary_auth_decoded(
+            self._transport,
+            OrdersReadServiceClient,
+            lambda client, req: client.get_batch_replace_status(req),
+            request,
+            batch_replace_status_from_proto,
         )
 
     async def batch_create(

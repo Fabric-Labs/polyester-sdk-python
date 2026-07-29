@@ -21,6 +21,14 @@ class OrderStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CANCELED: _ClassVar[OrderStatus]
     REJECTED: _ClassVar[OrderStatus]
 
+class BatchReplacePhase(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BATCH_REPLACE_PHASE_UNSPECIFIED: _ClassVar[BatchReplacePhase]
+    BATCH_REPLACE_PHASE_ADMITTED: _ClassVar[BatchReplacePhase]
+    BATCH_REPLACE_PHASE_WORKING: _ClassVar[BatchReplacePhase]
+    BATCH_REPLACE_PHASE_REJECTED: _ClassVar[BatchReplacePhase]
+    BATCH_REPLACE_PHASE_TERMINAL: _ClassVar[BatchReplacePhase]
+
 class OrderOriginScope(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     ORDER_ORIGIN_SCOPE_UNSPECIFIED: _ClassVar[OrderOriginScope]
@@ -44,6 +52,11 @@ WORKING: OrderStatus
 FILLED: OrderStatus
 CANCELED: OrderStatus
 REJECTED: OrderStatus
+BATCH_REPLACE_PHASE_UNSPECIFIED: BatchReplacePhase
+BATCH_REPLACE_PHASE_ADMITTED: BatchReplacePhase
+BATCH_REPLACE_PHASE_WORKING: BatchReplacePhase
+BATCH_REPLACE_PHASE_REJECTED: BatchReplacePhase
+BATCH_REPLACE_PHASE_TERMINAL: BatchReplacePhase
 ORDER_ORIGIN_SCOPE_UNSPECIFIED: OrderOriginScope
 DIRECT: OrderOriginScope
 ATTACHED_RISK: OrderOriginScope
@@ -141,7 +154,7 @@ class AttachedRisk(_message.Message):
     def __init__(self, take_profit: _Optional[_Union[AttachedRiskTakeProfit, _Mapping]] = ..., stop_loss: _Optional[_Union[AttachedRiskStopLoss, _Mapping]] = ..., trailing_stop: _Optional[_Union[AttachedRiskTrailingStop, _Mapping]] = ..., oco: _Optional[bool] = ...) -> None: ...
 
 class Order(_message.Message):
-    __slots__ = ("order_id", "symbol_id", "client_order_id", "side", "status", "order_type", "time_in_force", "self_trade_prevention_mode", "fee_source", "post_only", "orig_qty_scaled", "cum_qty_scaled", "leaves_qty_scaled", "avg_price_ticks", "price_ticks", "created_ts_ns", "terminal_ts_ns", "terminal_reason_code", "terminal_reason", "attached_risk", "origin", "market_client_ref_price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "version")
+    __slots__ = ("order_id", "symbol_id", "client_order_id", "side", "status", "order_type", "time_in_force", "self_trade_prevention_mode", "fee_source", "post_only", "orig_qty_scaled", "cum_qty_scaled", "leaves_qty_scaled", "avg_price_ticks", "price_ticks", "created_ts_ns", "terminal_ts_ns", "terminal_reason_code", "terminal_reason", "attached_risk", "origin", "market_client_ref_price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "version", "batch_request_id")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -167,6 +180,7 @@ class Order(_message.Message):
     MARKET_MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MARKET_MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
+    BATCH_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     order_id: int
     symbol_id: int
     client_order_id: str
@@ -192,7 +206,8 @@ class Order(_message.Message):
     market_max_slippage_ticks: int
     market_max_slippage_bps: int
     version: int
-    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., terminal_reason_code: _Optional[int] = ..., terminal_reason: _Optional[str] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ...) -> None: ...
+    batch_request_id: int
+    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_source: _Optional[_Union[_orders_pb2.FeeSource, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., terminal_reason_code: _Optional[int] = ..., terminal_reason: _Optional[str] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ..., batch_request_id: _Optional[int] = ...) -> None: ...
 
 class UserTrade(_message.Message):
     __slots__ = ("symbol_id", "match_id", "order_id", "side", "is_maker", "price_ticks", "qty_scaled", "fee_scaled", "fee_source", "referral_share_scaled", "ts_ns")
@@ -347,3 +362,47 @@ class GetOrderResponse(_message.Message):
     trades: _containers.RepeatedCompositeFieldContainer[UserTrade]
     transfers: _containers.RepeatedCompositeFieldContainer[OrderTransfer]
     def __init__(self, order: _Optional[_Union[Order, _Mapping]] = ..., trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[OrderTransfer, _Mapping]]] = ...) -> None: ...
+
+class GetBatchReplaceStatusRequest(_message.Message):
+    __slots__ = ("subaccount_id", "batch_request_id")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    BATCH_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    batch_request_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., batch_request_id: _Optional[int] = ...) -> None: ...
+
+class BatchReplaceStatusItem(_message.Message):
+    __slots__ = ("item_index", "phase", "old_order_id", "replacement_order_id", "order_status", "code", "updated_ts_ns")
+    ITEM_INDEX_FIELD_NUMBER: _ClassVar[int]
+    PHASE_FIELD_NUMBER: _ClassVar[int]
+    OLD_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    REPLACEMENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    ORDER_STATUS_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    item_index: int
+    phase: BatchReplacePhase
+    old_order_id: int
+    replacement_order_id: int
+    order_status: OrderStatus
+    code: str
+    updated_ts_ns: int
+    def __init__(self, item_index: _Optional[int] = ..., phase: _Optional[_Union[BatchReplacePhase, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., order_status: _Optional[_Union[OrderStatus, str]] = ..., code: _Optional[str] = ..., updated_ts_ns: _Optional[int] = ...) -> None: ...
+
+class GetBatchReplaceStatusResponse(_message.Message):
+    __slots__ = ("batch_request_id", "admission_status", "items", "accepted_count", "rejected_count", "accepted_ts_ns", "updated_ts_ns")
+    BATCH_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    ADMISSION_STATUS_FIELD_NUMBER: _ClassVar[int]
+    ITEMS_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    REJECTED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    batch_request_id: int
+    admission_status: _orders_pb2.BatchReplaceAdmissionStatus
+    items: _containers.RepeatedCompositeFieldContainer[BatchReplaceStatusItem]
+    accepted_count: int
+    rejected_count: int
+    accepted_ts_ns: int
+    updated_ts_ns: int
+    def __init__(self, batch_request_id: _Optional[int] = ..., admission_status: _Optional[_Union[_orders_pb2.BatchReplaceAdmissionStatus, str]] = ..., items: _Optional[_Iterable[_Union[BatchReplaceStatusItem, _Mapping]]] = ..., accepted_count: _Optional[int] = ..., rejected_count: _Optional[int] = ..., accepted_ts_ns: _Optional[int] = ..., updated_ts_ns: _Optional[int] = ...) -> None: ...

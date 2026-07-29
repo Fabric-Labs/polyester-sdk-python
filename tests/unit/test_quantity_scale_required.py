@@ -8,7 +8,7 @@ import pytest
 
 from polyester.codecs.orders import (
     batch_create_orders_to_proto,
-    batch_modify_orders_to_proto,
+    batch_replace_orders_to_proto,
     modify_order_to_proto,
     quantity_scale_for_symbol,
     resolve_quantity_scale,
@@ -61,10 +61,11 @@ def test_resolve_quantity_scale_allows_scaled_quantity_without_catalog() -> None
     assert resolve_quantity_scale(None, None, qty) == 6
 
 
-def test_batch_modify_decimal_qty_without_resolved_scale_raises() -> None:
+def test_batch_replace_decimal_qty_without_resolved_scale_raises() -> None:
     with pytest.raises(PolyesterValidationError, match="explicit quantity_scale"):
-        batch_modify_orders_to_proto(
+        batch_replace_orders_to_proto(
             items=[{"key": OrderId(10), "new_qty": "0.25"}],
+            symbol_id=1,
         )
 
 

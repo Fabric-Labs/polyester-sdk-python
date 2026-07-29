@@ -19,8 +19,10 @@ from polyester.models.trading import (
     BalanceHistory,
     BalanceHistorySeries,
     BalancesList,
-    BatchModifyOrdersResult,
-    BatchModifyResultItem,
+    BatchReplaceAdmissionItem,
+    BatchReplaceOrdersResult,
+    BatchReplaceStatusItem,
+    BatchReplaceStatusResult,
     BucketTransferResult,
     CancelAllOrdersResult,
     DepositAddress,
@@ -689,22 +691,57 @@ def decode_transfer_destinations(data: dict[str, Any]) -> TransferDestinationsLi
     return TransferDestinationsList(destinations=destinations)
 
 
-def decode_batch_modify_result(data: dict[str, Any]) -> BatchModifyOrdersResult:
+def decode_batch_replace_result(data: dict[str, Any]) -> BatchReplaceOrdersResult:
     results = [
-        BatchModifyResultItem(
-            status=str(_field(item, "status", default="") or ""),
+        BatchReplaceAdmissionItem(
+            item_index=int(_field(item, "itemIndex", "item_index", default=0) or 0),
+            status=_enum_name(_field(item, "status")).lower(),
             client_order_id=str(_field(item, "clientOrderId", "client_order_id", default="") or ""),
-            final_order_id=_id_str(_field(item, "finalOrderId", "final_order_id")),
+            old_order_id=_id_str(_field(item, "oldOrderId", "old_order_id")),
+            replacement_order_id=_id_str(
+                _field(item, "replacementOrderId", "replacement_order_id")
+            ),
             code=str(_field(item, "code", default="") or ""),
         )
         for item in _field(data, "results", default=[]) or []
         if isinstance(item, dict)
     ]
-    return BatchModifyOrdersResult(
+    return BatchReplaceOrdersResult(
+        batch_request_id=_id_str(_field(data, "batchRequestId", "batch_request_id")),
+        status=_enum_name(_field(data, "status")).lower(),
         results=results,
-        amended_count=int(_field(data, "amendedCount", "amended_count", default=0) or 0),
-        replaced_count=int(_field(data, "replacedCount", "replaced_count", default=0) or 0),
+        accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
         rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
+        accepted_ts_ns=int(_field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0),
+    )
+
+
+def decode_batch_replace_status(data: dict[str, Any]) -> BatchReplaceStatusResult:
+    items = [
+        BatchReplaceStatusItem(
+            item_index=int(_field(item, "itemIndex", "item_index", default=0) or 0),
+            phase=_enum_name(_field(item, "phase")).lower(),
+            old_order_id=_id_str(_field(item, "oldOrderId", "old_order_id")),
+            replacement_order_id=_id_str(
+                _field(item, "replacementOrderId", "replacement_order_id")
+            ),
+            order_status=_enum_name(_field(item, "orderStatus", "order_status")).lower(),
+            code=str(_field(item, "code", default="") or ""),
+            updated_ts_ns=int(_field(item, "updatedTsNs", "updated_ts_ns", default=0) or 0),
+        )
+        for item in _field(data, "items", default=[]) or []
+        if isinstance(item, dict)
+    ]
+    return BatchReplaceStatusResult(
+        batch_request_id=_id_str(_field(data, "batchRequestId", "batch_request_id")),
+        admission_status=_enum_name(
+            _field(data, "admissionStatus", "admission_status")
+        ).lower(),
+        items=items,
+        accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
+        rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
+        accepted_ts_ns=int(_field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0),
+        updated_ts_ns=int(_field(data, "updatedTsNs", "updated_ts_ns", default=0) or 0),
     )
 
 

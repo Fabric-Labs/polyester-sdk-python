@@ -32,7 +32,8 @@ from polyester.codecs.decode.market_data import (
 from polyester.codecs.decode.market_overview import market_overview_list_from_proto
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.decode.orders import (
-    batch_modify_from_proto,
+    batch_replace_from_proto,
+    batch_replace_status_from_proto,
     cancel_all_from_proto,
     get_order_from_proto,
     modify_order_from_proto,
@@ -58,7 +59,8 @@ __all__ = [
     "api_keys_list_from_proto",
     "balance_history_from_proto",
     "balances_list_from_proto",
-    "batch_modify_from_proto",
+    "batch_replace_from_proto",
+    "batch_replace_status_from_proto",
     "cancel_all_from_proto",
     "candles_columns_from_proto",
     "candles_from_proto",

@@ -30,6 +30,9 @@ class OrdersReadService(Protocol):
     async def get_order(self, request: orders_dot_v1_dot_orders__read__pb2.GetOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__read__pb2.GetOrderResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_batch_replace_status(self, request: orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class OrdersReadServiceASGIApplication(ConnectASGIApplication[OrdersReadService]):
     def __init__(self, service: OrdersReadService | AsyncGenerator[OrdersReadService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -75,6 +78,16 @@ class OrdersReadServiceASGIApplication(ConnectASGIApplication[OrdersReadService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_order,
+                ),
+                "/orders.v1.OrdersReadService/GetBatchReplaceStatus": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetBatchReplaceStatus",
+                        service_name="orders.v1.OrdersReadService",
+                        input=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest,
+                        output=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_batch_replace_status,
                 ),
             },
             interceptors=interceptors,
@@ -170,6 +183,26 @@ class OrdersReadServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_batch_replace_status(
+        self,
+        request: orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetBatchReplaceStatus",
+                service_name="orders.v1.OrdersReadService",
+                input=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest,
+                output=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -182,6 +215,8 @@ class OrdersReadServiceSync(Protocol):
     def get_user_trades(self, request: orders_dot_v1_dot_orders__read__pb2.GetUserTradesRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__read__pb2.GetUserTradesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_order(self, request: orders_dot_v1_dot_orders__read__pb2.GetOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__read__pb2.GetOrderResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_batch_replace_status(self, request: orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -228,6 +263,16 @@ class OrdersReadServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_order,
+                ),
+                "/orders.v1.OrdersReadService/GetBatchReplaceStatus": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetBatchReplaceStatus",
+                        service_name="orders.v1.OrdersReadService",
+                        input=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest,
+                        output=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_batch_replace_status,
                 ),
             },
             interceptors=interceptors,
@@ -317,6 +362,26 @@ class OrdersReadServiceClientSync(ConnectClientSync):
                 service_name="orders.v1.OrdersReadService",
                 input=orders_dot_v1_dot_orders__read__pb2.GetOrderRequest,
                 output=orders_dot_v1_dot_orders__read__pb2.GetOrderResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_batch_replace_status(
+        self,
+        request: orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetBatchReplaceStatus",
+                service_name="orders.v1.OrdersReadService",
+                input=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusRequest,
+                output=orders_dot_v1_dot_orders__read__pb2.GetBatchReplaceStatusResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

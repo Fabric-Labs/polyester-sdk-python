@@ -36,7 +36,7 @@ class OrdersService(Protocol):
     async def modify_order(self, request: orders_dot_v1_dot_orders__pb2.ModifyOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.ModifyOrderResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def batch_modify_orders(self, request: orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse:
+    async def batch_replace_orders(self, request: orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def batch_cancel_orders(self, request: orders_dot_v1_dot_orders__pb2.BatchCancelOrdersRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.BatchCancelOrdersResponse:
@@ -108,15 +108,15 @@ class OrdersServiceASGIApplication(ConnectASGIApplication[OrdersService]):
                     ),
                     function=svc.modify_order,
                 ),
-                "/orders.v1.OrdersService/BatchModifyOrders": Endpoint.unary(
+                "/orders.v1.OrdersService/BatchReplaceOrders": Endpoint.unary(
                     method=MethodInfo(
-                        name="BatchModifyOrders",
+                        name="BatchReplaceOrders",
                         service_name="orders.v1.OrdersService",
-                        input=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest,
-                        output=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse,
+                        input=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest,
+                        output=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=svc.batch_modify_orders,
+                    function=svc.batch_replace_orders,
                 ),
                 "/orders.v1.OrdersService/BatchCancelOrders": Endpoint.unary(
                     method=MethodInfo(
@@ -262,20 +262,20 @@ class OrdersServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
-    async def batch_modify_orders(
+    async def batch_replace_orders(
         self,
-        request: orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest,
+        request: orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse:
+    ) -> orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse:
         return await self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="BatchModifyOrders",
+                name="BatchReplaceOrders",
                 service_name="orders.v1.OrdersService",
-                input=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest,
-                output=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse,
+                input=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest,
+                output=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -319,7 +319,7 @@ class OrdersServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def modify_order(self, request: orders_dot_v1_dot_orders__pb2.ModifyOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.ModifyOrderResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def batch_modify_orders(self, request: orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse:
+    def batch_replace_orders(self, request: orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def batch_cancel_orders(self, request: orders_dot_v1_dot_orders__pb2.BatchCancelOrdersRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.BatchCancelOrdersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -389,15 +389,15 @@ class OrdersServiceWSGIApplication(ConnectWSGIApplication):
                     ),
                     function=service.modify_order,
                 ),
-                "/orders.v1.OrdersService/BatchModifyOrders": EndpointSync.unary(
+                "/orders.v1.OrdersService/BatchReplaceOrders": EndpointSync.unary(
                     method=MethodInfo(
-                        name="BatchModifyOrders",
+                        name="BatchReplaceOrders",
                         service_name="orders.v1.OrdersService",
-                        input=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest,
-                        output=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse,
+                        input=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest,
+                        output=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=service.batch_modify_orders,
+                    function=service.batch_replace_orders,
                 ),
                 "/orders.v1.OrdersService/BatchCancelOrders": EndpointSync.unary(
                     method=MethodInfo(
@@ -543,20 +543,20 @@ class OrdersServiceClientSync(ConnectClientSync):
             timeout_ms=timeout_ms,
         )
 
-    def batch_modify_orders(
+    def batch_replace_orders(
         self,
-        request: orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest,
+        request: orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse:
+    ) -> orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse:
         return self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="BatchModifyOrders",
+                name="BatchReplaceOrders",
                 service_name="orders.v1.OrdersService",
-                input=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersRequest,
-                output=orders_dot_v1_dot_orders__pb2.BatchModifyOrdersResponse,
+                input=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersRequest,
+                output=orders_dot_v1_dot_orders__pb2.BatchReplaceOrdersResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

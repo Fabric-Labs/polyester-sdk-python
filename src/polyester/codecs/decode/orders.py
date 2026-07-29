@@ -247,31 +247,34 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
     )
 
 
-def _batch_replace_admission_status(value: int) -> str:
-    mapping = {
-        orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED: "admitted",
-        orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED: "partially_admitted",
-        orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_REJECTED: "rejected",
-    }
-    return mapping.get(value, "")
+def _batch_replace_admission_status(value: object) -> str:
+    if value == orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED:
+        return "admitted"
+    if value == orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED:
+        return "partially_admitted"
+    if value == orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_REJECTED:
+        return "rejected"
+    return ""
 
 
-def _batch_replace_item_admission_status(value: int) -> str:
-    mapping = {
-        orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED: "admitted",
-        orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED: "rejected",
-    }
-    return mapping.get(value, "")
+def _batch_replace_item_admission_status(value: object) -> str:
+    if value == orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED:
+        return "admitted"
+    if value == orders_pb2.BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED:
+        return "rejected"
+    return ""
 
 
-def _batch_replace_phase(value: int) -> str:
-    mapping = {
-        orders_read_pb2.BATCH_REPLACE_PHASE_ADMITTED: "admitted",
-        orders_read_pb2.BATCH_REPLACE_PHASE_WORKING: "working",
-        orders_read_pb2.BATCH_REPLACE_PHASE_REJECTED: "rejected",
-        orders_read_pb2.BATCH_REPLACE_PHASE_TERMINAL: "terminal",
-    }
-    return mapping.get(value, "")
+def _batch_replace_phase(value: object) -> str:
+    if value == orders_read_pb2.BATCH_REPLACE_PHASE_ADMITTED:
+        return "admitted"
+    if value == orders_read_pb2.BATCH_REPLACE_PHASE_WORKING:
+        return "working"
+    if value == orders_read_pb2.BATCH_REPLACE_PHASE_REJECTED:
+        return "rejected"
+    if value == orders_read_pb2.BATCH_REPLACE_PHASE_TERMINAL:
+        return "terminal"
+    return ""
 
 
 def batch_replace_from_proto(

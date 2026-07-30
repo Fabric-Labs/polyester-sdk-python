@@ -22,6 +22,7 @@ from polyester.types.money import Quantity, resolve_price_ticks, resolve_qty_sca
 ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
 ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
 TIF_TO_PROTO = {"gtc": "GTC", "ioc": "IOC", "fok": "FOK"}
+FEE_ASSET_TO_PROTO = {"quote": "QUOTE", "base": "BASE"}
 MODIFY_BEHAVIOR_TO_PROTO = {
     "amend_or_replace": "AMEND_OR_REPLACE",
     "amend_only": "AMEND_ONLY",
@@ -74,7 +75,7 @@ def normalize_create_order_request(
     except (msgspec.ValidationError, TypeError) as exc:
         raise PolyesterValidationError("Invalid orders.create request") from exc
     # Reject floats even when qty is typed as Any for dual-path inputs.
-    for field_name in ("qty", "price", "market_client_ref_price"):
+    for field_name in ("qty", "max_quote_debit", "price", "market_client_ref_price"):
         value = getattr(normalized, field_name, None)
         if isinstance(value, float):
             raise PolyesterValidationError(
@@ -115,7 +116,7 @@ def create_order_to_wire(
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
         "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
         "qty_scaled": resolve_qty_scaled(
-            request.qty,
+            cast(Any, request.qty),
             _codec_quantity_scale(request.qty, quantity_scale),
             symbol=request.symbol,
         ),
@@ -134,6 +135,7 @@ def order_intent_from_request(
     request: CreateOrderRequest,
     *,
     quantity_scale: int | None = None,
+    quote_quantity_scale: int | None = None,
 ) -> orders_pb2.OrderIntent:
     """Build an :class:`OrderIntent` from the flat public request shape.
 
@@ -150,18 +152,46 @@ def order_intent_from_request(
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
         raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
 
+    if (request.qty is None) == (request.max_quote_debit is None):
+        raise PolyesterValidationError(
+            "orders.create requires exactly one of qty or max_quote_debit"
+        )
+    if request.max_quote_debit is not None and (
+        request.side != "buy"
+        or (request.order_type == "limit" and (request.tif or "gtc") != "ioc")
+    ):
+        raise PolyesterValidationError(
+            "max_quote_debit is only valid for buy market or limit IOC orders"
+        )
     intent = orders_pb2.OrderIntent(
         symbol=request.symbol or "",
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
-        qty_scaled=resolve_qty_scaled(
+    )
+    if request.qty is not None:
+        intent.base_qty_scaled = resolve_qty_scaled(
             request.qty,
             _codec_quantity_scale(request.qty, quantity_scale),
             symbol=request.symbol,
-        ),
-    )
+        )
+    else:
+        if request.side != "buy":
+            raise PolyesterValidationError("max_quote_debit is only valid for buy orders")
+        intent.max_quote_debit_scaled = resolve_qty_scaled(
+            cast(Any, request.max_quote_debit),
+            _codec_quantity_scale(request.max_quote_debit, quote_quantity_scale),
+            "max_quote_debit",
+            symbol=request.symbol,
+        )
     client_order_id = optional_client_id(request.client_order_id)
     if client_order_id:
         intent.client_order_id = client_order_id
+    if request.fee_asset is not None:
+        fee_asset = request.fee_asset.lower()
+        if fee_asset not in FEE_ASSET_TO_PROTO:
+            raise PolyesterValidationError("fee_asset must be quote or base")
+        if request.side == "sell" and fee_asset != "quote":
+            raise PolyesterValidationError("sell orders must use fee_asset=quote")
+        intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_asset])
 
     price_ticks = (
         resolve_price_ticks(request.price, "price", symbol=request.symbol)
@@ -214,10 +244,44 @@ def create_order_to_proto(
     request: CreateOrderRequest,
     *,
     quantity_scale: int | None = None,
+    quote_quantity_scale: int | None = None,
 ) -> orders_pb2.CreateOrderRequest:
     proto = orders_pb2.CreateOrderRequest(
-        order=order_intent_from_request(request, quantity_scale=quantity_scale)
+        order=order_intent_from_request(
+            request,
+            quantity_scale=quantity_scale,
+            quote_quantity_scale=quote_quantity_scale,
+        )
     )
+    if request.sub_account_id:
+        proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
+    return proto
+
+
+def preview_order_to_proto(
+    request: CreateOrderRequest,
+    *,
+    quantity_scale: int | None = None,
+    quote_quantity_scale: int | None = None,
+) -> orders_pb2.PreviewOrderRequest:
+    """Build a preview request from the same public shape as ``create``."""
+    intent = order_intent_from_request(
+        request,
+        quantity_scale=quantity_scale,
+        quote_quantity_scale=quote_quantity_scale,
+    )
+    proto = orders_pb2.PreviewOrderRequest(
+        symbol=intent.symbol,
+        side=intent.side,
+        fee_asset=intent.fee_asset,
+    )
+    if intent.HasField("base_qty_scaled"):
+        proto.base_qty_scaled = intent.base_qty_scaled
+    else:
+        proto.max_quote_debit_scaled = intent.max_quote_debit_scaled
+    execution = intent.WhichOneof("execution")
+    if execution is not None:
+        getattr(proto, execution).CopyFrom(getattr(intent, execution))
     if request.sub_account_id:
         proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
     return proto
@@ -468,6 +532,22 @@ def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | Non
     return scale
 
 
+def quote_quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | None) -> int:
+    if not symbol or catalogs is None:
+        raise PolyesterValidationError(
+            "quote quantity scale requires symbol and catalogs "
+            "(or pass a scaled Quantity / explicit quote_quantity_scale)"
+        )
+    scale = catalogs.quote_quantity_scale_for_symbol(symbol)
+    if scale is None:
+        raise PolyesterValidationError(
+            f"quote quantity scale for {symbol!r} is unavailable; "
+            "await client.wait_for_catalogs() before placing orders, "
+            "or pass a scaled Quantity"
+        )
+    return scale
+
+
 def resolve_quantity_scale(
     catalogs: CatalogManager | None,
     symbol: str | None,
@@ -491,6 +571,18 @@ def resolve_quantity_scale(
                 return value.scale
         return 0
     return quantity_scale_for_symbol(catalogs, symbol)
+
+
+def resolve_quote_quantity_scale(
+    catalogs: CatalogManager | None,
+    symbol: str | None,
+    value: object | None,
+) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, Quantity):
+        return value.scale if value.scale is not None else 0
+    return quote_quantity_scale_for_symbol(catalogs, symbol)
 
 
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:

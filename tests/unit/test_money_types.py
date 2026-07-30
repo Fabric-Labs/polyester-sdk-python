@@ -6,6 +6,7 @@ import pytest
 
 from polyester.codecs.orders import create_order_to_proto, normalize_create_order_request
 from polyester.errors import PolyesterValidationError
+from polyester.gen.orders.v1 import orders_pb2
 from polyester.types.money import (
     AssetAmount,
     Price,
@@ -66,7 +67,7 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
         price=Decimal("50000"),
     )
     proto = create_order_to_proto(req, quantity_scale=8)
-    assert proto.order.qty_scaled == 10_000_000
+    assert proto.order.base_qty_scaled == 10_000_000
     assert proto.order.limit_gtc.price_ticks == 50_000_000_000
 
     req2 = normalize_create_order_request(
@@ -77,8 +78,26 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
         price=Price.from_ticks(50_000_000_000, symbol="BTC-USD"),
     )
     proto2 = create_order_to_proto(req2, quantity_scale=8)
-    assert proto2.order.qty_scaled == proto.order.qty_scaled
+    assert proto2.order.base_qty_scaled == proto.order.base_qty_scaled
     assert proto2.order.limit_gtc.price_ticks == proto.order.limit_gtc.price_ticks
+
+
+def test_create_order_supports_quote_budget_sizing() -> None:
+    req = normalize_create_order_request(
+        symbol="BTC-USD",
+        side="buy",
+        order_type="market",
+        max_quote_debit=Decimal("12.34"),
+        fee_asset="base",
+    )
+    proto = create_order_to_proto(
+        req,
+        quantity_scale=8,
+        quote_quantity_scale=2,
+    )
+    assert proto.order.WhichOneof("sizing") == "max_quote_debit_scaled"
+    assert proto.order.max_quote_debit_scaled == 1234
+    assert proto.order.fee_asset == orders_pb2.BASE
 
 
 def test_create_order_rejects_float_qty() -> None:

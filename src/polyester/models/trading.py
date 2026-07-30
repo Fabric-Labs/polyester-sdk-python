@@ -25,6 +25,8 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     created_ts_ns: str = ""
     version: int = 0
     post_only: bool = False
+    fee_asset: str = ""
+    submitted_max_quote_debit_scaled: str = ""
     attached_risk: AttachedRisk | None = None
 
 
@@ -61,6 +63,20 @@ class OrderMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     status: str
     order_id: str = ""
     client_order_id: str = ""
+    resolved_base_qty_scaled: str = ""
+    resolved_base_qty: Quantity | None = None
+    submitted_max_quote_debit_scaled: str = ""
+
+
+class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    resolved_base_qty_scaled: str = ""
+    resolved_base_qty: Quantity | None = None
+    price_bound: Price | None = None
+    estimated_quote_debit_scaled: str = ""
+    estimated_fee_scaled: str = ""
+    estimated_net_base_qty: Quantity | None = None
+    fee_asset: str = ""
+    fresh_at_ts_ns: str = ""
 
 
 class GetOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -77,7 +93,7 @@ class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     price: Price | None = None
     qty: Quantity | None = None
     fee_scaled: str = ""
-    fee_source: str = ""
+    fee_asset: str = ""
     referral_share_scaled: str = ""
     ts_ns: str = ""
 
@@ -186,7 +202,7 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     time_in_force: str = ""
     qty: Quantity | None = None
     limit_price: Price | None = None
-    fee_source: str = ""
+    fee_asset: str = ""
     self_trade_prevention_mode: str = ""
     post_only: bool = False
     trigger_price: Price | None = None

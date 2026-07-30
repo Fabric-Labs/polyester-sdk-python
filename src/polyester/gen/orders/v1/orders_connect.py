@@ -18,6 +18,9 @@ import polyester.gen.orders.v1.orders_pb2 as orders_dot_v1_dot_orders__pb2
 
 
 class OrdersService(Protocol):
+    async def preview_order(self, request: orders_dot_v1_dot_orders__pb2.PreviewOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.PreviewOrderResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def create_order(self, request: orders_dot_v1_dot_orders__pb2.CreateOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.CreateOrderResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -48,6 +51,16 @@ class OrdersServiceASGIApplication(ConnectASGIApplication[OrdersService]):
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/orders.v1.OrdersService/PreviewOrder": Endpoint.unary(
+                    method=MethodInfo(
+                        name="PreviewOrder",
+                        service_name="orders.v1.OrdersService",
+                        input=orders_dot_v1_dot_orders__pb2.PreviewOrderRequest,
+                        output=orders_dot_v1_dot_orders__pb2.PreviewOrderResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.preview_order,
+                ),
                 "/orders.v1.OrdersService/CreateOrder": Endpoint.unary(
                     method=MethodInfo(
                         name="CreateOrder",
@@ -142,6 +155,26 @@ class OrdersServiceASGIApplication(ConnectASGIApplication[OrdersService]):
 
 
 class OrdersServiceClient(ConnectClient):
+    async def preview_order(
+        self,
+        request: orders_dot_v1_dot_orders__pb2.PreviewOrderRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> orders_dot_v1_dot_orders__pb2.PreviewOrderResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="PreviewOrder",
+                service_name="orders.v1.OrdersService",
+                input=orders_dot_v1_dot_orders__pb2.PreviewOrderRequest,
+                output=orders_dot_v1_dot_orders__pb2.PreviewOrderResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def create_order(
         self,
         request: orders_dot_v1_dot_orders__pb2.CreateOrderRequest,
@@ -307,6 +340,8 @@ class OrdersServiceClient(ConnectClient):
 
 
 class OrdersServiceSync(Protocol):
+    def preview_order(self, request: orders_dot_v1_dot_orders__pb2.PreviewOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.PreviewOrderResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_order(self, request: orders_dot_v1_dot_orders__pb2.CreateOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.CreateOrderResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def cancel_order(self, request: orders_dot_v1_dot_orders__pb2.CancelOrderRequest, ctx: RequestContext) -> orders_dot_v1_dot_orders__pb2.CancelOrderResponse:
@@ -329,6 +364,16 @@ class OrdersServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: OrdersServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/orders.v1.OrdersService/PreviewOrder": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="PreviewOrder",
+                        service_name="orders.v1.OrdersService",
+                        input=orders_dot_v1_dot_orders__pb2.PreviewOrderRequest,
+                        output=orders_dot_v1_dot_orders__pb2.PreviewOrderResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.preview_order,
+                ),
                 "/orders.v1.OrdersService/CreateOrder": EndpointSync.unary(
                     method=MethodInfo(
                         name="CreateOrder",
@@ -423,6 +468,26 @@ class OrdersServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class OrdersServiceClientSync(ConnectClientSync):
+    def preview_order(
+        self,
+        request: orders_dot_v1_dot_orders__pb2.PreviewOrderRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> orders_dot_v1_dot_orders__pb2.PreviewOrderResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="PreviewOrder",
+                service_name="orders.v1.OrdersService",
+                input=orders_dot_v1_dot_orders__pb2.PreviewOrderRequest,
+                output=orders_dot_v1_dot_orders__pb2.PreviewOrderResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     def create_order(
         self,
         request: orders_dot_v1_dot_orders__pb2.CreateOrderRequest,

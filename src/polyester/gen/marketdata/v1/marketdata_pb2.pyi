@@ -250,7 +250,7 @@ class PairMarketdataConfig(_message.Message):
     def __init__(self, orderbook_price_buckets: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class PairConfig(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "tick_size", "step_size", "min_notional_quote", "min_qty_base", "allow_buy_fee_from_received", "base_quantity_scale", "quote_quantity_scale", "marketdata", "listing_at", "delisting_at", "status", "default_market_slippage_bps_buy", "default_market_slippage_bps_sell", "max_client_ref_drift_bps")
+    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "tick_size", "step_size", "min_notional_quote", "min_qty_base", "allow_buy_fee_from_base", "base_quantity_scale", "quote_quantity_scale", "marketdata", "listing_at", "delisting_at", "status", "default_market_slippage_bps_buy", "default_market_slippage_bps_sell", "max_client_ref_drift_bps")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     BASE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -259,7 +259,7 @@ class PairConfig(_message.Message):
     STEP_SIZE_FIELD_NUMBER: _ClassVar[int]
     MIN_NOTIONAL_QUOTE_FIELD_NUMBER: _ClassVar[int]
     MIN_QTY_BASE_FIELD_NUMBER: _ClassVar[int]
-    ALLOW_BUY_FEE_FROM_RECEIVED_FIELD_NUMBER: _ClassVar[int]
+    ALLOW_BUY_FEE_FROM_BASE_FIELD_NUMBER: _ClassVar[int]
     BASE_QUANTITY_SCALE_FIELD_NUMBER: _ClassVar[int]
     QUOTE_QUANTITY_SCALE_FIELD_NUMBER: _ClassVar[int]
     MARKETDATA_FIELD_NUMBER: _ClassVar[int]
@@ -277,7 +277,7 @@ class PairConfig(_message.Message):
     step_size: str
     min_notional_quote: str
     min_qty_base: str
-    allow_buy_fee_from_received: bool
+    allow_buy_fee_from_base: bool
     base_quantity_scale: int
     quote_quantity_scale: int
     marketdata: PairMarketdataConfig
@@ -287,7 +287,7 @@ class PairConfig(_message.Message):
     default_market_slippage_bps_buy: int
     default_market_slippage_bps_sell: int
     max_client_ref_drift_bps: int
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_received: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_base: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ...) -> None: ...
 
 class GetSpotConfigRequest(_message.Message):
     __slots__ = ()

@@ -49,7 +49,10 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_type: str
     tif: str | None = None
     # Any: msgspec accepts str | Decimal | Quantity at runtime.
-    qty: Any
+    qty: Any | None = None
+    # BUY market-IOC and limit-IOC orders may instead specify a quote budget.
+    # Decimal inputs use the hydrated quote quantity scale for the symbol.
+    max_quote_debit: Any | None = None
     price: Any | None = None
     sub_account_id: str | None = None
     # Optional. Set a stable non-empty value when you may retry after an
@@ -59,6 +62,7 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     expires_at: str | None = None
     attached_risk: dict[str, Any] | None = None
     market_client_ref_price: Any | None = None
+    fee_asset: str | None = None
 
 
 __all__ = [

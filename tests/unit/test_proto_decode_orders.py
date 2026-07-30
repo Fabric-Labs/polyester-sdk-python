@@ -4,6 +4,7 @@ from polyester.codecs.decode.orders import (
     order_from_proto,
     order_mutation_from_proto,
     orders_list_from_proto,
+    preview_order_from_proto,
 )
 from polyester.codecs.scalars import format_id
 from polyester.gen.orders.v1 import orders_pb2
@@ -109,7 +110,7 @@ def test_get_order_from_proto_includes_trades() -> None:
                 order_id=7,
                 side=orders_pb2.BUY,
                 fee_scaled=5,
-                fee_source=orders_pb2.RECEIVED,
+                fee_asset=orders_pb2.BASE,
                 referral_share_scaled=2,
             )
         ],
@@ -120,7 +121,7 @@ def test_get_order_from_proto_includes_trades() -> None:
     assert len(result.trades) == 1
     assert result.trades[0].match_id == "99"
     assert result.trades[0].fee_scaled == "5"
-    assert result.trades[0].fee_source == "received"
+    assert result.trades[0].fee_asset == "base"
     assert result.trades[0].referral_share_scaled == "2"
 
 
@@ -148,6 +149,37 @@ def test_order_mutation_from_proto_create_includes_client_order_id() -> None:
     assert result.status == "accepted"
     assert result.order_id == format_id(42)
     assert result.client_order_id == "coid-1"
+
+
+def test_order_mutation_and_preview_expose_explicit_sizing() -> None:
+    create = order_mutation_from_proto(
+        orders_pb2.CreateOrderResponse(
+            order_id=42,
+            resolved_base_qty_scaled=100,
+            submitted_max_quote_debit_scaled=500,
+        ),
+        quantity_scale=2,
+    )
+    assert create.resolved_base_qty is not None
+    assert create.resolved_base_qty.scaled == 100
+    assert create.resolved_base_qty_scaled == "100"
+    assert create.submitted_max_quote_debit_scaled == "500"
+
+    preview = preview_order_from_proto(
+        orders_pb2.PreviewOrderResponse(
+            resolved_base_qty_scaled=100,
+            estimated_quote_debit_scaled=500,
+            estimated_fee_scaled=2,
+            estimated_net_base_qty_scaled=98,
+            fee_asset=orders_pb2.BASE,
+        ),
+        quantity_scale=2,
+    )
+    assert preview.resolved_base_qty is not None
+    assert preview.resolved_base_qty.scaled == 100
+    assert preview.resolved_base_qty_scaled == "100"
+    assert preview.estimated_quote_debit_scaled == "500"
+    assert preview.fee_asset == "base"
 
 
 def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Breaking
+- Replaced `fee_source` with `fee_asset` (`quote` or `base`) on trigger and trade models. The backend no longer emits the prior received-asset enum.
+
+### Features
+- Orders support explicit base-quantity or quote-budget (`max_quote_debit`) sizing. Create and preview results expose resolved base quantity, quote debit, fee asset, and estimates where returned by the API.
+- Added `orders.preview_order(...)` and `is_batch_replace_settled(...)`.
+
+### Fixed
+- Batch-replace status decoding now rejects aggregate counts that do not reconcile with item phases.
+
+### Clarified
+- Batch-replace admission is not finality: predecessor IDs may be stale after admission, while status returns successor IDs and phases. Poll status for reconciliation, reuse the same `request_id` on retry, and do not treat `is_batch_replace_settled` as finality.
+
 ## 0.1.0a27
 
 ### Breaking
@@ -295,7 +308,7 @@
 ## 0.1.0a5
 
 ### Triggers
-- `triggers.create()` exposes the full `CreateTriggerRequest` surface, unblocking `TRAILING_STOP`, `TWAP`, and `LADDER` creation via the SDK: `fee_source`, `self_trade_prevention_mode`, `trailing_distance_ticks`/`trailing_distance_bps`, `activation_price`, `max_slippage_ticks`/`max_slippage_bps`, `twap_duration_ms`/`twap_slice_interval_ms`, `ladder_price_min`/`ladder_price_max`, `ladder_levels`, and `ladder_distribution`
+- `triggers.create()` exposes the full `CreateTriggerRequest` surface, unblocking `TRAILING_STOP`, `TWAP`, and `LADDER` creation via the SDK: `fee_asset`, `self_trade_prevention_mode`, `trailing_distance_ticks`/`trailing_distance_bps`, `activation_price`, `max_slippage_ticks`/`max_slippage_bps`, `twap_duration_ms`/`twap_slice_interval_ms`, `ladder_price_min`/`ladder_price_max`, `ladder_levels`, and `ladder_distribution`
 - `trigger_price` is now optional on `create()` (not required for trailing/TWAP/ladder types)
 
 ### Testing

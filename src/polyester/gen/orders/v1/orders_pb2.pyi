@@ -32,11 +32,11 @@ class TimeInForce(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     IOC: _ClassVar[TimeInForce]
     FOK: _ClassVar[TimeInForce]
 
-class FeeSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+class FeeAsset(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
-    FEE_SOURCE_UNSPECIFIED: _ClassVar[FeeSource]
-    QUOTE: _ClassVar[FeeSource]
-    RECEIVED: _ClassVar[FeeSource]
+    FEE_ASSET_UNSPECIFIED: _ClassVar[FeeAsset]
+    QUOTE: _ClassVar[FeeAsset]
+    BASE: _ClassVar[FeeAsset]
 
 class SelfTradePreventionMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -62,7 +62,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
     ERROR_CODE_NOT_FOUND: _ClassVar[ErrorCode]
     ERROR_CODE_UPSTREAM_ERROR: _ClassVar[ErrorCode]
-    ERROR_CODE_FEE_SOURCE_NOT_ALLOWED: _ClassVar[ErrorCode]
+    ERROR_CODE_FEE_ASSET_NOT_ALLOWED: _ClassVar[ErrorCode]
     ERROR_CODE_PAIR_DISABLED: _ClassVar[ErrorCode]
     ERROR_CODE_ORDER_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_INTERNAL_ERROR: _ClassVar[ErrorCode]
@@ -111,6 +111,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_STALE_QUOTE: _ClassVar[ErrorCode]
     ERROR_CODE_VALIDATION_ERROR: _ClassVar[ErrorCode]
     ERROR_CODE_OVERLOADED: _ClassVar[ErrorCode]
+    ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -160,9 +161,9 @@ TIME_IN_FORCE_UNSPECIFIED: TimeInForce
 GTC: TimeInForce
 IOC: TimeInForce
 FOK: TimeInForce
-FEE_SOURCE_UNSPECIFIED: FeeSource
-QUOTE: FeeSource
-RECEIVED: FeeSource
+FEE_ASSET_UNSPECIFIED: FeeAsset
+QUOTE: FeeAsset
+BASE: FeeAsset
 SELF_TRADE_PREVENTION_MODE_UNSPECIFIED: SelfTradePreventionMode
 EXPIRE_MAKER: SelfTradePreventionMode
 EXPIRE_TAKER: SelfTradePreventionMode
@@ -182,7 +183,7 @@ ERROR_CODE_UNAUTHENTICATED: ErrorCode
 ERROR_CODE_PERMISSION_DENIED: ErrorCode
 ERROR_CODE_NOT_FOUND: ErrorCode
 ERROR_CODE_UPSTREAM_ERROR: ErrorCode
-ERROR_CODE_FEE_SOURCE_NOT_ALLOWED: ErrorCode
+ERROR_CODE_FEE_ASSET_NOT_ALLOWED: ErrorCode
 ERROR_CODE_PAIR_DISABLED: ErrorCode
 ERROR_CODE_ORDER_UNKNOWN: ErrorCode
 ERROR_CODE_INTERNAL_ERROR: ErrorCode
@@ -231,6 +232,7 @@ ERROR_CODE_MAX_SLIPPAGE_INVALID: ErrorCode
 ERROR_CODE_STALE_QUOTE: ErrorCode
 ERROR_CODE_VALIDATION_ERROR: ErrorCode
 ERROR_CODE_OVERLOADED: ErrorCode
+ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -284,30 +286,32 @@ class LimitFok(_message.Message):
     def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
 
 class OrderIntent(_message.Message):
-    __slots__ = ("symbol", "side", "qty_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "client_order_id", "fee_source", "self_trade_prevention_mode", "attached_risk")
+    __slots__ = ("symbol", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "client_order_id", "fee_asset", "self_trade_prevention_mode", "attached_risk")
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
-    QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
     MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
     LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
     LIMIT_IOC_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FOK_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    FEE_SOURCE_FIELD_NUMBER: _ClassVar[int]
+    FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
     SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
     ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
     symbol: str
     side: Side
-    qty_scaled: int
+    base_qty_scaled: int
+    max_quote_debit_scaled: int
     market_ioc: MarketIoc
     limit_gtc: LimitGtc
     limit_ioc: LimitIoc
     limit_fok: LimitFok
     client_order_id: str
-    fee_source: FeeSource
+    fee_asset: FeeAsset
     self_trade_prevention_mode: SelfTradePreventionMode
     attached_risk: RiskPolicy
-    def __init__(self, symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., qty_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_source: _Optional[_Union[FeeSource, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
 
 class CreateOrderRequest(_message.Message):
     __slots__ = ("subaccount_id", "order")
@@ -318,11 +322,13 @@ class CreateOrderRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., order: _Optional[_Union[OrderIntent, _Mapping]] = ...) -> None: ...
 
 class CreateOrderResponse(_message.Message):
-    __slots__ = ("order_id", "client_order_id", "accepted_at", "accepted_at_ts_ns", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
+    __slots__ = ("order_id", "client_order_id", "accepted_at", "accepted_at_ts_ns", "resolved_base_qty_scaled", "submitted_max_quote_debit_scaled", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     ACCEPTED_AT_FIELD_NUMBER: _ClassVar[int]
     ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    SUBMITTED_MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
     TAKE_PROFIT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     STOP_LOSS_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     TRAILING_STOP_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -330,10 +336,56 @@ class CreateOrderResponse(_message.Message):
     client_order_id: str
     accepted_at: _timestamp_pb2.Timestamp
     accepted_at_ts_ns: int
+    resolved_base_qty_scaled: int
+    submitted_max_quote_debit_scaled: int
     take_profit_trigger_id: int
     stop_loss_trigger_id: int
     trailing_stop_trigger_id: int
-    def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ..., resolved_base_qty_scaled: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+
+class PreviewOrderRequest(_message.Message):
+    __slots__ = ("subaccount_id", "symbol", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "fee_asset")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
+    MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_IOC_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FOK_FIELD_NUMBER: _ClassVar[int]
+    FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    symbol: str
+    side: Side
+    base_qty_scaled: int
+    max_quote_debit_scaled: int
+    market_ioc: MarketIoc
+    limit_gtc: LimitGtc
+    limit_ioc: LimitIoc
+    limit_fok: LimitFok
+    fee_asset: FeeAsset
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ...) -> None: ...
+
+class PreviewOrderResponse(_message.Message):
+    __slots__ = ("resolved_base_qty_scaled", "price_bound_ticks", "estimated_quote_debit_scaled", "estimated_fee_scaled", "estimated_net_base_qty_scaled", "fee_asset", "fresh_at", "fresh_at_ts_ns")
+    RESOLVED_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    PRICE_BOUND_TICKS_FIELD_NUMBER: _ClassVar[int]
+    ESTIMATED_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
+    ESTIMATED_FEE_SCALED_FIELD_NUMBER: _ClassVar[int]
+    ESTIMATED_NET_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    FRESH_AT_FIELD_NUMBER: _ClassVar[int]
+    FRESH_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    resolved_base_qty_scaled: int
+    price_bound_ticks: int
+    estimated_quote_debit_scaled: int
+    estimated_fee_scaled: int
+    estimated_net_base_qty_scaled: int
+    fee_asset: FeeAsset
+    fresh_at: _timestamp_pb2.Timestamp
+    fresh_at_ts_ns: int
+    def __init__(self, resolved_base_qty_scaled: _Optional[int] = ..., price_bound_ticks: _Optional[int] = ..., estimated_quote_debit_scaled: _Optional[int] = ..., estimated_fee_scaled: _Optional[int] = ..., estimated_net_base_qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., fresh_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., fresh_at_ts_ns: _Optional[int] = ...) -> None: ...
 
 class CancelOrderRequest(_message.Message):
     __slots__ = ("order_id", "client_order_id", "symbol_id", "subaccount_id")
@@ -496,16 +548,20 @@ class CancelAllAfterResponse(_message.Message):
     def __init__(self, status: _Optional[str] = ..., effective_timeout_sec: _Optional[int] = ..., expires_at_ts_ns: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class BatchCreateAccepted(_message.Message):
-    __slots__ = ("order_id", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id")
+    __slots__ = ("order_id", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id", "resolved_base_qty_scaled", "submitted_max_quote_debit_scaled")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     TAKE_PROFIT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     STOP_LOSS_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     TRAILING_STOP_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    SUBMITTED_MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
     order_id: int
     take_profit_trigger_id: int
     stop_loss_trigger_id: int
     trailing_stop_trigger_id: int
-    def __init__(self, order_id: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
+    resolved_base_qty_scaled: int
+    submitted_max_quote_debit_scaled: int
+    def __init__(self, order_id: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ..., resolved_base_qty_scaled: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ...) -> None: ...
 
 class BatchCreateRejected(_message.Message):
     __slots__ = ("error",)

@@ -245,6 +245,20 @@ result = await client.orders.create(
 Compatible values from fills/books can be passed back into writes when the
 instrument/domain matches.
 
+### Quote-budget orders and previews
+
+BUY market-IOC and limit-IOC orders can use `max_quote_debit` instead of
+`qty`; it is a quote-asset decimal amount (or a scaled `Quantity`). Specify
+exactly one sizing input. `orders.preview_order(...)` accepts the same shape
+and returns the resolved base quantity and estimated spend before admission.
+
+`orders.batch_replace(...)` returns an admission receipt, not final execution.
+The predecessor ID can be stale after admission; reconcile the successor IDs
+and per-item phases by polling `get_batch_replace_status`. Use
+`is_batch_replace_settled(status)` only to determine that all items have moved
+to `working`, `rejected`, or `terminal`, not as a finality signal. Retry an
+ambiguous batch request with the same `request_id`.
+
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).

@@ -39,6 +39,7 @@ from polyester.codecs.decode.orders import (
     modify_order_from_proto,
     order_mutation_from_proto,
     orders_list_from_proto,
+    preview_order_from_proto,
     user_trades_list_from_proto,
 )
 from polyester.codecs.decode.resolve import resolved_accounts_from_proto
@@ -84,6 +85,7 @@ __all__ = [
     "order_mutation_from_proto",
     "orderbook_from_proto",
     "orders_list_from_proto",
+    "preview_order_from_proto",
     "resolved_accounts_from_proto",
     "transfers_list_from_proto",
     "trigger_events_list_from_proto",

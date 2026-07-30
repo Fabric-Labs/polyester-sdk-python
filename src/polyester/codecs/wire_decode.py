@@ -161,7 +161,7 @@ def decode_user_trade(data: dict[str, Any]) -> UserTrade:
         price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
         qty=Quantity.from_scaled(int(qty_raw), symbol_id=symbol_id),
         fee_scaled=str(_field(data, "feeScaled", "fee_scaled", default="") or ""),
-        fee_source=_enum_name(_field(data, "feeSource", "fee_source", default="")).lower(),
+        fee_asset=_enum_name(_field(data, "feeAsset", "fee_asset", default="")).lower(),
         referral_share_scaled=str(
             _field(data, "referralShareScaled", "referral_share_scaled", default="") or ""
         ),

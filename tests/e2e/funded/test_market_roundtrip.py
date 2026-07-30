@@ -214,7 +214,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         received_fee = sum(
             int(trade.fee_scaled or "0")
             for trade in buy_projection.trades
-            if trade.fee_source == "received"
+            if trade.fee_asset == "base"
         )
         net_received = filled - received_fee
         assert net_received > 0, "BUY net received quantity must be positive"

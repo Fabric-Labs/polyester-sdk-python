@@ -18,7 +18,15 @@ from polyester.codecs.orders import (
 from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
-from polyester.models import BatchReplaceItem, ClientOrderId, CreateOrderRequest, OrderId
+from polyester.models import (
+    BatchReplaceItem,
+    BatchReplaceStatusItem,
+    BatchReplaceStatusResult,
+    ClientOrderId,
+    CreateOrderRequest,
+    OrderId,
+)
+from polyester.services.orders import is_batch_replace_settled
 
 
 def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
@@ -53,7 +61,7 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     assert proto.items[0].symbol == "BTC-USD"
     assert proto.items[0].side == orders_pb2.BUY
     assert proto.items[0].client_order_id == "cid-1"
-    assert proto.items[0].qty_scaled == 10_000_000
+    assert proto.items[0].base_qty_scaled == 10_000_000
     assert proto.items[0].WhichOneof("execution") == "limit_gtc"
     assert proto.items[0].limit_gtc.price_ticks == 50_000_000_000
     assert proto.items[1].symbol == "ETH-USD"
@@ -71,7 +79,7 @@ def test_batch_create_orders_to_proto_from_create_order_request() -> None:
     )
     proto = batch_create_orders_to_proto(items=[item], quantity_scale=8)
     assert len(proto.items) == 1
-    assert proto.items[0].qty_scaled == 50_000_000
+    assert proto.items[0].base_qty_scaled == 50_000_000
     assert proto.items[0].limit_gtc.price_ticks == 100_000_000
 
 
@@ -300,12 +308,47 @@ def test_batch_replace_status_decodes_phases() -> None:
                     updated_ts_ns=123,
                 )
             ],
+            accepted_count=1,
+            rejected_count=0,
         )
     )
     assert result.batch_request_id == format_id(77)
     assert result.admission_status == "admitted"
     assert result.items[0].phase == "working"
     assert result.items[0].updated_ts_ns == 123
+
+
+def test_batch_replace_status_reconciles_phase_counts() -> None:
+    msg = orders_read_pb2.GetBatchReplaceStatusResponse(
+        batch_request_id=77,
+        admission_status=orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
+        items=[
+            orders_read_pb2.BatchReplaceStatusItem(
+                item_index=0,
+                phase=orders_read_pb2.BATCH_REPLACE_PHASE_REJECTED,
+            )
+        ],
+        accepted_count=1,
+        rejected_count=0,
+    )
+    with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
+        batch_replace_status_from_proto(msg)
+
+
+def test_batch_replace_settled_means_status_reconciled_not_final() -> None:
+    status = BatchReplaceStatusResult(
+        batch_request_id="batch",
+        admission_status="admitted",
+        items=[BatchReplaceStatusItem(item_index=0, phase="working")],
+    )
+    assert is_batch_replace_settled(status)
+    assert not is_batch_replace_settled(
+        BatchReplaceStatusResult(
+            batch_request_id="batch",
+            admission_status="admitted",
+            items=[BatchReplaceStatusItem(item_index=0, phase="admitted")],
+        )
+    )
 
 
 def test_cancel_all_after_from_proto() -> None:

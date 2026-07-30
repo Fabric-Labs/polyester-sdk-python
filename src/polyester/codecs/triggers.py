@@ -25,9 +25,9 @@ TRIGGER_PRICE_SOURCE_TO_PROTO = {
     "mark": "MARK_PRICE",
     "mark_price": "MARK_PRICE",
 }
-FEE_SOURCE_TO_PROTO = {
+FEE_ASSET_TO_PROTO = {
     "quote": "QUOTE",
-    "received": "RECEIVED",
+    "base": "BASE",
 }
 SELF_TRADE_PREVENTION_MODE_TO_PROTO = {
     "expire_taker": "EXPIRE_TAKER",
@@ -103,7 +103,7 @@ def create_trigger_to_proto(
     sub_account_id: str | int | None = None,
     client_trigger_id: str | None = None,
     post_only: bool = False,
-    fee_source: str | None = None,
+    fee_asset: str | None = None,
     self_trade_prevention_mode: str | None = None,
     trailing_distance_ticks: int | None = None,
     trailing_distance_bps: int | None = None,
@@ -138,11 +138,11 @@ def create_trigger_to_proto(
     validated_trigger_id = optional_client_id(client_trigger_id, "client_trigger_id")
     if validated_trigger_id:
         intent.client_trigger_id = validated_trigger_id
-    if fee_source is not None:
-        fee_key = fee_source.lower()
-        if fee_key not in FEE_SOURCE_TO_PROTO:
-            raise PolyesterValidationError("fee_source must be quote or received")
-        intent.fee_source = getattr(orders_pb2, FEE_SOURCE_TO_PROTO[fee_key])
+    if fee_asset is not None:
+        fee_key = fee_asset.lower()
+        if fee_key not in FEE_ASSET_TO_PROTO:
+            raise PolyesterValidationError("fee_asset must be quote or base")
+        intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_key])
     if self_trade_prevention_mode is not None:
         stp_key = self_trade_prevention_mode.lower()
         if stp_key not in SELF_TRADE_PREVENTION_MODE_TO_PROTO:

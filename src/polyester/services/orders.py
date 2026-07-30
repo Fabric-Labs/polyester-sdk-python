@@ -17,6 +17,7 @@ from polyester.codecs.decode.orders import (
     modify_order_from_proto,
     order_mutation_from_proto,
     orders_list_from_proto,
+    preview_order_from_proto,
 )
 from polyester.codecs.orders import (
     batch_cancel_orders_to_proto,
@@ -28,7 +29,9 @@ from polyester.codecs.orders import (
     modify_order_to_proto,
     normalize_create_order_request,
     parse_optional_subaccount_id,
+    preview_order_to_proto,
     resolve_quantity_scale,
+    resolve_quote_quantity_scale,
     set_order_key,
 )
 from polyester.codecs.realtime_decode import decode_order_bytes
@@ -58,6 +61,7 @@ from polyester.models import (
     OrderKey,
     OrderMutationResult,
     OrdersList,
+    PreviewOrderResult,
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
@@ -214,6 +218,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     order_type=normalized.order_type,
                     tif=normalized.tif,
                     qty=normalized.qty,
+                    max_quote_debit=normalized.max_quote_debit,
                     price=normalized.price,
                     sub_account_id=resolved_sub,
                     client_order_id=normalized.client_order_id,
@@ -221,16 +226,76 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     expires_at=normalized.expires_at,
                     attached_risk=normalized.attached_risk,
                     market_client_ref_price=normalized.market_client_ref_price,
+                    fee_asset=normalized.fee_asset,
                 )
         await self._ensure_catalogs()
         quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
-        proto_request = create_order_to_proto(normalized, quantity_scale=quantity_scale)
+        quote_quantity_scale = resolve_quote_quantity_scale(
+            self._catalogs, normalized.symbol, normalized.max_quote_debit
+        )
+        proto_request = create_order_to_proto(
+            normalized,
+            quantity_scale=quantity_scale,
+            quote_quantity_scale=quote_quantity_scale,
+        )
         return await unary_auth_decoded(
             self._transport,
             OrdersServiceClient,
             lambda client, req: client.create_order(req),
             proto_request,
-            order_mutation_from_proto,
+            lambda response: order_mutation_from_proto(response, quantity_scale=quantity_scale),
+        )
+
+    async def preview_order(
+        self,
+        request: CreateOrderRequest | None = None,
+        *,
+        account: str | dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> PreviewOrderResult:
+        """Preview validation, resolved size, and estimated spend without admission."""
+        if account is not None:
+            kwargs = {
+                **kwargs,
+                "sub_account_id": self._resolve_sub_account_id(account=account),
+            }
+        normalized = normalize_create_order_request(request, **kwargs)
+        if normalized.sub_account_id is None:
+            resolved_sub = self._resolve_sub_account_id(None)
+            if resolved_sub is not None:
+                normalized = CreateOrderRequest(
+                    symbol=normalized.symbol,
+                    symbol_id=normalized.symbol_id,
+                    side=normalized.side,
+                    order_type=normalized.order_type,
+                    tif=normalized.tif,
+                    qty=normalized.qty,
+                    max_quote_debit=normalized.max_quote_debit,
+                    price=normalized.price,
+                    sub_account_id=resolved_sub,
+                    client_order_id=normalized.client_order_id,
+                    post_only=normalized.post_only,
+                    expires_at=normalized.expires_at,
+                    attached_risk=normalized.attached_risk,
+                    market_client_ref_price=normalized.market_client_ref_price,
+                    fee_asset=normalized.fee_asset,
+                )
+        await self._ensure_catalogs()
+        quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
+        quote_quantity_scale = resolve_quote_quantity_scale(
+            self._catalogs, normalized.symbol, normalized.max_quote_debit
+        )
+        proto_request = preview_order_to_proto(
+            normalized,
+            quantity_scale=quantity_scale,
+            quote_quantity_scale=quote_quantity_scale,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            OrdersServiceClient,
+            lambda client, req: client.preview_order(req),
+            proto_request,
+            lambda response: preview_order_from_proto(response, quantity_scale=quantity_scale),
         )
 
     async def cancel(
@@ -551,3 +616,15 @@ def _order_trades_projection_complete(result: GetOrderResult) -> bool:
             return False
         trade_sum += trade.qty.scaled
     return trade_sum == cum
+
+
+def is_batch_replace_settled(status: BatchReplaceStatusResult) -> bool:
+    """Whether every replacement has left admission and reached a stable phase.
+
+    ``terminal`` means the successor's lifecycle is terminal, not necessarily
+    that the original replacement request failed. Poll status to reconcile
+    predecessor/successor IDs and phases; do not infer finality from admission.
+    """
+    return bool(status.items) and all(
+        item.phase in {"working", "rejected", "terminal"} for item in status.items
+    )

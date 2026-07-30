@@ -73,7 +73,7 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
         trailing_distance_ticks=500_000,
         activation_price="51000",
         max_slippage_bps=25,
-        fee_source="quote",
+        fee_asset="quote",
         self_trade_prevention_mode="expire_maker",
     )
     trigger = proto.trigger
@@ -82,7 +82,7 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
     assert trailing.trailing_distance_ticks == 500_000
     assert trailing.activation_price_ticks == 51_000_000_000
     assert trailing.max_slippage_bps == 25
-    assert trigger.fee_source == orders_pb2.QUOTE
+    assert trigger.fee_asset == orders_pb2.QUOTE
     assert trigger.self_trade_prevention_mode == orders_pb2.EXPIRE_MAKER
 
 

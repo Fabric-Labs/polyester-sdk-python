@@ -277,7 +277,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
             symbol_id=int(msg.symbol_id),
         ),
         limit_price=cfg.limit_price,
-        fee_source=proto_enum_name(orders_pb2.FeeSource, msg.fee_source),
+        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
         self_trade_prevention_mode=proto_enum_name(
             orders_pb2.SelfTradePreventionMode, msg.self_trade_prevention_mode
         ),

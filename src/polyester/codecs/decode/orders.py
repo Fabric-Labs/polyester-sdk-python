@@ -27,6 +27,7 @@ from polyester.models import (
     ModifyOrderResult,
     OrderMutationResult,
     OrdersList,
+    PreviewOrderResult,
     RiskLeg,
     TrailingStop,
     UserTradesList,
@@ -138,6 +139,16 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         created_ts_ns=str(msg.created_ts_ns),
         version=int(msg.version),
         post_only=bool(msg.post_only),
+        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
+        submitted_max_quote_debit_scaled=(
+            str(msg.submitted_max_quote_debit_scaled)
+            if (
+                "submitted_max_quote_debit_scaled"
+                in msg.DESCRIPTOR.fields_by_name
+                and msg.HasField("submitted_max_quote_debit_scaled")
+            )
+            else ""
+        ),
         attached_risk=attached,
     )
 
@@ -160,7 +171,7 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         qty=_qty(msg.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         fee_scaled=str(msg.fee_scaled),
-        fee_source=proto_enum_name(orders_pb2.FeeSource, msg.fee_source),
+        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
         referral_share_scaled=str(msg.referral_share_scaled),
         ts_ns=str(msg.ts_ns),
     )
@@ -179,7 +190,9 @@ def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
     return GetOrderResult(order=order, trades=trades)
 
 
-def order_mutation_from_proto(msg) -> OrderMutationResult:
+def order_mutation_from_proto(
+    msg, *, quantity_scale: int | None = None
+) -> OrderMutationResult:
     client_order_id = getattr(msg, "client_order_id", "") or ""
     # CreateOrderResponse no longer carries a status field (POLY-3701): reaching
     # the client means the order was admitted, so synthesize "accepted".
@@ -201,6 +214,44 @@ def order_mutation_from_proto(msg) -> OrderMutationResult:
         status=status,
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
         client_order_id=client_order_id,
+        resolved_base_qty_scaled=str(getattr(msg, "resolved_base_qty_scaled", 0) or ""),
+        resolved_base_qty=(
+            _qty(msg.resolved_base_qty_scaled, symbol_id=0, scale=quantity_scale)
+            if getattr(msg, "resolved_base_qty_scaled", 0)
+            else None
+        ),
+        submitted_max_quote_debit_scaled=(
+            str(msg.submitted_max_quote_debit_scaled)
+            if (
+                "submitted_max_quote_debit_scaled"
+                in msg.DESCRIPTOR.fields_by_name
+                and msg.HasField("submitted_max_quote_debit_scaled")
+            )
+            else ""
+        ),
+    )
+
+
+def preview_order_from_proto(
+    msg: orders_pb2.PreviewOrderResponse, *, quantity_scale: int | None = None
+) -> PreviewOrderResult:
+    return PreviewOrderResult(
+        resolved_base_qty_scaled=str(msg.resolved_base_qty_scaled or ""),
+        resolved_base_qty=(
+            _qty(msg.resolved_base_qty_scaled, symbol_id=0, scale=quantity_scale)
+            if msg.resolved_base_qty_scaled
+            else None
+        ),
+        price_bound=_price(msg.price_bound_ticks) if msg.price_bound_ticks else None,
+        estimated_quote_debit_scaled=str(msg.estimated_quote_debit_scaled),
+        estimated_fee_scaled=str(msg.estimated_fee_scaled),
+        estimated_net_base_qty=(
+            _qty(msg.estimated_net_base_qty_scaled, symbol_id=0, scale=quantity_scale)
+            if msg.estimated_net_base_qty_scaled
+            else None
+        ),
+        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
+        fresh_at_ts_ns=str(msg.fresh_at_ts_ns),
     )
 
 
@@ -347,6 +398,8 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
             f"unknown admission status: {msg.admission_status}",
         )
     items: list[BatchReplaceStatusItem] = []
+    decoded_accepted = 0
+    decoded_rejected = 0
     for item in msg.items:
         phase = _batch_replace_phase(item.phase)
         if not phase:
@@ -368,12 +421,29 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
                 updated_ts_ns=int(item.updated_ts_ns),
             )
         )
+        if phase in {"admitted", "working", "terminal"}:
+            decoded_accepted += 1
+        else:
+            decoded_rejected += 1
+    accepted_count = int(msg.accepted_count)
+    rejected_count = int(msg.rejected_count)
+    if (
+        accepted_count != decoded_accepted
+        or rejected_count != decoded_rejected
+        or accepted_count + rejected_count != len(items)
+    ):
+        raise PolyesterResponseContractError(
+            "GetBatchReplaceStatus",
+            "batch replace status counts do not match decoded phases: "
+            f"accepted={accepted_count}/{decoded_accepted} "
+            f"rejected={rejected_count}/{decoded_rejected} items={len(items)}",
+        )
     return BatchReplaceStatusResult(
         batch_request_id=format_uint64_id(msg.batch_request_id),
         admission_status=admission_status,
         items=items,
-        accepted_count=int(msg.accepted_count),
-        rejected_count=int(msg.rejected_count),
+        accepted_count=accepted_count,
+        rejected_count=rejected_count,
         accepted_ts_ns=int(msg.accepted_ts_ns),
         updated_ts_ns=int(msg.updated_ts_ns),
     )

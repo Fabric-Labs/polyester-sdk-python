@@ -309,6 +309,18 @@ class CatalogManager:
                 return int(value) if value is not None else None
         return None
 
+    def quote_quantity_scale_for_symbol(self, symbol: str) -> int | None:
+        """Return the pair quote quantity scale, or None when unknown/unhydrated."""
+        if self._unusable:
+            return None
+        for pair in self._pairs():
+            if pair.get("symbol") == symbol:
+                value = pair.get("quote_quantity_scale")
+                if value is None:
+                    value = pair.get("quoteQuantityScale")
+                return int(value) if value is not None else None
+        return None
+
     def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int | None:
         if self._unusable:
             return None

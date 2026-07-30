@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.1.0a29
+
+### Changed
+- README install pin catches up to the current alpha tag. No API changes from `0.1.0a28`.
+
 ## 0.1.0a28
 
 ### Breaking

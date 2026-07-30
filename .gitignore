@@ -26,3 +26,4 @@ dist/
 pip-wheel-metadata/
 
 .DS_Store
+.venv-test/

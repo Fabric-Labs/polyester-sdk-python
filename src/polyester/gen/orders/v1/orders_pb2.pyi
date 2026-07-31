@@ -352,28 +352,18 @@ class PreviewOrderRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., order: _Optional[_Union[OrderIntent, _Mapping]] = ...) -> None: ...
 
 class PreviewOrderResponse(_message.Message):
-    __slots__ = ("resolved_base_qty_scaled", "price_bound_ticks", "estimated_quote_debit_scaled", "estimated_fee_scaled", "estimated_net_base_qty_scaled", "fee_asset", "fresh_at", "fresh_at_ts_ns", "admissible", "rejection")
-    RESOLVED_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    PRICE_BOUND_TICKS_FIELD_NUMBER: _ClassVar[int]
-    ESTIMATED_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
-    ESTIMATED_FEE_SCALED_FIELD_NUMBER: _ClassVar[int]
-    ESTIMATED_NET_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
-    FRESH_AT_FIELD_NUMBER: _ClassVar[int]
-    FRESH_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("admissible", "rejection", "resolved_base_qty_scaled", "protected_price_bound_ticks", "evaluated_at")
     ADMISSIBLE_FIELD_NUMBER: _ClassVar[int]
     REJECTION_FIELD_NUMBER: _ClassVar[int]
-    resolved_base_qty_scaled: int
-    price_bound_ticks: int
-    estimated_quote_debit_scaled: int
-    estimated_fee_scaled: int
-    estimated_net_base_qty_scaled: int
-    fee_asset: FeeAsset
-    fresh_at: _timestamp_pb2.Timestamp
-    fresh_at_ts_ns: int
+    RESOLVED_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    PROTECTED_PRICE_BOUND_TICKS_FIELD_NUMBER: _ClassVar[int]
+    EVALUATED_AT_FIELD_NUMBER: _ClassVar[int]
     admissible: bool
     rejection: ErrorDetail
-    def __init__(self, resolved_base_qty_scaled: _Optional[int] = ..., price_bound_ticks: _Optional[int] = ..., estimated_quote_debit_scaled: _Optional[int] = ..., estimated_fee_scaled: _Optional[int] = ..., estimated_net_base_qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., fresh_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., fresh_at_ts_ns: _Optional[int] = ..., admissible: _Optional[bool] = ..., rejection: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
+    resolved_base_qty_scaled: int
+    protected_price_bound_ticks: int
+    evaluated_at: _timestamp_pb2.Timestamp
+    def __init__(self, admissible: _Optional[bool] = ..., rejection: _Optional[_Union[ErrorDetail, _Mapping]] = ..., resolved_base_qty_scaled: _Optional[int] = ..., protected_price_bound_ticks: _Optional[int] = ..., evaluated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class CancelOrderRequest(_message.Message):
     __slots__ = ("order_id", "client_order_id", "symbol_id", "subaccount_id")

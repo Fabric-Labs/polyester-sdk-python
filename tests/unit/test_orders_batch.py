@@ -14,6 +14,7 @@ from polyester.codecs.orders import (
     batch_replace_orders_to_proto,
     cancel_all_after_to_proto,
     normalize_create_order_request,
+    validate_batch_size,
 )
 from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
@@ -84,8 +85,37 @@ def test_batch_create_orders_to_proto_from_create_order_request() -> None:
 
 
 def test_batch_create_requires_items() -> None:
-    with pytest.raises(PolyesterValidationError):
+    with pytest.raises(PolyesterValidationError, match="at least one"):
         batch_create_orders_to_proto(items=[])
+
+
+def test_batch_size_guard_rejects_more_than_twenty() -> None:
+    validate_batch_size("batch_create", 1)
+    validate_batch_size("batch_create", 20)
+    with pytest.raises(PolyesterValidationError, match="at least one"):
+        validate_batch_size("batch_create", 0)
+    with pytest.raises(PolyesterValidationError, match="at most 20"):
+        validate_batch_size("batch_create", 21)
+
+    item = {
+        "symbol": "BTC-USD",
+        "side": "buy",
+        "order_type": "limit",
+        "qty": "0.1",
+        "price": "1",
+    }
+    with pytest.raises(PolyesterValidationError, match="at most 20"):
+        batch_create_orders_to_proto(items=[item] * 21, quantity_scale=8)
+    with pytest.raises(PolyesterValidationError, match="at most 20"):
+        batch_cancel_orders_to_proto(items=[{"key": OrderId("1")}] * 21)
+    with pytest.raises(PolyesterValidationError, match="at most 20"):
+        batch_replace_orders_to_proto(
+            items=[
+                BatchReplaceItem(key=OrderId("1"), new_qty="0.1") for _ in range(21)
+            ],
+            symbol_id=1,
+            quantity_scale=8,
+        )
 
 
 def test_batch_cancel_orders_to_proto() -> None:

@@ -51,7 +51,9 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     # Any: msgspec accepts str | Decimal | Quantity at runtime.
     qty: Any | None = None
     # BUY market-IOC and limit-IOC orders may instead specify a quote budget.
-    # Decimal inputs use the hydrated quote quantity scale for the symbol.
+    # Decimal/str inputs use the hydrated catalog quote_quantity_scale.
+    # Typed Quantity values must use QuantityDomain.ORDER_QUOTE and embed that
+    # same catalog scale (Quantity.from_quote_scaled / from_quote_decimal).
     max_quote_debit: Any | None = None
     price: Any | None = None
     sub_account_id: str | None = None

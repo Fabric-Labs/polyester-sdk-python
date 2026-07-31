@@ -23,6 +23,7 @@ from polyester.errors import PolyesterValidationError
 
 class QuantityDomain(StrEnum):
     ORDER_BASE = "order_base"
+    ORDER_QUOTE = "order_quote"
     ASSET = "asset"
     LEDGER_E18 = "ledger_e18"
 
@@ -72,7 +73,7 @@ class Price:
 
 @dataclass(frozen=True, slots=True)
 class Quantity:
-    """Resolved order/trigger base quantity (protobuf qty_scaled)."""
+    """Resolved order/trigger base or quote quantity (protobuf qty_scaled)."""
 
     scaled: int
     scale: int | None = None
@@ -91,6 +92,10 @@ class Quantity:
         symbol_id: int | None = None,
     ) -> Quantity:
         value = _require_scaled_int(scaled, "scaled")
+        if domain not in (QuantityDomain.ORDER_BASE, QuantityDomain.ORDER_QUOTE):
+            raise PolyesterValidationError(
+                "Quantity domain must be order_base or order_quote"
+            )
         if scale is not None:
             validate_protocol_scale(scale)
         return cls(
@@ -99,6 +104,57 @@ class Quantity:
             domain=domain,
             symbol=symbol,
             symbol_id=symbol_id,
+        )
+
+    @classmethod
+    def from_quote_scaled(
+        cls,
+        scaled: int,
+        scale: int,
+        *,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
+    ) -> Quantity:
+        """Construct a quote-debit budget from scaled integer units.
+
+        ``scale`` is required so a bare integer can never silently inherit the
+        catalog scale. Use
+        ``CatalogManager.quote_quantity_scale_for_symbol``.
+        """
+        return cls.from_scaled(
+            scaled,
+            scale=scale,
+            domain=QuantityDomain.ORDER_QUOTE,
+            symbol=symbol,
+            symbol_id=symbol_id,
+        )
+
+    @classmethod
+    def from_quote_decimal_str(
+        cls,
+        raw: str,
+        scale: int,
+        *,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
+    ) -> Quantity:
+        scaled = parse_qty_scaled(raw, scale, "quote amount")
+        return cls.from_quote_scaled(
+            scaled, scale, symbol=symbol, symbol_id=symbol_id
+        )
+
+    @classmethod
+    def from_quote_decimal(
+        cls,
+        raw: Decimal,
+        scale: int,
+        *,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
+    ) -> Quantity:
+        scaled = parse_qty_scaled(raw, scale, "quote amount")
+        return cls.from_quote_scaled(
+            scaled, scale, symbol=symbol, symbol_id=symbol_id
         )
 
     def as_decimal(self, scale: int | None = None) -> Decimal:
@@ -263,6 +319,42 @@ def resolve_qty_scaled(
     return parse_qty_scaled(value, scale, field_name)
 
 
+def resolve_quote_qty_scaled(
+    value: str | Decimal | Quantity,
+    scale: int,
+    field_name: str = "max_quote_debit",
+    *,
+    symbol: str | None = None,
+    symbol_id: int | None = None,
+) -> int:
+    """Resolve a quote-debit budget. Typed values must carry the catalog quote scale."""
+    if isinstance(value, Quantity):
+        if value.scale is None:
+            raise PolyesterValidationError(
+                "quote amount scale is required; use "
+                "Quantity.from_quote_scaled/from_quote_decimal"
+            )
+        value.compatible_with(
+            domain=QuantityDomain.ORDER_QUOTE,
+            scale=scale,
+            symbol=symbol,
+            symbol_id=symbol_id,
+        )
+        if value.scaled <= 0:
+            raise PolyesterValidationError(f"{field_name} must be positive")
+        return value.scaled
+    if isinstance(value, AssetAmount):
+        raise PolyesterValidationError(
+            f"{field_name} expects Quantity (order quote), not AssetAmount"
+        )
+    if isinstance(value, (int, float, bool)) and not isinstance(value, Decimal):
+        raise PolyesterValidationError(
+            f"{field_name} must be a decimal string, Decimal, or Quantity "
+            "(use Quantity.from_quote_scaled for scaled ints)"
+        )
+    return parse_qty_scaled(value, scale, field_name)
+
+
 def resolve_asset_amount_scaled(
     value: str | Decimal | AssetAmount,
     scale: int,
@@ -343,4 +435,5 @@ __all__ = [
     "resolve_asset_amount_scaled_with_input_scale",
     "resolve_price_ticks",
     "resolve_qty_scaled",
+    "resolve_quote_qty_scaled",
 ]

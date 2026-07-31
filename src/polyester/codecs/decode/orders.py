@@ -38,11 +38,24 @@ from polyester.models import (
 from polyester.models import (
     UserTrade as PublicUserTrade,
 )
-from polyester.types.money import Price, Quantity
+from polyester.types.money import Price, Quantity, QuantityDomain
 
 
-def _qty(scaled: int, *, symbol_id: int, scale: int | None = None) -> Quantity:
-    return Quantity.from_scaled(int(scaled), scale=scale, symbol_id=int(symbol_id))
+def _qty(
+    scaled: int,
+    *,
+    symbol_id: int,
+    scale: int | None = None,
+    domain: QuantityDomain = QuantityDomain.ORDER_BASE,
+    symbol: str | None = None,
+) -> Quantity:
+    return Quantity.from_scaled(
+        int(scaled),
+        scale=scale,
+        domain=domain,
+        symbol=symbol,
+        symbol_id=int(symbol_id) if symbol_id else None,
+    )
 
 
 def _price(ticks: int, *, symbol_id: int | None = None) -> Price:
@@ -233,24 +246,74 @@ def order_mutation_from_proto(
 
 
 def preview_order_from_proto(
-    msg: orders_pb2.PreviewOrderResponse, *, quantity_scale: int | None = None
+    msg: orders_pb2.PreviewOrderResponse,
+    *,
+    quantity_scale: int | None = None,
+    quote_quantity_scale: int | None = None,
+    symbol: str | None = None,
+    symbol_id: int | None = None,
 ) -> PreviewOrderResult:
+    fee_asset = proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset)
+    if fee_asset == "base":
+        fee_domain = QuantityDomain.ORDER_BASE
+        fee_scale = quantity_scale
+    elif fee_asset == "quote":
+        fee_domain = QuantityDomain.ORDER_QUOTE
+        fee_scale = quote_quantity_scale
+    else:
+        raise PolyesterResponseContractError(
+            "PreviewOrder",
+            f"unknown fee_asset {fee_asset!r}",
+        )
+    if quote_quantity_scale is None:
+        raise PolyesterResponseContractError(
+            "PreviewOrder",
+            "quote_quantity_scale is required to decode estimated_quote_debit",
+        )
+    if fee_scale is None:
+        raise PolyesterResponseContractError(
+            "PreviewOrder",
+            "quantity scale is required to decode estimated_fee",
+        )
+    resolved_symbol_id = int(symbol_id) if symbol_id is not None else 0
     return PreviewOrderResult(
         resolved_base_qty_scaled=str(msg.resolved_base_qty_scaled or ""),
         resolved_base_qty=(
-            _qty(msg.resolved_base_qty_scaled, symbol_id=0, scale=quantity_scale)
+            _qty(
+                msg.resolved_base_qty_scaled,
+                symbol_id=resolved_symbol_id,
+                scale=quantity_scale,
+                symbol=symbol,
+            )
             if msg.resolved_base_qty_scaled
             else None
         ),
         price_bound=_price(msg.price_bound_ticks) if msg.price_bound_ticks else None,
-        estimated_quote_debit_scaled=str(msg.estimated_quote_debit_scaled),
-        estimated_fee_scaled=str(msg.estimated_fee_scaled),
+        estimated_quote_debit=_qty(
+            msg.estimated_quote_debit_scaled,
+            symbol_id=resolved_symbol_id,
+            scale=quote_quantity_scale,
+            domain=QuantityDomain.ORDER_QUOTE,
+            symbol=symbol,
+        ),
+        estimated_fee=_qty(
+            msg.estimated_fee_scaled,
+            symbol_id=resolved_symbol_id,
+            scale=fee_scale,
+            domain=fee_domain,
+            symbol=symbol,
+        ),
         estimated_net_base_qty=(
-            _qty(msg.estimated_net_base_qty_scaled, symbol_id=0, scale=quantity_scale)
+            _qty(
+                msg.estimated_net_base_qty_scaled,
+                symbol_id=resolved_symbol_id,
+                scale=quantity_scale,
+                symbol=symbol,
+            )
             if msg.estimated_net_base_qty_scaled
             else None
         ),
-        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
+        fee_asset=fee_asset,
         fresh_at_ts_ns=str(msg.fresh_at_ts_ns),
     )
 

@@ -1,3 +1,5 @@
+import pytest
+
 from polyester.codecs.decode.orders import (
     get_order_from_proto,
     modify_order_from_proto,
@@ -7,6 +9,7 @@ from polyester.codecs.decode.orders import (
     preview_order_from_proto,
 )
 from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOpenOrdersResponse,
@@ -15,6 +18,7 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     OrderStatus,
     UserTrade,
 )
+from polyester.types.money import QuantityDomain
 
 
 def test_order_from_proto_maps_enums_and_ids() -> None:
@@ -173,13 +177,33 @@ def test_order_mutation_and_preview_expose_explicit_sizing() -> None:
             estimated_net_base_qty_scaled=98,
             fee_asset=orders_pb2.BASE,
         ),
-        quantity_scale=2,
+        quantity_scale=8,
+        quote_quantity_scale=6,
+        symbol="BTC-USDT",
+        symbol_id=1,
     )
     assert preview.resolved_base_qty is not None
     assert preview.resolved_base_qty.scaled == 100
     assert preview.resolved_base_qty_scaled == "100"
-    assert preview.estimated_quote_debit_scaled == "500"
+    assert preview.estimated_quote_debit is not None
+    assert preview.estimated_quote_debit.scaled == 500
+    assert preview.estimated_quote_debit.domain == QuantityDomain.ORDER_QUOTE
+    assert preview.estimated_quote_debit.scale == 6
+    assert preview.estimated_fee is not None
+    assert preview.estimated_fee.scaled == 2
+    assert preview.estimated_fee.domain == QuantityDomain.ORDER_BASE
+    assert preview.estimated_fee.scale == 8
     assert preview.fee_asset == "base"
+
+    with pytest.raises(PolyesterResponseContractError, match="quote_quantity_scale"):
+        preview_order_from_proto(
+            orders_pb2.PreviewOrderResponse(
+                estimated_quote_debit_scaled=1,
+                estimated_fee_scaled=1,
+                fee_asset=orders_pb2.QUOTE,
+            ),
+            quantity_scale=8,
+        )
 
 
 def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:

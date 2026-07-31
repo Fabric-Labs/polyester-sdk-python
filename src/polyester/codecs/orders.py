@@ -17,7 +17,12 @@ from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
-from polyester.types.money import Quantity, resolve_price_ticks, resolve_qty_scaled
+from polyester.types.money import (
+    Quantity,
+    resolve_price_ticks,
+    resolve_qty_scaled,
+    resolve_quote_qty_scaled,
+)
 
 ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
 ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
@@ -28,6 +33,16 @@ MODIFY_BEHAVIOR_TO_PROTO = {
     "amend_only": "AMEND_ONLY",
     "replace_only": "REPLACE_ONLY",
 }
+MAX_BATCH_ITEMS = 20
+
+
+def validate_batch_size(operation: str, length: int) -> None:
+    if length == 0:
+        raise PolyesterValidationError(f"{operation} requires at least one item")
+    if length > MAX_BATCH_ITEMS:
+        raise PolyesterValidationError(
+            f"{operation} accepts at most {MAX_BATCH_ITEMS} items; received {length}"
+        )
 
 
 def require_order_key(key: OrderKey, op: str) -> OrderKey:
@@ -176,9 +191,14 @@ def order_intent_from_request(
     else:
         if request.side != "buy":
             raise PolyesterValidationError("max_quote_debit is only valid for buy orders")
-        intent.max_quote_debit_scaled = resolve_qty_scaled(
+        if quote_quantity_scale is None:
+            raise PolyesterValidationError(
+                "quote quantity scale is required for max_quote_debit; "
+                "await client.wait_for_catalogs() or pass quote_quantity_scale"
+            )
+        intent.max_quote_debit_scaled = resolve_quote_qty_scaled(
             cast(Any, request.max_quote_debit),
-            _codec_quantity_scale(request.max_quote_debit, quote_quantity_scale),
+            quote_quantity_scale,
             "max_quote_debit",
             symbol=request.symbol,
         )
@@ -350,8 +370,7 @@ def batch_create_orders_to_proto(
 ) -> orders_pb2.BatchCreateOrdersRequest:
     # ``allow_partial`` was removed from the wire in POLY-3701; it is accepted
     # for backwards compatibility but ignored.
-    if not items:
-        raise PolyesterValidationError("batch_create requires at least one item")
+    validate_batch_size("batch_create", len(items))
     proto = orders_pb2.BatchCreateOrdersRequest(
         request_id=optional_request_id(request_id) or f"batch-create-{uuid.uuid4().hex[:12]}",
     )
@@ -382,8 +401,7 @@ def batch_cancel_orders_to_proto(
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
 ) -> orders_pb2.BatchCancelOrdersRequest:
-    if not items:
-        raise PolyesterValidationError("batch_cancel requires at least one item")
+    validate_batch_size("batch_cancel", len(items))
     proto = orders_pb2.BatchCancelOrdersRequest(
         request_id=optional_request_id(request_id) or f"batch-cancel-{uuid.uuid4().hex[:12]}",
     )
@@ -426,8 +444,7 @@ def batch_replace_orders_to_proto(
     request_id: str | None = None,
     quantity_scale: int | None = None,
 ) -> orders_pb2.BatchReplaceOrdersRequest:
-    if not items:
-        raise PolyesterValidationError("batch_replace requires at least one item")
+    validate_batch_size("batch_replace", len(items))
     if symbol_id <= 0:
         raise PolyesterValidationError("batch_replace requires a resolved symbol_id")
     proto = orders_pb2.BatchReplaceOrdersRequest(
@@ -578,11 +595,28 @@ def resolve_quote_quantity_scale(
     symbol: str | None,
     value: object | None,
 ) -> int:
+    """Resolve catalog quote quantity scale for quote-debit budgets.
+
+    Always looks up the pair's catalog ``quote_quantity_scale``. Typed
+    :class:`Quantity` values must embed a matching scale; decimal/str inputs
+    require the catalog scale (no silent bypass when ``Quantity.scale`` is
+    missing).
+    """
     if value is None:
         return 0
+    catalog_scale = quote_quantity_scale_for_symbol(catalogs, symbol)
     if isinstance(value, Quantity):
-        return value.scale if value.scale is not None else 0
-    return quote_quantity_scale_for_symbol(catalogs, symbol)
+        if value.scale is None:
+            raise PolyesterValidationError(
+                "quote amount scale is required; use "
+                "Quantity.from_quote_scaled/from_quote_decimal"
+            )
+        if value.scale != catalog_scale:
+            raise PolyesterValidationError(
+                f"quantity scale mismatch: value scale is {value.scale}, "
+                f"destination is {catalog_scale}"
+            )
+    return catalog_scale
 
 
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:

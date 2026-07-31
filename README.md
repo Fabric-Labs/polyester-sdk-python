@@ -215,9 +215,45 @@ creates. **Set a stable non-empty value when you may retry** after an ambiguous
 transport/server failure, and reuse that same id on retry / reconciliation -
 without it you cannot safely tell whether the first attempt admitted the order.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
-`-`. Batch create accepts at most 20 orders. Treat a cancel response as an
-admission acknowledgement and reconcile with `list_open` before releasing local
-state.
+`-`. Batch create, cancel, and replace accept at most 20 items. Treat a cancel
+response as an admission acknowledgement and reconcile with `list_open` before
+releasing local state.
+
+Create sizing is explicit: set exactly one of base `qty` or `max_quote_debit`
+(a hard all-in quote-debit budget). Decimal/str quote budgets use the pair's
+catalog `quote_quantity_scale`. Typed budgets must use
+`QuantityDomain.ORDER_QUOTE` and embed that scale; construct with
+`Quantity.from_quote_decimal_str` / `from_quote_decimal` / `from_quote_scaled`
+and validate against `client.catalogs.quote_quantity_scale_for_symbol`.
+
+```python
+quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BNB-USDT")
+assert quote_scale is not None  # await client.wait_for_catalogs() first
+result = await client.orders.create(
+    symbol="BNB-USDT",
+    side="buy",
+    order_type="market",
+    max_quote_debit=Quantity.from_quote_decimal_str(
+        "25.00", quote_scale, symbol="BNB-USDT"
+    ),
+)
+```
+
+Use `orders.preview_order(...)` for advisory resolved base quantity, price
+bound, and typed quote/fee estimates before submitting a quote-budget order.
+`estimated_quote_debit` always has `ORDER_QUOTE` domain;
+`estimated_fee` has `ORDER_BASE` or `ORDER_QUOTE` according to `fee_asset`.
+Preview is not deployed on every API host, so handle an unimplemented/not-found
+response and do not make Preview a prerequisite for order submission.
+
+Market orders are IOC and enforce a slippage-derived execution boundary. See
+[Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
+before overriding market slippage.
+
+Scaled transfer/withdraw `AssetAmount` inputs must carry their source scale.
+`AssetAmount.from_scaled(..., scale=None)` is accepted for composition only and
+fails closed on encoding unless the request's `amount_scale` /
+`quantity_scale` is explicit.
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
@@ -244,13 +280,6 @@ result = await client.orders.create(
 
 Compatible values from fills/books can be passed back into writes when the
 instrument/domain matches.
-
-### Quote-budget orders and previews
-
-BUY market-IOC and limit-IOC orders can use `max_quote_debit` instead of
-`qty`; it is a quote-asset decimal amount (or a scaled `Quantity`). Specify
-exactly one sizing input. `orders.preview_order(...)` accepts the same shape
-and returns the resolved base quantity and estimated spend before admission.
 
 `orders.batch_replace(...)` returns an admission receipt, not final execution.
 The predecessor ID can be stale after admission; reconcile the successor IDs

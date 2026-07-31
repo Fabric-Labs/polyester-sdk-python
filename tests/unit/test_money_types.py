@@ -4,7 +4,12 @@ from decimal import Decimal
 
 import pytest
 
-from polyester.codecs.orders import create_order_to_proto, normalize_create_order_request
+from polyester.catalogs import CatalogManager
+from polyester.codecs.orders import (
+    create_order_to_proto,
+    normalize_create_order_request,
+    resolve_quote_quantity_scale,
+)
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.types.money import (
@@ -13,8 +18,10 @@ from polyester.types.money import (
     Quantity,
     QuantityDomain,
     resolve_asset_amount_scaled,
+    resolve_asset_amount_scaled_with_input_scale,
     resolve_price_ticks,
     resolve_qty_scaled,
+    resolve_quote_qty_scaled,
 )
 
 
@@ -98,6 +105,64 @@ def test_create_order_supports_quote_budget_sizing() -> None:
     assert proto.order.WhichOneof("sizing") == "max_quote_debit_scaled"
     assert proto.order.max_quote_debit_scaled == 1234
     assert proto.order.fee_asset == orders_pb2.BASE
+
+    quote = Quantity.from_quote_decimal_str("12.34", 2, symbol="BTC-USD")
+    req2 = normalize_create_order_request(
+        symbol="BTC-USD",
+        side="buy",
+        order_type="market",
+        max_quote_debit=quote,
+    )
+    proto2 = create_order_to_proto(req2, quote_quantity_scale=2)
+    assert proto2.order.max_quote_debit_scaled == 1234
+
+
+def test_quote_budget_requires_matching_catalog_scale() -> None:
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {
+            "pairs": [
+                {
+                    "symbol": "BTC-USD",
+                    "symbol_id": 1,
+                    "base_quantity_scale": 8,
+                    "quote_quantity_scale": 6,
+                }
+            ]
+        }
+    )
+    quote = Quantity.from_quote_scaled(5_000_000, 6, symbol="BTC-USD")
+    assert resolve_quote_quantity_scale(catalogs, "BTC-USD", quote) == 6
+    assert resolve_quote_qty_scaled(quote, 6, symbol="BTC-USD") == 5_000_000
+
+    wrong_scale = Quantity.from_quote_scaled(5_000_000, 8)
+    with pytest.raises(PolyesterValidationError, match="scale mismatch"):
+        resolve_quote_quantity_scale(catalogs, "BTC-USD", wrong_scale)
+
+    missing_scale = Quantity.from_scaled(
+        5_000_000, domain=QuantityDomain.ORDER_QUOTE
+    )
+    with pytest.raises(PolyesterValidationError, match="quote amount scale is required"):
+        resolve_quote_quantity_scale(catalogs, "BTC-USD", missing_scale)
+    with pytest.raises(PolyesterValidationError, match="quote amount scale is required"):
+        resolve_quote_qty_scaled(missing_scale, 6)
+
+    with pytest.raises(PolyesterValidationError, match="order_base or order_quote"):
+        Quantity.from_scaled(1, domain=QuantityDomain.ASSET)
+
+
+def test_asset_amount_without_value_or_parameter_scale_fails_closed() -> None:
+    amount = AssetAmount.from_scaled(1, domain=QuantityDomain.LEDGER_E18, asset_id=7)
+    with pytest.raises(PolyesterValidationError, match="declared input scale"):
+        resolve_asset_amount_scaled_with_input_scale(
+            amount, None, 18, asset_id=7
+        )
+    assert (
+        resolve_asset_amount_scaled_with_input_scale(
+            amount, 6, 18, asset_id=7
+        )
+        == 1_000_000_000_000
+    )
 
 
 def test_create_order_rejects_float_qty() -> None:

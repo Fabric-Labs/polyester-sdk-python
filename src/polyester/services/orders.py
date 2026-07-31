@@ -30,6 +30,8 @@ from polyester.codecs.orders import (
     normalize_create_order_request,
     parse_optional_subaccount_id,
     preview_order_to_proto,
+    quantity_scale_for_symbol,
+    quote_quantity_scale_for_symbol,
     resolve_quantity_scale,
     resolve_quote_quantity_scale,
     set_order_key,
@@ -285,6 +287,14 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit
         )
+        # Preview estimates always need catalog base + quote scales (fail closed).
+        decode_base_scale = quantity_scale_for_symbol(self._catalogs, normalized.symbol)
+        decode_quote_scale = quote_quantity_scale_for_symbol(self._catalogs, normalized.symbol)
+        symbol_id = (
+            self._catalogs.symbol_id_for_symbol(normalized.symbol)
+            if normalized.symbol
+            else normalized.symbol_id
+        )
         proto_request = preview_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -295,7 +305,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersServiceClient,
             lambda client, req: client.preview_order(req),
             proto_request,
-            lambda response: preview_order_from_proto(response, quantity_scale=quantity_scale),
+            lambda response: preview_order_from_proto(
+                response,
+                quantity_scale=decode_base_scale,
+                quote_quantity_scale=decode_quote_scale,
+                symbol=normalized.symbol,
+                symbol_id=symbol_id,
+            ),
         )
 
     async def cancel(

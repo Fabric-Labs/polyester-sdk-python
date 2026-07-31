@@ -72,8 +72,10 @@ class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     resolved_base_qty_scaled: str = ""
     resolved_base_qty: Quantity | None = None
     price_bound: Price | None = None
-    estimated_quote_debit_scaled: str = ""
-    estimated_fee_scaled: str = ""
+    # All-in quote debit with OrderQuote domain + catalog quote scale.
+    estimated_quote_debit: Quantity | None = None
+    # Estimated fee with OrderBase or OrderQuote domain according to fee_asset.
+    estimated_fee: Quantity | None = None
     estimated_net_base_qty: Quantity | None = None
     fee_asset: str = ""
     fresh_at_ts_ns: str = ""

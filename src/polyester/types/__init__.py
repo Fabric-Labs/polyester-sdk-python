@@ -7,6 +7,7 @@ from polyester.types.money import (
     resolve_asset_amount_scaled,
     resolve_price_ticks,
     resolve_qty_scaled,
+    resolve_quote_qty_scaled,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "resolve_asset_amount_scaled",
     "resolve_price_ticks",
     "resolve_qty_scaled",
+    "resolve_quote_qty_scaled",
 ]

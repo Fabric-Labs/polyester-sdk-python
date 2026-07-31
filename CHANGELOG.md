@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Breaking
+- `PreviewOrderResult` now exposes typed `estimated_quote_debit` and
+  `estimated_fee` (`Quantity`) instead of bare `estimated_quote_debit_scaled` /
+  `estimated_fee_scaled` strings. Quote estimates carry `QuantityDomain.ORDER_QUOTE`
+  and the pair's catalog quote scale; fee estimates use `ORDER_BASE` or
+  `ORDER_QUOTE` according to `fee_asset`.
+- Quote-budget encoding (`max_quote_debit`) always resolves the catalog
+  `quote_quantity_scale` and rejects typed `Quantity` values that omit scale or
+  mismatch the catalog. Prefer `Quantity.from_quote_scaled` /
+  `from_quote_decimal` / `from_quote_decimal_str` with
+  `QuantityDomain.ORDER_QUOTE`.
+
+### Added
+- `QuantityDomain.ORDER_QUOTE` and `Quantity.from_quote_*` constructors.
+- Local validation rejects create, cancel, and replace batches above 20 items.
+
+### Fixed
+- Transfer/withdraw `AssetAmount` encoding fails closed when neither the value
+  nor request parameters provide a source scale (no silent e18 assumption).
+
+### Clarified
+- Preview is not deployed on every API host; handle unimplemented/not-found and
+  do not make Preview a prerequisite for order submission.
+- Market orders enforce slippage-derived price protection; see
+  [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection).
+
 ## 0.1.0a29
 
 ### Changed

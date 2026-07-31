@@ -118,18 +118,20 @@ class ConditionalTrigger(_message.Message):
     def __init__(self, trigger_price_ticks: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., child: _Optional[_Union[ConditionalChildExecution, _Mapping]] = ...) -> None: ...
 
 class TrailingStopTrigger(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps")
+    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps", "side")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRAILING_DISTANCE_BPS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     trailing_distance_bps: int
     activation_price_ticks: int
     max_slippage_ticks: int
     max_slippage_bps: int
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ...) -> None: ...
+    side: _orders_pb2.Side
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ...) -> None: ...
 
 class TwapMarketIoc(_message.Message):
     __slots__ = ()

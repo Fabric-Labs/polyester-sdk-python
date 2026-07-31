@@ -42,6 +42,29 @@ def test_trigger_from_proto_maps_stop_price() -> None:
     assert trigger.details is not None and trigger.details.case == "stop"
 
 
+def test_trigger_from_proto_attached_trailing_surfaces_side_and_parent() -> None:
+    msg = triggers_pb2.Trigger(
+        trigger_id=42,
+        symbol_id=2,
+        symbol="BTC-USD",
+        status=triggers_pb2.STATUS_ARMED,
+        parent_order_id=99,
+        qty_scaled=1_000_000,
+        trailing_stop=triggers_pb2.TrailingStopTrigger(
+            side=orders_pb2.BUY,
+            trailing_distance_bps=50,
+        ),
+        trailing=triggers_pb2.TrailingDetails(trailing_distance_bps=50),
+    )
+    trigger = trigger_from_proto(msg)
+    assert trigger.trigger_type == "trailing_stop"
+    assert trigger.side == "buy"
+    assert trigger.parent_order_id == format_id(99)
+    assert trigger.order_type == "market"
+    assert trigger.time_in_force == "ioc"
+    assert trigger.details is not None and trigger.details.case == "trailing"
+
+
 def test_trigger_from_proto_projects_twap_child_orders_and_executed_qty() -> None:
     msg = triggers_pb2.Trigger(
         trigger_id=11,

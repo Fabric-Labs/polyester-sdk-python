@@ -284,24 +284,18 @@ def preview_order_to_proto(
     quantity_scale: int | None = None,
     quote_quantity_scale: int | None = None,
 ) -> orders_pb2.PreviewOrderRequest:
-    """Build a preview request from the same public shape as ``create``."""
-    intent = order_intent_from_request(
-        request,
-        quantity_scale=quantity_scale,
-        quote_quantity_scale=quote_quantity_scale,
-    )
+    """Build a preview request from the same public shape as ``create``.
+
+    Wire reshape of ``PreviewOrderRequest`` to wrap an ``OrderIntent``
+    (``subaccount_id`` + ``order``), matching ``CreateOrderRequest``.
+    """
     proto = orders_pb2.PreviewOrderRequest(
-        symbol=intent.symbol,
-        side=intent.side,
-        fee_asset=intent.fee_asset,
+        order=order_intent_from_request(
+            request,
+            quantity_scale=quantity_scale,
+            quote_quantity_scale=quote_quantity_scale,
+        )
     )
-    if intent.HasField("base_qty_scaled"):
-        proto.base_qty_scaled = intent.base_qty_scaled
-    else:
-        proto.max_quote_debit_scaled = intent.max_quote_debit_scaled
-    execution = intent.WhichOneof("execution")
-    if execution is not None:
-        getattr(proto, execution).CopyFrom(getattr(intent, execution))
     if request.sub_account_id:
         proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
     return proto

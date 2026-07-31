@@ -241,10 +241,12 @@ result = await client.orders.create(
 
 Use `orders.preview_order(...)` for advisory resolved base quantity, price
 bound, and typed quote/fee estimates before submitting a quote-budget order.
-`estimated_quote_debit` always has `ORDER_QUOTE` domain;
-`estimated_fee` has `ORDER_BASE` or `ORDER_QUOTE` according to `fee_asset`.
-Preview is not deployed on every API host, so handle an unimplemented/not-found
-response and do not make Preview a prerequisite for order submission.
+Preview accepts the same public create kwargs and encodes them as an
+`OrderIntent` (same wire contract as create). `estimated_quote_debit` always
+has `ORDER_QUOTE` domain; `estimated_fee` has `ORDER_BASE` or `ORDER_QUOTE`
+according to `fee_asset`. Preview is not deployed on every API host, so handle
+an unimplemented/not-found response and do not make Preview a prerequisite for
+order submission.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)

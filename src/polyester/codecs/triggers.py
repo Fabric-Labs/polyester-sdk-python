@@ -174,11 +174,13 @@ def create_trigger_to_proto(
         )
         getattr(intent, type_key).CopyFrom(conditional)
     elif type_key == "trailing_stop":
-        # The wire strategy has no side field and executes as SELL.
+        # Standalone trailing create remains sell-only; the wire always
+        # populates the wire ``side`` field (attached trailing may use either).
         if side_key != "sell":
             raise PolyesterValidationError("trailing_stop only supports side=sell")
         trailing = intent.trailing_stop
         trailing.SetInParent()
+        trailing.side = side_proto
         if trailing_distance_ticks is not None:
             trailing.trailing_distance_ticks = trailing_distance_ticks
         if trailing_distance_bps is not None:

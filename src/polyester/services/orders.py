@@ -255,7 +255,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         account: str | dict[str, str] | None = None,
         **kwargs: Any,
     ) -> PreviewOrderResult:
-        """Preview validation, resolved size, and estimated spend without admission."""
+        """Preview validation, resolved size, and estimated spend without admission.
+
+        Accepts the same public create shape; the wire request wraps an
+        ``OrderIntent``
+        """
         if account is not None:
             kwargs = {
                 **kwargs,

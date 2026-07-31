@@ -79,6 +79,7 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
     trigger = proto.trigger
     assert trigger.WhichOneof("strategy") == "trailing_stop"
     trailing = trigger.trailing_stop
+    assert trailing.side == orders_pb2.SELL
     assert trailing.trailing_distance_ticks == 500_000
     assert trailing.activation_price_ticks == 51_000_000_000
     assert trailing.max_slippage_bps == 25

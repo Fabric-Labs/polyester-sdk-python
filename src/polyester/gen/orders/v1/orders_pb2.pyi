@@ -344,31 +344,15 @@ class CreateOrderResponse(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ..., resolved_base_qty_scaled: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., trailing_stop_trigger_id: _Optional[int] = ...) -> None: ...
 
 class PreviewOrderRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "fee_asset")
+    __slots__ = ("subaccount_id", "order")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
-    SIDE_FIELD_NUMBER: _ClassVar[int]
-    BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
-    MARKET_IOC_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_IOC_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_FOK_FIELD_NUMBER: _ClassVar[int]
-    FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    ORDER_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
-    symbol: str
-    side: Side
-    base_qty_scaled: int
-    max_quote_debit_scaled: int
-    market_ioc: MarketIoc
-    limit_gtc: LimitGtc
-    limit_ioc: LimitIoc
-    limit_fok: LimitFok
-    fee_asset: FeeAsset
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ...) -> None: ...
+    order: OrderIntent
+    def __init__(self, subaccount_id: _Optional[int] = ..., order: _Optional[_Union[OrderIntent, _Mapping]] = ...) -> None: ...
 
 class PreviewOrderResponse(_message.Message):
-    __slots__ = ("resolved_base_qty_scaled", "price_bound_ticks", "estimated_quote_debit_scaled", "estimated_fee_scaled", "estimated_net_base_qty_scaled", "fee_asset", "fresh_at", "fresh_at_ts_ns")
+    __slots__ = ("resolved_base_qty_scaled", "price_bound_ticks", "estimated_quote_debit_scaled", "estimated_fee_scaled", "estimated_net_base_qty_scaled", "fee_asset", "fresh_at", "fresh_at_ts_ns", "admissible", "rejection")
     RESOLVED_BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     PRICE_BOUND_TICKS_FIELD_NUMBER: _ClassVar[int]
     ESTIMATED_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -377,6 +361,8 @@ class PreviewOrderResponse(_message.Message):
     FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
     FRESH_AT_FIELD_NUMBER: _ClassVar[int]
     FRESH_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    ADMISSIBLE_FIELD_NUMBER: _ClassVar[int]
+    REJECTION_FIELD_NUMBER: _ClassVar[int]
     resolved_base_qty_scaled: int
     price_bound_ticks: int
     estimated_quote_debit_scaled: int
@@ -385,7 +371,9 @@ class PreviewOrderResponse(_message.Message):
     fee_asset: FeeAsset
     fresh_at: _timestamp_pb2.Timestamp
     fresh_at_ts_ns: int
-    def __init__(self, resolved_base_qty_scaled: _Optional[int] = ..., price_bound_ticks: _Optional[int] = ..., estimated_quote_debit_scaled: _Optional[int] = ..., estimated_fee_scaled: _Optional[int] = ..., estimated_net_base_qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., fresh_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., fresh_at_ts_ns: _Optional[int] = ...) -> None: ...
+    admissible: bool
+    rejection: ErrorDetail
+    def __init__(self, resolved_base_qty_scaled: _Optional[int] = ..., price_bound_ticks: _Optional[int] = ..., estimated_quote_debit_scaled: _Optional[int] = ..., estimated_fee_scaled: _Optional[int] = ..., estimated_net_base_qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., fresh_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., fresh_at_ts_ns: _Optional[int] = ..., admissible: _Optional[bool] = ..., rejection: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
 
 class CancelOrderRequest(_message.Message):
     __slots__ = ("order_id", "client_order_id", "symbol_id", "subaccount_id")

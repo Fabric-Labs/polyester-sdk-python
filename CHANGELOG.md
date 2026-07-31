@@ -13,6 +13,13 @@
   mismatch the catalog. Prefer `Quantity.from_quote_scaled` /
   `from_quote_decimal` / `from_quote_decimal_str` with
   `QuantityDomain.ORDER_QUOTE`.
+- Wire break: `PreviewOrderRequest` now wraps an `OrderIntent`
+  (`subaccount_id` + `order`), matching create. The public
+  `orders.preview_order(...)` kwargs stay the same create shape.
+- Wire break: `TrailingStopTrigger` carries `side`. Standalone trailing create
+  still validates sell-only, but encode always populates the wire field.
+  Trigger decode surfaces type/side/`parent_order_id` for attached trailing
+  stops (side is no longer hardcoded to sell).
 
 ### Added
 - `QuantityDomain.ORDER_QUOTE` and `Quantity.from_quote_*` constructors.

@@ -8,8 +8,10 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.orders import (
     create_order_to_proto,
     normalize_create_order_request,
+    preview_order_to_proto,
     resolve_quote_quantity_scale,
 )
+from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.types.money import (
@@ -115,6 +117,26 @@ def test_create_order_supports_quote_budget_sizing() -> None:
     )
     proto2 = create_order_to_proto(req2, quote_quantity_scale=2)
     assert proto2.order.max_quote_debit_scaled == 1234
+
+
+def test_preview_order_wraps_order_intent() -> None:
+    req = normalize_create_order_request(
+        symbol="BTC-USD",
+        side="buy",
+        order_type="market",
+        max_quote_debit=Decimal("12.34"),
+        fee_asset="base",
+        sub_account_id=format_id(99),
+    )
+    preview = preview_order_to_proto(req, quote_quantity_scale=2)
+    assert preview.subaccount_id == 99
+    assert preview.HasField("order")
+    assert preview.order.symbol == "BTC-USD"
+    assert preview.order.side == orders_pb2.BUY
+    assert preview.order.WhichOneof("sizing") == "max_quote_debit_scaled"
+    assert preview.order.max_quote_debit_scaled == 1234
+    assert preview.order.WhichOneof("execution") == "market_ioc"
+    assert preview.order.fee_asset == orders_pb2.BASE
 
 
 def test_quote_budget_requires_matching_catalog_scale() -> None:

@@ -68,17 +68,25 @@ class OrderMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     submitted_max_quote_debit_scaled: str = ""
 
 
+class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
+    field_path: str = ""
+    rule_id: str = ""
+    message: str = ""
+
+
+class OrderErrorDetail(msgspec.Struct, kw_only=True, omit_defaults=True):
+    code: str = ""
+    violations: list[OrderFieldViolation] = []
+
+
 class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    admissible: bool | None = None
+    rejection: OrderErrorDetail | None = None
     resolved_base_qty_scaled: str = ""
     resolved_base_qty: Quantity | None = None
-    price_bound: Price | None = None
-    # All-in quote debit with OrderQuote domain + catalog quote scale.
-    estimated_quote_debit: Quantity | None = None
-    # Estimated fee with OrderBase or OrderQuote domain according to fee_asset.
-    estimated_fee: Quantity | None = None
-    estimated_net_base_qty: Quantity | None = None
-    fee_asset: str = ""
-    fresh_at_ts_ns: str = ""
+    # Protective execution boundary (not expected fill price).
+    protected_price_bound: Price | None = None
+    evaluated_at_ms: int = 0
 
 
 class GetOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -119,6 +127,12 @@ class BalancesList(msgspec.Struct, kw_only=True, omit_defaults=True):
     balances: list[AssetBalance]
 
 
+class ZipperReasonDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    code: int = 0
+    reason_id: str = ""
+    message: str = ""
+
+
 class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     intent_id: str
     flow_kind: str = ""
@@ -127,6 +141,8 @@ class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     is_terminal: bool = False
     owner_account_id: str = ""
     smart_account_address: str = ""
+    lifecycle_reason: str = "unspecified"
+    zipper_reason: ZipperReasonDetails | None = None
 
 
 class LifecycleFlowsList(msgspec.Struct, kw_only=True, omit_defaults=True):

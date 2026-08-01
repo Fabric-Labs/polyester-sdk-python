@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from polyester.codecs.decode.lifecycle import lifecycle_reason_from_code
 from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
+from polyester.gen.chain.zipper.v1 import reason_pb2
 from polyester.models.market import (
     Candle,
     CandlesResult,
@@ -53,6 +55,7 @@ from polyester.models.trading import (
     UserTrade,
     UserTradesList,
     WithdrawIntentResult,
+    ZipperReasonDetails,
 )
 
 
@@ -63,11 +66,32 @@ def _field(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
     return default
 
 
+_WIRE_ENUM_PREFIXES = (
+    "SIDE_",
+    "ORDER_TYPE_",
+    "ORDER_STATUS_",
+    "TIF_",
+    "FLOW_STEP_",
+    "FLOW_KIND_",
+    "KIND_",
+    "TIME_IN_FORCE_",
+)
+
+
 def _enum_name(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
-        return value.removeprefix("SIDE_").removeprefix("ORDER_TYPE_").removeprefix("TIF_")
+        name = value.strip()
+        if not name:
+            return ""
+        for prefix in _WIRE_ENUM_PREFIXES:
+            if name.startswith(prefix):
+                return name[len(prefix) :].lower()
+        # Already-normalized snake labels stay as-is; other SCREAMING names lower.
+        if name == name.lower():
+            return name
+        return name.lower()
     return str(value)
 
 
@@ -329,16 +353,61 @@ def _lifecycle_flow_payload(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _decode_zipper_reason(value: Any) -> ZipperReasonDetails | None:
+    if not isinstance(value, dict):
+        return None
+    raw_code = _field(value, "code", default=0)
+    try:
+        if isinstance(raw_code, str) and not raw_code.strip().lstrip("-").isdigit():
+            code = int(reason_pb2.ZipperReasonCode.Value(raw_code.strip()))
+        else:
+            code = int(raw_code or 0)
+    except (TypeError, ValueError):
+        code = 0
+    return ZipperReasonDetails(
+        code=code,
+        reason_id=str(_field(value, "reasonId", "reason_id", default="") or ""),
+        message=str(_field(value, "message", default="") or ""),
+    )
+
+
+def _decode_lifecycle_reason(value: Any) -> str:
+    if value is None:
+        return "unspecified"
+    if isinstance(value, str):
+        label = value.strip()
+        if not label or label in {"REASON_UNSPECIFIED", "unspecified"}:
+            return "unspecified"
+        if label.startswith("unknown_reason_"):
+            return label
+        # Accept already-normalized snake labels or SCREAMING enum names.
+        if label == label.lower():
+            return label
+        if label.startswith("REASON_"):
+            label = label.removeprefix("REASON_")
+        return label.lower()
+    try:
+        return lifecycle_reason_from_code(int(value))
+    except (TypeError, ValueError):
+        return "unspecified"
+
+
 def decode_lifecycle_flow(data: dict[str, Any]) -> LifecycleFlowSummary:
     payload = _lifecycle_flow_payload(data)
-    latest_step = _field(payload, "latestStep", "latest_step")
+    latest_step = _field(payload, "latestStep", "latest_step", "currentStep", "current_step")
     flow_kind = _field(payload, "flowKind", "flow_kind")
+    intent_id = _field(payload, "intentId", "intent_id", "flowId", "flow_id", default="")
+    zipper_raw = _field(payload, "zipperReason", "zipper_reason")
     return LifecycleFlowSummary(
-        intent_id=str(_field(payload, "intentId", "intent_id", default="") or ""),
+        intent_id=str(intent_id or ""),
         flow_kind=_enum_name(flow_kind) if flow_kind is not None else "",
         latest_step=_enum_name(latest_step) if latest_step is not None else "",
         is_open=bool(_field(payload, "isOpen", "is_open", default=False)),
         is_terminal=bool(_field(payload, "isTerminal", "is_terminal", default=False)),
+        lifecycle_reason=_decode_lifecycle_reason(
+            _field(payload, "lifecycleReason", "lifecycle_reason", "reasonCode", "reason_code")
+        ),
+        zipper_reason=_decode_zipper_reason(zipper_raw),
     )
 
 

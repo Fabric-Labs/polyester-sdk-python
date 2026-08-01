@@ -6,10 +6,12 @@ from polyester.codecs.decode.lifecycle import (
     flow_from_get_response,
     flow_summary_from_proto,
     flows_list_from_proto,
+    lifecycle_reason_from_code,
 )
 from polyester.codecs.realtime_decode import decode_flow_detail_bytes
 from polyester.errors import PolyesterRealtimeError, PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
+from polyester.gen.chain.zipper.v1 import reason_pb2
 
 
 def test_flow_summary_from_proto() -> None:
@@ -29,6 +31,42 @@ def test_flow_summary_from_proto() -> None:
     assert flow.is_terminal is True
     assert flow.owner_account_id
     assert flow.smart_account_address == "0xabc"
+    assert flow.lifecycle_reason == "unspecified"
+    assert flow.zipper_reason is None
+
+
+def test_flow_summary_zipper_reason_and_lifecycle_reason() -> None:
+    msg = lifecycle_read_pb2.FlowSummaryView(
+        flow_id="flow-rej",
+        flow_kind=types_pb2.KIND_WITHDRAW,
+        current_step=lifecycle_read_pb2.FLOW_STEP_FAILED,
+        is_open=False,
+        is_terminal=True,
+        lifecycle_reason=types_pb2.ZIPPER_VALIDATION_REJECTED,
+        zipper_reason=reason_pb2.ZipperReasonDetails(
+            code=reason_pb2.DEPOSIT_AMOUNT_BELOW_MINIMUM,
+            reason_id="deposit_amount_below_minimum",
+            message="amount below minimum",
+        ),
+    )
+    flow = flow_summary_from_proto(msg)
+    assert flow.lifecycle_reason == "zipper_validation_rejected"
+    assert flow.zipper_reason is not None
+    assert flow.zipper_reason.code == int(reason_pb2.DEPOSIT_AMOUNT_BELOW_MINIMUM)
+    assert flow.zipper_reason.reason_id == "deposit_amount_below_minimum"
+    assert flow.zipper_reason.message == "amount below minimum"
+
+
+def test_lifecycle_reason_unknown_code_fallback() -> None:
+    assert lifecycle_reason_from_code(2001) == "unknown_reason_2001"
+    msg = lifecycle_read_pb2.FlowSummaryView(
+        flow_id="flow-unknown",
+        lifecycle_reason=2001,
+    )
+    flow = flow_summary_from_proto(msg)
+    assert flow.flow_kind == "unspecified"
+    assert flow.latest_step == "unspecified"
+    assert flow.lifecycle_reason == "unknown_reason_2001"
 
 
 def test_flow_from_get_response_unwraps_detail_summary() -> None:

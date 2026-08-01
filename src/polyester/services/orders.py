@@ -30,8 +30,6 @@ from polyester.codecs.orders import (
     normalize_create_order_request,
     parse_optional_subaccount_id,
     preview_order_to_proto,
-    quantity_scale_for_symbol,
-    quote_quantity_scale_for_symbol,
     resolve_quantity_scale,
     resolve_quote_quantity_scale,
     set_order_key,
@@ -255,10 +253,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         account: str | dict[str, str] | None = None,
         **kwargs: Any,
     ) -> PreviewOrderResult:
-        """Preview validation, resolved size, and estimated spend without admission.
+        """Check current order admissibility without creating an order.
 
-        Accepts the same public create shape; the wire request wraps an
-        ``OrderIntent``
+        Returns resolved base size and protected price bound when available.
+        Does not return fee or quote-debit estimates. Accepts the same public
+        create shape; the wire request wraps an ``OrderIntent``.
         """
         if account is not None:
             kwargs = {
@@ -291,9 +290,6 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit
         )
-        # Preview estimates always need catalog base + quote scales (fail closed).
-        decode_base_scale = quantity_scale_for_symbol(self._catalogs, normalized.symbol)
-        decode_quote_scale = quote_quantity_scale_for_symbol(self._catalogs, normalized.symbol)
         symbol_id = (
             self._catalogs.symbol_id_for_symbol(normalized.symbol)
             if normalized.symbol
@@ -311,8 +307,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             proto_request,
             lambda response: preview_order_from_proto(
                 response,
-                quantity_scale=decode_base_scale,
-                quote_quantity_scale=decode_quote_scale,
+                quantity_scale=quantity_scale,
                 symbol=normalized.symbol,
                 symbol_id=symbol_id,
             ),

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.1.0a31
+
+### Breaking
+- `PreviewOrderResult` no longer exposes fee/debit estimates
+  (`estimated_quote_debit`, `estimated_fee`, `estimated_net_base_qty`,
+  `fee_asset`, `fresh_at_ts_ns`) or `price_bound`. Wire/public result is now
+  admissibility-focused: `admissible`, optional `rejection`
+  (`OrderErrorDetail` with `code` + `violations`), `resolved_base_qty_scaled` /
+  `resolved_base_qty`, `protected_price_bound` (renamed from `price_bound`;
+  protective boundary, not expected fill), and `evaluated_at_ms`.
+  Known Preview rejection codes use TypeScript-compatible labels such as
+  `BAD_QTY`; unknown open-enum values use `UNKNOWN_ERROR_CODE(<n>)`.
+- Lifecycle flow summaries expose `lifecycle_reason` (snake catalog label;
+  unknown wire codes become `unknown_reason_{code}`) and optional
+  `zipper_reason` (`ZipperReasonDetails`: numeric `code`, `reason_id`,
+  `message`). Wire `FlowReason` / `reason_code` renamed to `LifecycleReason` /
+  `lifecycle_reason`.
+
+### Added
+- `OrderErrorDetail`, `OrderFieldViolation`, and `ZipperReasonDetails` public
+  models for Preview rejection and lifecycle Zipper failure detail.
+
 ## 0.1.0a30
 
 ### Breaking

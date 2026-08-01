@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a30`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a31`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a30"
+pip install "polyester-sdk==0.1.0a31"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -239,14 +239,16 @@ result = await client.orders.create(
 )
 ```
 
-Use `orders.preview_order(...)` for advisory resolved base quantity, price
-bound, and typed quote/fee estimates before submitting a quote-budget order.
+Use `orders.preview_order(...)` to check current order admissibility and, when
+available, resolved base quantity plus protected price bound before submitting.
 Preview accepts the same public create kwargs and encodes them as an
-`OrderIntent` (same wire contract as create). `estimated_quote_debit` always
-has `ORDER_QUOTE` domain; `estimated_fee` has `ORDER_BASE` or `ORDER_QUOTE`
-according to `fee_asset`. Preview is not deployed on every API host, so handle
-an unimplemented/not-found response and do not make Preview a prerequisite for
-order submission.
+`OrderIntent` (same wire contract as create). It does not return fee or
+quote-debit estimates. `protected_price_bound` is a protective execution
+boundary, not an expected fill price. Rejections carry stable labels such as
+`BAD_QTY` plus field violations; `evaluated_at_ms` records when admission was
+evaluated. Preview is not deployed on every API
+host, so handle an unimplemented/not-found response and do not make Preview a
+prerequisite for order submission.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)

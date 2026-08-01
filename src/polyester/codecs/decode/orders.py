@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
+from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
@@ -25,6 +25,8 @@ from polyester.models import (
     CancelAllOrdersResult,
     GetOrderResult,
     ModifyOrderResult,
+    OrderErrorDetail,
+    OrderFieldViolation,
     OrderMutationResult,
     OrdersList,
     PreviewOrderResult,
@@ -245,76 +247,70 @@ def order_mutation_from_proto(
     )
 
 
+def _error_code_label(raw_code: int) -> str:
+    if raw_code == 0:
+        return "UNSPECIFIED"
+    try:
+        code = orders_pb2.ErrorCode.Name(raw_code)
+    except (ValueError, TypeError):
+        return f"UNKNOWN_ERROR_CODE({raw_code})"
+    if not code or code == str(raw_code):
+        return f"UNKNOWN_ERROR_CODE({raw_code})"
+    return code.removeprefix("ERROR_CODE_")
+
+
+def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDetail:
+    return OrderErrorDetail(
+        code=_error_code_label(int(msg.code)),
+        violations=[
+            OrderFieldViolation(
+                field_path=item.field_path,
+                rule_id=item.rule_id,
+                message=item.message,
+            )
+            for item in msg.violations
+        ],
+    )
+
+
 def preview_order_from_proto(
     msg: orders_pb2.PreviewOrderResponse,
     *,
     quantity_scale: int | None = None,
-    quote_quantity_scale: int | None = None,
     symbol: str | None = None,
     symbol_id: int | None = None,
 ) -> PreviewOrderResult:
-    fee_asset = proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset)
-    if fee_asset == "base":
-        fee_domain = QuantityDomain.ORDER_BASE
-        fee_scale = quantity_scale
-    elif fee_asset == "quote":
-        fee_domain = QuantityDomain.ORDER_QUOTE
-        fee_scale = quote_quantity_scale
-    else:
+    if not msg.HasField("evaluated_at"):
         raise PolyesterResponseContractError(
-            "PreviewOrder",
-            f"unknown fee_asset {fee_asset!r}",
-        )
-    if quote_quantity_scale is None:
-        raise PolyesterResponseContractError(
-            "PreviewOrder",
-            "quote_quantity_scale is required to decode estimated_quote_debit",
-        )
-    if fee_scale is None:
-        raise PolyesterResponseContractError(
-            "PreviewOrder",
-            "quantity scale is required to decode estimated_fee",
+            "PreviewOrder", "successful response is missing evaluated_at"
         )
     resolved_symbol_id = int(symbol_id) if symbol_id is not None else 0
+    has_resolved = msg.HasField("resolved_base_qty_scaled")
+    resolved_scaled = int(msg.resolved_base_qty_scaled) if has_resolved else 0
     return PreviewOrderResult(
-        resolved_base_qty_scaled=str(msg.resolved_base_qty_scaled or ""),
+        admissible=bool(msg.admissible) if msg.HasField("admissible") else None,
+        rejection=(
+            _order_error_detail_from_proto(msg.rejection)
+            if msg.HasField("rejection")
+            else None
+        ),
+        resolved_base_qty_scaled=str(resolved_scaled) if has_resolved else "",
         resolved_base_qty=(
             _qty(
-                msg.resolved_base_qty_scaled,
+                resolved_scaled,
                 symbol_id=resolved_symbol_id,
                 scale=quantity_scale,
                 symbol=symbol,
             )
-            if msg.resolved_base_qty_scaled
+            if has_resolved and quantity_scale is not None
             else None
         ),
-        price_bound=_price(msg.price_bound_ticks) if msg.price_bound_ticks else None,
-        estimated_quote_debit=_qty(
-            msg.estimated_quote_debit_scaled,
-            symbol_id=resolved_symbol_id,
-            scale=quote_quantity_scale,
-            domain=QuantityDomain.ORDER_QUOTE,
-            symbol=symbol,
-        ),
-        estimated_fee=_qty(
-            msg.estimated_fee_scaled,
-            symbol_id=resolved_symbol_id,
-            scale=fee_scale,
-            domain=fee_domain,
-            symbol=symbol,
-        ),
-        estimated_net_base_qty=(
-            _qty(
-                msg.estimated_net_base_qty_scaled,
-                symbol_id=resolved_symbol_id,
-                scale=quantity_scale,
-                symbol=symbol,
-            )
-            if msg.estimated_net_base_qty_scaled
+        protected_price_bound=(
+            _price(msg.protected_price_bound_ticks)
+            if msg.HasField("protected_price_bound_ticks")
             else None
         ),
-        fee_asset=fee_asset,
-        fresh_at_ts_ns=str(msg.fresh_at_ts_ns),
+        evaluated_at_ms=timestamp_to_ms(msg.evaluated_at),
     )
 
 

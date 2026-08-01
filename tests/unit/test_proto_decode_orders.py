@@ -1,4 +1,5 @@
 import pytest
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs.decode.orders import (
     get_order_from_proto,
@@ -18,7 +19,6 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     OrderStatus,
     UserTrade,
 )
-from polyester.types.money import QuantityDomain
 
 
 def test_order_from_proto_maps_enums_and_ids() -> None:
@@ -155,7 +155,7 @@ def test_order_mutation_from_proto_create_includes_client_order_id() -> None:
     assert result.client_order_id == "coid-1"
 
 
-def test_order_mutation_and_preview_expose_explicit_sizing() -> None:
+def test_order_mutation_exposes_explicit_sizing() -> None:
     create = order_mutation_from_proto(
         orders_pb2.CreateOrderResponse(
             order_id=42,
@@ -169,41 +169,86 @@ def test_order_mutation_and_preview_expose_explicit_sizing() -> None:
     assert create.resolved_base_qty_scaled == "100"
     assert create.submitted_max_quote_debit_scaled == "500"
 
+
+def test_preview_order_admissible_with_protected_bound() -> None:
+    evaluated_at = Timestamp(seconds=1_700_000_000, nanos=500_000_000)
     preview = preview_order_from_proto(
         orders_pb2.PreviewOrderResponse(
+            admissible=True,
             resolved_base_qty_scaled=100,
-            estimated_quote_debit_scaled=500,
-            estimated_fee_scaled=2,
-            estimated_net_base_qty_scaled=98,
-            fee_asset=orders_pb2.BASE,
+            protected_price_bound_ticks=42_000,
+            evaluated_at=evaluated_at,
         ),
         quantity_scale=8,
-        quote_quantity_scale=6,
         symbol="BTC-USDT",
         symbol_id=1,
     )
+    assert preview.admissible is True
+    assert preview.rejection is None
     assert preview.resolved_base_qty is not None
     assert preview.resolved_base_qty.scaled == 100
     assert preview.resolved_base_qty_scaled == "100"
-    assert preview.estimated_quote_debit is not None
-    assert preview.estimated_quote_debit.scaled == 500
-    assert preview.estimated_quote_debit.domain == QuantityDomain.ORDER_QUOTE
-    assert preview.estimated_quote_debit.scale == 6
-    assert preview.estimated_fee is not None
-    assert preview.estimated_fee.scaled == 2
-    assert preview.estimated_fee.domain == QuantityDomain.ORDER_BASE
-    assert preview.estimated_fee.scale == 8
-    assert preview.fee_asset == "base"
+    assert preview.protected_price_bound is not None
+    assert preview.protected_price_bound.ticks == 42_000
+    assert preview.evaluated_at_ms == 1_700_000_000_500
 
-    with pytest.raises(PolyesterResponseContractError, match="quote_quantity_scale"):
-        preview_order_from_proto(
-            orders_pb2.PreviewOrderResponse(
-                estimated_quote_debit_scaled=1,
-                estimated_fee_scaled=1,
-                fee_asset=orders_pb2.QUOTE,
+
+def test_preview_order_rejection_with_violations() -> None:
+    preview = preview_order_from_proto(
+        orders_pb2.PreviewOrderResponse(
+            admissible=False,
+            rejection=orders_pb2.ErrorDetail(
+                code=orders_pb2.ERROR_CODE_BAD_QTY,
+                violations=[
+                    orders_pb2.FieldViolation(
+                        field_path="order.qty",
+                        rule_id="qty.min",
+                        message="quantity below minimum",
+                    )
+                ],
             ),
-            quantity_scale=8,
+            evaluated_at=Timestamp(seconds=1),
         )
+    )
+    assert preview.admissible is False
+    assert preview.rejection is not None
+    assert preview.rejection.code == "BAD_QTY"
+    assert len(preview.rejection.violations) == 1
+    assert preview.rejection.violations[0].field_path == "order.qty"
+    assert preview.rejection.violations[0].rule_id == "qty.min"
+    assert preview.rejection.violations[0].message == "quantity below minimum"
+    assert preview.resolved_base_qty is None
+    assert preview.resolved_base_qty_scaled == ""
+    assert preview.protected_price_bound is None
+    assert preview.evaluated_at_ms == 1_000
+
+
+def test_preview_order_unknown_rejection_code() -> None:
+    preview = preview_order_from_proto(
+        orders_pb2.PreviewOrderResponse(
+            admissible=False,
+            rejection=orders_pb2.ErrorDetail(code=99_999),
+            evaluated_at=Timestamp(seconds=1),
+        )
+    )
+    assert preview.rejection is not None
+    assert preview.rejection.code == "UNKNOWN_ERROR_CODE(99999)"
+
+
+def test_preview_order_without_scale_keeps_scaled_string() -> None:
+    preview = preview_order_from_proto(
+        orders_pb2.PreviewOrderResponse(
+            resolved_base_qty_scaled=250,
+            evaluated_at=Timestamp(seconds=1),
+        )
+    )
+    assert preview.resolved_base_qty_scaled == "250"
+    assert preview.resolved_base_qty is None
+
+
+def test_preview_order_rejects_missing_evaluated_at() -> None:
+    with pytest.raises(PolyesterResponseContractError, match="missing evaluated_at"):
+        preview_order_from_proto(orders_pb2.PreviewOrderResponse(admissible=True))
 
 
 def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:

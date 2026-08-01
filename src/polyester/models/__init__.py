@@ -110,6 +110,8 @@ from polyester.models.trading import (
     LifecycleFlowsList,
     LifecycleFlowSummary,
     ModifyOrderResult,
+    OrderErrorDetail,
+    OrderFieldViolation,
     OrderMutationResult,
     OrdersList,
     PreviewOrderResult,
@@ -133,6 +135,7 @@ from polyester.models.trading import (
     UserTrade,
     UserTradesList,
     WithdrawIntentResult,
+    ZipperReasonDetails,
 )
 from polyester.models.zipper import (
     DepositWithdrawConfig,
@@ -212,6 +215,9 @@ __all__ = [
     "LedgerTransfer",
     "LifecycleFlowSummary",
     "LifecycleFlowsList",
+    "OrderErrorDetail",
+    "OrderFieldViolation",
+    "ZipperReasonDetails",
     "CandlesResult",
     "MarketOverviewEntry",
     "MarketOverviewList",

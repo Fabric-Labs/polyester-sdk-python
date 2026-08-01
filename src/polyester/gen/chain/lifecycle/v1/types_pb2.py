@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from polyester.gen.polyester.type.v1 import u128_pb2 as polyester_dot_type_dot_v1_dot_u128__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1e\x63hain/lifecycle/v1/types.proto\x12\x12\x63hain.lifecycle.v1\x1a\x1cpolyester/type/v1/u128.proto\"b\n\x08\x41ssetIds\x12&\n\x0fzipped_asset_id\x18\x01 \x01(\rR\rzippedAssetId\x12(\n\x10unified_asset_id\x18\x03 \x01(\rR\x0eunifiedAssetIdJ\x04\x08\x02\x10\x03\"\xea\x01\n\nRequestFee\x12\x39\n\tasset_ids\x18\x01 \x01(\x0b\x32\x1c.chain.lifecycle.v1.AssetIdsR\x08\x61ssetIds\x12\x36\n\namount_e18\x18\x02 \x01(\x0b\x32\x17.polyester.type.v1.U128R\tamountE18\x12+\n\x11recipient_address\x18\x03 \x01(\tR\x10recipientAddress\x12<\n\x06status\x18\x04 \x01(\x0e\x32$.chain.lifecycle.v1.RequestFeeStatusR\x06status*u\n\x10RequestFeeStatus\x12\"\n\x1eREQUEST_FEE_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n\x19REQUEST_FEE_STATUS_LOCKED\x10\x01\x12\x1e\n\x1aREQUEST_FEE_STATUS_SETTLED\x10\x02*\xe8\x03\n\nFlowReason\x12\x1b\n\x17\x46LOW_REASON_UNSPECIFIED\x10\x00\x12*\n&FLOW_REASON_ZIPPER_VALIDATION_REJECTED\x10\x65\x12)\n%FLOW_REASON_ZIPPER_EXECUTION_REJECTED\x10\x66\x12\x30\n,FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED\x10g\x12,\n(FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED\x10h\x12\'\n\"FLOW_REASON_LEDGER_MIRROR_REJECTED\x10\xc8\x01\x12\x37\n2FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS\x10\xc9\x01\x12.\n)FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS\x10\xca\x01\x12\x39\n4FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND\x10\xcb\x01\x12\x39\n4FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED\x10\xcc\x01*X\n\x08\x46lowKind\x12\x14\n\x10KIND_UNSPECIFIED\x10\x00\x12\x10\n\x0cKIND_DEPOSIT\x10\x01\x12\x11\n\rKIND_WITHDRAW\x10\x02\x12\x11\n\rKIND_TRANSFER\x10\x03*\x8e\x01\n\nFlowDomain\x12\x16\n\x12\x44OMAIN_UNSPECIFIED\x10\x00\x12\x19\n\x15\x44OMAIN_EXTERNAL_CHAIN\x10\x01\x12\x11\n\rDOMAIN_ZIPPER\x10\x02\x12\x12\n\x0e\x44OMAIN_FUNDING\x10\x03\x12\x12\n\x0e\x44OMAIN_TRADING\x10\x04\x12\x12\n\x0e\x44OMAIN_LENDING\x10\x05*\x81\x01\n\x0fLifecycleSource\x12\x16\n\x12SOURCE_UNSPECIFIED\x10\x00\x12\x12\n\x0eSOURCE_RELAYER\x10\x01\x12\x1a\n\x16SOURCE_POLYESTER_CHAIN\x10\x02\x12\x13\n\x0fSOURCE_EXECUTOR\x10\x03\x12\x11\n\rSOURCE_LEDGER\x10\x04*\xc7\x01\n\tFlowState\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x18\n\x14STATE_PENDING_SOURCE\x10\x01\x12!\n\x1dSTATE_PENDING_POLYESTER_CHAIN\x10\x02\x12\x18\n\x14STATE_PENDING_LEDGER\x10\x03\x12\x13\n\x0fSTATE_COMPLETED\x10\x04\x12\x10\n\x0cSTATE_FAILED\x10\x05\x12\x11\n\rSTATE_DROPPED\x10\x06\x12\x12\n\x0eSTATE_REFUNDED\x10\x07\x42QZOgithub.com/Fabric-Labs/polyester-sdk-go/gen/chain/lifecycle/v1;chainlifecyclev1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1e\x63hain/lifecycle/v1/types.proto\x12\x12\x63hain.lifecycle.v1\x1a\x1cpolyester/type/v1/u128.proto\"b\n\x08\x41ssetIds\x12&\n\x0fzipped_asset_id\x18\x01 \x01(\rR\rzippedAssetId\x12(\n\x10unified_asset_id\x18\x03 \x01(\rR\x0eunifiedAssetIdJ\x04\x08\x02\x10\x03\"\xea\x01\n\nRequestFee\x12\x39\n\tasset_ids\x18\x01 \x01(\x0b\x32\x1c.chain.lifecycle.v1.AssetIdsR\x08\x61ssetIds\x12\x36\n\namount_e18\x18\x02 \x01(\x0b\x32\x17.polyester.type.v1.U128R\tamountE18\x12+\n\x11recipient_address\x18\x03 \x01(\tR\x10recipientAddress\x12<\n\x06status\x18\x04 \x01(\x0e\x32$.chain.lifecycle.v1.RequestFeeStatusR\x06status*u\n\x10RequestFeeStatus\x12\"\n\x1eREQUEST_FEE_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n\x19REQUEST_FEE_STATUS_LOCKED\x10\x01\x12\x1e\n\x1aREQUEST_FEE_STATUS_SETTLED\x10\x02*\xfc\x02\n\x0fLifecycleReason\x12\x16\n\x12REASON_UNSPECIFIED\x10\x00\x12\x1e\n\x1aZIPPER_VALIDATION_REJECTED\x10\x65\x12\x1d\n\x19ZIPPER_EXECUTION_REJECTED\x10\x66\x12$\n ZIPPER_WITHDRAW_EXECUTION_FAILED\x10g\x12 \n\x1cZIPPER_DEPOSIT_REFUND_FAILED\x10h\x12\x1b\n\x16LEDGER_MIRROR_REJECTED\x10\xc8\x01\x12+\n&LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS\x10\xc9\x01\x12\"\n\x1dLEDGER_MIRROR_TRANSFER_EXISTS\x10\xca\x01\x12-\n(LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND\x10\xcb\x01\x12-\n(LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED\x10\xcc\x01*X\n\x08\x46lowKind\x12\x14\n\x10KIND_UNSPECIFIED\x10\x00\x12\x10\n\x0cKIND_DEPOSIT\x10\x01\x12\x11\n\rKIND_WITHDRAW\x10\x02\x12\x11\n\rKIND_TRANSFER\x10\x03*\x8e\x01\n\nFlowDomain\x12\x16\n\x12\x44OMAIN_UNSPECIFIED\x10\x00\x12\x19\n\x15\x44OMAIN_EXTERNAL_CHAIN\x10\x01\x12\x11\n\rDOMAIN_ZIPPER\x10\x02\x12\x12\n\x0e\x44OMAIN_FUNDING\x10\x03\x12\x12\n\x0e\x44OMAIN_TRADING\x10\x04\x12\x12\n\x0e\x44OMAIN_LENDING\x10\x05*\x81\x01\n\x0fLifecycleSource\x12\x16\n\x12SOURCE_UNSPECIFIED\x10\x00\x12\x12\n\x0eSOURCE_RELAYER\x10\x01\x12\x1a\n\x16SOURCE_POLYESTER_CHAIN\x10\x02\x12\x13\n\x0fSOURCE_EXECUTOR\x10\x03\x12\x11\n\rSOURCE_LEDGER\x10\x04*\xc7\x01\n\tFlowState\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x18\n\x14STATE_PENDING_SOURCE\x10\x01\x12!\n\x1dSTATE_PENDING_POLYESTER_CHAIN\x10\x02\x12\x18\n\x14STATE_PENDING_LEDGER\x10\x03\x12\x13\n\x0fSTATE_COMPLETED\x10\x04\x12\x10\n\x0cSTATE_FAILED\x10\x05\x12\x11\n\rSTATE_DROPPED\x10\x06\x12\x12\n\x0eSTATE_REFUNDED\x10\x07\x42QZOgithub.com/Fabric-Labs/polyester-sdk-go/gen/chain/lifecycle/v1;chainlifecyclev1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,16 +35,16 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'ZOgithub.com/Fabric-Labs/polyester-sdk-go/gen/chain/lifecycle/v1;chainlifecyclev1'
   _globals['_REQUESTFEESTATUS']._serialized_start=421
   _globals['_REQUESTFEESTATUS']._serialized_end=538
-  _globals['_FLOWREASON']._serialized_start=541
-  _globals['_FLOWREASON']._serialized_end=1029
-  _globals['_FLOWKIND']._serialized_start=1031
-  _globals['_FLOWKIND']._serialized_end=1119
-  _globals['_FLOWDOMAIN']._serialized_start=1122
-  _globals['_FLOWDOMAIN']._serialized_end=1264
-  _globals['_LIFECYCLESOURCE']._serialized_start=1267
-  _globals['_LIFECYCLESOURCE']._serialized_end=1396
-  _globals['_FLOWSTATE']._serialized_start=1399
-  _globals['_FLOWSTATE']._serialized_end=1598
+  _globals['_LIFECYCLEREASON']._serialized_start=541
+  _globals['_LIFECYCLEREASON']._serialized_end=921
+  _globals['_FLOWKIND']._serialized_start=923
+  _globals['_FLOWKIND']._serialized_end=1011
+  _globals['_FLOWDOMAIN']._serialized_start=1014
+  _globals['_FLOWDOMAIN']._serialized_end=1156
+  _globals['_LIFECYCLESOURCE']._serialized_start=1159
+  _globals['_LIFECYCLESOURCE']._serialized_end=1288
+  _globals['_FLOWSTATE']._serialized_start=1291
+  _globals['_FLOWSTATE']._serialized_end=1490
   _globals['_ASSETIDS']._serialized_start=84
   _globals['_ASSETIDS']._serialized_end=182
   _globals['_REQUESTFEE']._serialized_start=185

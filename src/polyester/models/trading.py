@@ -38,6 +38,14 @@ class RiskLeg(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Attached trailing-stop projection.
+
+    Create/modify dicts must supply a positive ``trailing_distance_ticks`` or
+    ``trailing_distance_bps`` (and positive slippage when set).
+    ``trigger_price_source`` / ``order_type`` are not on the trailing wire and
+    are rejected if supplied under ``attached_risk.trailing_stop``.
+    """
+
     distance_ticks: int = 0
     distance_bps: int = 0
     max_slippage_ticks: int = 0

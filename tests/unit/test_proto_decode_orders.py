@@ -94,6 +94,27 @@ def test_order_from_proto_maps_attached_risk() -> None:
     assert order.attached_risk.trailing_stop.max_slippage_ticks == 10
 
 
+def test_order_from_proto_omits_trailing_stop_without_distance() -> None:
+    from polyester.gen.orders.v1.orders_read_pb2 import (
+        AttachedRisk as ProtoAttachedRisk,
+    )
+    from polyester.gen.orders.v1.orders_read_pb2 import (
+        AttachedRiskTrailingStop,
+    )
+
+    msg = Order(
+        order_id=3,
+        symbol_id=1,
+        attached_risk=ProtoAttachedRisk(
+            trailing_stop=AttachedRiskTrailingStop(
+                policy=orders_pb2.TrailingStopPolicy(activation_price_ticks=5500)
+            )
+        ),
+    )
+    order = order_from_proto(msg)
+    assert order.attached_risk is None
+
+
 def test_orders_list_from_proto() -> None:
     msg = GetOpenOrdersResponse(
         orders=[Order(order_id=1, symbol_id=1, side=orders_pb2.SELL)],

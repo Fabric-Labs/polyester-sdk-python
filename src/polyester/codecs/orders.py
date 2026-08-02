@@ -301,6 +301,61 @@ def preview_order_to_proto(
     return proto
 
 
+def _validate_attached_trailing_stop_dict(data: dict[str, Any]) -> None:
+    trailing = data.get("trailing_stop")
+    if trailing is None:
+        trailing = data.get("trailingStop")
+    if trailing is None:
+        return
+    if not isinstance(trailing, dict):
+        raise PolyesterValidationError("attached_risk.trailing_stop must be an object")
+    for key in ("order_type", "orderType"):
+        if key in trailing:
+            raise PolyesterValidationError(
+                "attached trailing_stop child is always market; "
+                "order_type cannot be supplied"
+            )
+    for key in ("trigger_price_source", "triggerPriceSource"):
+        if key in trailing:
+            raise PolyesterValidationError(
+                "attached risk always uses last trade; "
+                "trigger_price_source cannot be supplied"
+            )
+
+    def _pick(*names: str) -> Any:
+        for name in names:
+            if name in trailing and trailing[name] is not None:
+                return trailing[name]
+        return None
+
+    dist_ticks = _pick("trailing_distance_ticks", "trailingDistanceTicks")
+    dist_bps = _pick("trailing_distance_bps", "trailingDistanceBps")
+    if dist_ticks is None and dist_bps is None:
+        raise PolyesterValidationError(
+            "trailing_stop requires trailing_distance_ticks or trailing_distance_bps"
+        )
+    if dist_ticks is not None and dist_bps is not None:
+        raise PolyesterValidationError(
+            "trailing_stop requires exactly one of trailing_distance_ticks "
+            "or trailing_distance_bps"
+        )
+    if dist_ticks is not None and int(dist_ticks) <= 0:
+        raise PolyesterValidationError("trailing_distance_ticks must be positive")
+    if dist_bps is not None and int(dist_bps) <= 0:
+        raise PolyesterValidationError("trailing_distance_bps must be positive")
+
+    slip_ticks = _pick("max_slippage_ticks", "maxSlippageTicks")
+    slip_bps = _pick("max_slippage_bps", "maxSlippageBps")
+    if slip_ticks is not None and slip_bps is not None:
+        raise PolyesterValidationError(
+            "trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps"
+        )
+    if slip_ticks is not None and int(slip_ticks) <= 0:
+        raise PolyesterValidationError("max_slippage_ticks must be positive")
+    if slip_bps is not None and int(slip_bps) <= 0:
+        raise PolyesterValidationError("max_slippage_bps must be positive")
+
+
 def risk_policy_from_dict(data: dict[str, Any] | None) -> orders_pb2.RiskPolicy | None:
     if not data:
         return None
@@ -317,6 +372,7 @@ def risk_policy_from_dict(data: dict[str, Any] | None) -> orders_pb2.RiskPolicy 
                 stack.append(child)
         elif isinstance(value, list):
             stack.extend(value)
+    _validate_attached_trailing_stop_dict(data)
     risk = orders_pb2.RiskPolicy()
     ParseDict(data, risk, ignore_unknown_fields=True)
     return risk

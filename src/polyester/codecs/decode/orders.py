@@ -98,11 +98,19 @@ def _risk_leg_from_policy(policy) -> RiskLeg | None:
 def _trailing_stop_from_policy(policy) -> TrailingStop | None:
     if policy is None:
         return None
+    distance_ticks = int(policy.trailing_distance_ticks)
+    distance_bps = int(policy.trailing_distance_bps)
+    # Missing or non-positive distance is not a usable trailing stop; omit
+    # rather than fabricating a zero-distance stop.
+    if distance_ticks <= 0 and distance_bps <= 0:
+        return None
+    max_slippage_ticks = int(policy.max_slippage_ticks)
+    max_slippage_bps = int(policy.max_slippage_bps)
     return TrailingStop(
-        distance_ticks=int(policy.trailing_distance_ticks),
-        distance_bps=int(policy.trailing_distance_bps),
-        max_slippage_ticks=int(policy.max_slippage_ticks),
-        max_slippage_bps=int(policy.max_slippage_bps),
+        distance_ticks=distance_ticks,
+        distance_bps=distance_bps,
+        max_slippage_ticks=max_slippage_ticks if max_slippage_ticks > 0 else 0,
+        max_slippage_bps=max_slippage_bps if max_slippage_bps > 0 else 0,
         activation_price=(
             _price(policy.activation_price_ticks) if policy.activation_price_ticks else None
         ),

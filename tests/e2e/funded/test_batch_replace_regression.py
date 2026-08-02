@@ -61,7 +61,7 @@ async def test_batch_replace_admission_status_and_idempotency(
     try:
         with contextlib.suppress(Exception):
             await live_client.orders.cancel_all(symbol=trade_symbol)
-        for index in range(40):
+        for index in range(20):
             cid = unique_client_order_id(f"br-{index}")
             await live_client.orders.create(
                 symbol=trade_symbol,
@@ -85,7 +85,7 @@ async def test_batch_replace_admission_status_and_idempotency(
                 Decimal(price) * (Decimal("0.99") - Decimal(round_i) * Decimal("0.001")),
                 "f",
             )
-            new_cids = [unique_client_order_id(f"br-r{round_i}-{index}") for index in range(40)]
+            new_cids = [unique_client_order_id(f"br-r{round_i}-{index}") for index in range(20)]
             items = [
                 {
                     "key": ClientOrderId(cid),

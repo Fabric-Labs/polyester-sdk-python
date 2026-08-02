@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.0a33
+
+### Fixed
+- Attached `trailing_stop` encode rejects non-positive distance/max slippage and rejects
+  `order_type` under `trailing_stop` (child is always market).
+- Decode omits attached trailing legs that lack a positive distance (no fabricated
+  zero-distance stop).
+
 ## 0.1.0a32
 
 ### Breaking

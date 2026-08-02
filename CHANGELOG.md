@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0a32
+
 ### Breaking
 - Trigger snapshots no longer expose `child_order_ids`. Child-order history is
   authoritative on trigger events: use `triggers.list_events(..., event_type="fired")`

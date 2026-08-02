@@ -47,6 +47,12 @@ _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
     triggers_pb2.EVENT_CANCELED: "canceled",
     triggers_pb2.EVENT_UPDATED: "updated",
 }
+_TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
+    "fired": triggers_pb2.EVENT_FIRED,
+    "canceled": triggers_pb2.EVENT_CANCELED,
+    "cancelled": triggers_pb2.EVENT_CANCELED,
+    "updated": triggers_pb2.EVENT_UPDATED,
+}
 
 
 def _trigger_status_label(value: int) -> str:
@@ -71,6 +77,16 @@ def _trigger_event_type_label(value: int) -> str:
     return _TRIGGER_EVENT_TYPE_LABELS.get(
         value, proto_enum_name(triggers_pb2.TriggerEventType, value)
     )
+
+
+def trigger_event_type_from_label(label: str) -> int:
+    key = label.strip().lower()
+    if key not in _TRIGGER_EVENT_TYPE_FROM_LABEL:
+        raise ValueError(
+            f"invalid trigger event type {label!r}; expected one of: "
+            "fired, canceled, updated"
+        )
+    return _TRIGGER_EVENT_TYPE_FROM_LABEL[key]
 
 
 def _price(ticks: int, *, symbol: str | None = None) -> Price | None:
@@ -290,7 +306,6 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         updated_at=_timestamp(msg.updated_at) if has_field(msg, "updated_at") else None,
         armed_at=_timestamp(msg.armed_at) if has_field(msg, "armed_at") else None,
         completed_at=_timestamp(msg.completed_at) if has_field(msg, "completed_at") else None,
-        child_order_ids=[format_uint64_id(i) for i in msg.child_order_ids],
         details=details,
     )
 
@@ -333,11 +348,14 @@ def trigger_mutation_from_proto(
 def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
     return TriggerEvent(
         trigger_id=format_uint64_id(msg.trigger_id),
+        subaccount_id=format_uint64_id(msg.subaccount_id) if msg.subaccount_id else "",
         symbol_id=int(msg.symbol_id),
         trigger_type=proto_enum_name(triggers_pb2.TriggerType, msg.trigger_type),
         event_type=_trigger_event_type_label(msg.event_type),
-        ts_ns=str(msg.ts_ns),
-        fire_px=Price.from_ticks(int(msg.fire_price_ticks)) if msg.fire_price_ticks else None,
+        ts_ns=str(msg.ts_ns) if msg.ts_ns else "",
+        child_seq=int(msg.child_seq),
+        child_order_id=format_uint64_id(msg.child_order_id) if msg.child_order_id else "",
+        fire_price=Price.from_ticks(int(msg.fire_price_ticks)) if msg.fire_price_ticks else None,
         reason=msg.reason,
     )
 

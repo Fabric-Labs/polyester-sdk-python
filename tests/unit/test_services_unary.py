@@ -109,7 +109,13 @@ async def test_triggers_list_and_list_events_pass_page_token() -> None:
     )
     with patch("polyester.services.triggers.unary_auth_decoded", events_capture):
         service = AsyncTriggersService(MagicMock(), MagicMock(), None)
-        events = await service.list_events(trigger_id=7, limit=20, page_token="evt-page-1")
+        events = await service.list_events(
+            trigger_id=7,
+            limit=20,
+            event_type="fired",
+            page_token="evt-page-1",
+        )
     assert events_capture.request.trigger_id == 7
+    assert events_capture.request.event_type == triggers_pb2.EVENT_FIRED
     assert events_capture.request.page_token == "evt-page-1"
     assert events.next_page_token == "evt-page-2"

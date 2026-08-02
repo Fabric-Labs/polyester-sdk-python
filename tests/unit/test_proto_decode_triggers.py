@@ -65,7 +65,7 @@ def test_trigger_from_proto_attached_trailing_surfaces_side_and_parent() -> None
     assert trigger.details is not None and trigger.details.case == "trailing"
 
 
-def test_trigger_from_proto_projects_twap_child_orders_and_executed_qty() -> None:
+def test_trigger_from_proto_projects_twap_executed_qty() -> None:
     msg = triggers_pb2.Trigger(
         trigger_id=11,
         symbol_id=1,
@@ -85,14 +85,12 @@ def test_trigger_from_proto_projects_twap_child_orders_and_executed_qty() -> Non
             slice_count=12,
             executed_qty_scaled=25_000_000,
         ),
-        child_order_ids=[101, 202],
         client_trigger_id="twap-1",
     )
     trigger = trigger_from_proto(msg)
     assert trigger.trigger_type == "twap"
     assert trigger.side == "buy"
     assert trigger.order_type == "market"
-    assert trigger.child_order_ids == [format_id(101), format_id(202)]
     assert trigger.details is not None and trigger.details.case == "twap"
     assert trigger.details.twap is not None
     assert trigger.details.twap.slice_idx == 2
@@ -154,10 +152,13 @@ def test_trigger_events_list_from_proto() -> None:
         events=[
             triggers_pb2.TriggerEvent(
                 trigger_id=1,
+                subaccount_id=9,
                 symbol_id=2,
                 trigger_type=triggers_pb2.TAKE_PROFIT,
                 event_type=triggers_pb2.EVENT_FIRED,
                 ts_ns=123,
+                child_seq=3,
+                child_order_id=77,
                 fire_price_ticks=100,
                 reason="hit",
             )
@@ -166,5 +167,24 @@ def test_trigger_events_list_from_proto() -> None:
     )
     result = trigger_events_list_from_proto(msg)
     assert len(result.events) == 1
-    assert result.events[0].event_type == "fired"
+    event = result.events[0]
+    assert event.event_type == "fired"
+    assert event.trigger_type == "take_profit"
+    assert event.subaccount_id == format_id(9)
+    assert event.child_seq == 3
+    assert event.child_order_id == format_id(77)
+    assert event.fire_price is not None and event.fire_price.ticks == 100
+    assert event.reason == "hit"
     assert result.next_page_token == "evt-page-2"
+
+
+def test_trigger_event_type_from_label() -> None:
+    from polyester.codecs.decode.triggers import trigger_event_type_from_label
+
+    assert trigger_event_type_from_label("fired") == triggers_pb2.EVENT_FIRED
+    assert trigger_event_type_from_label("canceled") == triggers_pb2.EVENT_CANCELED
+    try:
+        trigger_event_type_from_label("nope")
+        raise AssertionError("expected ValueError")
+    except ValueError:
+        pass

@@ -229,7 +229,6 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     updated_at: datetime | None = None
     armed_at: datetime | None = None
     completed_at: datetime | None = None
-    child_order_ids: list[str] = []
     details: TriggerDetails | None = None
 
 
@@ -279,11 +278,14 @@ class DepositAddressesList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_id: str = ""
+    subaccount_id: str = ""
     symbol_id: int = 0
     trigger_type: str = ""
     event_type: str = ""
     ts_ns: str = ""
-    fire_px: Price | None = None
+    child_seq: int = 0
+    child_order_id: str = ""
+    fire_price: Price | None = None
     reason: str = ""
 
 

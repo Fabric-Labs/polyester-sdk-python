@@ -25,6 +25,7 @@ from polyester.gen.triggers.v1.triggers_pb2 import (
     ListTriggersRequest,
     PauseTriggerRequest,
     ResumeTriggerRequest,
+    TriggerEventType,
 )
 from polyester.models import (
     Trigger,
@@ -290,8 +291,13 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         sub_account_id: str | None = None,
         limit: int = 50,
+        event_type: str | None = None,
         page_token: str | None = None,
     ) -> TriggerEventsList:
+        from typing import cast
+
+        from polyester.codecs.decode.triggers import trigger_event_type_from_label
+
         request = ListTriggerEventsRequest(
             trigger_id=id_to_int(trigger_id, "trigger_id"),
             limit=limit,
@@ -301,6 +307,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
+        if event_type:
+            request.event_type = cast(TriggerEventType, trigger_event_type_from_label(event_type))
         if page_token:
             request.page_token = page_token
         return await unary_auth_decoded(

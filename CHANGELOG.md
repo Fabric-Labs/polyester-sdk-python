@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Breaking
+- Trigger snapshots no longer expose `child_order_ids`. Child-order history is
+  authoritative on trigger events: use `triggers.list_events(..., event_type="fired")`
+  and read `child_order_id` / `child_seq`.
+- `TriggerEvent.fire_px` renamed to `fire_price`.
+
+### Added
+- `triggers.list_events(..., event_type=...)` optional filter
+  (`fired` / `canceled` / `updated`).
+- `TriggerEvent` thickens with `subaccount_id`, `child_seq`, and
+  `child_order_id` (plus existing `symbol_id`, `trigger_type`, `fire_price`,
+  `reason`, `ts_ns`).
+
 ## 0.1.0a31
 
 ### Breaking

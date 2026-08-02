@@ -564,13 +564,17 @@ def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
         )
         or 0
     )
+    child_order_raw = _field(data, "childOrderId", "child_order_id", default=0) or 0
     return TriggerEvent(
         trigger_id=_id_str(_field(data, "triggerId", "trigger_id")),
+        subaccount_id=_id_str(_field(data, "subaccountId", "subaccount_id")),
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
         trigger_type=_enum_name(_field(data, "triggerType", "trigger_type")).lower(),
         event_type=_enum_name(_field(data, "eventType", "event_type")).lower(),
         ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
-        fire_px=Price.from_ticks(int(fire_raw)) if int(fire_raw) else None,
+        child_seq=int(_field(data, "childSeq", "child_seq", default=0) or 0),
+        child_order_id=_id_str(child_order_raw) if int(child_order_raw) else "",
+        fire_price=Price.from_ticks(int(fire_raw)) if int(fire_raw) else None,
         reason=str(_field(data, "reason", default="") or ""),
     )
 

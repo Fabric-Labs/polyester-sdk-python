@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.0a34
+
+### Docs
+- PyPI Documentation URL points to the Python SDK docs on polyester.ai
+  (`/docs/sdk/python/get-started/overview`).
+
 ## 0.1.0a33
 
 ### Fixed

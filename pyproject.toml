@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "polyester-sdk"
-version = "0.1.0a33"
+version = "0.1.0a34"
 description = "Official Python SDK for Polyester APIs."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -53,7 +53,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/Fabric-Labs/polyester-sdk-python"
-Documentation = "https://polyester.ai/docs"
+Documentation = "https://polyester.ai/docs/sdk/python/get-started/overview"
 Repository = "https://github.com/Fabric-Labs/polyester-sdk-python"
 Issues = "https://github.com/Fabric-Labs/polyester-sdk-python/issues"
 

@@ -212,7 +212,7 @@ class Order(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., terminal_reason_code: _Optional[int] = ..., terminal_reason: _Optional[str] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ..., batch_request_id: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ...) -> None: ...
 
 class UserTrade(_message.Message):
-    __slots__ = ("symbol_id", "match_id", "order_id", "side", "is_maker", "price_ticks", "qty_scaled", "fee_scaled", "fee_asset", "referral_share_scaled", "ts_ns")
+    __slots__ = ("symbol_id", "match_id", "order_id", "side", "is_maker", "price_ticks", "qty_scaled", "fee_amount_e18", "fee_asset", "referral_share_amount_e18", "ts_ns", "fee_is_rebate")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     MATCH_ID_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -220,10 +220,11 @@ class UserTrade(_message.Message):
     IS_MAKER_FIELD_NUMBER: _ClassVar[int]
     PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
-    FEE_SCALED_FIELD_NUMBER: _ClassVar[int]
+    FEE_AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
-    REFERRAL_SHARE_SCALED_FIELD_NUMBER: _ClassVar[int]
+    REFERRAL_SHARE_AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
+    FEE_IS_REBATE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     match_id: int
     order_id: int
@@ -231,11 +232,12 @@ class UserTrade(_message.Message):
     is_maker: bool
     price_ticks: int
     qty_scaled: int
-    fee_scaled: int
+    fee_amount_e18: _u128_pb2.U128
     fee_asset: _orders_pb2.FeeAsset
-    referral_share_scaled: int
+    referral_share_amount_e18: _u128_pb2.U128
     ts_ns: int
-    def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., is_maker: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., referral_share_scaled: _Optional[int] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    fee_is_rebate: bool
+    def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., is_maker: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., referral_share_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., ts_ns: _Optional[int] = ..., fee_is_rebate: _Optional[bool] = ...) -> None: ...
 
 class OrderTransfer(_message.Message):
     __slots__ = ("match_id", "asset_id", "amount_e18", "is_debit", "transfer_code", "account_code", "ts_ns", "tx_id")

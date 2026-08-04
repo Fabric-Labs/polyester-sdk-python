@@ -7,7 +7,7 @@
 ### Added
 - Lifecycle reason catalog maps trading-withdraw failure codes to snake labels:
   `trading_withdraw_policy_denied`, `trading_withdraw_contract_reverted`, and
-  `trading_withdraw_execution_failed` (proto `ff6c74e` / POLY-3868).
+  `trading_withdraw_execution_failed` .
 
 ## 0.1.0a36
 

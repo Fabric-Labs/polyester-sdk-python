@@ -29,6 +29,9 @@ class RotateGuardSignerWalletResult(msgspec.Struct, kw_only=True, omit_defaults=
 class ExportGuardSignerWalletResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     private_key: str = ""
 
+    def __repr__(self) -> str:
+        return "ExportGuardSignerWalletResult(private_key='[REDACTED]')"
+
 
 class BatchSignProtectedActionsResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     approvals: list[GuardApproval]

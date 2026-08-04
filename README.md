@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a35`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a36`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,10 +66,13 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a35"
+pip install "polyester-sdk==0.1.0a36"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
+
+The PyPI sdist/wheel do **not** include `tests/`. Full `pytest` (unit, hardening,
+live) requires a git checkout of this repository.
 
 For development from a git checkout:
 
@@ -295,6 +298,17 @@ ambiguous batch request with the same `request_id`.
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
+
+## User trade fees
+
+`UserTrade` fee fields are fixed **18-decimal** magnitudes of `fee_asset`
+(`fee_amount_e18`, `referral_share_amount_e18`), not catalog asset-scaled
+integers. Convert e18 → the fee asset's catalog scale before subtracting from a
+BUY fill's base quantity.
+
+Magnitudes are unsigned. Treat `fee_amount_e18` as a **debit** unless
+`fee_is_rebate` is true (then it is a **credit**). Proto3 omits false, so the
+rebate flag is sparse on the wire.
 
 ## Triggers
 

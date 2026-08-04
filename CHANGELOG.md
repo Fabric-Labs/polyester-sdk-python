@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.1.0a36
+
+### Fixed
+- `ExportGuardSignerWalletResult.__repr__` redacts `private_key`.
+
+### Docs
+- README documents `UserTrade` fee e18 fields and `fee_is_rebate` polarity.
+- README notes that the PyPI package excludes `tests/`; full pytest needs a git checkout.
+
 ## 0.1.0a35
 
 ### Breaking

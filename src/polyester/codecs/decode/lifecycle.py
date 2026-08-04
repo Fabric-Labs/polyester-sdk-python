@@ -30,6 +30,13 @@ _LIFECYCLE_REASON_BY_CODE: dict[int, str] = {
     int(types_pb2.LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED): (
         "ledger_mirror_transfer_id_already_failed"
     ),
+    int(types_pb2.TRADING_WITHDRAW_POLICY_DENIED): "trading_withdraw_policy_denied",
+    int(types_pb2.TRADING_WITHDRAW_CONTRACT_REVERTED): (
+        "trading_withdraw_contract_reverted"
+    ),
+    int(types_pb2.TRADING_WITHDRAW_EXECUTION_FAILED): (
+        "trading_withdraw_execution_failed"
+    ),
 }
 
 

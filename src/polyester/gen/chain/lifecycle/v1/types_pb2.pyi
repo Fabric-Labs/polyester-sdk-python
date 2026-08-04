@@ -25,6 +25,9 @@ class LifecycleReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     LEDGER_MIRROR_TRANSFER_EXISTS: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED: _ClassVar[LifecycleReason]
+    TRADING_WITHDRAW_POLICY_DENIED: _ClassVar[LifecycleReason]
+    TRADING_WITHDRAW_CONTRACT_REVERTED: _ClassVar[LifecycleReason]
+    TRADING_WITHDRAW_EXECUTION_FAILED: _ClassVar[LifecycleReason]
 
 class FlowKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -73,6 +76,9 @@ LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS: LifecycleReason
 LEDGER_MIRROR_TRANSFER_EXISTS: LifecycleReason
 LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND: LifecycleReason
 LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED: LifecycleReason
+TRADING_WITHDRAW_POLICY_DENIED: LifecycleReason
+TRADING_WITHDRAW_CONTRACT_REVERTED: LifecycleReason
+TRADING_WITHDRAW_EXECUTION_FAILED: LifecycleReason
 KIND_UNSPECIFIED: FlowKind
 KIND_DEPOSIT: FlowKind
 KIND_WITHDRAW: FlowKind

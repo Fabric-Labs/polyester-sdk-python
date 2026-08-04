@@ -110,10 +110,13 @@ class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     is_maker: bool = False
     price: Price | None = None
     qty: Quantity | None = None
-    fee_scaled: str = ""
+    fee_amount_e18: str = "0"
     fee_asset: str = ""
-    referral_share_scaled: str = ""
+    referral_share_amount_e18: str = "0"
     ts_ns: str = ""
+    # True when fee_amount_e18 is a rebate credit instead of a fee debit.
+    # Proto3 omits false, so sparse wire encoding only sets this for rebates.
+    fee_is_rebate: bool = False
 
 
 class UserTradesList(msgspec.Struct, kw_only=True, omit_defaults=True):

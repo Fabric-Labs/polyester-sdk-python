@@ -1288,9 +1288,9 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
                         symbol_id=1,
                         order_id=1,
                         qty_scaled=40,
-                        fee_scaled=1,
+                        fee_amount_e18=u128_pb2.U128(hi=0, lo=1),
                         fee_asset=orders_pb2.BASE,
-                        referral_share_scaled=1,
+                        referral_share_amount_e18=u128_pb2.U128(hi=0, lo=1),
                     ),
                     orders_read_pb2.UserTrade(symbol_id=1, order_id=1, qty_scaled=60),
                 ],
@@ -1318,8 +1318,9 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
         assert result.order.cum_qty.scaled == 100
         assert sum(t.qty.scaled for t in result.trades if t.qty is not None) == 100
         assert result.trades[0].fee_asset == "base"
-        assert result.trades[0].fee_scaled == "1"
-        assert result.trades[0].referral_share_scaled == "1"
+        assert result.trades[0].fee_amount_e18 == "1"
+        assert result.trades[0].referral_share_amount_e18 == "1"
+        assert result.trades[0].fee_is_rebate is False
         await client.aclose()
     finally:
         await http.aclose()

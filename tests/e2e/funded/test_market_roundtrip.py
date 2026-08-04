@@ -41,6 +41,23 @@ def _poly3028_skip(reason: str) -> None:
     pytest.skip(f"possible POLY-3028 backend reserve blocker: {reason}")
 
 
+def _fee_amount_e18_to_asset_scaled(fee_e18: str, asset_scale: int) -> int:
+    from polyester.codecs.ledger_amounts import LEDGER_SCALE
+
+    if not fee_e18 or fee_e18 == "0":
+        return 0
+    value = int(fee_e18)
+    if asset_scale < 0 or asset_scale > LEDGER_SCALE:
+        raise ValueError(f"invalid asset scale {asset_scale}")
+    diff = LEDGER_SCALE - asset_scale
+    if diff == 0:
+        return value
+    divisor = 10**diff
+    if value % divisor != 0:
+        raise ValueError(f"fee_amount_e18 {fee_e18!r} not exact at scale {asset_scale}")
+    return value // divisor
+
+
 async def _hydrate_catalogs(client) -> tuple[dict, dict]:
     spot = await client.market_data.get_spot_config()
     client.catalogs.hydrate_spot_config(spot.raw)
@@ -211,11 +228,13 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
             key=ClientOrderId(buy_cid),
             timeout=20,
         )
-        received_fee = sum(
-            int(trade.fee_scaled or "0")
-            for trade in buy_projection.trades
-            if trade.fee_asset == "base"
-        )
+        asset_scale = buy_order.cum_qty.scale if buy_order.cum_qty.scale is not None else 0
+        received_fee = 0
+        for trade in buy_projection.trades:
+            if trade.fee_asset != "base":
+                continue
+            fee = _fee_amount_e18_to_asset_scaled(trade.fee_amount_e18, asset_scale)
+            received_fee += -fee if trade.fee_is_rebate else fee
         net_received = filled - received_fee
         assert net_received > 0, "BUY net received quantity must be positive"
         cleanup_qty = Quantity.from_scaled(

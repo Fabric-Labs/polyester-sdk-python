@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.balances import u128_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
@@ -193,10 +194,17 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
         is_maker=bool(msg.is_maker),
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         qty=_qty(msg.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
-        fee_scaled=str(msg.fee_scaled),
+        fee_amount_e18=(
+            u128_from_proto(msg.fee_amount_e18) if msg.HasField("fee_amount_e18") else "0"
+        ),
         fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
-        referral_share_scaled=str(msg.referral_share_scaled),
+        referral_share_amount_e18=(
+            u128_from_proto(msg.referral_share_amount_e18)
+            if msg.HasField("referral_share_amount_e18")
+            else "0"
+        ),
         ts_ns=str(msg.ts_ns),
+        fee_is_rebate=bool(msg.fee_is_rebate),
     )
 
 

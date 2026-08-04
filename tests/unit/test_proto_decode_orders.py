@@ -126,6 +126,8 @@ def test_orders_list_from_proto() -> None:
 
 
 def test_get_order_from_proto_includes_trades() -> None:
+    from polyester.gen.polyester.type.v1 import u128_pb2
+
     msg = GetOrderResponse(
         order=Order(order_id=7, symbol_id=2),
         trades=[
@@ -134,9 +136,10 @@ def test_get_order_from_proto_includes_trades() -> None:
                 match_id=99,
                 order_id=7,
                 side=orders_pb2.BUY,
-                fee_scaled=5,
+                fee_amount_e18=u128_pb2.U128(hi=0, lo=5),
                 fee_asset=orders_pb2.BASE,
-                referral_share_scaled=2,
+                referral_share_amount_e18=u128_pb2.U128(hi=0, lo=2),
+                fee_is_rebate=True,
             )
         ],
     )
@@ -145,9 +148,10 @@ def test_get_order_from_proto_includes_trades() -> None:
     assert result.order.order_id == format_id(7)
     assert len(result.trades) == 1
     assert result.trades[0].match_id == "99"
-    assert result.trades[0].fee_scaled == "5"
+    assert result.trades[0].fee_amount_e18 == "5"
     assert result.trades[0].fee_asset == "base"
-    assert result.trades[0].referral_share_scaled == "2"
+    assert result.trades[0].referral_share_amount_e18 == "2"
+    assert result.trades[0].fee_is_rebate is True
 
 
 def test_modify_order_from_proto_action_taken_enum() -> None:

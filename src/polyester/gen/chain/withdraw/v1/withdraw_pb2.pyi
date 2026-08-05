@@ -16,9 +16,26 @@ class TradingWithdrawAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTION_UNSPECIFIED: _ClassVar[TradingWithdrawAction]
     TO_FUNDING: _ClassVar[TradingWithdrawAction]
     TO_EXTERNAL_CHAIN: _ClassVar[TradingWithdrawAction]
+
+class WithdrawDestinationValidationCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RESULT_UNSPECIFIED: _ClassVar[WithdrawDestinationValidationCode]
+    VALID: _ClassVar[WithdrawDestinationValidationCode]
+    INVALID_ADDRESS: _ClassVar[WithdrawDestinationValidationCode]
+    UNSUPPORTED_CHAIN: _ClassVar[WithdrawDestinationValidationCode]
+    POLYESTER_SMART_ACCOUNT: _ClassVar[WithdrawDestinationValidationCode]
+    TOKEN_CONTRACT: _ClassVar[WithdrawDestinationValidationCode]
+    DENYLISTED_ADDRESS: _ClassVar[WithdrawDestinationValidationCode]
 ACTION_UNSPECIFIED: TradingWithdrawAction
 TO_FUNDING: TradingWithdrawAction
 TO_EXTERNAL_CHAIN: TradingWithdrawAction
+RESULT_UNSPECIFIED: WithdrawDestinationValidationCode
+VALID: WithdrawDestinationValidationCode
+INVALID_ADDRESS: WithdrawDestinationValidationCode
+UNSUPPORTED_CHAIN: WithdrawDestinationValidationCode
+POLYESTER_SMART_ACCOUNT: WithdrawDestinationValidationCode
+TOKEN_CONTRACT: WithdrawDestinationValidationCode
+DENYLISTED_ADDRESS: WithdrawDestinationValidationCode
 
 class CreateTradingWithdrawResponse(_message.Message):
     __slots__ = ("intent_id",)
@@ -71,3 +88,23 @@ class CreateWalletTradingWithdrawRequest(_message.Message):
     signer_wallet: str
     payload_signature: bytes
     def __init__(self, payload: _Optional[_Union[TradingWithdrawIntentPayload, _Mapping]] = ..., subaccount_id: _Optional[int] = ..., signer_wallet: _Optional[str] = ..., payload_signature: _Optional[bytes] = ...) -> None: ...
+
+class ValidateWithdrawDestinationRequest(_message.Message):
+    __slots__ = ("destination_chain_id", "destination_address")
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    destination_chain_id: int
+    destination_address: str
+    def __init__(self, destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ...) -> None: ...
+
+class ValidateWithdrawDestinationResponse(_message.Message):
+    __slots__ = ("valid", "code", "message", "canonical_destination_address")
+    VALID_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    CANONICAL_DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    valid: bool
+    code: WithdrawDestinationValidationCode
+    message: str
+    canonical_destination_address: str
+    def __init__(self, valid: _Optional[bool] = ..., code: _Optional[_Union[WithdrawDestinationValidationCode, str]] = ..., message: _Optional[str] = ..., canonical_destination_address: _Optional[str] = ...) -> None: ...

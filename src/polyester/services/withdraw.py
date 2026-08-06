@@ -5,7 +5,10 @@ from dataclasses import dataclass, field
 from google.protobuf.message import DecodeError
 
 from polyester.auth import ApiKeyCredentials
-from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
+from polyester.codecs.decode.withdraw import (
+    withdraw_destination_validation_from_proto,
+    withdraw_intent_from_proto,
+)
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.withdraw import (
     new_trading_withdraw_nonce,
@@ -14,7 +17,7 @@ from polyester.codecs.withdraw import (
 from polyester.errors import PolyesterAuthError, PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.chain.withdraw.v1.withdraw_connect import WithdrawServiceClient
-from polyester.models import WithdrawIntentResult
+from polyester.models import WithdrawDestinationValidation, WithdrawIntentResult
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -219,6 +222,33 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         )
 
     create_api_key_to_external = create_api_key_to_external_chain
+
+    async def validate_destination(
+        self,
+        *,
+        destination_chain_id: int,
+        destination_address: str,
+    ) -> WithdrawDestinationValidation:
+        """Check one external-chain destination without creating a withdraw.
+
+        Use for form feedback before Trading → external submission; create RPCs
+        remain authoritative.
+        """
+        if int(destination_chain_id) <= 0:
+            raise PolyesterValidationError("destination_chain_id must be non-zero")
+        if not str(destination_address or "").strip():
+            raise PolyesterValidationError("destination_address is required")
+        request = withdraw_pb2.ValidateWithdrawDestinationRequest(
+            destination_chain_id=int(destination_chain_id),
+            destination_address=str(destination_address),
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            WithdrawServiceClient,
+            lambda client, req: client.validate_withdraw_destination(req),
+            request,
+            withdraw_destination_validation_from_proto,
+        )
 
     async def create_to_funding(
         self,

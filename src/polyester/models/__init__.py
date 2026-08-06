@@ -134,6 +134,7 @@ from polyester.models.trading import (
     TriggerTwapDetails,
     UserTrade,
     UserTradesList,
+    WithdrawDestinationValidation,
     WithdrawIntentResult,
     ZipperReasonDetails,
 )
@@ -273,6 +274,7 @@ __all__ = [
     "UserProfile",
     "UsernameHistoryEntry",
     "UsernameHistoryList",
+    "WithdrawDestinationValidation",
     "WithdrawIntentResult",
     "WithdrawWhitelistView",
     "ZipperAssetConfig",

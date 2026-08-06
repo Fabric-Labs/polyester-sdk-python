@@ -471,3 +471,12 @@ class CancelAllAfterResult(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class WithdrawIntentResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     intent_id: str = ""
+
+
+class WithdrawDestinationValidation(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """User-safe outcome of ``WithdrawService.validate_destination``."""
+
+    valid: bool = False
+    code: str = "unspecified"
+    message: str = ""
+    canonical_destination_address: str = ""

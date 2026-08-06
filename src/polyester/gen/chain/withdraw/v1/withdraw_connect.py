@@ -18,6 +18,9 @@ import polyester.gen.chain.withdraw.v1.withdraw_pb2 as chain_dot_withdraw_dot_v1
 
 
 class WithdrawService(Protocol):
+    async def validate_withdraw_destination(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def create_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -30,6 +33,16 @@ class WithdrawServiceASGIApplication(ConnectASGIApplication[WithdrawService]):
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/chain.withdraw.v1.WithdrawService/ValidateWithdrawDestination": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ValidateWithdrawDestination",
+                        service_name="chain.withdraw.v1.WithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.validate_withdraw_destination,
+                ),
                 "/chain.withdraw.v1.WithdrawService/CreateTradingWithdraw": Endpoint.unary(
                     method=MethodInfo(
                         name="CreateTradingWithdraw",
@@ -64,6 +77,26 @@ class WithdrawServiceASGIApplication(ConnectASGIApplication[WithdrawService]):
 
 
 class WithdrawServiceClient(ConnectClient):
+    async def validate_withdraw_destination(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ValidateWithdrawDestination",
+                service_name="chain.withdraw.v1.WithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
+                output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def create_trading_withdraw(
         self,
         request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawRequest,
@@ -109,6 +142,8 @@ class WithdrawServiceClient(ConnectClient):
 
 
 class WithdrawServiceSync(Protocol):
+    def validate_withdraw_destination(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_wallet_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawResponse:
@@ -119,6 +154,16 @@ class WithdrawServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: WithdrawServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/chain.withdraw.v1.WithdrawService/ValidateWithdrawDestination": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ValidateWithdrawDestination",
+                        service_name="chain.withdraw.v1.WithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.validate_withdraw_destination,
+                ),
                 "/chain.withdraw.v1.WithdrawService/CreateTradingWithdraw": EndpointSync.unary(
                     method=MethodInfo(
                         name="CreateTradingWithdraw",
@@ -153,6 +198,26 @@ class WithdrawServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class WithdrawServiceClientSync(ConnectClientSync):
+    def validate_withdraw_destination(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ValidateWithdrawDestination",
+                service_name="chain.withdraw.v1.WithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
+                output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     def create_trading_withdraw(
         self,
         request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawRequest,

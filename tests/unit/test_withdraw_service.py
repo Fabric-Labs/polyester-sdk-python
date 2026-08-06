@@ -132,3 +132,42 @@ async def test_create_to_funding_rejects_zero_nonce() -> None:
             nonce=0,
             deadline_ts_sec=1_800_000_000,
         )
+
+
+@pytest.mark.asyncio
+async def test_validate_destination_builds_request() -> None:
+    capture = CaptureUnary(
+        withdraw_pb2.ValidateWithdrawDestinationResponse(
+            valid=True,
+            code=withdraw_pb2.VALID,
+            message="ok",
+            canonical_destination_address="0xabc",
+        )
+    )
+    with patch("polyester.services.withdraw.unary_auth_decoded", capture):
+        service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+        result = await service.validate_destination(
+            destination_chain_id=6,
+            destination_address="0xAbC",
+        )
+    assert isinstance(capture.request, withdraw_pb2.ValidateWithdrawDestinationRequest)
+    assert capture.request.destination_chain_id == 6
+    assert capture.request.destination_address == "0xAbC"
+    assert result.valid is True
+    assert result.code == "valid"
+    assert result.canonical_destination_address == "0xabc"
+
+
+@pytest.mark.asyncio
+async def test_validate_destination_rejects_missing_inputs() -> None:
+    service = AsyncWithdrawService(transport=MagicMock(), default_sub_account_id=None)
+    with pytest.raises(PolyesterValidationError, match="destination_chain_id"):
+        await service.validate_destination(
+            destination_chain_id=0,
+            destination_address="0xabc",
+        )
+    with pytest.raises(PolyesterValidationError, match="destination_address"):
+        await service.validate_destination(
+            destination_chain_id=6,
+            destination_address="",
+        )

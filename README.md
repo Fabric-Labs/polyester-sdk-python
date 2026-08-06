@@ -344,6 +344,10 @@ SDK notes:
 - **Trading → funding:** prepare and persist an exact API-key signature with
   `client.trading_withdraws.prepare_api_key_to_funding(...)`, then call
   `submit_prepared(...)`. One-call `create_api_key_to_funding(...)` is also available.
+- **Trading → external destination check:**
+  `await client.trading_withdraws.validate_destination(destination_chain_id=..., destination_address=...)`
+  returns user-safe `valid` / `code` / `message` / `canonical_destination_address`
+  without creating a withdraw (create RPCs remain authoritative).
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
 
 ```python

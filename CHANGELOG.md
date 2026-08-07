@@ -2,10 +2,16 @@
 
 ## Unreleased
 
+## 0.1.0a39
+
 ### Breaking
 - `lifecycle.get_flow_by_tx(...)` now returns `LifecycleFlowsList` instead of
   silently returning only the first match. Its default page size is now 50;
   use `list_flows_by_tx(...)` with `next_page_token` for complete pagination.
+
+### Added
+- Generated `polyester.ratelimit.v1` contracts expose structured quota
+  rejection details used by order and trade WebSocket responses.
 
 ## 0.1.0a38
 

@@ -1245,8 +1245,13 @@ async def test_l2_create_deposit_address_rejects_missing_entity_via_public_servi
 
 
 @pytest.mark.asyncio
-async def test_l2_get_flow_by_tx_rejects_missing_match_via_public_service() -> None:
-    body = lifecycle_read_pb2.ListFlowsByTxResponse().SerializeToString()
+async def test_l2_get_flow_by_tx_returns_all_matches_via_public_service() -> None:
+    body = lifecycle_read_pb2.ListFlowsByTxResponse(
+        matches=[
+            lifecycle_read_pb2.FlowTxMatchView(flow_id="flow-a"),
+            lifecycle_read_pb2.FlowTxMatchView(flow_id="flow-b"),
+        ]
+    ).SerializeToString()
 
     async def handler(req: ParsedRequest) -> HttpScript:
         if "ListFlowsByTx" in req.path:
@@ -1256,8 +1261,8 @@ async def test_l2_get_flow_by_tx_rejects_missing_match_via_public_service() -> N
     http = await MockHttpServer.spawn(handler)
     try:
         client = AsyncPolyester(api_url=http.base_url, hydrate_catalogs=False)
-        with pytest.raises(PolyesterTransportError, match="no matching flow"):
-            await client.lifecycle.get_flow_by_tx(tx_hash="0x01")
+        result = await client.lifecycle.get_flow_by_tx(tx_hash="0x01")
+        assert [flow.intent_id for flow in result.flows] == ["flow-a", "flow-b"]
         await client.aclose()
     finally:
         await http.aclose()

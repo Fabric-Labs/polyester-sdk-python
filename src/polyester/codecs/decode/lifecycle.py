@@ -130,7 +130,10 @@ def flow_from_get_response(msg: lifecycle_read_pb2.GetFlowResponse) -> Lifecycle
 
 def flow_from_get_by_tx_response(
     msg: lifecycle_read_pb2.ListFlowsByTxResponse,
-) -> LifecycleFlowSummary:
-    if msg.matches:
-        return flow_tx_match_from_proto(msg.matches[0])
-    raise PolyesterTransportError("get flow by transaction response has no matching flow")
+) -> LifecycleFlowsList:
+    """Decode every flow in a transaction lookup response.
+
+    The legacy helper name is retained for compatibility, but transaction
+    lookups are one-to-many and must not silently discard bundled flows.
+    """
+    return flows_by_tx_list_from_proto(msg)

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Breaking
+- `lifecycle.get_flow_by_tx(...)` now returns `LifecycleFlowsList` instead of
+  silently returning only the first match. Its default page size is now 50;
+  use `list_flows_by_tx(...)` with `next_page_token` for complete pagination.
+
 ## 0.1.0a38
 
 ### Added

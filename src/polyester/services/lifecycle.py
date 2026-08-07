@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.lifecycle import (
-    flow_from_get_by_tx_response,
     flow_from_get_response,
     flows_by_tx_list_from_proto,
     flows_list_from_proto,
@@ -91,20 +90,17 @@ class AsyncLifecycleService(BaseService):
         *,
         tx_hash: str,
         lookup_kind: str = "any",
-        limit: int = 1,
-    ) -> LifecycleFlowSummary:
-        from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
+        limit: int = 50,
+    ) -> LifecycleFlowsList:
+        """Return all matches in the first page for a transaction lookup.
 
-        kind_name = lookup_kind.upper()
-        if not kind_name.startswith("TX_"):
-            kind_name = f"TX_{kind_name}"
-        lookup_enum = getattr(lifecycle_read_pb2, kind_name, lifecycle_read_pb2.TX_ANY)
-        return await unary_public_decoded(
-            self._transport,
-            LifecycleReadServiceClient,
-            lambda client, req: client.list_flows_by_tx(req),
-            ListFlowsByTxRequest(tx_hash=tx_hash, lookup_kind=lookup_enum, limit=limit),
-            flow_from_get_by_tx_response,
+        A chain transaction can contain multiple bundled lifecycle flows.
+        Use ``list_flows_by_tx`` directly when following pagination tokens.
+        """
+        return await self.list_flows_by_tx(
+            tx_hash=tx_hash,
+            lookup_kind=lookup_kind,
+            limit=limit,
         )
 
     async def list_flows_by_tx(

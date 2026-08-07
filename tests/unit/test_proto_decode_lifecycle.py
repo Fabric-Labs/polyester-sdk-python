@@ -133,9 +133,24 @@ def test_flow_detail_missing_summary_fails_closed() -> None:
         flow_detail_from_proto(lifecycle_read_pb2.FlowDetailView(from_live_state=True))
 
 
-def test_get_by_transaction_missing_match_fails_closed() -> None:
-    with pytest.raises(PolyesterTransportError, match="no matching flow"):
-        flow_from_get_by_tx_response(lifecycle_read_pb2.ListFlowsByTxResponse())
+def test_get_by_transaction_decodes_all_matches() -> None:
+    result = flow_from_get_by_tx_response(
+        lifecycle_read_pb2.ListFlowsByTxResponse(
+            matches=[
+                lifecycle_read_pb2.FlowTxMatchView(flow_id="flow-a"),
+                lifecycle_read_pb2.FlowTxMatchView(flow_id="flow-b"),
+            ],
+            next_page_token="next",
+        )
+    )
+
+    assert [flow.intent_id for flow in result.flows] == ["flow-a", "flow-b"]
+    assert result.next_page_token == "next"
+
+
+def test_get_by_transaction_allows_no_matches() -> None:
+    result = flow_from_get_by_tx_response(lifecycle_read_pb2.ListFlowsByTxResponse())
+    assert result.flows == []
 
 
 def test_realtime_decoder_rejects_empty_payload() -> None:

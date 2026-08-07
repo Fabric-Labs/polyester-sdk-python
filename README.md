@@ -557,6 +557,27 @@ python3 examples/05_public_orderbook_stream.py
 
 Then bump the version, update `CHANGELOG.md`, build, and publish to PyPI. Install from the new wheel (not editable) and rerun `smoke_realtime.sh` once to confirm the published artifact.
 
+## Lifecycle transaction lookups
+
+One chain transaction can reference multiple lifecycle flows when operations
+are bundled. Transaction lookups therefore return a page, not one flow:
+
+```python
+page = await client.lifecycle.list_flows_by_tx(tx_hash=tx_hash, limit=50)
+flow_ids = [flow.intent_id for flow in page.flows]
+
+while page.next_page_token:
+    page = await client.lifecycle.list_flows_by_tx(
+        tx_hash=tx_hash,
+        limit=50,
+        page_token=page.next_page_token,
+    )
+    flow_ids.extend(flow.intent_id for flow in page.flows)
+```
+
+`get_flow_by_tx(...)` also returns the complete first page. Use
+`list_flows_by_tx(...)` when following pagination.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).

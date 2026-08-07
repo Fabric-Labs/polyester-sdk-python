@@ -4,6 +4,7 @@ from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
+from polyester.gen.polyester.ratelimit.v1 import types_pb2 as _types_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -112,6 +113,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_VALIDATION_ERROR: _ClassVar[ErrorCode]
     ERROR_CODE_OVERLOADED: _ClassVar[ErrorCode]
     ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL: _ClassVar[ErrorCode]
+    ERROR_CODE_RATE_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -233,6 +235,7 @@ ERROR_CODE_STALE_QUOTE: ErrorCode
 ERROR_CODE_VALIDATION_ERROR: ErrorCode
 ERROR_CODE_OVERLOADED: ErrorCode
 ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL: ErrorCode
+ERROR_CODE_RATE_LIMIT_EXCEEDED: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -400,12 +403,14 @@ class FieldViolation(_message.Message):
     def __init__(self, field_path: _Optional[str] = ..., rule_id: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code", "violations")
+    __slots__ = ("code", "violations", "rate_limit")
     CODE_FIELD_NUMBER: _ClassVar[int]
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
+    RATE_LIMIT_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     violations: _containers.RepeatedCompositeFieldContainer[FieldViolation]
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ...) -> None: ...
+    rate_limit: _types_pb2.RateLimitDetail
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ...) -> None: ...
 
 class RiskMarketIoc(_message.Message):
     __slots__ = ()
@@ -642,20 +647,22 @@ class BatchReplaceOrderItem(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., new_price_ticks: _Optional[int] = ..., new_qty_scaled: _Optional[int] = ..., new_attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ..., new_client_order_id: _Optional[str] = ...) -> None: ...
 
 class BatchReplaceAdmissionItem(_message.Message):
-    __slots__ = ("item_index", "status", "old_order_id", "replacement_order_id", "client_order_id", "code")
+    __slots__ = ("item_index", "status", "old_order_id", "replacement_order_id", "client_order_id", "code", "error")
     ITEM_INDEX_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     OLD_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     REPLACEMENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
     item_index: int
     status: BatchReplaceItemAdmissionStatus
     old_order_id: int
     replacement_order_id: int
     client_order_id: str
     code: str
-    def __init__(self, item_index: _Optional[int] = ..., status: _Optional[_Union[BatchReplaceItemAdmissionStatus, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ...) -> None: ...
+    error: ErrorDetail
+    def __init__(self, item_index: _Optional[int] = ..., status: _Optional[_Union[BatchReplaceItemAdmissionStatus, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., error: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
 
 class BatchReplaceOrdersRequest(_message.Message):
     __slots__ = ("subaccount_id", "symbol_id", "request_id", "items")
@@ -698,16 +705,18 @@ class BatchCancelItem(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., symbol_id: _Optional[int] = ...) -> None: ...
 
 class BatchCancelResultItem(_message.Message):
-    __slots__ = ("status", "order_id", "client_order_id", "code")
+    __slots__ = ("status", "order_id", "client_order_id", "code", "error")
     STATUS_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
     status: str
     order_id: int
     client_order_id: str
     code: str
-    def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ...) -> None: ...
+    error: ErrorDetail
+    def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., error: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
 
 class BatchCancelOrdersRequest(_message.Message):
     __slots__ = ("subaccount_id", "request_id", "items")

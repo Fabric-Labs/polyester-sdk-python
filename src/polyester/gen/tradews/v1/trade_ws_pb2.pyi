@@ -67,12 +67,14 @@ class AckResponse(_message.Message):
     def __init__(self, create_order: _Optional[_Union[_orders_pb2.CreateOrderResponse, _Mapping]] = ..., cancel_order: _Optional[_Union[_orders_pb2.CancelOrderResponse, _Mapping]] = ..., modify_order: _Optional[_Union[_orders_pb2.ModifyOrderResponse, _Mapping]] = ..., cancel_all_orders: _Optional[_Union[_orders_pb2.CancelAllOrdersResponse, _Mapping]] = ...) -> None: ...
 
 class CommandReject(_message.Message):
-    __slots__ = ("code", "detail")
+    __slots__ = ("code", "detail", "error")
     CODE_FIELD_NUMBER: _ClassVar[int]
     DETAIL_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
     code: str
     detail: str
-    def __init__(self, code: _Optional[str] = ..., detail: _Optional[str] = ...) -> None: ...
+    error: _orders_pb2.ErrorDetail
+    def __init__(self, code: _Optional[str] = ..., detail: _Optional[str] = ..., error: _Optional[_Union[_orders_pb2.ErrorDetail, _Mapping]] = ...) -> None: ...
 
 class OverloadResponse(_message.Message):
     __slots__ = ("code", "detail")

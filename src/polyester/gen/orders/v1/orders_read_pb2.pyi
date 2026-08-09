@@ -260,7 +260,7 @@ class OrderTransfer(_message.Message):
     def __init__(self, match_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., ts_ns: _Optional[int] = ..., tx_id: _Optional[str] = ...) -> None: ...
 
 class GetOpenOrdersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "side", "limit", "page_token", "include_attached_risk", "include_attached_risk_state")
+    __slots__ = ("subaccount_id", "symbol_id", "side", "limit", "page_token", "include_attached_risk", "include_attached_risk_state", "trigger_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
@@ -268,6 +268,7 @@ class GetOpenOrdersRequest(_message.Message):
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_ATTACHED_RISK_STATE_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol_id: _containers.RepeatedScalarFieldContainer[int]
     side: _orders_pb2.Side
@@ -275,7 +276,8 @@ class GetOpenOrdersRequest(_message.Message):
     page_token: str
     include_attached_risk: bool
     include_attached_risk_state: bool
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ...) -> None: ...
+    trigger_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ..., trigger_id: _Optional[int] = ...) -> None: ...
 
 class GetOpenOrdersResponse(_message.Message):
     __slots__ = ("orders", "next_page_token")
@@ -286,7 +288,7 @@ class GetOpenOrdersResponse(_message.Message):
     def __init__(self, orders: _Optional[_Iterable[_Union[Order, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetOrderHistoryRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "side", "status", "start_ts_ns", "end_ts_ns", "limit", "page_token", "include_attached_risk", "include_attached_risk_state")
+    __slots__ = ("subaccount_id", "symbol_id", "side", "status", "start_ts_ns", "end_ts_ns", "limit", "page_token", "include_attached_risk", "include_attached_risk_state", "trigger_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
@@ -297,6 +299,7 @@ class GetOrderHistoryRequest(_message.Message):
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_ATTACHED_RISK_STATE_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol_id: _containers.RepeatedScalarFieldContainer[int]
     side: _orders_pb2.Side
@@ -307,7 +310,8 @@ class GetOrderHistoryRequest(_message.Message):
     page_token: str
     include_attached_risk: bool
     include_attached_risk_state: bool
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., start_ts_ns: _Optional[int] = ..., end_ts_ns: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ...) -> None: ...
+    trigger_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., start_ts_ns: _Optional[int] = ..., end_ts_ns: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ..., trigger_id: _Optional[int] = ...) -> None: ...
 
 class GetOrderHistoryResponse(_message.Message):
     __slots__ = ("orders", "next_page_token")

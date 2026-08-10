@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.balances import u128_from_proto
+from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
@@ -167,8 +168,7 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         submitted_max_quote_debit_scaled=(
             str(msg.submitted_max_quote_debit_scaled)
             if (
-                "submitted_max_quote_debit_scaled"
-                in msg.DESCRIPTOR.fields_by_name
+                "submitted_max_quote_debit_scaled" in msg.DESCRIPTOR.fields_by_name
                 and msg.HasField("submitted_max_quote_debit_scaled")
             )
             else ""
@@ -221,9 +221,7 @@ def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
     return GetOrderResult(order=order, trades=trades)
 
 
-def order_mutation_from_proto(
-    msg, *, quantity_scale: int | None = None
-) -> OrderMutationResult:
+def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> OrderMutationResult:
     client_order_id = getattr(msg, "client_order_id", "") or ""
     # CreateOrderResponse no longer carries a status field (POLY-3701): reaching
     # the client means the order was admitted, so synthesize "accepted".
@@ -235,12 +233,8 @@ def order_mutation_from_proto(
     if message_name == "CreateOrderResponse":
         if not msg.order_id:
             raise PolyesterResponseContractError("CreateOrder", "missing order_id")
-    elif message_name == "CancelOrderResponse" and (
-        not msg.order_id or not str(status).strip()
-    ):
-        raise PolyesterResponseContractError(
-            "CancelOrder", "missing order_id or status"
-        )
+    elif message_name == "CancelOrderResponse" and (not msg.order_id or not str(status).strip()):
+        raise PolyesterResponseContractError("CancelOrder", "missing order_id or status")
     return OrderMutationResult(
         status=status,
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
@@ -254,8 +248,7 @@ def order_mutation_from_proto(
         submitted_max_quote_debit_scaled=(
             str(msg.submitted_max_quote_debit_scaled)
             if (
-                "submitted_max_quote_debit_scaled"
-                in msg.DESCRIPTOR.fields_by_name
+                "submitted_max_quote_debit_scaled" in msg.DESCRIPTOR.fields_by_name
                 and msg.HasField("submitted_max_quote_debit_scaled")
             )
             else ""
@@ -286,6 +279,9 @@ def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDet
             )
             for item in msg.violations
         ],
+        rate_limit=(
+            rate_limit_detail_from_proto(msg.rate_limit) if msg.HasField("rate_limit") else None
+        ),
     )
 
 
@@ -306,9 +302,7 @@ def preview_order_from_proto(
     return PreviewOrderResult(
         admissible=bool(msg.admissible) if msg.HasField("admissible") else None,
         rejection=(
-            _order_error_detail_from_proto(msg.rejection)
-            if msg.HasField("rejection")
-            else None
+            _order_error_detail_from_proto(msg.rejection) if msg.HasField("rejection") else None
         ),
         resolved_base_qty_scaled=str(resolved_scaled) if has_resolved else "",
         resolved_base_qty=(
@@ -348,8 +342,7 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
     status = (msg.status or "").strip()
     if not status or status.lower() not in {"submitted", "dry_run"}:
         raise PolyesterResponseContractError(
-            "CancelAllOrders",
-            f"invalid CancelAllOrders response: unknown status {msg.status!r}"
+            "CancelAllOrders", f"invalid CancelAllOrders response: unknown status {msg.status!r}"
         )
     if status.lower() == "submitted" and (
         int(msg.submitted_cancels) + int(msg.failed_cancels) != int(msg.matched_orders)
@@ -437,6 +430,11 @@ def batch_replace_from_proto(
                 format_uint64_id(item.replacement_order_id) if item.replacement_order_id else ""
             ),
             code=item.code,
+            rate_limit=(
+                rate_limit_detail_from_proto(item.error.rate_limit)
+                if item.HasField("error") and item.error.HasField("rate_limit")
+                else None
+            ),
         )
         for item in msg.results
     ]
@@ -451,7 +449,7 @@ def batch_replace_from_proto(
             "BatchReplaceOrders",
             "batch replace response counts do not match decoded outcomes: "
             f"accepted={accepted_count}/{decoded_accepted} "
-            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}",
         )
     return BatchReplaceOrdersResult(
         batch_request_id=format_uint64_id(msg.batch_request_id),
@@ -487,9 +485,7 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
                 phase=phase,
                 old_order_id=format_uint64_id(item.old_order_id) if item.old_order_id else "",
                 replacement_order_id=(
-                    format_uint64_id(item.replacement_order_id)
-                    if item.replacement_order_id
-                    else ""
+                    format_uint64_id(item.replacement_order_id) if item.replacement_order_id else ""
                 ),
                 order_status=proto_enum_name(OrderStatus, item.order_status),
                 code=item.code,
@@ -543,14 +539,19 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             code = f"unknown_error_code({raw_code})"
         if raw_code and code == str(raw_code):
             code = f"unknown_error_code({raw_code})"
+        rate_limit = (
+            rate_limit_detail_from_proto(item.rejected.error.rate_limit)
+            if item.rejected.HasField("error") and item.rejected.error.HasField("rate_limit")
+            else None
+        )
         return BatchCreateResultItem(
             status="rejected",
             client_order_id=item.client_order_id,
             code=code,
+            rate_limit=rate_limit,
         )
     raise PolyesterResponseContractError(
-        "BatchCreateOrders",
-        "batch create response item has neither accepted nor rejected outcome"
+        "BatchCreateOrders", "batch create response item has neither accepted nor rejected outcome"
     )
 
 
@@ -569,7 +570,7 @@ def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchC
             "BatchCreateOrders",
             "batch create response counts do not match decoded outcomes: "
             f"accepted={accepted_count}/{decoded_accepted} "
-            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}",
         )
     return BatchCreateOrdersResult(
         results=results,
@@ -589,8 +590,7 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
             decoded_rejected += 1
         else:
             raise PolyesterResponseContractError(
-                "BatchCancelOrders",
-                f"batch cancel response has unknown status: {item.status}"
+                "BatchCancelOrders", f"batch cancel response has unknown status: {item.status}"
             )
 
     results = [
@@ -599,6 +599,11 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
             order_id=format_uint64_id(item.order_id) if item.order_id else "",
             client_order_id=item.client_order_id,
             code=item.code,
+            rate_limit=(
+                rate_limit_detail_from_proto(item.error.rate_limit)
+                if item.HasField("error") and item.error.HasField("rate_limit")
+                else None
+            ),
         )
         for item in msg.results
     ]
@@ -613,7 +618,7 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
             "BatchCancelOrders",
             "batch cancel response counts do not match decoded outcomes: "
             f"accepted={accepted_count}/{decoded_accepted} "
-            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}"
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}",
         )
     return BatchCancelOrdersResult(
         results=results,
@@ -626,8 +631,7 @@ def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> Cance
     status = (msg.status or "").strip()
     if not status or status.lower() not in {"armed", "disabled"}:
         raise PolyesterResponseContractError(
-            "CancelAllAfter",
-            f"invalid CancelAllAfter response: unknown status {msg.status!r}"
+            "CancelAllAfter", f"invalid CancelAllAfter response: unknown status {msg.status!r}"
         )
     return CancelAllAfterResult(
         status=msg.status,

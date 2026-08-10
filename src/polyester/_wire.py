@@ -7,6 +7,10 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
 
+from polyester.codecs.decode.ratelimit import (
+    rate_limit_detail_from_proto,
+    retry_after_seconds_from_detail,
+)
 from polyester.errors import (
     PolyesterApiError,
     PolyesterAuthError,
@@ -17,6 +21,7 @@ from polyester.errors import (
 )
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 _ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
@@ -41,8 +46,21 @@ def _unpack_error_detail(detail: Message) -> Message | None:
             order_detail = orders_pb2.ErrorDetail()
             detail.Unpack(order_detail)
             return order_detail
+        if detail.Is(ratelimit_pb2.RateLimitDetail.DESCRIPTOR):
+            rate_limit = ratelimit_pb2.RateLimitDetail()
+            detail.Unpack(rate_limit)
+            return rate_limit
         return None
     return detail
+
+
+def _rate_limit_error(message: str, *, proto_detail=None) -> PolyesterRateLimitError:
+    detail = rate_limit_detail_from_proto(proto_detail)
+    return PolyesterRateLimitError(
+        message,
+        retry_after=retry_after_seconds_from_detail(detail),
+        detail=detail,
+    )
 
 
 def map_connect_error(exc: ConnectError):
@@ -57,8 +75,13 @@ def map_connect_error(exc: ConnectError):
                 code_name = auth_pb2.AuthErrorCode.Name(unpacked.code)
                 message = unpacked.message or error_message
                 return PolyesterApiError(message, code=code_name, raw=unpacked)
-            if full_name.endswith("ErrorDetail") and hasattr(unpacked, "code"):
+            if full_name == "polyester.ratelimit.v1.RateLimitDetail":
+                return _rate_limit_error(error_message, proto_detail=unpacked)
+            if full_name == "orders.v1.ErrorDetail":
                 code_name = orders_pb2.ErrorCode.Name(unpacked.code)
+                rate_limit = unpacked.rate_limit if unpacked.HasField("rate_limit") else None
+                if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
+                    return _rate_limit_error(error_message, proto_detail=rate_limit)
                 if (
                     "POLICY" in code_name
                     or "UNAUTHENTICATED" in code_name
@@ -67,6 +90,7 @@ def map_connect_error(exc: ConnectError):
                     return PolyesterAuthError(error_message)
                 if code_name.startswith("ERROR_CODE_"):
                     return PolyesterApiError(error_message, code=code_name)
+                return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
     if is_cloudflare_browser_ban(error_message):
         return PolyesterTransportError(cloudflare_1010_message())
@@ -76,7 +100,8 @@ def map_connect_error(exc: ConnectError):
         return PolyesterServerError(error_message)
     if code == "resource_exhausted":
         # connectrpc-python does not currently retain response metadata on
-        # ConnectError, so retry_after cannot be recovered on this path.
+        # ConnectError, so header retry_after cannot be recovered on this path.
+        # Structured RateLimitDetail above populates retry_after when attached.
         return PolyesterRateLimitError(error_message)
     if code == "deadline_exceeded":
         return PolyesterTransportError(error_message)

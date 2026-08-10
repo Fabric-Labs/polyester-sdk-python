@@ -6,6 +6,7 @@ from typing import Any
 import msgspec
 
 from polyester.models.order_key import OrderKey
+from polyester.models.ratelimit import RateLimitDetail
 from polyester.types.money import AssetAmount, Price, Quantity
 
 
@@ -85,6 +86,7 @@ class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
 class OrderErrorDetail(msgspec.Struct, kw_only=True, omit_defaults=True):
     code: str = ""
     violations: list[OrderFieldViolation] = []
+    rate_limit: RateLimitDetail | None = None
 
 
 class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -406,6 +408,7 @@ class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True
     old_order_id: str = ""
     replacement_order_id: str = ""
     code: str = ""
+    rate_limit: RateLimitDetail | None = None
 
 
 class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -442,6 +445,7 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_id: str = ""
     client_order_id: str = ""
     code: str = ""
+    rate_limit: RateLimitDetail | None = None
 
 
 class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -455,6 +459,7 @@ class BatchCancelResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_id: str = ""
     client_order_id: str = ""
     code: str = ""
+    rate_limit: RateLimitDetail | None = None
 
 
 class BatchCancelOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):

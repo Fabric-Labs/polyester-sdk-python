@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a40`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a41`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a40"
+pip install "polyester-sdk==0.1.0a41"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -148,6 +148,14 @@ cooperative backpressure without blocking the event loop. The low-level synchron
 `polyester.auth.sign_request` helper instead raises `PolyesterRateLimitError` immediately when
 capacity is exhausted; honor `retry_after`. Neither path reuses a signature or drifts outside the
 API's 10-second freshness window.
+
+Connect `resource_exhausted` and HTTP 429 responses raise `PolyesterRateLimitError`. When the
+server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
+`orders.v1.ErrorDetail.rate_limit`), inspect `error.detail` for `policy_class`, `scope`,
+`operation_id`, and presence-aware quota fields. `retry_after` prefers `detail.retry_after_ms`,
+then `Retry-After` / `Retry-After-Ms` / `Grpc-Retry-Pushback-Ms` headers on HTTP paths. Preview
+and batch rejections expose the same payload on `OrderErrorDetail.rate_limit` / batch item
+`rate_limit`.
 
 ## Authentication patterns
 

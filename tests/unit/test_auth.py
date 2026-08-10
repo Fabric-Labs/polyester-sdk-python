@@ -172,7 +172,10 @@ def test_sync_signing_capacity_fails_immediately_without_sleeping() -> None:
     )
     allocator = credentials._timestamp_allocator
     with allocator._lock:
-        allocator._last_timestamp_ms = time.time_ns() // 1_000_000 + MAX_SIGNING_FUTURE_SKEW_MS
+        # Far enough ahead that CI clock jitter cannot open a free slot mid-test.
+        allocator._last_timestamp_ms = (
+            time.time_ns() // 1_000_000 + MAX_SIGNING_FUTURE_SKEW_MS + 60_000
+        )
 
     started = time.monotonic()
     with pytest.raises(PolyesterRateLimitError) as captured:

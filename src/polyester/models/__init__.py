@@ -66,6 +66,7 @@ from polyester.models.policies import (
     SubaccountPoliciesList,
     SubaccountPolicy,
 )
+from polyester.models.ratelimit import RateLimitDetail
 from polyester.models.sub_accounts import (
     CreateSubaccountResult,
     GetSubaccountResult,
@@ -218,6 +219,7 @@ __all__ = [
     "LifecycleFlowsList",
     "OrderErrorDetail",
     "OrderFieldViolation",
+    "RateLimitDetail",
     "ZipperReasonDetails",
     "CandlesResult",
     "MarketOverviewEntry",

@@ -52,11 +52,23 @@ class PolyesterResponseContractError(PolyesterError):
 
 
 class PolyesterRateLimitError(PolyesterTransportError):
-    """Raised when the API returns a rate-limit response."""
+    """Raised when the API returns a rate-limit response.
 
-    def __init__(self, message: str, *, retry_after: float | None = None) -> None:
+    ``detail`` is the structured ``polyester.ratelimit.v1.RateLimitDetail``
+    payload when the server attached it. ``retry_after`` prefers
+    ``detail.retry_after_ms``, then response headers when available.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retry_after: float | None = None,
+        detail: object | None = None,
+    ) -> None:
         super().__init__(message)
         self.retry_after = retry_after
+        self.detail = detail
 
 
 class PolyesterServerError(PolyesterTransportError):

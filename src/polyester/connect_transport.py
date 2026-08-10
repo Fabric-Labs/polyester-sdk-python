@@ -38,6 +38,15 @@ def _retry_after_seconds(raw: str | None) -> float | None:
     return parsed if parsed >= 0 else None
 
 
+def _retry_after_from_headers(headers: httpx.Headers) -> float | None:
+    if (seconds := _retry_after_seconds(headers.get("retry-after"))) is not None:
+        return seconds
+    for name in ("retry-after-ms", "grpc-retry-pushback-ms"):
+        if (milliseconds := _retry_after_seconds(headers.get(name))) is not None:
+            return milliseconds / 1000.0
+    return None
+
+
 def connect_content_type(wire_format: WireFormat) -> str:
     if wire_format == "json":
         return CONNECT_JSON_CONTENT_TYPE
@@ -69,10 +78,9 @@ def raise_for_status(response: httpx.Response) -> None:
     if response.status_code in (401, 403):
         raise PolyesterAuthError(message)
     if response.status_code == 429:
-        retry_after = response.headers.get("retry-after")
         raise PolyesterRateLimitError(
             message,
-            retry_after=_retry_after_seconds(retry_after),
+            retry_after=_retry_after_from_headers(response.headers),
         )
     if response.status_code >= 500:
         raise PolyesterServerError(message)
@@ -97,6 +105,11 @@ def parse_connect_json_response(response: httpx.Response) -> Any:
         message = str(payload.get("message", "API error"))
         if code in ("unauthenticated", "permission_denied"):
             raise PolyesterAuthError(message)
+        if code == "resource_exhausted":
+            raise PolyesterRateLimitError(
+                message,
+                retry_after=_retry_after_from_headers(response.headers),
+            )
         raise PolyesterApiError(message, code=code, raw=payload)
     return payload
 

@@ -102,7 +102,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         limit: int | None = None,
         include_attached_risk: bool = False,
         include_attached_risk_state: bool = False,
+        trigger_id: str | int | None = None,
     ) -> OrdersList:
+        """List open orders.
+
+        When ``trigger_id`` is set, only child orders created by that trigger
+        are returned (for example TWAP/ladder slice children).
+        """
         request = GetOpenOrdersRequest(
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
@@ -116,6 +122,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.page_token = page_token
         if limit is not None:
             request.limit = limit
+        if trigger_id is not None and trigger_id != "":
+            request.trigger_id = id_to_int(trigger_id, "trigger_id")
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
@@ -135,7 +143,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         limit: int = 100,
         include_attached_risk: bool = False,
         include_attached_risk_state: bool = False,
+        trigger_id: str | int | None = None,
     ) -> OrdersList:
+        """List order history.
+
+        When ``trigger_id`` is set, only child orders created by that trigger
+        are returned (for example TWAP/ladder slice children).
+        """
         request = GetOrderHistoryRequest(
             limit=limit,
             include_attached_risk=include_attached_risk,
@@ -155,6 +169,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.symbol_id.append(resolved)
         if page_token:
             request.page_token = page_token
+        if trigger_id is not None and trigger_id != "":
+            request.trigger_id = id_to_int(trigger_id, "trigger_id")
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,

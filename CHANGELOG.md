@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0a40
+
 ### Breaking
 - Generated `TriggerEvent.fire_price_ticks` is now optional (absent for
   time-scheduled TWAP slice fires). Decoded `TriggerEvent.fire_price` is `None`

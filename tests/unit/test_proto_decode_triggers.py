@@ -178,6 +178,22 @@ def test_trigger_events_list_from_proto() -> None:
     assert result.next_page_token == "evt-page-2"
 
 
+def test_trigger_event_absent_fire_price() -> None:
+    msg = triggers_pb2.ListTriggerEventsResponse(
+        events=[
+            triggers_pb2.TriggerEvent(
+                trigger_id=1,
+                trigger_type=triggers_pb2.TWAP,
+                event_type=triggers_pb2.EVENT_FIRED,
+                child_seq=1,
+            )
+        ]
+    )
+    result = trigger_events_list_from_proto(msg)
+    assert len(result.events) == 1
+    assert result.events[0].fire_price is None
+
+
 def test_trigger_event_type_from_label() -> None:
     from polyester.codecs.decode.triggers import trigger_event_type_from_label
 

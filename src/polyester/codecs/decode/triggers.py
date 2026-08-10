@@ -355,7 +355,11 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
         ts_ns=str(msg.ts_ns) if msg.ts_ns else "",
         child_seq=int(msg.child_seq),
         child_order_id=format_uint64_id(msg.child_order_id) if msg.child_order_id else "",
-        fire_price=Price.from_ticks(int(msg.fire_price_ticks)) if msg.fire_price_ticks else None,
+        fire_price=(
+            Price.from_ticks(int(msg.fire_price_ticks))
+            if msg.HasField("fire_price_ticks")
+            else None
+        ),
         reason=msg.reason,
     )
 

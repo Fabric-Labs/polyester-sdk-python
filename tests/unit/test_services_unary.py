@@ -11,11 +11,13 @@ from polyester.gen.auth.v1.auth_pb2 import MeRequest
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2
 from polyester.gen.collab.v1 import whiteboard_pb2 as wb_pb2
 from polyester.gen.layout.v1 import layout_pb2
+from polyester.gen.orders.v1 import orders_read_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import ApiData
 from polyester.services.auth import AsyncAuthService
 from polyester.services.chain_analytics import AsyncChainAnalyticsService
 from polyester.services.layout import AsyncLayoutService
+from polyester.services.orders import AsyncOrdersService
 from polyester.services.social_verification import AsyncSocialVerificationService
 from polyester.services.triggers import AsyncTriggersService
 from polyester.services.whiteboard import AsyncWhiteboardService
@@ -119,3 +121,20 @@ async def test_triggers_list_and_list_events_pass_page_token() -> None:
     assert events_capture.request.event_type == triggers_pb2.EVENT_FIRED
     assert events_capture.request.page_token == "evt-page-1"
     assert events.next_page_token == "evt-page-2"
+
+
+@pytest.mark.asyncio
+async def test_orders_list_open_and_history_pass_trigger_id() -> None:
+    open_capture = CaptureUnary(orders_read_pb2.GetOpenOrdersResponse())
+    with patch("polyester.services.orders.unary_auth_decoded", open_capture):
+        service = AsyncOrdersService(MagicMock(), MagicMock(), None)
+        await service.list_open(trigger_id=42, limit=5)
+    assert open_capture.request.trigger_id == 42
+    assert open_capture.request.limit == 5
+
+    history_capture = CaptureUnary(orders_read_pb2.GetOrderHistoryResponse())
+    with patch("polyester.services.orders.unary_auth_decoded", history_capture):
+        service = AsyncOrdersService(MagicMock(), MagicMock(), None)
+        await service.list_history(trigger_id=42, limit=5)
+    assert history_capture.request.trigger_id == 42
+    assert history_capture.request.limit == 5

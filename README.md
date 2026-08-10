@@ -323,6 +323,11 @@ Response `status` uses the same labels (British spelling `cancelled`).
 `order.attached_risk` (take-profit / stop-loss / trailing-stop). `Order` also
 exposes `post_only`.
 
+`orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
+return only child orders created by that trigger (TWAP/ladder slices).
+Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
+(`fire_price_ticks` is optional on the wire).
+
 ## Balances: funding vs trading
 
 Ledger balances have separate **funding** and **trading** buckets per asset.

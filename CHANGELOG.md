@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.1.0a42
+
+### Added
+- Fail-closed catalog-backed symbol filters for market overview and raw symbol paths.
+- Shared positive/ranged limit validation before protobuf encoding.
+- Catalog pair-constraint accessors and deterministic order/trigger preflight
+  (tick size, step size, min quantity, computable min notional).
+- Shared `ts_ns` response-contract invariant that rejects millisecond-shaped values.
+- Regression coverage for F001/F002/F004/F006/F007/F018/F019/F020/F027/F008/F031
+  audit behaviors, including malformed-secret non-disclosure.
+
+### Fixed
+- Unknown non-empty symbol filters no longer degrade into unfiltered requests.
+- Trigger label decode failures surface as `PolyesterValidationError` instead of
+  raw `ValueError`.
+- Zero-valued optional catalog minimums (`min_qty_base`, `min_notional_quote`)
+  are treated as unset so live catalogs hydrate.
+
 ## 0.1.0a41
 
 ### Added

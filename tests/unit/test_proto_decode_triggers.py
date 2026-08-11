@@ -1,3 +1,5 @@
+import pytest
+
 from polyester.codecs.decode.triggers import (
     get_trigger_from_proto,
     trigger_events_list_from_proto,
@@ -6,6 +8,7 @@ from polyester.codecs.decode.triggers import (
     triggers_list_from_proto,
 )
 from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 
@@ -104,11 +107,8 @@ def test_trigger_status_from_label() -> None:
 
     assert trigger_status_from_label("armed") == triggers_pb2.STATUS_ARMED
     assert trigger_status_from_label("cancelled") == triggers_pb2.STATUS_CANCELED
-    try:
+    with pytest.raises(PolyesterValidationError):
         trigger_status_from_label("nope")
-        raise AssertionError("expected ValueError")
-    except ValueError:
-        pass
 
 
 def test_triggers_list_from_proto() -> None:
@@ -199,8 +199,5 @@ def test_trigger_event_type_from_label() -> None:
 
     assert trigger_event_type_from_label("fired") == triggers_pb2.EVENT_FIRED
     assert trigger_event_type_from_label("canceled") == triggers_pb2.EVENT_CANCELED
-    try:
+    with pytest.raises(PolyesterValidationError):
         trigger_event_type_from_label("nope")
-        raise AssertionError("expected ValueError")
-    except ValueError:
-        pass

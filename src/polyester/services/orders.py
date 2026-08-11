@@ -66,9 +66,11 @@ from polyester.models import (
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._pair_constraints import preflight_pair_constraints
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import resolve_symbol_id
+from polyester.services._symbols import resolve_symbol_filter, resolve_symbol_id
+from polyester.services._validation import validate_limit
 
 
 class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
@@ -109,6 +111,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         When ``trigger_id`` is set, only child orders created by that trigger
         are returned (for example TWAP/ladder slice children).
         """
+        validated_limit = validate_limit(limit, allow_none=True)
         request = GetOpenOrdersRequest(
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
@@ -120,8 +123,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.subaccount_id = parsed_sub
         if page_token:
             request.page_token = page_token
-        if limit is not None:
-            request.limit = limit
+        if validated_limit is not None:
+            request.limit = validated_limit
         if trigger_id is not None and trigger_id != "":
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
         return await unary_auth_decoded(
@@ -150,8 +153,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         When ``trigger_id`` is set, only child orders created by that trigger
         are returned (for example TWAP/ladder slice children).
         """
+        validated_limit = validate_limit(limit)
         request = GetOrderHistoryRequest(
-            limit=limit,
+            limit=validated_limit,
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
         )
@@ -249,6 +253,16 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit
         )
+        preflight_pair_constraints(
+            self._catalogs,
+            symbol=normalized.symbol,
+            qty=normalized.qty,
+            prices={
+                "price": normalized.price,
+                "market_client_ref_price": normalized.market_client_ref_price,
+            },
+            notional_price=normalized.price,
+        )
         proto_request = create_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -305,6 +319,16 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit
+        )
+        preflight_pair_constraints(
+            self._catalogs,
+            symbol=normalized.symbol,
+            qty=normalized.qty,
+            prices={
+                "price": normalized.price,
+                "market_client_ref_price": normalized.market_client_ref_price,
+            },
+            notional_price=normalized.price,
         )
         symbol_id = (
             self._catalogs.symbol_id_for_symbol(normalized.symbol)
@@ -380,6 +404,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     ) -> ModifyOrderResult:
         await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
+        preflight_pair_constraints(
+            self._catalogs,
+            symbol=symbol,
+            qty=new_qty,
+            prices={"new_price": new_price},
+            notional_price=new_price,
+        )
         proto_request = modify_order_to_proto(
             symbol=symbol,
             key=key,
@@ -410,9 +441,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         dry_run: bool = False,
         request_id: str | None = None,
     ) -> CancelAllOrdersResult:
+        resolved_symbol = resolve_symbol_filter(
+            self._catalogs, symbol, label="orders.cancel_all symbol"
+        )
         proto_request = cancel_all_orders_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
-            symbol=symbol,
+            symbol=resolved_symbol,
             side=side,
             dry_run=dry_run,
             request_id=request_id,
@@ -446,6 +480,18 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 for item in items
             ),
         )
+        for item in items:
+            new_qty = item.new_qty if isinstance(item, BatchReplaceItem) else item.get("new_qty")
+            new_price = (
+                item.new_price if isinstance(item, BatchReplaceItem) else item.get("new_price")
+            )
+            preflight_pair_constraints(
+                self._catalogs,
+                symbol=symbol,
+                qty=new_qty,
+                prices={"new_price": new_price},
+                notional_price=new_price,
+            )
         proto_request = batch_replace_orders_to_proto(
             items=items,
             symbol_id=symbol_id,
@@ -507,6 +553,23 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     scale_symbol = str(item["symbol"])
         await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, scale_symbol, *qty_values)
+        for item in items:
+            normalized_item = (
+                item
+                if isinstance(item, CreateOrderRequest)
+                else normalize_create_order_request(None, **item)
+            )
+            item_symbol = normalized_item.symbol or symbol
+            preflight_pair_constraints(
+                self._catalogs,
+                symbol=item_symbol,
+                qty=normalized_item.qty,
+                prices={
+                    "price": normalized_item.price,
+                    "market_client_ref_price": normalized_item.market_client_ref_price,
+                },
+                notional_price=normalized_item.price,
+            )
         proto_request = batch_create_orders_to_proto(
             items=items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
@@ -553,10 +616,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         side: str | None = None,
         request_id: str | None = None,
     ) -> CancelAllAfterResult:
+        resolved_symbol = resolve_symbol_filter(
+            self._catalogs, symbol, label="orders.cancel_all_after symbol"
+        )
         proto_request = cancel_all_after_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             timeout_sec=timeout_sec,
-            symbol=symbol,
+            symbol=resolved_symbol,
             side=side,
             request_id=request_id,
         )

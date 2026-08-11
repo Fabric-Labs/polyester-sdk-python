@@ -24,6 +24,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
+from polyester.services._validation import validate_limit
 
 
 class AsyncHeatmapService(BaseService):
@@ -53,6 +54,7 @@ class AsyncHeatmapService(BaseService):
     ) -> ApiData:
         from polyester.gen.marketdata.v1 import heatmap_pb2
 
+        validated_limit = validate_limit(limit)
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,
@@ -80,7 +82,7 @@ class AsyncHeatmapService(BaseService):
             symbol_id=resolved_symbol_id,
             interval=interval_enum,
             depth=depth_enum,
-            limit=limit,
+            limit=validated_limit,
             quantity_mode=qty_enum,
         )
         if from_ts_sec is not None:

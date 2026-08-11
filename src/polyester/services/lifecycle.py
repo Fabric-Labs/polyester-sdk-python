@@ -19,6 +19,7 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto, subscribe_public_proto
+from polyester.services._validation import validate_limit
 
 
 class AsyncLifecycleService(BaseService):
@@ -38,7 +39,7 @@ class AsyncLifecycleService(BaseService):
     ) -> LifecycleFlowsList:
         from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
 
-        request = ListFlowsRequest(limit=limit)
+        request = ListFlowsRequest(limit=validate_limit(limit))
         if reversed:
             request.sort = lifecycle_read_pb2.SORT_OLDEST
         else:
@@ -117,7 +118,11 @@ class AsyncLifecycleService(BaseService):
         if not kind_name.startswith("TX_"):
             kind_name = f"TX_{kind_name}"
         lookup_enum = getattr(lifecycle_read_pb2, kind_name, lifecycle_read_pb2.TX_ANY)
-        request = ListFlowsByTxRequest(tx_hash=tx_hash, lookup_kind=lookup_enum, limit=limit)
+        request = ListFlowsByTxRequest(
+            tx_hash=tx_hash,
+            lookup_kind=lookup_enum,
+            limit=validate_limit(limit),
+        )
         if page_token:
             request.page_token = page_token
         return await unary_public_decoded(

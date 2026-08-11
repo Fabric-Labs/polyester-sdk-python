@@ -385,12 +385,12 @@ def test_cancel_all_after_from_proto() -> None:
     msg = orders_pb2.CancelAllAfterResponse(
         status="armed",
         effective_timeout_sec=120,
-        expires_at_ts_ns=1_700_000_000_000,
+        expires_at_ts_ns=1_700_000_000_000_000_000,
     )
     result = cancel_all_after_from_proto(msg)
     assert result.status == "armed"
     assert result.effective_timeout_sec == 120
-    assert result.expires_at_ts_ns == "1700000000000"
+    assert result.expires_at_ts_ns == "1700000000000000000"
 
 
 def test_cancel_all_requires_known_status() -> None:

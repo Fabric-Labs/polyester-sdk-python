@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from polyester.catalogs.zipper import build_zipper_catalog_data
@@ -39,6 +40,41 @@ def _parse_protocol_scale(value: Any, *, field_name: str) -> int | None:
         return None
     validate_protocol_scale(parsed, field_name=f"catalog {field_name}")
     return parsed
+
+
+def _parse_positive_decimal_field(value: Any, *, field_name: str) -> str | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, (bool, float)):
+        raise PolyesterValidationError(f"catalog {field_name} must be a positive decimal string")
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise PolyesterValidationError(
+            f"catalog {field_name} must be a positive decimal string"
+        ) from exc
+    if parsed == 0:
+        if field_name in {"min_qty_base", "min_notional_quote"}:
+            # Optional protobuf minimums arrive as "0" when disabled.
+            return None
+        raise PolyesterValidationError(f"catalog {field_name} must be positive")
+    if not parsed.is_finite() or parsed < 0:
+        raise PolyesterValidationError(f"catalog {field_name} must be positive")
+    return format(parsed, "f")
+
+
+@dataclass(frozen=True, slots=True)
+class PairConstraints:
+    """Deterministic pair rules advertised by the hydrated spot catalog."""
+
+    symbol: str
+    symbol_id: int
+    base_quantity_scale: int
+    quote_quantity_scale: int | None = None
+    tick_size: str | None = None
+    step_size: str | None = None
+    min_qty_base: str | None = None
+    min_notional_quote: str | None = None
 
 
 @dataclass(slots=True)
@@ -138,6 +174,27 @@ class CatalogManager:
                     raise PolyesterValidationError("catalog symbol_id must be non-zero")
                 if scale is None:
                     raise PolyesterValidationError("catalog base_quantity_scale is required")
+                quote_scale = _parse_protocol_scale(
+                    pair.get("quote_quantity_scale")
+                    if pair.get("quote_quantity_scale") is not None
+                    else pair.get("quoteQuantityScale"),
+                    field_name="quote_quantity_scale",
+                )
+                for snake, camel in (
+                    ("tick_size", "tickSize"),
+                    ("step_size", "stepSize"),
+                    ("min_qty_base", "minQtyBase"),
+                    ("min_notional_quote", "minNotionalQuote"),
+                ):
+                    parsed_constraint = _parse_positive_decimal_field(
+                        pair.get(snake) if pair.get(snake) is not None else pair.get(camel),
+                        field_name=snake,
+                    )
+                    if parsed_constraint is not None:
+                        row[snake] = parsed_constraint
+                    else:
+                        row.pop(snake, None)
+                        row.pop(camel, None)
                 if symbol in symbols_seen:
                     raise PolyesterValidationError(f"catalog contains duplicate symbol {symbol!r}")
                 if symbol_id in symbol_ids_seen:
@@ -148,6 +205,8 @@ class CatalogManager:
                 symbol_ids_seen.add(symbol_id)
                 row["symbol_id"] = symbol_id
                 row["base_quantity_scale"] = scale
+                if quote_scale is not None:
+                    row["quote_quantity_scale"] = quote_scale
                 cleaned_pairs.append(row)
         except PolyesterValidationError as exc:
             self._reject_refresh(str(exc))
@@ -321,6 +380,33 @@ class CatalogManager:
                 return int(value) if value is not None else None
         return None
 
+    def pair_constraints_for_symbol(self, symbol: str) -> PairConstraints | None:
+        """Return immutable deterministic pair rules, or None for an unknown symbol."""
+        if self._unusable:
+            return None
+        pair = self._pair_for_symbol(symbol)
+        if pair is None:
+            return None
+        symbol_id = pair.get("symbol_id") or pair.get("symbolId")
+        base_scale = pair.get("base_quantity_scale")
+        if base_scale is None:
+            base_scale = pair.get("baseQuantityScale")
+        if symbol_id is None or base_scale is None:
+            return None
+        quote_scale = pair.get("quote_quantity_scale")
+        if quote_scale is None:
+            quote_scale = pair.get("quoteQuantityScale")
+        return PairConstraints(
+            symbol=symbol,
+            symbol_id=int(symbol_id),
+            base_quantity_scale=int(base_scale),
+            quote_quantity_scale=int(quote_scale) if quote_scale is not None else None,
+            tick_size=_constraint_value(pair, "tick_size", "tickSize"),
+            step_size=_constraint_value(pair, "step_size", "stepSize"),
+            min_qty_base=_constraint_value(pair, "min_qty_base", "minQtyBase"),
+            min_notional_quote=_constraint_value(pair, "min_notional_quote", "minNotionalQuote"),
+        )
+
     def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int | None:
         if self._unusable:
             return None
@@ -421,8 +507,16 @@ def msgspec_to_dict(value: object) -> dict[str, Any]:
     return msgspec.to_builtins(value)
 
 
+def _constraint_value(pair: dict[str, Any], snake: str, camel: str) -> str | None:
+    value = pair.get(snake)
+    if value is None:
+        value = pair.get(camel)
+    return str(value) if value not in (None, "") else None
+
+
 __all__ = [
     "MAX_PROTOCOL_SCALE",
     "CatalogManager",
+    "PairConstraints",
     "msgspec_to_dict",
 ]

@@ -24,6 +24,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_public, unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
+from polyester.services._validation import validate_limit
 
 TIMEFRAME_ALIASES: dict[str, str] = {
     "1s": "SEC_1",
@@ -77,6 +78,7 @@ class AsyncMarketDataService(BaseService):
         limit: int = 100,
         from_match_id: int | None = None,
     ) -> MarketTradesResult:
+        validated_limit = validate_limit(limit)
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,
@@ -86,7 +88,7 @@ class AsyncMarketDataService(BaseService):
         quantity_scale = _quantity_scale_for_symbol_id(
             self._catalogs, resolved_symbol_id, label="get_trades"
         )
-        request = GetTradesRequest(symbol_id=resolved_symbol_id, limit=limit)
+        request = GetTradesRequest(symbol_id=resolved_symbol_id, limit=validated_limit)
         if from_match_id is not None:
             request.from_match_id = from_match_id
         return await unary_public_decoded(
@@ -261,6 +263,7 @@ def _build_candles_request(
         symbol_id=symbol_id,
         label="get_candles",
     )
+    validated_limit = validate_limit(limit)
     timeframe_name = TIMEFRAME_ALIASES.get(timeframe, timeframe.upper())
     timeframe_enum = getattr(marketdata_pb2, timeframe_name, None)
     if timeframe_enum is None:
@@ -271,7 +274,7 @@ def _build_candles_request(
     request = GetCandlesRequest(
         symbol_id=resolved_symbol_id,
         timeframe=timeframe_enum,
-        limit=limit,
+        limit=validated_limit,
         include_incomplete=include_incomplete,
     )
     if start_time is not None:

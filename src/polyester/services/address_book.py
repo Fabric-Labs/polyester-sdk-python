@@ -40,6 +40,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+from polyester.services._validation import validate_limit
 
 
 class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
@@ -74,7 +75,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         limit: int = 50,
         page_token: str | None = None,
     ) -> AddressBookEntriesList:
-        request = ListAddressBookEntriesRequest(limit=limit)
+        request = ListAddressBookEntriesRequest(limit=validate_limit(limit))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -101,7 +102,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         kind: str | None = None,
         limit: int = 50,
     ) -> TransferCounterpartiesList:
-        request = ListTransferCounterpartiesRequest(limit=limit)
+        request = ListTransferCounterpartiesRequest(limit=validate_limit(limit))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -130,7 +131,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
     ) -> AddressBookTransferDestinationsList:
         request = ListTransferDestinationsRequest(
             kind=address_book_entry_kind_from_label(kind),
-            limit=limit,
+            limit=validate_limit(limit),
         )
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -155,7 +156,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         limit: int = 50,
         page_token: str | None = None,
     ) -> InternalTransferWhitelistEntriesList:
-        request = ListInternalTransferWhitelistEntriesRequest(limit=limit)
+        request = ListInternalTransferWhitelistEntriesRequest(limit=validate_limit(limit))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -198,7 +199,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         sub_account_id: str | None = None,
         limit: int = 50,
     ) -> AddressBookView:
-        request = GetAddressBookViewRequest(limit=limit)
+        request = GetAddressBookViewRequest(limit=validate_limit(limit))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.balances import u128_from_proto
+from polyester.codecs.decode.invariants import (
+    ts_ns_from_response,
+    ts_ns_string_from_response,
+)
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
@@ -161,7 +165,12 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         leaves_qty=_qty(msg.leaves_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
-        created_ts_ns=str(msg.created_ts_ns),
+        created_ts_ns=ts_ns_string_from_response(
+            msg.created_ts_ns,
+            context="Order",
+            field_name="created_ts_ns",
+            empty_when_zero=True,
+        ),
         version=int(msg.version),
         post_only=bool(msg.post_only),
         fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
@@ -203,7 +212,11 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
             if msg.HasField("referral_share_amount_e18")
             else "0"
         ),
-        ts_ns=str(msg.ts_ns),
+        ts_ns=ts_ns_string_from_response(
+            msg.ts_ns,
+            context="UserTrade",
+            empty_when_zero=True,
+        ),
         fee_is_rebate=bool(msg.fee_is_rebate),
     )
 
@@ -457,7 +470,11 @@ def batch_replace_from_proto(
         results=results,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
-        accepted_ts_ns=int(msg.accepted_ts_ns),
+        accepted_ts_ns=ts_ns_from_response(
+            msg.accepted_ts_ns,
+            context="BatchReplaceOrders",
+            field_name="accepted_ts_ns",
+        ),
     )
 
 
@@ -489,7 +506,11 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
                 ),
                 order_status=proto_enum_name(OrderStatus, item.order_status),
                 code=item.code,
-                updated_ts_ns=int(item.updated_ts_ns),
+                updated_ts_ns=ts_ns_from_response(
+                    item.updated_ts_ns,
+                    context="GetBatchReplaceStatus",
+                    field_name="updated_ts_ns",
+                ),
             )
         )
         if phase in {"admitted", "working", "terminal"}:
@@ -515,8 +536,16 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
         items=items,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
-        accepted_ts_ns=int(msg.accepted_ts_ns),
-        updated_ts_ns=int(msg.updated_ts_ns),
+        accepted_ts_ns=ts_ns_from_response(
+            msg.accepted_ts_ns,
+            context="GetBatchReplaceStatus",
+            field_name="accepted_ts_ns",
+        ),
+        updated_ts_ns=ts_ns_from_response(
+            msg.updated_ts_ns,
+            context="GetBatchReplaceStatus",
+            field_name="updated_ts_ns",
+        ),
     )
 
 
@@ -636,5 +665,10 @@ def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> Cance
     return CancelAllAfterResult(
         status=msg.status,
         effective_timeout_sec=int(msg.effective_timeout_sec),
-        expires_at_ts_ns=str(msg.expires_at_ts_ns),
+        expires_at_ts_ns=ts_ns_string_from_response(
+            msg.expires_at_ts_ns,
+            context="CancelAllAfter",
+            field_name="expires_at_ts_ns",
+            empty_when_zero=True,
+        ),
     )

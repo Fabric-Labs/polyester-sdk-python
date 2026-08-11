@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from polyester.codecs.decode.invariants import (
+    ts_ns_from_response,
+    ts_ns_string_from_response,
+)
 from polyester.codecs.decode.lifecycle import lifecycle_reason_from_code
 from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
@@ -134,7 +138,12 @@ def decode_order(data: dict[str, Any]) -> Order:
         leaves_qty=_qty(_field(data, "leavesQty", "leaves_qty", default="") or 0),
         price=_price(_field(data, "priceTicks", "price_ticks", default=0) or 0),
         avg_px=_price(_field(data, "avgPxTicks", "avg_px_ticks", default=0) or 0),
-        created_ts_ns=str(_field(data, "createdTsNs", "created_ts_ns", default="") or ""),
+        created_ts_ns=ts_ns_string_from_response(
+            _field(data, "createdTsNs", "created_ts_ns", default=0) or 0,
+            context="Order",
+            field_name="created_ts_ns",
+            empty_when_zero=True,
+        ),
         version=int(_field(data, "version", default=0) or 0),
     )
 
@@ -189,7 +198,11 @@ def decode_user_trade(data: dict[str, Any]) -> UserTrade:
         referral_share_amount_e18=_u128_str(
             _field(data, "referralShareAmountE18", "referral_share_amount_e18")
         ),
-        ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
+        ts_ns=ts_ns_string_from_response(
+            _field(data, "tsNs", "ts_ns", default=0) or 0,
+            context="UserTrade",
+            empty_when_zero=True,
+        ),
         fee_is_rebate=bool(_field(data, "feeIsRebate", "fee_is_rebate", default=False)),
     )
 
@@ -218,7 +231,11 @@ def decode_market_trade(data: dict[str, Any], *, quantity_scale: int) -> MarketT
         is_buy=bool(_field(data, "isBuy", "is_buy", default=False)),
         price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
         qty=Quantity.from_scaled(int(qty_raw), scale=quantity_scale, symbol_id=symbol_id),
-        ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
+        ts_ns=ts_ns_string_from_response(
+            _field(data, "tsNs", "ts_ns", default=0) or 0,
+            context="MarketTrade",
+            empty_when_zero=True,
+        ),
     )
 
 
@@ -572,7 +589,11 @@ def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
         trigger_type=_enum_name(_field(data, "triggerType", "trigger_type")).lower(),
         event_type=_enum_name(_field(data, "eventType", "event_type")).lower(),
-        ts_ns=str(_field(data, "tsNs", "ts_ns", default="") or ""),
+        ts_ns=ts_ns_string_from_response(
+            _field(data, "tsNs", "ts_ns", default=0) or 0,
+            context="TriggerEvent",
+            empty_when_zero=True,
+        ),
         child_seq=int(_field(data, "childSeq", "child_seq", default=0) or 0),
         child_order_id=_id_str(child_order_raw) if int(child_order_raw) else "",
         fire_price=Price.from_ticks(int(fire_raw)) if int(fire_raw) else None,
@@ -786,7 +807,11 @@ def decode_batch_replace_result(data: dict[str, Any]) -> BatchReplaceOrdersResul
         results=results,
         accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
         rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
-        accepted_ts_ns=int(_field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0),
+        accepted_ts_ns=ts_ns_from_response(
+            _field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0,
+            context="BatchReplaceOrders",
+            field_name="accepted_ts_ns",
+        ),
     )
 
 
@@ -801,21 +826,31 @@ def decode_batch_replace_status(data: dict[str, Any]) -> BatchReplaceStatusResul
             ),
             order_status=_enum_name(_field(item, "orderStatus", "order_status")).lower(),
             code=str(_field(item, "code", default="") or ""),
-            updated_ts_ns=int(_field(item, "updatedTsNs", "updated_ts_ns", default=0) or 0),
+            updated_ts_ns=ts_ns_from_response(
+                _field(item, "updatedTsNs", "updated_ts_ns", default=0) or 0,
+                context="GetBatchReplaceStatus",
+                field_name="updated_ts_ns",
+            ),
         )
         for item in _field(data, "items", default=[]) or []
         if isinstance(item, dict)
     ]
     return BatchReplaceStatusResult(
         batch_request_id=_id_str(_field(data, "batchRequestId", "batch_request_id")),
-        admission_status=_enum_name(
-            _field(data, "admissionStatus", "admission_status")
-        ).lower(),
+        admission_status=_enum_name(_field(data, "admissionStatus", "admission_status")).lower(),
         items=items,
         accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
         rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
-        accepted_ts_ns=int(_field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0),
-        updated_ts_ns=int(_field(data, "updatedTsNs", "updated_ts_ns", default=0) or 0),
+        accepted_ts_ns=ts_ns_from_response(
+            _field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0,
+            context="GetBatchReplaceStatus",
+            field_name="accepted_ts_ns",
+        ),
+        updated_ts_ns=ts_ns_from_response(
+            _field(data, "updatedTsNs", "updated_ts_ns", default=0) or 0,
+            context="GetBatchReplaceStatus",
+            field_name="updated_ts_ns",
+        ),
     )
 
 

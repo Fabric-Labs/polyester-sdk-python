@@ -13,6 +13,7 @@ from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_symbol_id
+from polyester.services._validation import validate_limit
 
 
 class AsyncTradesService(ScopedSubAccountMixin, BaseService):
@@ -41,7 +42,8 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         limit: int = 100,
         page_token: str | None = None,
     ) -> UserTradesList:
-        request = GetUserTradesRequest(limit=limit)
+        validated_limit = validate_limit(limit)
+        request = GetUserTradesRequest(limit=validated_limit)
         if symbol is not None or symbol_id is not None:
             request.symbol_id = resolve_symbol_id(
                 self._catalogs,

@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a41`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a42`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a41"
+pip install "polyester-sdk==0.1.0a42"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -272,7 +272,19 @@ fails closed on encoding unless the request's `amount_scale` /
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
-(fixed 1e6), not market tick-size alignment (server validates tick size).
+(fixed 1e6). After catalog hydration, order and trigger writes preflight the
+advertised tick size, step size, minimum base quantity, and minimum quote
+notional when both quantity and execution price are available. These
+deterministic checks do not replace `orders.preview_order(...)`, which remains
+the authority for balances, reservations, liquidity, and other stateful rules.
+
+Inspect the immutable rules with:
+
+```python
+rules = client.catalogs.pair_constraints_for_symbol("BTC-USDT")
+assert rules is not None
+print(rules.tick_size, rules.step_size, rules.min_qty_base, rules.min_notional_quote)
+```
 
 ### For bots (scaled integers)
 
@@ -323,6 +335,11 @@ rebate flag is sparse on the wire.
 `triggers.list(status=...)` filters by lifecycle status. Valid values:
 
 `created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
+
+Invalid status and event-type labels raise `PolyesterValidationError`. Raw
+symbol filters in market overview, order cleanup/history, and trigger list
+paths are checked against the hydrated spot catalog; unknown non-empty filters
+fail locally instead of broadening the request.
 
 Unknown values raise `ValueError` (they do not silently return an empty list).
 Response `status` uses the same labels (British spelling `cancelled`).
@@ -433,6 +450,11 @@ async with subscription:
         print(trade.price.ticks if trade.price else None, trade.qty.scaled if trade.qty else None)
         break
 ```
+
+Explicit list and heatmap limits must be integers from 1 through 1000. APIs
+whose limit is optional preserve the server default when it is omitted.
+Response fields named `ts_ns` are epoch nanoseconds; millisecond-shaped values
+are rejected with `PolyesterResponseContractError`.
 
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its

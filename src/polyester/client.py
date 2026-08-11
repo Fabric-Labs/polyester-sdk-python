@@ -102,6 +102,7 @@ class AsyncPolyester:
         self.candles = self.market_data
         self.market_overview = AsyncMarketOverviewService(
             self._transport,
+            self.catalogs,
             realtime=self.realtime,
         )
         self.zipper = AsyncZipperService(

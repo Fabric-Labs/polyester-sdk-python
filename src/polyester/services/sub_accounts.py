@@ -35,6 +35,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+from polyester.services._validation import validate_limit
 
 
 class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
@@ -135,7 +136,10 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is None:
             raise PolyesterValidationError("sub_account_id is required")
-        request = ListSubaccountEventsRequest(subaccount_id=parsed_sub, limit=limit)
+        request = ListSubaccountEventsRequest(
+            subaccount_id=parsed_sub,
+            limit=validate_limit(limit),
+        )
         if page_token:
             request.page_token = page_token
         return await unary_auth_decoded(

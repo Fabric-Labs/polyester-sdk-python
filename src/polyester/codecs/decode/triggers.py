@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from polyester.codecs.decode.invariants import ts_ns_string_from_response
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
+from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import (
@@ -64,7 +66,7 @@ def _trigger_status_label(value: int) -> str:
 def trigger_status_from_label(label: str) -> int:
     key = label.strip().lower()
     if key not in _TRIGGER_STATUS_FROM_LABEL:
-        raise ValueError(
+        raise PolyesterValidationError(
             f"invalid trigger status {label!r}; expected one of: "
             "created, armed, running, completed, cancelled, failed, paused"
         )
@@ -82,9 +84,8 @@ def _trigger_event_type_label(value: int) -> str:
 def trigger_event_type_from_label(label: str) -> int:
     key = label.strip().lower()
     if key not in _TRIGGER_EVENT_TYPE_FROM_LABEL:
-        raise ValueError(
-            f"invalid trigger event type {label!r}; expected one of: "
-            "fired, canceled, updated"
+        raise PolyesterValidationError(
+            f"invalid trigger event type {label!r}; expected one of: fired, canceled, updated"
         )
     return _TRIGGER_EVENT_TYPE_FROM_LABEL[key]
 
@@ -352,7 +353,11 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
         symbol_id=int(msg.symbol_id),
         trigger_type=proto_enum_name(triggers_pb2.TriggerType, msg.trigger_type),
         event_type=_trigger_event_type_label(msg.event_type),
-        ts_ns=str(msg.ts_ns) if msg.ts_ns else "",
+        ts_ns=ts_ns_string_from_response(
+            msg.ts_ns,
+            context="TriggerEvent",
+            empty_when_zero=True,
+        ),
         child_seq=int(msg.child_seq),
         child_order_id=format_uint64_id(msg.child_order_id) if msg.child_order_id else "",
         fire_price=(

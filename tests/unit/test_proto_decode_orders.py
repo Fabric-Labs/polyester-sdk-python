@@ -35,7 +35,7 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
         leaves_qty_scaled=90,
         price_ticks=5000,
         avg_price_ticks=4990,
-        created_ts_ns=1_700_000_000_000,
+        created_ts_ns=1_700_000_000_000_000_000,
         post_only=True,
     )
     order = order_from_proto(msg)

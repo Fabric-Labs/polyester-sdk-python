@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.invariants import ts_ns_string_from_response
 from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.codecs.scalars import format_price_ticks, format_qty_scaled
 from polyester.errors import PolyesterTransportError
@@ -46,7 +47,11 @@ def market_trade_from_proto(
         is_buy=bool(msg.is_buy),
         price=Price.from_ticks(int(msg.price_ticks)),
         qty=Quantity.from_scaled(int(msg.qty_scaled), scale=quantity_scale, symbol_id=symbol_id),
-        ts_ns=str(msg.ts_ns),
+        ts_ns=ts_ns_string_from_response(
+            msg.ts_ns,
+            context="MarketTrade",
+            empty_when_zero=True,
+        ),
     )
 
 
@@ -124,9 +129,7 @@ def candles_columns_from_proto(
         rendered = ", ".join(
             [f"ts_sec={row_count}", *(f"{name}={length}" for name, length in lengths.items())]
         )
-        raise PolyesterTransportError(
-            f"invalid GetCandlesColumns response lengths: {rendered}"
-        )
+        raise PolyesterTransportError(f"invalid GetCandlesColumns response lengths: {rendered}")
 
     candles: list[Candle] = []
     for index, ts in enumerate(msg.ts_sec):

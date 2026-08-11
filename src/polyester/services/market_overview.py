@@ -5,6 +5,7 @@ import builtins
 import contextlib
 from collections.abc import Callable
 
+from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.market_overview import market_overview_list_from_proto
 from polyester.codecs.realtime_decode import decode_market_overview_batch_bytes
 from polyester.gen.marketoverview.v1.marketoverview_connect import MarketOverviewServiceClient
@@ -16,11 +17,20 @@ from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubsc
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import require_realtime, subscribe_public_proto
+from polyester.services._symbols import resolve_symbol_filters
+from polyester.services._validation import validate_limit
 
 
 class AsyncMarketOverviewService(BaseService):
-    def __init__(self, transport, *, realtime: AsyncRealtimeClient | None = None) -> None:
+    def __init__(
+        self,
+        transport,
+        catalogs: CatalogManager | None = None,
+        *,
+        realtime: AsyncRealtimeClient | None = None,
+    ) -> None:
         super().__init__(transport)
+        self._catalogs = catalogs
         self._realtime = realtime
 
     async def list(
@@ -31,13 +41,17 @@ class AsyncMarketOverviewService(BaseService):
         page_token: str = "",
         include_sparklines: bool = False,
     ) -> MarketOverviewList:
+        validated_limit = validate_limit(limit)
+        resolved_symbols = resolve_symbol_filters(
+            self._catalogs, symbols, label="market_overview.list symbols"
+        )
         request = ListMarketOverviewRequest(
-            limit=limit,
+            limit=validated_limit,
             page_token=page_token,
             include_sparklines=include_sparklines,
         )
-        if symbols:
-            request.symbols.extend(symbols)
+        if resolved_symbols:
+            request.symbols.extend(resolved_symbols)
         return await unary_public_decoded(
             self._transport,
             MarketOverviewServiceClient,

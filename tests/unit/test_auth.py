@@ -211,3 +211,26 @@ def test_load_credentials_from_private_key_env(monkeypatch) -> None:
     creds = load_api_key_credentials()
     assert creds is not None
     assert creds.private_key == generated.private_bytes_raw()
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "malformed-secret-not-hex",
+        "ab" * 31,
+        b"malformed-secret-material",
+    ],
+)
+def test_f004_malformed_secret_is_not_disclosed(secret: str | bytes) -> None:
+    from polyester.errors import PolyesterAuthError
+
+    rendered_secret = secret.decode(errors="ignore") if isinstance(secret, bytes) else secret
+    with pytest.raises(PolyesterAuthError) as exc_info:
+        load_api_key_credentials(
+            api_key_id="ak_test",
+            api_private_key=secret,
+            from_env=False,
+        )
+    rendered_error = f"{exc_info.value!s}\n{exc_info.value!r}"
+    assert rendered_secret not in rendered_error
+    assert "malformed-secret" not in rendered_error

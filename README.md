@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a42`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a43`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -66,7 +66,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a42"
+pip install "polyester-sdk==0.1.0a43"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -109,8 +109,9 @@ async def main() -> None:
     ) as client:
         overview = await client.market_overview.list(limit=5)
         for market in overview.markets:
-            ticks = market.last_price.ticks if market.last_price is not None else None
-            print(market.symbol, ticks)
+            last = market.last_price.ticks if market.last_price is not None else None
+            index = market.index_price.ticks if market.index_price is not None else None
+            print(market.symbol, last, index)
 
         open_orders = await client.orders.list_open()
         print(f"{len(open_orders.orders)} open orders")

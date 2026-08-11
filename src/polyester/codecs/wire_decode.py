@@ -310,11 +310,15 @@ def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
     from polyester.types.money import Price
 
     ticks = _field(data, "lastPriceTicks", "last_price_ticks", default=0) or 0
+    index_ticks = _field(data, "indexPriceTicks", "index_price_ticks", default=0) or 0
     symbol = str(_field(data, "symbol", default="") or "")
     return MarketOverviewEntry(
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
         symbol=symbol,
         last_price=Price.from_ticks(int(ticks), symbol=symbol or None) if int(ticks) else None,
+        index_price=Price.from_ticks(int(index_ticks), symbol=symbol or None)
+        if int(index_ticks)
+        else None,
         change_24h_bp=str(_field(data, "change24hBp", "change_24h_bp", default="") or ""),
         volume_24h_quote_scaled=str(
             _field(data, "volume24hQuoteScaled", "volume_24h_quote_scaled", default="") or ""

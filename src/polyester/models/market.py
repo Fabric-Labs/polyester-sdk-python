@@ -39,6 +39,7 @@ class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     symbol_id: int
     symbol: str = ""
     last_price: Price | None = None
+    index_price: Price | None = None
     change_24h_bp: str = ""
     volume_24h_quote_scaled: str = ""
 

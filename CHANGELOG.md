@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+- SDK boundary cleanup: raw `symbol` / `symbols` filters on market overview,
+  triggers.list, and orders cancel-all paths forward to the API without
+  catalog fail-closed admission.
+- Removed client-side pair-constraint preflight (tick/step/min qty/notional)
+  and the `PairConstraints` public accessor; catalog hydration still resolves
+  symbol IDs / scales and treats zero-valued optional minima as unset.
+- `ts_ns` decode no longer rejects millisecond-shaped integers; unit correctness
+  remains an API concern.
+- Pagination `validate_limit` is wire-safety only (reject bool/non-int); the
+  SDK no longer hardcodes a global 1–1000 max across endpoints.
+
 ## 0.1.0a43
 
 Git tag: `v0.1.0a43`.

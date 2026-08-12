@@ -4,9 +4,6 @@ from typing import Any
 
 from polyester.errors import PolyesterResponseContractError
 
-_MIN_MILLISECOND_SHAPED_EPOCH = 1_000_000_000_000
-_MAX_MILLISECOND_SHAPED_EPOCH = 999_999_999_999_999
-
 
 def ts_ns_from_response(
     value: Any,
@@ -14,7 +11,11 @@ def ts_ns_from_response(
     context: str,
     field_name: str = "ts_ns",
 ) -> int:
-    """Decode an epoch-nanosecond field and reject millisecond-shaped responses."""
+    """Decode an epoch timestamp field as a non-negative integer.
+
+    Does not guess units (ns vs ms); callers treat the value as epoch nanoseconds
+    per the API contract, and the backend owns unit correctness.
+    """
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
@@ -24,11 +25,6 @@ def ts_ns_from_response(
     if parsed < 0:
         raise PolyesterResponseContractError(
             context, f"{field_name} must be an unsigned epoch-nanosecond integer"
-        )
-    if _MIN_MILLISECOND_SHAPED_EPOCH <= parsed <= _MAX_MILLISECOND_SHAPED_EPOCH:
-        raise PolyesterResponseContractError(
-            context,
-            f"{field_name} is millisecond-shaped; expected epoch nanoseconds",
         )
     return parsed
 

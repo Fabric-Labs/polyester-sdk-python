@@ -273,19 +273,11 @@ fails closed on encoding unless the request's `amount_scale` /
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
-(fixed 1e6). After catalog hydration, order and trigger writes preflight the
-advertised tick size, step size, minimum base quantity, and minimum quote
-notional when both quantity and execution price are available. These
-deterministic checks do not replace `orders.preview_order(...)`, which remains
-the authority for balances, reservations, liquidity, and other stateful rules.
-
-Inspect the immutable rules with:
-
-```python
-rules = client.catalogs.pair_constraints_for_symbol("BTC-USDT")
-assert rules is not None
-print(rules.tick_size, rules.step_size, rules.min_qty_base, rules.min_notional_quote)
-```
+(fixed 1e6), not market tick-size alignment (server validates tick size).
+Catalog hydration resolves `symbol` → `symbol_id` and quantity scales for
+encoding; pair admission (tick/step/min qty/notional) stays on the API.
+`orders.preview_order(...)` remains the authority for balances, reservations,
+liquidity, and other stateful rules.
 
 ### For bots (scaled integers)
 
@@ -337,10 +329,11 @@ rebate flag is sparse on the wire.
 
 `created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
 
-Invalid status and event-type labels raise `PolyesterValidationError`. Raw
-symbol filters in market overview, order cleanup/history, and trigger list
-paths are checked against the hydrated spot catalog; unknown non-empty filters
-fail locally instead of broadening the request.
+Invalid status and event-type labels raise `PolyesterValidationError`.
+Endpoints that wire raw `symbol` / `symbols` strings forward trimmed filters
+to the API (unknown symbols are not rejected locally). Paths that encode
+`symbol_id` still resolve through the hydrated catalog and fail closed on
+unknown symbols.
 
 Unknown values raise `ValueError` (they do not silently return an empty list).
 Response `status` uses the same labels (British spelling `cancelled`).
@@ -452,10 +445,11 @@ async with subscription:
         break
 ```
 
-Explicit list and heatmap limits must be integers from 1 through 1000. APIs
-whose limit is optional preserve the server default when it is omitted.
-Response fields named `ts_ns` are epoch nanoseconds; millisecond-shaped values
-are rejected with `PolyesterResponseContractError`.
+List and heatmap `limit` arguments must be integers (booleans and other types
+are rejected for wire safety). Optional limits omit when unset so the server
+default applies; allowed ranges are enforced by each API, not a global SDK cap.
+Response fields named `ts_ns` are treated as epoch nanoseconds per the API
+contract.
 
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its

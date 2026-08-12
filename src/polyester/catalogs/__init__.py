@@ -63,20 +63,6 @@ def _parse_positive_decimal_field(value: Any, *, field_name: str) -> str | None:
     return format(parsed, "f")
 
 
-@dataclass(frozen=True, slots=True)
-class PairConstraints:
-    """Deterministic pair rules advertised by the hydrated spot catalog."""
-
-    symbol: str
-    symbol_id: int
-    base_quantity_scale: int
-    quote_quantity_scale: int | None = None
-    tick_size: str | None = None
-    step_size: str | None = None
-    min_qty_base: str | None = None
-    min_notional_quote: str | None = None
-
-
 @dataclass(slots=True)
 class CatalogManager:
     spot_config: dict[str, Any] = field(default_factory=dict)
@@ -380,33 +366,6 @@ class CatalogManager:
                 return int(value) if value is not None else None
         return None
 
-    def pair_constraints_for_symbol(self, symbol: str) -> PairConstraints | None:
-        """Return immutable deterministic pair rules, or None for an unknown symbol."""
-        if self._unusable:
-            return None
-        pair = self._pair_for_symbol(symbol)
-        if pair is None:
-            return None
-        symbol_id = pair.get("symbol_id") or pair.get("symbolId")
-        base_scale = pair.get("base_quantity_scale")
-        if base_scale is None:
-            base_scale = pair.get("baseQuantityScale")
-        if symbol_id is None or base_scale is None:
-            return None
-        quote_scale = pair.get("quote_quantity_scale")
-        if quote_scale is None:
-            quote_scale = pair.get("quoteQuantityScale")
-        return PairConstraints(
-            symbol=symbol,
-            symbol_id=int(symbol_id),
-            base_quantity_scale=int(base_scale),
-            quote_quantity_scale=int(quote_scale) if quote_scale is not None else None,
-            tick_size=_constraint_value(pair, "tick_size", "tickSize"),
-            step_size=_constraint_value(pair, "step_size", "stepSize"),
-            min_qty_base=_constraint_value(pair, "min_qty_base", "minQtyBase"),
-            min_notional_quote=_constraint_value(pair, "min_notional_quote", "minNotionalQuote"),
-        )
-
     def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int | None:
         if self._unusable:
             return None
@@ -507,16 +466,8 @@ def msgspec_to_dict(value: object) -> dict[str, Any]:
     return msgspec.to_builtins(value)
 
 
-def _constraint_value(pair: dict[str, Any], snake: str, camel: str) -> str | None:
-    value = pair.get(snake)
-    if value is None:
-        value = pair.get(camel)
-    return str(value) if value not in (None, "") else None
-
-
 __all__ = [
     "MAX_PROTOCOL_SCALE",
     "CatalogManager",
-    "PairConstraints",
     "msgspec_to_dict",
 ]

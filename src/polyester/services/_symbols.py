@@ -24,27 +24,25 @@ def resolve_symbol_id(
     )
 
 
-def resolve_symbol_filter(
-    catalogs: CatalogManager | None,
+def normalize_raw_symbol_filter(
     symbol: str | None,
     *,
     label: str = "symbol filter",
 ) -> str | None:
-    """Validate a raw string symbol filter against the hydrated catalog."""
-    if symbol is None or symbol == "":
+    """Trim a raw string symbol filter; empty/whitespace values are omitted.
+
+    Endpoints that wire ``symbol`` / ``symbols`` as strings forward the value to
+    the API. Catalog admission for unknown symbols is a backend concern.
+    """
+    if symbol is None:
         return None
-    if not isinstance(symbol, str) or not symbol.strip():
-        raise PolyesterValidationError(f"{label} must be a non-empty symbol string")
+    if not isinstance(symbol, str):
+        raise PolyesterValidationError(f"{label} must be a symbol string")
     normalized = symbol.strip()
-    if catalogs is None or catalogs.symbol_id_for_symbol(normalized) is None:
-        raise PolyesterValidationError(
-            f"Unknown symbol filter {normalized!r}; await client.wait_for_catalogs() first"
-        )
-    return normalized
+    return normalized or None
 
 
-def resolve_symbol_filters(
-    catalogs: CatalogManager | None,
+def normalize_raw_symbol_filters(
     symbols: list[str] | None,
     *,
     label: str = "symbol filters",
@@ -53,7 +51,7 @@ def resolve_symbol_filters(
         return []
     resolved: list[str] = []
     for symbol in symbols:
-        item = resolve_symbol_filter(catalogs, symbol, label=label)
+        item = normalize_raw_symbol_filter(symbol, label=label)
         if item is not None:
             resolved.append(item)
     return resolved

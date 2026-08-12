@@ -4,8 +4,6 @@ from typing import Literal, overload
 
 from polyester.errors import PolyesterValidationError
 
-MAX_LIST_LIMIT = 1_000
-
 
 @overload
 def validate_limit(
@@ -31,13 +29,16 @@ def validate_limit(
     label: str = "limit",
     allow_none: bool = False,
 ) -> int | None:
-    """Validate an SDK pagination limit without materializing omitted defaults."""
+    """Wire-safety for pagination limits (no SDK-wide max policy).
+
+    Rejects ``bool`` and non-integers so values cannot silently coerce on the
+    wire. Endpoint/server protos remain the authority for allowed ranges.
+    Optional limits omit when ``None`` so server defaults are preserved.
+    """
     if limit is None:
         if allow_none:
             return None
-        raise PolyesterValidationError(f"{label} must be an integer from 1 to {MAX_LIST_LIMIT}")
+        raise PolyesterValidationError(f"{label} must be an integer")
     if isinstance(limit, bool) or not isinstance(limit, int):
-        raise PolyesterValidationError(f"{label} must be an integer from 1 to {MAX_LIST_LIMIT}")
-    if limit < 1 or limit > MAX_LIST_LIMIT:
-        raise PolyesterValidationError(f"{label} must be from 1 to {MAX_LIST_LIMIT}")
+        raise PolyesterValidationError(f"{label} must be an integer")
     return limit

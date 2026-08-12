@@ -11,11 +11,15 @@ from polyester.codecs.decode.triggers import (
     trigger_event_type_from_label,
     trigger_status_from_label,
 )
-from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
+from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
-from polyester.services._pair_constraints import preflight_pair_constraints
+from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.triggers.v1 import triggers_pb2
+from polyester.services._symbols import resolve_symbol_id
+from polyester.services._validation import validate_limit
 from polyester.services.market_overview import AsyncMarketOverviewService
+from polyester.services.orders import AsyncOrdersService
 from polyester.services.triggers import AsyncTriggersService
 from tests.unit.support import CaptureUnary
 
@@ -41,16 +45,6 @@ def _catalogs() -> CatalogManager:
     return catalogs
 
 
-def test_catalog_exposes_pair_constraints() -> None:
-    constraints = _catalogs().pair_constraints_for_symbol("BTC-USDT")
-    assert constraints is not None
-    assert constraints.symbol_id == 1
-    assert constraints.tick_size == "0.01"
-    assert constraints.step_size == "0.001"
-    assert constraints.min_qty_base == "0.002"
-    assert constraints.min_notional_quote == "10"
-
-
 def test_catalog_treats_zero_optional_constraints_as_unset() -> None:
     catalogs = CatalogManager()
     catalogs.hydrate_spot_config(
@@ -68,55 +62,98 @@ def test_catalog_treats_zero_optional_constraints_as_unset() -> None:
             ]
         }
     )
-    constraints = catalogs.pair_constraints_for_symbol("BTC-USDT")
-    assert constraints is not None
-    assert constraints.tick_size == "0.01"
-    assert constraints.step_size == "0.001"
-    assert constraints.min_qty_base is None
-    assert constraints.min_notional_quote is None
+    pair = catalogs.spot_config["pairs"][0]
+    assert pair["tick_size"] == "0.01"
+    assert pair["step_size"] == "0.001"
+    assert "min_qty_base" not in pair
+    assert "min_notional_quote" not in pair
+    assert catalogs.symbol_id_for_symbol("BTC-USDT") == 1
+    assert catalogs.base_quantity_scale_for_symbol("BTC-USDT") == 4
 
 
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        ({"qty": "0.0025"}, "step_size"),
-        ({"qty": "0.001"}, "at least"),
-        ({"prices": {"price": "1.001"}}, "tick_size"),
-        ({"qty": "0.002", "notional_price": "100"}, "notional"),
-    ],
-)
-def test_pair_constraint_preflight_rejects_deterministic_violations(
-    kwargs: dict[str, object], message: str
-) -> None:
-    with pytest.raises(PolyesterValidationError, match=message):
-        preflight_pair_constraints(_catalogs(), symbol="BTC-USDT", **kwargs)
+def test_unknown_symbol_id_resolution_still_fails_locally() -> None:
+    with pytest.raises(PolyesterValidationError, match="Unknown symbol"):
+        resolve_symbol_id(_catalogs(), symbol="NOPE-USDT", symbol_id=None, label="create")
 
 
 @pytest.mark.asyncio
-async def test_market_overview_filters_are_catalog_backed() -> None:
+async def test_market_overview_forwards_unknown_raw_symbols() -> None:
     capture = CaptureUnary(marketoverview_pb2.ListMarketOverviewResponse())
-    service = AsyncMarketOverviewService(MagicMock(), _catalogs())
+    service = AsyncMarketOverviewService(MagicMock())
     with patch("polyester.services.market_overview.unary_public_decoded", capture):
-        await service.list(symbols=["BTC-USDT"], limit=5)
-    assert list(capture.request.symbols) == ["BTC-USDT"]
-
-    with pytest.raises(PolyesterValidationError, match="Unknown symbol filter"):
-        await service.list(symbols=["NOPE-USDT"])
+        await service.list(symbols=["NOPE-USDT", "  BTC-USDT  ", ""], limit=5)
+    assert list(capture.request.symbols) == ["NOPE-USDT", "BTC-USDT"]
 
 
 @pytest.mark.asyncio
-async def test_trigger_raw_symbol_filter_fails_closed() -> None:
+async def test_trigger_list_forwards_unknown_raw_symbol() -> None:
+    capture = CaptureUnary(triggers_pb2.ListTriggersResponse())
     service = AsyncTriggersService(MagicMock(), _catalogs(), None)
-    with pytest.raises(PolyesterValidationError, match="Unknown symbol filter"):
+    with patch("polyester.services.triggers.unary_auth_decoded", capture):
         await service.list(symbol="NOPE-USDT")
+    assert capture.request.symbol == "NOPE-USDT"
 
 
-@pytest.mark.parametrize("limit", [0, -1, 1001, True])
 @pytest.mark.asyncio
-async def test_list_limit_is_validated_before_encoding(limit: object) -> None:
-    service = AsyncMarketOverviewService(MagicMock(), _catalogs())
+async def test_cancel_all_forwards_unknown_raw_symbol() -> None:
+    capture = CaptureUnary(
+        orders_pb2.CancelAllOrdersResponse(
+            status="dry_run",
+            matched_orders=0,
+            submitted_cancels=0,
+            failed_cancels=0,
+        )
+    )
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.orders.unary_auth_decoded", capture):
+        await service.cancel_all(symbol="NOPE-USDT", dry_run=True)
+    assert capture.request.symbol == "NOPE-USDT"
+
+
+@pytest.mark.asyncio
+async def test_cancel_all_after_forwards_unknown_raw_symbol() -> None:
+    capture = CaptureUnary(
+        orders_pb2.CancelAllAfterResponse(
+            status="armed",
+            effective_timeout_sec=30,
+            expires_at_ts_ns=0,
+        )
+    )
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.orders.unary_auth_decoded", capture):
+        await service.cancel_all_after(timeout_sec=30, symbol="NOPE-USDT")
+    assert capture.request.symbol == "NOPE-USDT"
+
+
+@pytest.mark.asyncio
+async def test_create_order_does_not_preflight_pair_constraints() -> None:
+    """Off-tick / below-min inputs must reach encode/transport (backend admits)."""
+    capture = CaptureUnary(orders_pb2.CreateOrderResponse(order_id=42))
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.orders.unary_auth_decoded", capture):
+        await service.create(
+            symbol="BTC-USDT",
+            side="buy",
+            order_type="limit",
+            tif="gtc",
+            qty="0.001",  # below min_qty_base 0.002 and off step if checked
+            price="1.001",  # off tick_size 0.01
+        )
+    assert capture.calls == 1
+    assert capture.request.order.symbol == "BTC-USDT"
+    assert capture.request.order.limit_gtc.price_ticks == 1_001_000
+
+
+@pytest.mark.parametrize("limit", [True, 1.5, "10"])
+def test_list_limit_rejects_non_integers(limit: object) -> None:
     with pytest.raises(PolyesterValidationError, match="limit"):
-        await service.list(limit=limit)  # type: ignore[arg-type]
+        validate_limit(limit)  # type: ignore[arg-type]
+
+
+def test_list_limit_allows_values_outside_former_1000_cap() -> None:
+    assert validate_limit(1001) == 1001
+    assert validate_limit(0) == 0
+    assert validate_limit(None, allow_none=True) is None
 
 
 def test_trigger_label_decoders_use_sdk_validation_error() -> None:
@@ -126,19 +163,20 @@ def test_trigger_label_decoders_use_sdk_validation_error() -> None:
         trigger_event_type_from_label("unknown")
 
 
-def test_ts_ns_invariant_rejects_millisecond_shaped_values() -> None:
-    with pytest.raises(PolyesterResponseContractError, match="millisecond-shaped"):
-        ts_ns_from_response(1_700_000_000_000, context="test")
-    assert ts_ns_from_response(1_700_000_000_000_000_000, context="test")
+def test_ts_ns_decodes_millisecond_shaped_values() -> None:
+    ms_shaped = 1_700_000_000_000
+    ns_shaped = 1_700_000_000_000_000_000
+    assert ts_ns_from_response(ms_shaped, context="test") == ms_shaped
+    assert ts_ns_from_response(ns_shaped, context="test") == ns_shaped
 
-    with pytest.raises(PolyesterResponseContractError):
-        market_trade_from_proto(
-            marketdata_pb2.MarketTrade(
-                symbol_id=1,
-                match_id=1,
-                price_ticks=1,
-                qty_scaled=1,
-                ts_ns=1_700_000_000_000,
-            ),
-            quantity_scale=4,
-        )
+    trade = market_trade_from_proto(
+        marketdata_pb2.MarketTrade(
+            symbol_id=1,
+            match_id=1,
+            price_ticks=1,
+            qty_scaled=1,
+            ts_ns=1_700_000_000_000,
+        ),
+        quantity_scale=4,
+    )
+    assert trade.ts_ns == "1700000000000"

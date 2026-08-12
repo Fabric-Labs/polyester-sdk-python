@@ -37,10 +37,9 @@ from polyester.models import (
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._pair_constraints import preflight_pair_constraints
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import resolve_symbol_filter
+from polyester.services._symbols import normalize_raw_symbol_filter
 from polyester.services._validation import validate_limit
 
 
@@ -90,9 +89,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        resolved_symbol = resolve_symbol_filter(
-            self._catalogs, symbol, label="triggers.list symbol"
-        )
+        resolved_symbol = normalize_raw_symbol_filter(symbol, label="triggers.list symbol")
         if resolved_symbol:
             request.symbol = resolved_symbol
         if status is not None:
@@ -159,19 +156,6 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
     ) -> TriggerMutationResult:
         await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)
-        preflight_pair_constraints(
-            self._catalogs,
-            symbol=symbol,
-            qty=qty,
-            prices={
-                "trigger_price": trigger_price,
-                "limit_price": limit_price,
-                "activation_price": activation_price,
-                "ladder_price_min": ladder_price_min,
-                "ladder_price_max": ladder_price_max,
-            },
-            notional_price=limit_price if limit_price is not None else ladder_price_min,
-        )
         request = create_trigger_to_proto(
             symbol=symbol,
             trigger_type=trigger_type,

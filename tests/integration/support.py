@@ -39,6 +39,7 @@ def jwt_session_only(exc: BaseException) -> bool:
         or "interactive session" in message
         or "permission denied" in message
         or "permission_denied" in message
+        or "api keys cannot" in message
     )
     if isinstance(exc, PolyesterAuthError):
         return sessionish
@@ -71,7 +72,10 @@ async def call_optional(
             pytest.skip(f"{label} not mounted on devnet")
         raise
     except PolyesterServerError as exc:
-        if allow_proto_mismatch and devnet_proto_mismatch(exc):
+        message = str(exc).lower()
+        if allow_proto_mismatch and (
+            devnet_proto_mismatch(exc) or "unavailable" in message
+        ):
             pytest.skip(f"{label} unavailable on devnet: {exc}")
         raise
 

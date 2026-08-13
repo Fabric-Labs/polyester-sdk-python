@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a43`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a44`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -28,6 +28,9 @@ Requires **Python 3.11+**.
 | Address book (list/view/subscribe) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
+| VIP tiers + status | Yes |
+| Spot fee rates | Yes |
+| Trading rate limits | Yes |
 | Balances, holds, equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -66,7 +69,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a43"
+pip install "polyester-sdk==0.1.0a44"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -156,7 +159,9 @@ server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect deta
 `operation_id`, and presence-aware quota fields. `retry_after` prefers `detail.retry_after_ms`,
 then `Retry-After` / `Retry-After-Ms` / `Grpc-Retry-Pushback-Ms` headers on HTTP paths. Preview
 and batch rejections expose the same payload on `OrderErrorDetail.rate_limit` / batch item
-`rate_limit`.
+`rate_limit`. That error payload is distinct from `client.rate_limits`
+(`ratelimit.v1.RateLimitService`), which returns the public trading quota catalog and
+authenticated account / API-key limits.
 
 ## Authentication patterns
 
@@ -322,6 +327,28 @@ BUY fill's base quantity.
 Magnitudes are unsigned. Treat `fee_amount_e18` as a **debit** unless
 `fee_is_rebate` is true (then it is a **credit**). Proto3 omits false, so the
 rebate flag is sparse on the wire.
+
+`client.fees.get_spot_fee_rates()` returns the account target's current effective maker/taker
+percents per listed symbol (optional `symbol_id` filter). That is the live effective-rate
+surface, not a guaranteed quote of every future fill. The completed user-trade record still
+owns the exact charge.
+
+## VIP, spot fees, and trading rate limits
+
+Public catalog reads need no credentials. Authenticated VIP status, effective spot fees, and
+account trading limits require an API key. `GetVIPStatus` has no subaccount selector: JWT and
+API-key callers receive the owning root group only. USD amounts and fee percents are decimal
+strings. Optional qualification metrics, timestamps, and next-tier thresholds stay omitted
+when unset. `policy_class` uses full protobuf enum names
+(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`).
+
+```python
+tiers = await client.vip.list_vip_tiers()
+status = await client.vip.get_vip_status()
+fees = await client.fees.get_spot_fee_rates()
+catalog = await client.rate_limits.get_rate_limit_config()
+limits = await client.rate_limits.get_trading_rate_limits()
+```
 
 ## Triggers
 

@@ -1,4 +1,4 @@
-"""Protobuf response decoders (proto Message → public msgspec models)."""
+"""Protobuf response decoders (proto Message ? public msgspec models)."""
 
 from polyester.codecs.decode.api_keys import (
     api_key_from_proto,
@@ -17,6 +17,7 @@ from polyester.codecs.decode.deposit import (
     deposit_address_from_proto,
     deposit_addresses_list_from_proto,
 )
+from polyester.codecs.decode.fees import spot_fee_rates_list_from_proto
 from polyester.codecs.decode.heatmap import heatmap_from_proto
 from polyester.codecs.decode.internal_transfers import internal_transfer_from_proto
 from polyester.codecs.decode.lifecycle import (
@@ -43,6 +44,10 @@ from polyester.codecs.decode.orders import (
     user_trades_list_from_proto,
 )
 from polyester.codecs.decode.resolve import resolved_accounts_from_proto
+from polyester.codecs.decode.trading_rate_limits import (
+    rate_limit_config_from_proto,
+    trading_rate_limits_from_proto,
+)
 from polyester.codecs.decode.transfers import transfers_list_from_proto
 from polyester.codecs.decode.triggers import (
     get_trigger_from_proto,
@@ -51,6 +56,7 @@ from polyester.codecs.decode.triggers import (
     trigger_mutation_from_proto,
     triggers_list_from_proto,
 )
+from polyester.codecs.decode.vip import vip_status_from_proto, vip_tiers_list_from_proto
 from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
 from polyester.codecs.decode.zipper import deposit_withdraw_config_from_proto
 
@@ -73,6 +79,11 @@ __all__ = [
     "flow_from_get_by_tx_response",
     "flow_from_get_response",
     "flows_list_from_proto",
+    "rate_limit_config_from_proto",
+    "spot_fee_rates_list_from_proto",
+    "trading_rate_limits_from_proto",
+    "vip_status_from_proto",
+    "vip_tiers_list_from_proto",
     "get_api_key_from_proto",
     "get_order_from_proto",
     "get_trigger_from_proto",

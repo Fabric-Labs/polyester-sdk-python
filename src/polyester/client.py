@@ -22,6 +22,7 @@ from polyester.services import (
     AsyncBalancesService,
     AsyncChainAnalyticsService,
     AsyncDepositService,
+    AsyncFeeService,
     AsyncGuardSignerService,
     AsyncHeatmapService,
     AsyncInternalTransfersService,
@@ -33,11 +34,13 @@ from polyester.services import (
     AsyncOrdersService,
     AsyncPoliciesService,
     AsyncPolychartService,
+    AsyncRateLimitService,
     AsyncSocialVerificationService,
     AsyncSubAccountsService,
     AsyncTradesService,
     AsyncTransfersService,
     AsyncTriggersService,
+    AsyncVIPService,
     AsyncWhiteboardService,
     AsyncWithdrawService,
     AsyncZipperService,
@@ -160,6 +163,7 @@ class AsyncPolyester:
             self._transport, self.catalogs, default_sub_account_id
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
+        self.fees = AsyncFeeService(self._transport, default_sub_account_id)
         self.api_keys = AsyncApiKeysService(
             self._transport,
             default_sub_account_id,
@@ -188,6 +192,8 @@ class AsyncPolyester:
         self.polychart = AsyncPolychartService(self._transport)
         self.layout = AsyncLayoutService(self._transport)
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
+        self.rate_limits = AsyncRateLimitService(self._transport, default_sub_account_id)
+        self.vip = AsyncVIPService(self._transport)
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
         self._catalog_last_error: BaseException | None = None
@@ -371,6 +377,7 @@ class Polyester:
         )
         self.internal_transfers = _SyncService(self._loop, self._client.internal_transfers)
         self.deposit = _SyncService(self._loop, self._client.deposit)
+        self.fees = _SyncService(self._loop, self._client.fees)
         self.api_keys = _SyncSubscribeService(
             self._loop, self._client.api_keys, self._active_sync_subscriptions
         )
@@ -403,6 +410,8 @@ class Polyester:
         self.polychart = _SyncService(self._loop, self._client.polychart)
         self.layout = _SyncService(self._loop, self._client.layout)
         self.guard_signer = _SyncService(self._loop, self._client.guard_signer)
+        self.rate_limits = _SyncService(self._loop, self._client.rate_limits)
+        self.vip = _SyncService(self._loop, self._client.vip)
         self.withdraw = _SyncService(self._loop, self._client.withdraw)
         self.trading_withdraws = self.withdraw
 

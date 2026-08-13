@@ -41,6 +41,7 @@ from polyester.models.common import (
     OrderbookLevel,
     SpotConfig,
 )
+from polyester.models.fees import SpotFeeRate, SpotFeeRatesList
 from polyester.models.guard_signer import (
     BatchSignProtectedActionsResult,
     CreateGuardSignerWalletResult,
@@ -139,6 +140,17 @@ from polyester.models.trading import (
     WithdrawIntentResult,
     ZipperReasonDetails,
 )
+from polyester.models.trading_rate_limits import (
+    RateLimitConfig,
+    TradingRateLimitRule,
+    TradingRateLimits,
+)
+from polyester.models.vip import (
+    NextVIPTierThresholds,
+    VIPStatus,
+    VIPTier,
+    VIPTiersList,
+)
 from polyester.models.zipper import (
     DepositWithdrawConfig,
     ZippedAssetSupplyBatch,
@@ -219,6 +231,7 @@ __all__ = [
     "LifecycleFlowsList",
     "OrderErrorDetail",
     "OrderFieldViolation",
+    "RateLimitConfig",
     "RateLimitDetail",
     "ZipperReasonDetails",
     "CandlesResult",
@@ -244,6 +257,8 @@ __all__ = [
     "RiskLeg",
     "RotateGuardSignerWalletResult",
     "SpotConfig",
+    "SpotFeeRate",
+    "SpotFeeRatesList",
     "SpotMarketRule",
     "SubAccount",
     "SubAccountActivityEvent",
@@ -256,6 +271,8 @@ __all__ = [
     "SubaccountPoliciesList",
     "SubaccountPolicy",
     "TrailingStop",
+    "TradingRateLimitRule",
+    "TradingRateLimits",
     "TransferCounterpartiesList",
     "TransferCounterparty",
     "TransferDestination",
@@ -274,6 +291,10 @@ __all__ = [
     "UserTrade",
     "UserTradesList",
     "UserProfile",
+    "VIPStatus",
+    "VIPTier",
+    "VIPTiersList",
+    "NextVIPTierThresholds",
     "UsernameHistoryEntry",
     "UsernameHistoryList",
     "WithdrawDestinationValidation",

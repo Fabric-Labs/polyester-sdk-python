@@ -197,8 +197,9 @@ read `os.environ`.
 
 **Scripts and local tests only:** `AsyncPolyester.from_env()` and
 `Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,
-and `POLYESTER_ACCOUNT_ID` from the process environment. This is a convenience
-helper, not the primary integration pattern.
+`POLYESTER_ACCOUNT_ID`, and optional `POLYESTER_API_URL` / `POLYESTER_WS_URL`
+from the process environment. This is a convenience helper, not the primary
+integration pattern.
 
 ## Create and cancel orders
 
@@ -235,6 +236,32 @@ Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create, cancel, and replace accept at most 20 items. Treat a cancel
 response as an admission acknowledgement and reconcile with `list_open` before
 releasing local state.
+
+Attached take-profit / stop-loss use the same friendly keys as the read
+model (`trigger_price`, `order_type`, `limit_price`). Child execution is
+`market` (default) or `limit`, not `limit_ioc` / `limit_fok`, and not a
+nested `child.execution` wrapper.
+
+```python
+result = await client.orders.create(
+    symbol="BNB-USDT",
+    side="buy",
+    order_type="limit",
+    tif="gtc",
+    qty="0.01",
+    price="100",
+    post_only=True,
+    attached_risk={
+        "take_profit": {"trigger_price": "140", "order_type": "market"},
+        "stop_loss": {"trigger_price": "80", "order_type": "market"},
+        "oco": True,
+    },
+)
+detail = await client.orders.get(
+    key=ClientOrderId(result.client_order_id),
+    include_attached_risk=True,
+)
+```
 
 Create sizing is explicit: set exactly one of base `qty` or `max_quote_debit`
 (a hard all-in quote-debit budget). Decimal/str quote budgets use the pair's
@@ -362,12 +389,14 @@ to the API (unknown symbols are not rejected locally). Paths that encode
 `symbol_id` still resolve through the hydrated catalog and fail closed on
 unknown symbols.
 
-Unknown values raise `ValueError` (they do not silently return an empty list).
-Response `status` uses the same labels (British spelling `cancelled`).
+Unknown values raise `PolyesterValidationError` (they do not silently return
+an empty list). Response `status` uses the same labels (British spelling
+`cancelled`).
 
 `orders.get(..., include_attached_risk=True)` returns policy data on
 `order.attached_risk` (take-profit / stop-loss / trailing-stop). `Order` also
-exposes `post_only`.
+exposes `post_only`. Create/modify accept the same shape as a dict or
+`AttachedRisk`.
 
 `orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
 return only child orders created by that trigger (TWAP/ladder slices).

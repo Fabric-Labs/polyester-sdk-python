@@ -62,7 +62,8 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_order_id: str | None = None
     post_only: bool = False
     expires_at: str | None = None
-    attached_risk: dict[str, Any] | None = None
+    # Friendly dict, proto-JSON, or AttachedRisk. Encoded in risk_policy_from_dict.
+    attached_risk: Any | None = None
     market_client_ref_price: Any | None = None
     fee_asset: str | None = None
 

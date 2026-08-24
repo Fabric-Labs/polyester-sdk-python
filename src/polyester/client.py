@@ -55,6 +55,33 @@ from polyester.transport import TransportConfig, TransportFactory
 
 DEFAULT_API_URL = "https://api-devnet.polyester.ai"
 DEFAULT_WS_URL = "wss://api-devnet.polyester.ai"
+API_URL_ENV = "POLYESTER_API_URL"
+WS_URL_ENV = "POLYESTER_WS_URL"
+
+
+def _apply_from_env(overrides: dict[str, Any]) -> dict[str, Any]:
+    """Fill missing constructor kwargs from ``POLYESTER_*`` process env."""
+    if "api_key_id" not in overrides:
+        api_key_id = os.getenv(API_KEY_ID_ENV)
+        if api_key_id:
+            overrides["api_key_id"] = api_key_id.strip()
+    if "api_private_key" not in overrides:
+        api_private_key = os.getenv(API_PRIVATE_KEY_ENV)
+        if api_private_key:
+            overrides["api_private_key"] = api_private_key.strip()
+    if "default_account_id" not in overrides:
+        account_id = os.getenv(ACCOUNT_ID_ENV)
+        if account_id:
+            overrides["default_account_id"] = account_id.strip()
+    if "api_url" not in overrides:
+        api_url = os.getenv(API_URL_ENV)
+        if api_url:
+            overrides["api_url"] = api_url.strip()
+    if "ws_url" not in overrides:
+        ws_url = os.getenv(WS_URL_ENV)
+        if ws_url:
+            overrides["ws_url"] = ws_url.strip()
+    return overrides
 
 
 class AsyncPolyester:
@@ -206,19 +233,7 @@ class AsyncPolyester:
     @classmethod
     def from_env(cls, **overrides) -> AsyncPolyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
-        if "api_key_id" not in overrides:
-            api_key_id = os.getenv(API_KEY_ID_ENV)
-            if api_key_id:
-                overrides["api_key_id"] = api_key_id.strip()
-        if "api_private_key" not in overrides:
-            api_private_key = os.getenv(API_PRIVATE_KEY_ENV)
-            if api_private_key:
-                overrides["api_private_key"] = api_private_key.strip()
-        if "default_account_id" not in overrides:
-            account_id = os.getenv(ACCOUNT_ID_ENV)
-            if account_id:
-                overrides["default_account_id"] = account_id.strip()
-        return cls(**overrides)
+        return cls(**_apply_from_env(overrides))
 
     @property
     def catalogs_last_error(self) -> BaseException | None:
@@ -418,19 +433,7 @@ class Polyester:
     @classmethod
     def from_env(cls, **overrides) -> Polyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
-        if "api_key_id" not in overrides:
-            api_key_id = os.getenv(API_KEY_ID_ENV)
-            if api_key_id:
-                overrides["api_key_id"] = api_key_id.strip()
-        if "api_private_key" not in overrides:
-            api_private_key = os.getenv(API_PRIVATE_KEY_ENV)
-            if api_private_key:
-                overrides["api_private_key"] = api_private_key.strip()
-        if "default_account_id" not in overrides:
-            account_id = os.getenv(ACCOUNT_ID_ENV)
-            if account_id:
-                overrides["default_account_id"] = account_id.strip()
-        return cls(**overrides)
+        return cls(**_apply_from_env(overrides))
 
     def close(self) -> None:
         for subscription in list(self._active_sync_subscriptions):

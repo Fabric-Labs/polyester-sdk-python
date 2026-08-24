@@ -47,6 +47,7 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOrderRequest,
 )
 from polyester.models import (
+    AttachedRisk,
     BatchCancelOrdersResult,
     BatchCreateOrdersResult,
     BatchReplaceItem,
@@ -377,7 +378,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         request_id: str | None = None,
         new_price: object | None = None,
         new_qty: object | None = None,
-        new_attached_risk: dict | None = None,
+        new_attached_risk: dict | AttachedRisk | None = None,
         behavior: str | None = None,
         new_client_order_id: str | None = None,
     ) -> ModifyOrderResult:

@@ -32,7 +32,7 @@ from polyester.errors import (
     mutation_outcome_unknown,
 )
 from polyester.patch import UNSET
-from polyester.services.orders import wait_for_order_trades_complete
+from polyester.services.orders import is_batch_replace_settled, wait_for_order_trades_complete
 from polyester.services.withdraw import PreparedTradingWithdraw
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
@@ -73,6 +73,7 @@ __all__ = [
     "is_mfa_enrollment_required",
     "is_mfa_last_factor_required",
     "is_not_found",
+    "is_batch_replace_settled",
     "is_step_up_required",
     "wait_for_order_trades_complete",
 ]

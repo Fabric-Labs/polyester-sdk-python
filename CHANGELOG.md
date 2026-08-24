@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+- `orders.create` / `modify` encode attached TP/SL from friendly keys
+  (`trigger_price`, `order_type`, `limit_price`) and `AttachedRisk` models onto
+  the write `RiskPolicy` wire. Unknown fields and the extra `child.execution`
+  wrapper are rejected instead of being dropped.
+- `AsyncPolyester.from_env()` / `Polyester.from_env()` read `POLYESTER_API_URL`
+  and `POLYESTER_WS_URL`.
+- Re-export `is_batch_replace_settled` from `polyester`.
+
 ## 0.1.0a44
 
 Git tag: `v0.1.0a44`.

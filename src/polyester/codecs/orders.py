@@ -4,7 +4,6 @@ import uuid
 from typing import Any, cast
 
 import msgspec
-from google.protobuf.json_format import ParseDict
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.correlation_id import (
@@ -17,6 +16,7 @@ from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
+from polyester.models.trading import AttachedRisk, RiskLeg, TrailingStop
 from polyester.types.money import (
     Quantity,
     resolve_price_ticks,
@@ -254,7 +254,7 @@ def order_intent_from_request(
                 if price_ticks is not None:
                     intent.limit_fok.price_ticks = price_ticks
 
-    risk = risk_policy_from_dict(request.attached_risk)
+    risk = risk_policy_from_dict(request.attached_risk, symbol=request.symbol)
     if risk is not None:
         intent.attached_risk.CopyFrom(risk)
     return intent
@@ -301,35 +301,300 @@ def preview_order_to_proto(
     return proto
 
 
-def _validate_attached_trailing_stop_dict(data: dict[str, Any]) -> None:
-    trailing = data.get("trailing_stop")
-    if trailing is None:
-        trailing = data.get("trailingStop")
-    if trailing is None:
-        return
-    if not isinstance(trailing, dict):
+_RISK_POLICY_KEYS = frozenset(
+    {"take_profit", "takeProfit", "stop_loss", "stopLoss", "trailing_stop", "trailingStop", "oco"}
+)
+_RISK_LEG_KEYS = frozenset(
+    {
+        "trigger_price",
+        "triggerPrice",
+        "order_type",
+        "orderType",
+        "limit_price",
+        "limitPrice",
+        "trigger_price_source",
+        "triggerPriceSource",
+        "trigger_price_ticks",
+        "triggerPriceTicks",
+        "child",
+    }
+)
+_RISK_CHILD_KEYS = frozenset({"market_ioc", "marketIoc", "limit_gtc", "limitGtc"})
+_RISK_LIMIT_GTC_KEYS = frozenset({"price_ticks", "priceTicks", "price"})
+_TRAILING_STOP_KEYS = frozenset(
+    {
+        "trailing_distance_ticks",
+        "trailingDistanceTicks",
+        "trailing_distance_bps",
+        "trailingDistanceBps",
+        "distance_ticks",
+        "distance_bps",
+        "max_slippage_ticks",
+        "maxSlippageTicks",
+        "max_slippage_bps",
+        "maxSlippageBps",
+        "activation_price",
+        "activationPrice",
+        "activation_price_ticks",
+        "activationPriceTicks",
+        "order_type",
+        "orderType",
+        "trigger_price_source",
+        "triggerPriceSource",
+    }
+)
+
+
+def _mapping_get(data: dict[str, Any], *names: str) -> Any:
+    for name in names:
+        if name in data and data[name] is not None:
+            return data[name]
+    return None
+
+
+def _mapping_has(data: dict[str, Any], *names: str) -> bool:
+    return any(name in data for name in names)
+
+
+def _reject_unknown_keys(data: dict[str, Any], allowed: frozenset[str], *, field_name: str) -> None:
+    unknown = set(data) - allowed
+    if unknown:
+        raise PolyesterValidationError(
+            f"{field_name} has unsupported fields: {', '.join(sorted(unknown))}"
+        )
+
+
+def _reject_trigger_price_source(data: dict[str, Any], *, field_name: str) -> None:
+    if _mapping_has(data, "trigger_price_source", "triggerPriceSource"):
+        raise PolyesterValidationError(
+            "attached risk always uses last trade; trigger_price_source cannot be supplied"
+        )
+
+
+def _positive_int(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise PolyesterValidationError(f"{field_name} must be an integer")
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise PolyesterValidationError(f"{field_name} must be an integer") from exc
+    if parsed <= 0:
+        raise PolyesterValidationError(f"{field_name} must be positive")
+    return parsed
+
+
+def _risk_leg_model_to_dict(leg: RiskLeg) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if leg.trigger_price is not None:
+        out["trigger_price"] = leg.trigger_price
+    if leg.order_type:
+        out["order_type"] = leg.order_type
+    if leg.limit_price is not None:
+        out["limit_price"] = leg.limit_price
+    if leg.trigger_price_source:
+        out["trigger_price_source"] = leg.trigger_price_source
+    return out
+
+
+def _trailing_stop_model_to_dict(stop: TrailingStop) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if stop.distance_ticks:
+        out["trailing_distance_ticks"] = stop.distance_ticks
+    if stop.distance_bps:
+        out["trailing_distance_bps"] = stop.distance_bps
+    if stop.max_slippage_ticks:
+        out["max_slippage_ticks"] = stop.max_slippage_ticks
+    if stop.max_slippage_bps:
+        out["max_slippage_bps"] = stop.max_slippage_bps
+    if stop.activation_price is not None:
+        out["activation_price"] = stop.activation_price
+    if stop.trigger_price_source:
+        out["trigger_price_source"] = stop.trigger_price_source
+    if stop.order_type:
+        out["order_type"] = stop.order_type
+    return out
+
+
+def _attached_risk_to_dict(risk: AttachedRisk) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if risk.take_profit is not None:
+        out["take_profit"] = _risk_leg_model_to_dict(risk.take_profit)
+    if risk.stop_loss is not None:
+        out["stop_loss"] = _risk_leg_model_to_dict(risk.stop_loss)
+    if risk.trailing_stop is not None:
+        out["trailing_stop"] = _trailing_stop_model_to_dict(risk.trailing_stop)
+    if risk.oco:
+        out["oco"] = True
+    return out
+
+
+def _resolve_optional_price_ticks(
+    value: object,
+    field_name: str,
+    *,
+    symbol: str | None,
+) -> int:
+    return resolve_price_ticks(value, field_name, symbol=symbol)  # type: ignore[arg-type]
+
+
+def _risk_execution_from_friendly(
+    *,
+    order_type: object | None,
+    limit_price: object | None,
+    field_name: str,
+    symbol: str | None,
+) -> orders_pb2.RiskExecution:
+    child = orders_pb2.RiskExecution()
+    label = str(order_type).strip().lower() if order_type is not None else "market"
+    if label in {"market", "market_ioc"}:
+        if limit_price is not None:
+            raise PolyesterValidationError(
+                f"{field_name} MARKET child must not set limit_price"
+            )
+        child.market_ioc.SetInParent()
+        return child
+    if label in {"limit", "limit_gtc"}:
+        if limit_price is None:
+            raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
+        child.limit_gtc.price_ticks = _resolve_optional_price_ticks(
+            limit_price, f"{field_name}.limit_price", symbol=symbol
+        )
+        return child
+    raise PolyesterValidationError(
+        f"{field_name} order_type must be 'market' or 'limit' (got {order_type!r})"
+    )
+
+
+def _risk_execution_from_child(
+    child: object,
+    *,
+    field_name: str,
+    symbol: str | None,
+) -> orders_pb2.RiskExecution:
+    if not isinstance(child, dict):
+        raise PolyesterValidationError(f"{field_name}.child must be an object")
+    if _mapping_has(child, "execution"):
+        raise PolyesterValidationError(
+            f"{field_name}.child.execution is not a wire field; set child.market_ioc "
+            "or child.limit_gtc (limit_ioc and limit_fok are not attached-risk children)"
+        )
+    _reject_unknown_keys(child, _RISK_CHILD_KEYS, field_name=f"{field_name}.child")
+    has_market = _mapping_has(child, "market_ioc", "marketIoc")
+    has_limit = _mapping_has(child, "limit_gtc", "limitGtc")
+    if has_market and has_limit:
+        raise PolyesterValidationError(
+            f"{field_name}.child must set exactly one of market_ioc or limit_gtc"
+        )
+    execution = orders_pb2.RiskExecution()
+    if has_limit:
+        limit = _mapping_get(child, "limit_gtc", "limitGtc")
+        if not isinstance(limit, dict):
+            raise PolyesterValidationError(f"{field_name}.child.limit_gtc must be an object")
+        _reject_unknown_keys(
+            limit, _RISK_LIMIT_GTC_KEYS, field_name=f"{field_name}.child.limit_gtc"
+        )
+        price = _mapping_get(limit, "price")
+        ticks = _mapping_get(limit, "price_ticks", "priceTicks")
+        if price is not None and ticks is not None:
+            raise PolyesterValidationError(
+                f"{field_name}.child.limit_gtc accepts price or price_ticks, not both"
+            )
+        if price is not None:
+            execution.limit_gtc.price_ticks = _resolve_optional_price_ticks(
+                price, f"{field_name}.child.limit_gtc.price", symbol=symbol
+            )
+        elif ticks is not None:
+            execution.limit_gtc.price_ticks = _positive_int(
+                ticks, f"{field_name}.child.limit_gtc.price_ticks"
+            )
+        else:
+            raise PolyesterValidationError(
+                f"{field_name} LIMIT child requires limit_price"
+            )
+        return execution
+    if has_market:
+        market = _mapping_get(child, "market_ioc", "marketIoc")
+        if market not in (None, {}):
+            if not isinstance(market, dict):
+                raise PolyesterValidationError(f"{field_name}.child.market_ioc must be an object")
+            if market:
+                raise PolyesterValidationError(
+                    f"{field_name}.child.market_ioc does not accept extra fields"
+                )
+        execution.market_ioc.SetInParent()
+        return execution
+    execution.market_ioc.SetInParent()
+    return execution
+
+
+def _risk_leg_from_dict(
+    data: object,
+    *,
+    field_name: str,
+    symbol: str | None,
+) -> orders_pb2.TakeProfitPolicy:
+    if not isinstance(data, dict):
+        raise PolyesterValidationError(f"{field_name} must be an object")
+    _reject_unknown_keys(data, _RISK_LEG_KEYS, field_name=field_name)
+    _reject_trigger_price_source(data, field_name=field_name)
+
+    trigger_price = _mapping_get(data, "trigger_price", "triggerPrice")
+    trigger_ticks = _mapping_get(data, "trigger_price_ticks", "triggerPriceTicks")
+    if trigger_price is not None and trigger_ticks is not None:
+        raise PolyesterValidationError(
+            f"{field_name} accepts trigger_price or trigger_price_ticks, not both"
+        )
+    if trigger_price is not None:
+        ticks = _resolve_optional_price_ticks(
+            trigger_price, f"{field_name}.trigger_price", symbol=symbol
+        )
+    elif trigger_ticks is not None:
+        ticks = _positive_int(trigger_ticks, f"{field_name}.trigger_price_ticks")
+    else:
+        raise PolyesterValidationError(f"{field_name} requires trigger_price")
+
+    order_type = _mapping_get(data, "order_type", "orderType")
+    limit_price = _mapping_get(data, "limit_price", "limitPrice")
+    child_data = data.get("child") if "child" in data else None
+    if child_data is not None and (order_type is not None or limit_price is not None):
+        raise PolyesterValidationError(
+            f"{field_name} accepts friendly order_type/limit_price or child, not both"
+        )
+    if child_data is not None:
+        child = _risk_execution_from_child(child_data, field_name=field_name, symbol=symbol)
+    else:
+        child = _risk_execution_from_friendly(
+            order_type=order_type,
+            limit_price=limit_price,
+            field_name=field_name,
+            symbol=symbol,
+        )
+
+    policy = orders_pb2.TakeProfitPolicy(trigger_price_ticks=ticks)
+    policy.child.CopyFrom(child)
+    return policy
+
+
+def _trailing_stop_from_dict(
+    data: object,
+    *,
+    symbol: str | None,
+) -> orders_pb2.TrailingStopPolicy:
+    if not isinstance(data, dict):
         raise PolyesterValidationError("attached_risk.trailing_stop must be an object")
-    for key in ("order_type", "orderType"):
-        if key in trailing:
-            raise PolyesterValidationError(
-                "attached trailing_stop child is always market; "
-                "order_type cannot be supplied"
-            )
-    for key in ("trigger_price_source", "triggerPriceSource"):
-        if key in trailing:
-            raise PolyesterValidationError(
-                "attached risk always uses last trade; "
-                "trigger_price_source cannot be supplied"
-            )
+    _reject_unknown_keys(data, _TRAILING_STOP_KEYS, field_name="attached_risk.trailing_stop")
+    _reject_trigger_price_source(data, field_name="attached_risk.trailing_stop")
+    if _mapping_has(data, "order_type", "orderType"):
+        raise PolyesterValidationError(
+            "attached trailing_stop child is always market; order_type cannot be supplied"
+        )
 
-    def _pick(*names: str) -> Any:
-        for name in names:
-            if name in trailing and trailing[name] is not None:
-                return trailing[name]
-        return None
-
-    dist_ticks = _pick("trailing_distance_ticks", "trailingDistanceTicks")
-    dist_bps = _pick("trailing_distance_bps", "trailingDistanceBps")
+    dist_ticks = _mapping_get(
+        data, "trailing_distance_ticks", "trailingDistanceTicks", "distance_ticks"
+    )
+    dist_bps = _mapping_get(
+        data, "trailing_distance_bps", "trailingDistanceBps", "distance_bps"
+    )
     if dist_ticks is None and dist_bps is None:
         raise PolyesterValidationError(
             "trailing_stop requires trailing_distance_ticks or trailing_distance_bps"
@@ -339,42 +604,96 @@ def _validate_attached_trailing_stop_dict(data: dict[str, Any]) -> None:
             "trailing_stop requires exactly one of trailing_distance_ticks "
             "or trailing_distance_bps"
         )
-    if dist_ticks is not None and int(dist_ticks) <= 0:
-        raise PolyesterValidationError("trailing_distance_ticks must be positive")
-    if dist_bps is not None and int(dist_bps) <= 0:
-        raise PolyesterValidationError("trailing_distance_bps must be positive")
 
-    slip_ticks = _pick("max_slippage_ticks", "maxSlippageTicks")
-    slip_bps = _pick("max_slippage_bps", "maxSlippageBps")
+    proto = orders_pb2.TrailingStopPolicy()
+    if dist_ticks is not None:
+        proto.trailing_distance_ticks = _positive_int(dist_ticks, "trailing_distance_ticks")
+    else:
+        proto.trailing_distance_bps = _positive_int(dist_bps, "trailing_distance_bps")
+
+    slip_ticks = _mapping_get(data, "max_slippage_ticks", "maxSlippageTicks")
+    slip_bps = _mapping_get(data, "max_slippage_bps", "maxSlippageBps")
     if slip_ticks is not None and slip_bps is not None:
         raise PolyesterValidationError(
             "trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps"
         )
-    if slip_ticks is not None and int(slip_ticks) <= 0:
-        raise PolyesterValidationError("max_slippage_ticks must be positive")
-    if slip_bps is not None and int(slip_bps) <= 0:
-        raise PolyesterValidationError("max_slippage_bps must be positive")
+    if slip_ticks is not None:
+        proto.max_slippage_ticks = _positive_int(slip_ticks, "max_slippage_ticks")
+    if slip_bps is not None:
+        proto.max_slippage_bps = _positive_int(slip_bps, "max_slippage_bps")
+
+    activation = _mapping_get(data, "activation_price", "activationPrice")
+    activation_ticks = _mapping_get(data, "activation_price_ticks", "activationPriceTicks")
+    if activation is not None and activation_ticks is not None:
+        raise PolyesterValidationError(
+            "trailing_stop accepts activation_price or activation_price_ticks, not both"
+        )
+    if activation is not None:
+        proto.activation_price_ticks = _resolve_optional_price_ticks(
+            activation, "attached_risk.trailing_stop.activation_price", symbol=symbol
+        )
+    elif activation_ticks is not None:
+        proto.activation_price_ticks = _positive_int(
+            activation_ticks, "activation_price_ticks"
+        )
+    return proto
 
 
-def risk_policy_from_dict(data: dict[str, Any] | None) -> orders_pb2.RiskPolicy | None:
+def risk_policy_from_dict(
+    data: dict[str, Any] | AttachedRisk | None,
+    *,
+    symbol: str | None = None,
+) -> orders_pb2.RiskPolicy | None:
+    """Encode public attached-risk input onto the write ``RiskPolicy`` wire.
+
+    Accepts ``AttachedRisk`` / ``RiskLeg`` models, friendly keys
+    (``trigger_price``, ``order_type``, ``limit_price``), and proto-JSON
+    (``trigger_price_ticks``, ``child.market_ioc`` / ``child.limit_gtc``).
+    Unknown fields and the extra ``child.execution`` wrapper are rejected.
+    """
+    if data is None:
+        return None
+    if isinstance(data, AttachedRisk):
+        data = _attached_risk_to_dict(data)
+        if not data:
+            raise PolyesterValidationError(
+                "attached_risk requires take_profit and/or a stop leg"
+            )
+    elif not isinstance(data, dict):
+        raise PolyesterValidationError("attached_risk must be an object or AttachedRisk")
     if not data:
         return None
-    stack: list[object] = [data]
-    while stack:
-        value = stack.pop()
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key in {"trigger_price_source", "triggerPriceSource"}:
-                    raise PolyesterValidationError(
-                        "attached risk always uses last trade; "
-                        "trigger_price_source cannot be supplied"
-                    )
-                stack.append(child)
-        elif isinstance(value, list):
-            stack.extend(value)
-    _validate_attached_trailing_stop_dict(data)
+    _reject_unknown_keys(data, _RISK_POLICY_KEYS, field_name="attached_risk")
+
+    take_profit = _mapping_get(data, "take_profit", "takeProfit")
+    stop_loss = _mapping_get(data, "stop_loss", "stopLoss")
+    trailing_stop = _mapping_get(data, "trailing_stop", "trailingStop")
+    if stop_loss is not None and trailing_stop is not None:
+        raise PolyesterValidationError(
+            "attached_risk allows at most one of stop_loss or trailing_stop"
+        )
+    if take_profit is None and stop_loss is None and trailing_stop is None:
+        raise PolyesterValidationError("attached_risk requires take_profit and/or a stop leg")
+
     risk = orders_pb2.RiskPolicy()
-    ParseDict(data, risk, ignore_unknown_fields=True)
+    if _mapping_has(data, "oco"):
+        oco = data.get("oco")
+        if not isinstance(oco, bool):
+            raise PolyesterValidationError("attached_risk.oco must be a boolean")
+        risk.oco = oco
+    if take_profit is not None:
+        tp = _risk_leg_from_dict(take_profit, field_name="take_profit", symbol=symbol)
+        risk.take_profit.CopyFrom(tp)
+    if stop_loss is not None:
+        sl = _risk_leg_from_dict(stop_loss, field_name="stop_loss", symbol=symbol)
+        risk.stop_loss.CopyFrom(
+            orders_pb2.StopLossPolicy(
+                trigger_price_ticks=sl.trigger_price_ticks,
+                child=sl.child,
+            )
+        )
+    if trailing_stop is not None:
+        risk.trailing_stop.CopyFrom(_trailing_stop_from_dict(trailing_stop, symbol=symbol))
     return risk
 
 
@@ -518,7 +837,7 @@ def modify_order_to_proto(
     request_id: str | None = None,
     new_price: object | None = None,
     new_qty: object | None = None,
-    new_attached_risk: dict[str, Any] | None = None,
+    new_attached_risk: dict[str, Any] | AttachedRisk | None = None,
     behavior: str | None = None,
     new_client_order_id: str | None = None,
     quantity_scale: int | None = None,
@@ -553,7 +872,7 @@ def modify_order_to_proto(
         proto.new_client_order_id = required_client_id(
             new_client_order_id, "new_client_order_id"
         )
-    risk = risk_policy_from_dict(new_attached_risk)
+    risk = risk_policy_from_dict(new_attached_risk, symbol=symbol)
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
     return proto

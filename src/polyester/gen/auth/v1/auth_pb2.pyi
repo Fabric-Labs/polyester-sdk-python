@@ -55,6 +55,7 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_REVISION_CONFLICT: _ClassVar[AuthErrorCode]
     AUTH_MFA_ELEVATION_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_MFA_LAST_FACTOR_REQUIRED: _ClassVar[AuthErrorCode]
+    AUTH_INTERNAL_ERROR: _ClassVar[AuthErrorCode]
 AUTH_UNSPECIFIED: AuthErrorCode
 AUTH_USERNAME_INVALID: AuthErrorCode
 AUTH_USERNAME_TAKEN: AuthErrorCode
@@ -94,6 +95,7 @@ AUTH_POLICY_SCOPE_MISMATCH: AuthErrorCode
 AUTH_REVISION_CONFLICT: AuthErrorCode
 AUTH_MFA_ELEVATION_REQUIRED: AuthErrorCode
 AUTH_MFA_LAST_FACTOR_REQUIRED: AuthErrorCode
+AUTH_INTERNAL_ERROR: AuthErrorCode
 
 class GetNonceRequest(_message.Message):
     __slots__ = ("smart_account_address",)

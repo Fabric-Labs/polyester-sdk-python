@@ -31,6 +31,11 @@ class InternalTransferAccount(msgspec.Struct, kw_only=True, omit_defaults=True):
     sub_account_label: str = ""
 
 
+class AddressBookTagInput(msgspec.Struct, kw_only=True, omit_defaults=True):
+    name: str
+    color: str = ""
+
+
 class AddressBookTagSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     tag_id: str = ""
     name: str = ""

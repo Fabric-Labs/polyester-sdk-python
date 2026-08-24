@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+- Address-book writes: `create_entry` / `update_entry` / `delete_entry` and
+  `create_tag` / `update_tag` / `delete_tag`. Entry create and update accept
+  `new_tags` so a tag can be created and attached in the same request.
+  Update is a durable PATCH (`expected_revision` + FieldMask). When `tag_ids`
+  is also selected the resulting set is those ids plus `new_tags`; otherwise
+  `new_tags` are appended.
+- `AUTH_INTERNAL_ERROR` from `auth.v1.AuthErrorDetail`.
+
 ### Changed
 - `orders.create` / `modify` encode attached TP/SL from friendly keys
   (`trigger_price`, `order_type`, `limit_price`) and `AttachedRisk` models onto
@@ -10,6 +19,8 @@
 - `AsyncPolyester.from_env()` / `Polyester.from_env()` read `POLYESTER_API_URL`
   and `POLYESTER_WS_URL`.
 - Re-export `is_batch_replace_settled` from `polyester`.
+- Social verification Twitter handles accept an optional leading `@`. The SDK
+  forwards the handle as supplied; the API strips the prefix.
 
 ## 0.1.0a44
 

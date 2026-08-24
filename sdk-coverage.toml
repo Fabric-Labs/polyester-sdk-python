@@ -67,29 +67,5 @@ procedure = "/auth.v1.SubaccountService/RespondSubaccountInvite"
 reason = "Invite mutations require interactive JWT/session."
 
 [[allowlist]]
-procedure = "/auth.v1.AddressBookService/CreateAddressBookEntry"
-reason = "Address-book mutations require interactive JWT/session."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/UpdateAddressBookEntry"
-reason = "Address-book mutations require interactive JWT/session."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/DeleteAddressBookEntry"
-reason = "Address-book mutations require interactive JWT/session."
-
-[[allowlist]]
 procedure = "/auth.v1.AddressBookService/CopyAddressBookEntry"
-reason = "Address-book mutations require interactive JWT/session."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/CreateAddressBookTag"
-reason = "Address-book mutations require interactive JWT/session."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/UpdateAddressBookTag"
-reason = "Address-book mutations require interactive JWT/session."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/DeleteAddressBookTag"
-reason = "Address-book mutations require interactive JWT/session."
+reason = "Address-book copy remains unwrapped; create/update/delete entry and tag CRUD are wrapped."

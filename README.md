@@ -25,7 +25,7 @@ Requires **Python 3.11+**.
 | Profile (identity subscribe) | Yes |
 | API keys (list/get/subscribe/local keypair generation) | Yes |
 | Subaccounts (list/get/members/invites/activity/subscribe) | Yes |
-| Address book (list/view/subscribe) | Yes |
+| Address book (list/view/create/update/subscribe) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
 | VIP tiers + status | Yes |
@@ -376,6 +376,33 @@ fees = await client.fees.get_spot_fee_rates()
 catalog = await client.rate_limits.get_rate_limit_config()
 limits = await client.rate_limits.get_trading_rate_limits()
 ```
+
+## Address book and social handles
+
+Address-book reads (`list_books`, `list_entries`, `get_view`) and writes
+(`create_entry`, `update_entry`, `delete_entry`, tag CRUD) are wrapped.
+Create and update accept `new_tags` so a tag can be created and attached in
+the same request. Update is a durable PATCH: pass `expected_revision` from a
+prior read and only the fields you set are selected. When `tag_ids` is also
+set, the resulting set is those ids plus `new_tags`; otherwise `new_tags` are
+appended to the current tags.
+
+```python
+entry = await client.address_book.create_entry(
+    label="ops",
+    address="0x…",
+    polychain_chain_id=1,
+    new_tags=[{"name": "hot", "color": "#f00"}],
+)
+entry = await client.address_book.update_entry(
+    address_book_entry_id=entry.address_book_entry_id,
+    expected_revision=entry.revision,
+    new_tags=[{"name": "vip"}],
+)
+```
+
+`social_verification.start(..., handle="@alice")` accepts an optional leading
+`@` on Twitter handles. The SDK forwards the handle as supplied.
 
 ## Triggers
 

@@ -452,14 +452,16 @@ class CreateAddressBookEntryResponse(_message.Message):
     def __init__(self, entry: _Optional[_Union[AddressBookEntry, _Mapping]] = ...) -> None: ...
 
 class AddressBookEntryUpdateSpec(_message.Message):
-    __slots__ = ("label", "note", "tag_ids")
+    __slots__ = ("label", "note", "tag_ids", "new_tags")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     NOTE_FIELD_NUMBER: _ClassVar[int]
     TAG_IDS_FIELD_NUMBER: _ClassVar[int]
+    NEW_TAGS_FIELD_NUMBER: _ClassVar[int]
     label: str
     note: str
     tag_ids: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+    new_tags: _containers.RepeatedCompositeFieldContainer[AddressBookTagInput]
+    def __init__(self, label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., new_tags: _Optional[_Iterable[_Union[AddressBookTagInput, _Mapping]]] = ...) -> None: ...
 
 class UpdateAddressBookEntryRequest(_message.Message):
     __slots__ = ("address_book_entry_id", "entry", "update_mask", "expected_revision")

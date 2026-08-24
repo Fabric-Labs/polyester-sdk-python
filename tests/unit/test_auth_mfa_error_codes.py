@@ -5,6 +5,7 @@ from connectrpc.errors import ConnectError
 
 from polyester._wire import map_connect_error
 from polyester.errors import (
+    AUTH_INTERNAL_ERROR,
     AUTH_MFA_ELEVATION_REQUIRED,
     AUTH_MFA_LAST_FACTOR_REQUIRED,
     AUTH_MFA_NOT_ENROLLED,
@@ -51,6 +52,12 @@ def test_map_connect_error_surfaces_stable_mfa_codes() -> None:
             if other_code == want:
                 continue
             assert not other_predicate(mapped)
+
+
+def test_map_connect_error_surfaces_auth_internal_error() -> None:
+    mapped = _map(auth_pb2.AUTH_INTERNAL_ERROR, "internal")
+    assert mapped.code == AUTH_INTERNAL_ERROR
+    assert auth_error_code(mapped) == AUTH_INTERNAL_ERROR
 
 
 def test_mfa_predicates_ignore_message_text_and_removed_api_key_code() -> None:

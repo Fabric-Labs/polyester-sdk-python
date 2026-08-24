@@ -39,10 +39,12 @@ def jwt_session_only(exc: BaseException) -> bool:
         or "interactive session" in message
         or "permission denied" in message
         or "permission_denied" in message
+        or "unauthorized" in message
+        or "unauthenticated" in message
         or "api keys cannot" in message
     )
     if isinstance(exc, PolyesterAuthError):
-        return sessionish
+        return sessionish or exc.status_code == 401
     if isinstance(exc, PolyesterApiError):
         code = str(getattr(exc, "code", "") or "").lower()
         return sessionish or code in {"unauthenticated", "permission_denied"}

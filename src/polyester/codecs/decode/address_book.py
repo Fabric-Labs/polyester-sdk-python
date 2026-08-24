@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import address_book_pb2
 from polyester.models.address_book import (
     AccountScope,
@@ -421,3 +422,31 @@ def address_book_view_from_proto(
         withdraw_whitelist=withdraw,
         recent_destinations_truncated=bool(msg.recent_destinations_truncated),
     )
+
+
+def entry_from_create_proto(
+    msg: address_book_pb2.CreateAddressBookEntryResponse,
+) -> AddressBookEntry:
+    if not msg.HasField("entry"):
+        raise PolyesterResponseContractError("CreateAddressBookEntry", "missing entry")
+    return address_book_entry_from_proto(msg.entry)
+
+
+def entry_from_update_proto(
+    msg: address_book_pb2.UpdateAddressBookEntryResponse,
+) -> AddressBookEntry:
+    if not msg.HasField("entry"):
+        raise PolyesterResponseContractError("UpdateAddressBookEntry", "missing entry")
+    return address_book_entry_from_proto(msg.entry)
+
+
+def tag_from_create_proto(msg: address_book_pb2.CreateAddressBookTagResponse) -> AddressBookTag:
+    if not msg.HasField("tag"):
+        raise PolyesterResponseContractError("CreateAddressBookTag", "missing tag")
+    return address_book_tag_from_proto(msg.tag)
+
+
+def tag_from_update_proto(msg: address_book_pb2.UpdateAddressBookTagResponse) -> AddressBookTag:
+    if not msg.HasField("tag"):
+        raise PolyesterResponseContractError("UpdateAddressBookTag", "missing tag")
+    return address_book_tag_from_proto(msg.tag)

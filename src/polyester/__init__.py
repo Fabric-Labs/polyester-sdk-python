@@ -7,6 +7,7 @@ from polyester.codecs.withdraw import (
     new_trading_withdraw_nonce,
 )
 from polyester.errors import (
+    AUTH_INTERNAL_ERROR,
     AUTH_MFA_ELEVATION_REQUIRED,
     AUTH_MFA_LAST_FACTOR_REQUIRED,
     AUTH_MFA_NOT_ENROLLED,
@@ -37,6 +38,7 @@ from polyester.services.withdraw import PreparedTradingWithdraw
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
 __all__ = [
+    "AUTH_INTERNAL_ERROR",
     "AUTH_MFA_ELEVATION_REQUIRED",
     "AUTH_MFA_LAST_FACTOR_REQUIRED",
     "AUTH_MFA_NOT_ENROLLED",

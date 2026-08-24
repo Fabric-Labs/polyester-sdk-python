@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a45
+
+Git tag: `v0.1.0a45`.
+
 ### Added
 - Address-book writes: `create_entry` / `update_entry` / `delete_entry` and
   `create_tag` / `update_tag` / `delete_tag`. Entry create and update accept

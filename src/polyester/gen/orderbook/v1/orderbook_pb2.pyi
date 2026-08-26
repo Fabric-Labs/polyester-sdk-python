@@ -38,12 +38,12 @@ DEPTH_500: Depth
 DEPTH_1000: Depth
 
 class GetOrderBookRequest(_message.Message):
-    __slots__ = ("symbol", "depth")
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("symbol_id", "depth")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
-    symbol: str
+    symbol_id: int
     depth: Depth
-    def __init__(self, symbol: _Optional[str] = ..., depth: _Optional[_Union[Depth, str]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., depth: _Optional[_Union[Depth, str]] = ...) -> None: ...
 
 class PriceLevel(_message.Message):
     __slots__ = ("price_ticks", "qty_scaled")

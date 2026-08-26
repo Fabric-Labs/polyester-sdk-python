@@ -76,9 +76,8 @@ class Sparkline(_message.Message):
     def __init__(self, interval: _Optional[_Union[SparklineInterval, str]] = ..., close_ticks: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class MarketOverview(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks")
+    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
     LAST_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     LAST_TRADE_TS_NS_FIELD_NUMBER: _ClassVar[int]
     CHANGE_24H_BPS_FIELD_NUMBER: _ClassVar[int]
@@ -94,7 +93,6 @@ class MarketOverview(_message.Message):
     SPARKLINES_FIELD_NUMBER: _ClassVar[int]
     INDEX_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
-    symbol: str
     last_price_ticks: int
     last_trade_ts_ns: int
     change_24h_bps: int
@@ -109,25 +107,25 @@ class MarketOverview(_message.Message):
     best_ask_qty_scaled: int
     sparklines: _containers.RepeatedCompositeFieldContainer[Sparkline]
     index_price_ticks: int
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ...) -> None: ...
 
 class ListMarketOverviewRequest(_message.Message):
-    __slots__ = ("symbols", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals")
-    SYMBOLS_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("symbol_id", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     ORDER_BY_FIELD_NUMBER: _ClassVar[int]
     SORT_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_SPARKLINES_FIELD_NUMBER: _ClassVar[int]
     SPARKLINE_INTERVALS_FIELD_NUMBER: _ClassVar[int]
-    symbols: _containers.RepeatedScalarFieldContainer[str]
+    symbol_id: _containers.RepeatedScalarFieldContainer[int]
     limit: int
     page_token: str
     order_by: MarketOrderBy
     sort: SortDirection
     include_sparklines: bool
     sparkline_intervals: _containers.RepeatedScalarFieldContainer[SparklineInterval]
-    def __init__(self, symbols: _Optional[_Iterable[str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[MarketOrderBy, str]] = ..., sort: _Optional[_Union[SortDirection, str]] = ..., include_sparklines: _Optional[bool] = ..., sparkline_intervals: _Optional[_Iterable[_Union[SparklineInterval, str]]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[_Iterable[int]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[MarketOrderBy, str]] = ..., sort: _Optional[_Union[SortDirection, str]] = ..., include_sparklines: _Optional[bool] = ..., sparkline_intervals: _Optional[_Iterable[_Union[SparklineInterval, str]]] = ...) -> None: ...
 
 class ListMarketOverviewResponse(_message.Message):
     __slots__ = ("markets", "next_page_token")

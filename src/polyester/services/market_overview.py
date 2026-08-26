@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import builtins
 import contextlib
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
+from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.market_overview import market_overview_list_from_proto
 from polyester.codecs.realtime_decode import decode_market_overview_batch_bytes
 from polyester.gen.marketoverview.v1.marketoverview_connect import MarketOverviewServiceClient
@@ -16,7 +17,7 @@ from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubsc
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import require_realtime, subscribe_public_proto
-from polyester.services._symbols import normalize_raw_symbol_filters
+from polyester.services._symbols import resolve_symbol_ids
 from polyester.services._validation import validate_limit
 
 
@@ -25,10 +26,18 @@ class AsyncMarketOverviewService(BaseService):
         self,
         transport,
         *,
+        catalogs: CatalogManager | None = None,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         super().__init__(transport)
+        self._catalogs = catalogs or CatalogManager()
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
+
+    async def _ensure_catalogs(self) -> None:
+        if self._wait_for_catalogs is not None:
+            await self._wait_for_catalogs()
 
     async def list(
         self,
@@ -39,22 +48,24 @@ class AsyncMarketOverviewService(BaseService):
         include_sparklines: bool = False,
     ) -> MarketOverviewList:
         validated_limit = validate_limit(limit)
-        resolved_symbols = normalize_raw_symbol_filters(
-            symbols, label="market_overview.list symbols"
-        )
+        if symbols:
+            await self._ensure_catalogs()
         request = ListMarketOverviewRequest(
             limit=validated_limit,
             page_token=page_token,
             include_sparklines=include_sparklines,
         )
-        if resolved_symbols:
-            request.symbols.extend(resolved_symbols)
+        resolved_ids = resolve_symbol_ids(
+            self._catalogs, symbols, label="market_overview.list symbols"
+        )
+        if resolved_ids:
+            request.symbol_id.extend(resolved_ids)
         return await unary_public_decoded(
             self._transport,
             MarketOverviewServiceClient,
             lambda client, req: client.list_market_overview(req),
             request,
-            market_overview_list_from_proto,
+            lambda msg: market_overview_list_from_proto(msg, self._catalogs),
         )
 
     async def subscribe(self) -> AsyncSubscription[MarketOverviewList]:
@@ -62,7 +73,7 @@ class AsyncMarketOverviewService(BaseService):
         return await subscribe_public_proto(
             self._realtime,
             channel="public:spot:market_overview:updates:proto",
-            decode=decode_market_overview_batch_bytes,
+            decode=lambda payload: decode_market_overview_batch_bytes(payload, self._catalogs),
         )
 
     async def create_subscription(
@@ -132,7 +143,7 @@ class AsyncMarketOverviewService(BaseService):
         stream = AsyncSnapshotThenStreamSubscription(
             realtime=realtime,
             channel=channel,
-            decode=decode_market_overview_batch_bytes,
+            decode=lambda payload: decode_market_overview_batch_bytes(payload, self._catalogs),
             fetch_snapshot=fetch_snapshot,
             read_publication=lambda batch: batch.markets,
             apply_snapshot=apply_snapshot,

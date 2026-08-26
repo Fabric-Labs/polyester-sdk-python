@@ -70,6 +70,7 @@ def test_symbol_mismatch_on_reuse() -> None:
 def test_create_order_accepts_decimal_and_scaled() -> None:
     req = normalize_create_order_request(
         symbol="BTC-USD",
+        symbol_id=1,
         side="buy",
         order_type="limit",
         qty=Decimal("0.1"),
@@ -81,6 +82,7 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
 
     req2 = normalize_create_order_request(
         symbol="BTC-USD",
+        symbol_id=1,
         side="buy",
         order_type="limit",
         qty=Quantity.from_scaled(10_000_000, scale=8, symbol="BTC-USD"),
@@ -94,6 +96,7 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
 def test_create_order_supports_quote_budget_sizing() -> None:
     req = normalize_create_order_request(
         symbol="BTC-USD",
+        symbol_id=1,
         side="buy",
         order_type="market",
         max_quote_debit=Decimal("12.34"),
@@ -111,6 +114,7 @@ def test_create_order_supports_quote_budget_sizing() -> None:
     quote = Quantity.from_quote_decimal_str("12.34", 2, symbol="BTC-USD")
     req2 = normalize_create_order_request(
         symbol="BTC-USD",
+        symbol_id=1,
         side="buy",
         order_type="market",
         max_quote_debit=quote,
@@ -122,6 +126,7 @@ def test_create_order_supports_quote_budget_sizing() -> None:
 def test_preview_order_wraps_order_intent() -> None:
     req = normalize_create_order_request(
         symbol="BTC-USD",
+        symbol_id=1,
         side="buy",
         order_type="market",
         max_quote_debit=Decimal("12.34"),
@@ -131,7 +136,7 @@ def test_preview_order_wraps_order_intent() -> None:
     preview = preview_order_to_proto(req, quote_quantity_scale=2)
     assert preview.subaccount_id == 99
     assert preview.HasField("order")
-    assert preview.order.symbol == "BTC-USD"
+    assert preview.order.symbol_id == 1
     assert preview.order.side == orders_pb2.BUY
     assert preview.order.WhichOneof("sizing") == "max_quote_debit_scaled"
     assert preview.order.max_quote_debit_scaled == 1234

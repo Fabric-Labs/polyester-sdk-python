@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Breaking
+- Connect market, order, trigger, fee, policy, and orderbook payloads are
+  `symbol_id`-only. `GetSpotConfig` is the remaining message that still
+  returns both `symbol` and `symbol_id`. Public methods still accept display
+  `symbol` and resolve it through the hydrated catalog.
+- Market overview, trigger list, cancel-all, and cancel-all-after no longer
+  forward raw symbol strings. Unknown symbols fail closed.
+- Trigger `modify` / `resume` require `symbol` or `symbol_id` so the Connect
+  request can carry the required market identifier.
+- Policy models dropped perpetual rules and unenforced money-movement fields.
+  `READ_TRANSFER_DESTINATIONS` is now `READ_ADDRESS_BOOK`.
+- Removed `PerpMarketRule`.
+
 ## 0.1.0a45
 
 Git tag: `v0.1.0a45`.

@@ -33,6 +33,7 @@ from polyester.services.orders import is_batch_replace_settled
 def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     dict_item = {
         "symbol": "BTC-USD",
+        "symbol_id": 1,
         "side": "buy",
         "order_type": "limit",
         "tif": "gtc",
@@ -42,6 +43,7 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     }
     struct_item = normalize_create_order_request(
         symbol="ETH-USD",
+        symbol_id=2,
         side="sell",
         order_type="market",
         qty="1",
@@ -59,13 +61,13 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     assert "allow_partial" not in {f.name for f in proto.DESCRIPTOR.fields}
     assert proto.subaccount_id == id_to_int("123")
     assert len(proto.items) == 2
-    assert proto.items[0].symbol == "BTC-USD"
+    assert proto.items[0].symbol_id == 1
     assert proto.items[0].side == orders_pb2.BUY
     assert proto.items[0].client_order_id == "cid-1"
     assert proto.items[0].base_qty_scaled == 10_000_000
     assert proto.items[0].WhichOneof("execution") == "limit_gtc"
     assert proto.items[0].limit_gtc.price_ticks == 50_000_000_000
-    assert proto.items[1].symbol == "ETH-USD"
+    assert proto.items[1].symbol_id == 2
     assert proto.items[1].side == orders_pb2.SELL
     assert proto.items[1].WhichOneof("execution") == "market_ioc"
 
@@ -73,6 +75,7 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
 def test_batch_create_orders_to_proto_from_create_order_request() -> None:
     item = CreateOrderRequest(
         symbol="BTC-USD",
+        symbol_id=1,
         side="buy",
         order_type="limit",
         qty="0.5",
@@ -99,6 +102,7 @@ def test_batch_size_guard_rejects_more_than_twenty() -> None:
 
     item = {
         "symbol": "BTC-USD",
+        "symbol_id": 1,
         "side": "buy",
         "order_type": "limit",
         "qty": "0.1",
@@ -155,14 +159,14 @@ def test_cancel_all_after_to_proto() -> None:
     proto = cancel_all_after_to_proto(
         sub_account_id="7",
         timeout_sec=60,
-        symbol="BTC-USD",
+        symbol_id=1,
         side="sell",
         request_id="req-deadman-1",
     )
     assert proto.request_id == "req-deadman-1"
     assert proto.subaccount_id == id_to_int("7")
     assert proto.timeout_sec == 60
-    assert proto.symbol == "BTC-USD"
+    assert proto.symbol_id == 1
     assert proto.side == orders_pb2.SELL
 
 

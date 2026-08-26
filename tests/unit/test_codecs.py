@@ -41,6 +41,7 @@ def test_price_rejects_trailing_dot_and_accepts_trimmed_whitespace() -> None:
 def test_create_order_rejects_stray_price_on_market() -> None:
     req = normalize_create_order_request(
         symbol="BTC-USDT",
+        symbol_id=1,
         side="buy",
         order_type="market",
         qty="0.01",
@@ -71,6 +72,7 @@ def test_modify_order_to_proto_requires_order_key() -> None:
         modify_order_to_proto(symbol="BTC-USD", new_price="100")
     proto = modify_order_to_proto(
         symbol="BTC-USD",
+        symbol_id=1,
         key=ClientOrderId("cid-1"),
         new_price="100",
     )
@@ -84,14 +86,14 @@ def test_ledger_range_codecs() -> None:
 
 
 def test_modify_trigger_to_proto() -> None:
-    proto = modify_trigger_to_proto(trigger_id="1", trigger_price="100")
+    proto = modify_trigger_to_proto(trigger_id="1", symbol_id=1, trigger_price="100")
     assert proto.trigger_price_ticks == 100_000_000
 
 
 def test_cancel_all_orders_to_proto() -> None:
-    proto = cancel_all_orders_to_proto(symbol="BNB-USDT", dry_run=True)
+    proto = cancel_all_orders_to_proto(symbol_id=3, dry_run=True)
     assert proto.dry_run is True
-    assert proto.symbol == "BNB-USDT"
+    assert proto.symbol_id == 3
 
 
 def test_create_order_to_wire_maps_public_strings() -> None:

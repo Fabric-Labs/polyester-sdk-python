@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
+from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.balances import asset_balance_from_proto
 from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
@@ -114,11 +115,13 @@ def decode_flow_detail_bytes(payload: bytes) -> LifecycleFlowSummary:
     return flow_detail_from_proto(_parse_proto(payload, FlowDetailView))
 
 
-def decode_market_overview_batch_bytes(payload: bytes) -> MarketOverviewList:
+def decode_market_overview_batch_bytes(
+    payload: bytes, catalogs: CatalogManager | None = None
+) -> MarketOverviewList:
     from polyester.gen.marketoverview.v1.marketoverview_pb2 import MarketOverviewBatch
 
     batch = _parse_proto(payload, MarketOverviewBatch)
-    markets = [market_overview_entry_from_proto(item) for item in batch.markets]
+    markets = [market_overview_entry_from_proto(item, catalogs) for item in batch.markets]
     return MarketOverviewList(markets=markets, total=len(markets))
 
 

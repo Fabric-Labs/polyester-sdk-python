@@ -77,52 +77,35 @@ def test_unknown_symbol_id_resolution_still_fails_locally() -> None:
 
 
 @pytest.mark.asyncio
-async def test_market_overview_forwards_unknown_raw_symbols() -> None:
+async def test_market_overview_resolves_known_symbols_and_rejects_unknown() -> None:
     capture = CaptureUnary(marketoverview_pb2.ListMarketOverviewResponse())
-    service = AsyncMarketOverviewService(MagicMock())
+    service = AsyncMarketOverviewService(MagicMock(), catalogs=_catalogs())
     with patch("polyester.services.market_overview.unary_public_decoded", capture):
-        await service.list(symbols=["NOPE-USDT", "  BTC-USDT  ", ""], limit=5)
-    assert list(capture.request.symbols) == ["NOPE-USDT", "BTC-USDT"]
+        await service.list(symbols=["  BTC-USDT  ", ""], limit=5)
+    assert list(capture.request.symbol_id) == [1]
+    with pytest.raises(PolyesterValidationError, match="Unknown symbol"):
+        await service.list(symbols=["NOPE-USDT"])
 
 
 @pytest.mark.asyncio
-async def test_trigger_list_forwards_unknown_raw_symbol() -> None:
-    capture = CaptureUnary(triggers_pb2.ListTriggersResponse())
+async def test_trigger_list_rejects_unknown_raw_symbol() -> None:
     service = AsyncTriggersService(MagicMock(), _catalogs(), None)
-    with patch("polyester.services.triggers.unary_auth_decoded", capture):
+    with pytest.raises(PolyesterValidationError, match="Unknown symbol"):
         await service.list(symbol="NOPE-USDT")
-    assert capture.request.symbol == "NOPE-USDT"
 
 
 @pytest.mark.asyncio
-async def test_cancel_all_forwards_unknown_raw_symbol() -> None:
-    capture = CaptureUnary(
-        orders_pb2.CancelAllOrdersResponse(
-            status="dry_run",
-            matched_orders=0,
-            submitted_cancels=0,
-            failed_cancels=0,
-        )
-    )
+async def test_cancel_all_rejects_unknown_raw_symbol() -> None:
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
-    with patch("polyester.services.orders.unary_auth_decoded", capture):
+    with pytest.raises(PolyesterValidationError, match="Unknown symbol"):
         await service.cancel_all(symbol="NOPE-USDT", dry_run=True)
-    assert capture.request.symbol == "NOPE-USDT"
 
 
 @pytest.mark.asyncio
-async def test_cancel_all_after_forwards_unknown_raw_symbol() -> None:
-    capture = CaptureUnary(
-        orders_pb2.CancelAllAfterResponse(
-            status="armed",
-            effective_timeout_sec=30,
-            expires_at_ts_ns=0,
-        )
-    )
+async def test_cancel_all_after_rejects_unknown_raw_symbol() -> None:
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
-    with patch("polyester.services.orders.unary_auth_decoded", capture):
+    with pytest.raises(PolyesterValidationError, match="Unknown symbol"):
         await service.cancel_all_after(timeout_sec=30, symbol="NOPE-USDT")
-    assert capture.request.symbol == "NOPE-USDT"
 
 
 @pytest.mark.asyncio
@@ -140,7 +123,7 @@ async def test_create_order_does_not_preflight_pair_constraints() -> None:
             price="1.001",  # off tick_size 0.01
         )
     assert capture.calls == 1
-    assert capture.request.order.symbol == "BTC-USDT"
+    assert capture.request.order.symbol_id == 1
     assert capture.request.order.limit_gtc.price_ticks == 1_001_000
 
 

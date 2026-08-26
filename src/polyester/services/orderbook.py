@@ -49,9 +49,15 @@ class AsyncOrderbookService(BaseService):
 
     async def get(self, *, symbol: str, depth: int = 50) -> OrderbookData:
         from polyester.gen.orderbook.v1 import orderbook_pb2
+        from polyester.services._symbols import resolve_symbol_id
 
         depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(depth))
-        request = GetOrderBookRequest(symbol=symbol, depth=depth_enum)
+        request = GetOrderBookRequest(
+            symbol_id=resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="orderbook.get"
+            ),
+            depth=depth_enum,
+        )
         return await unary_public_decoded(
             self._transport,
             OrderbookServiceClient,
@@ -158,7 +164,7 @@ class AsyncOrderbookService(BaseService):
             from polyester.gen.orderbook.v1 import orderbook_pb2
 
             depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(ws_depth))
-            request = GetOrderBookRequest(symbol=symbol, depth=depth_enum)
+            request = GetOrderBookRequest(symbol_id=resolved_symbol_id, depth=depth_enum)
             return await unary_public_decoded(
                 self._transport,
                 OrderbookServiceClient,

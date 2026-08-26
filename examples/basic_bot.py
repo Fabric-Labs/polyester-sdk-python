@@ -14,7 +14,10 @@ async def main() -> None:
     ) as client:
         overview = await client.market_overview.list(limit=3)
         for row in overview.markets:
-            print(row.symbol, row.last_price.ticks if row.last_price else None)
+            print(
+                row.symbol or row.symbol_id,
+                row.last_price.ticks if row.last_price else None,
+            )
 
         open_orders = await client.orders.list_open()
         print(f"Open orders: {len(open_orders.orders)}")

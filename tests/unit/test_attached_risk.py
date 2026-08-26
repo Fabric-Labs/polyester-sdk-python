@@ -204,6 +204,7 @@ def test_create_intent_maps_friendly_attached_risk() -> None:
     intent = order_intent_from_request(
         CreateOrderRequest(
             symbol="BTC-USDT",
+            symbol_id=1,
             side="buy",
             order_type="limit",
             tif="gtc",
@@ -231,6 +232,7 @@ def test_create_intent_maps_friendly_attached_risk() -> None:
 def test_modify_encodes_new_attached_risk() -> None:
     proto = modify_order_to_proto(
         symbol="BTC-USDT",
+        symbol_id=1,
         key=ClientOrderId("cid-1"),
         new_attached_risk={
             "take_profit": {"trigger_price": "140", "order_type": "market"},

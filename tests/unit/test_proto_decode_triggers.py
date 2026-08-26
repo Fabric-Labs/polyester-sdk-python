@@ -17,7 +17,6 @@ def test_trigger_from_proto_maps_stop_price() -> None:
     msg = triggers_pb2.Trigger(
         trigger_id=7,
         symbol_id=2,
-        symbol="BTC-USD",
         status=triggers_pb2.STATUS_ARMED,
         qty_scaled=1_000_000,
         # Configuration oneof drives the thick type/side/execution projection.
@@ -49,7 +48,6 @@ def test_trigger_from_proto_attached_trailing_surfaces_side_and_parent() -> None
     msg = triggers_pb2.Trigger(
         trigger_id=42,
         symbol_id=2,
-        symbol="BTC-USD",
         status=triggers_pb2.STATUS_ARMED,
         parent_order_id=99,
         qty_scaled=1_000_000,
@@ -72,7 +70,6 @@ def test_trigger_from_proto_projects_twap_executed_qty() -> None:
     msg = triggers_pb2.Trigger(
         trigger_id=11,
         symbol_id=1,
-        symbol="BTC-USDT",
         status=triggers_pb2.STATUS_RUNNING,
         qty_scaled=100_000_000,
         twap=triggers_pb2.TwapTrigger(

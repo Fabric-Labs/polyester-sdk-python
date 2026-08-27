@@ -150,7 +150,6 @@ def test_market_overview_list_from_proto() -> None:
         markets=[
             marketoverview_pb2.MarketOverview(
                 symbol_id=1,
-                symbol="BTC-USD",
                 last_price_ticks=50_000,
                 index_price_ticks=49_500,
                 change_24h_bps=-100,
@@ -160,7 +159,8 @@ def test_market_overview_list_from_proto() -> None:
     )
     result = market_overview_list_from_proto(msg)
     assert len(result.markets) == 1
-    assert result.markets[0].symbol == "BTC-USD"
+    assert result.markets[0].symbol_id == 1
+    assert result.markets[0].symbol == ""
     assert result.markets[0].index_price is not None
     assert result.markets[0].index_price.ticks == 49_500
 

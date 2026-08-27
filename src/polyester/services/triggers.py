@@ -39,7 +39,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import normalize_raw_symbol_filter
+from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
 
 
@@ -89,9 +89,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        resolved_symbol = normalize_raw_symbol_filter(symbol, label="triggers.list symbol")
-        if resolved_symbol:
-            request.symbol = resolved_symbol
+        if symbol:
+            await self._ensure_catalogs()
+            request.symbol_id = resolve_optional_symbol_id(
+                self._catalogs, symbol=symbol, label="triggers.list symbol"
+            ) or 0
         if status is not None:
             labels = [status] if isinstance(status, str) else list(status)
             request.status.extend(trigger_status_from_label(label) for label in labels)
@@ -158,6 +160,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)
         request = create_trigger_to_proto(
             symbol=symbol,
+            symbol_id=resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
+            ),
             trigger_type=trigger_type,
             trigger_price=trigger_price,
             side=side,
@@ -218,6 +223,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         trigger_id: str | int,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
         sub_account_id: str | None = None,
         trigger_price: str | None = None,
         limit_price: str | None = None,
@@ -227,8 +234,12 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         max_slippage_ticks: int | None = None,
         max_slippage_bps: int | None = None,
     ) -> TriggerMutationResult:
+        await self._ensure_catalogs()
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
+            symbol_id=resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
+            ),
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             trigger_price=trigger_price,
             limit_price=limit_price,
@@ -272,9 +283,17 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         trigger_id: str | int,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
         sub_account_id: str | None = None,
     ) -> TriggerMutationResult:
-        request = ResumeTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
+        await self._ensure_catalogs()
+        request = ResumeTriggerRequest(
+            trigger_id=id_to_int(trigger_id, "trigger_id"),
+            symbol_id=resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=symbol_id, label="triggers.resume"
+            ),
+        )
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

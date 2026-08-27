@@ -82,6 +82,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_MIN_QTY: _ClassVar[ErrorCode]
     ERROR_CODE_POST_ONLY_LIMIT_ONLY: _ClassVar[ErrorCode]
     ERROR_CODE_BATCH_TOO_LARGE: _ClassVar[ErrorCode]
+    ERROR_CODE_POLICY_MAX_OPEN_ORDERS: _ClassVar[ErrorCode]
     ERROR_CODE_MODIFICATION_REQUIRES_REPLACE: _ClassVar[ErrorCode]
     ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE: _ClassVar[ErrorCode]
     ERROR_CODE_MARKET_PRICE_UNAVAILABLE: _ClassVar[ErrorCode]
@@ -114,6 +115,9 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_OVERLOADED: _ClassVar[ErrorCode]
     ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL: _ClassVar[ErrorCode]
     ERROR_CODE_RATE_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN: _ClassVar[ErrorCode]
+    ERROR_CODE_POLICY_SPOT_READ_DENY: _ClassVar[ErrorCode]
+    ERROR_CODE_API_KEY_SPOT_READ_DENY: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -204,6 +208,7 @@ ERROR_CODE_PRICE_TICK_SIZE: ErrorCode
 ERROR_CODE_MIN_QTY: ErrorCode
 ERROR_CODE_POST_ONLY_LIMIT_ONLY: ErrorCode
 ERROR_CODE_BATCH_TOO_LARGE: ErrorCode
+ERROR_CODE_POLICY_MAX_OPEN_ORDERS: ErrorCode
 ERROR_CODE_MODIFICATION_REQUIRES_REPLACE: ErrorCode
 ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE: ErrorCode
 ERROR_CODE_MARKET_PRICE_UNAVAILABLE: ErrorCode
@@ -236,6 +241,9 @@ ERROR_CODE_VALIDATION_ERROR: ErrorCode
 ERROR_CODE_OVERLOADED: ErrorCode
 ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL: ErrorCode
 ERROR_CODE_RATE_LIMIT_EXCEEDED: ErrorCode
+ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN: ErrorCode
+ERROR_CODE_POLICY_SPOT_READ_DENY: ErrorCode
+ERROR_CODE_API_KEY_SPOT_READ_DENY: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -289,8 +297,8 @@ class LimitFok(_message.Message):
     def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
 
 class OrderIntent(_message.Message):
-    __slots__ = ("symbol", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "client_order_id", "fee_asset", "self_trade_prevention_mode", "attached_risk")
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("symbol_id", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "client_order_id", "fee_asset", "self_trade_prevention_mode", "attached_risk")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -302,7 +310,7 @@ class OrderIntent(_message.Message):
     FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
     SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
     ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
-    symbol: str
+    symbol_id: int
     side: Side
     base_qty_scaled: int
     max_quote_debit_scaled: int
@@ -314,7 +322,7 @@ class OrderIntent(_message.Message):
     fee_asset: FeeAsset
     self_trade_prevention_mode: SelfTradePreventionMode
     attached_risk: RiskPolicy
-    def __init__(self, symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
 
 class CreateOrderRequest(_message.Message):
     __slots__ = ("subaccount_id", "order")
@@ -473,18 +481,18 @@ class RiskPolicy(_message.Message):
     def __init__(self, take_profit: _Optional[_Union[TakeProfitPolicy, _Mapping]] = ..., stop_loss: _Optional[_Union[StopLossPolicy, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopPolicy, _Mapping]] = ..., oco: _Optional[bool] = ...) -> None: ...
 
 class CancelAllOrdersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol", "side", "dry_run", "request_id")
+    __slots__ = ("subaccount_id", "symbol_id", "side", "dry_run", "request_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     DRY_RUN_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
-    symbol: str
+    symbol_id: int
     side: Side
     dry_run: bool
     request_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ...) -> None: ...
 
 class CancelAllOrdersResponse(_message.Message):
     __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns")
@@ -503,18 +511,18 @@ class CancelAllOrdersResponse(_message.Message):
     def __init__(self, status: _Optional[str] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class CancelAllAfterRequest(_message.Message):
-    __slots__ = ("subaccount_id", "timeout_sec", "symbol", "side", "request_id")
+    __slots__ = ("subaccount_id", "timeout_sec", "symbol_id", "side", "request_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEOUT_SEC_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     timeout_sec: int
-    symbol: str
+    symbol_id: int
     side: Side
     request_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., timeout_sec: _Optional[int] = ..., symbol: _Optional[str] = ..., side: _Optional[_Union[Side, str]] = ..., request_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., timeout_sec: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., request_id: _Optional[str] = ...) -> None: ...
 
 class CancelAllAfterResponse(_message.Message):
     __slots__ = ("status", "effective_timeout_sec", "expires_at_ts_ns", "ts", "ts_ns")
@@ -587,7 +595,7 @@ class BatchCreateOrdersResponse(_message.Message):
     def __init__(self, results: _Optional[_Iterable[_Union[BatchCreateResultItem, _Mapping]]] = ..., accepted_count: _Optional[int] = ..., rejected_count: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class ModifyOrderRequest(_message.Message):
-    __slots__ = ("subaccount_id", "order_id", "client_order_id", "request_id", "new_price_ticks", "new_qty_scaled", "new_attached_risk", "behavior", "new_client_order_id")
+    __slots__ = ("subaccount_id", "order_id", "client_order_id", "request_id", "new_price_ticks", "new_qty_scaled", "new_attached_risk", "behavior", "new_client_order_id", "symbol_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -597,6 +605,7 @@ class ModifyOrderRequest(_message.Message):
     NEW_ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
     BEHAVIOR_FIELD_NUMBER: _ClassVar[int]
     NEW_CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     order_id: int
     client_order_id: str
@@ -606,7 +615,8 @@ class ModifyOrderRequest(_message.Message):
     new_attached_risk: RiskPolicy
     behavior: ModifyBehavior
     new_client_order_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., request_id: _Optional[str] = ..., new_price_ticks: _Optional[int] = ..., new_qty_scaled: _Optional[int] = ..., new_attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ..., behavior: _Optional[_Union[ModifyBehavior, str]] = ..., new_client_order_id: _Optional[str] = ...) -> None: ...
+    symbol_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., request_id: _Optional[str] = ..., new_price_ticks: _Optional[int] = ..., new_qty_scaled: _Optional[int] = ..., new_attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ..., behavior: _Optional[_Union[ModifyBehavior, str]] = ..., new_client_order_id: _Optional[str] = ..., symbol_id: _Optional[int] = ...) -> None: ...
 
 class ModifyOrderResponse(_message.Message):
     __slots__ = ("action_taken", "old_order_id", "final_order_id", "code", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id", "ts", "ts_ns")

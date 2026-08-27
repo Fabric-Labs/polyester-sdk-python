@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.fees import spot_fee_rates_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.gen.fees.v1.fees_connect import FeeServiceClient
@@ -13,9 +14,15 @@ from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
 
 class AsyncFeeService(ScopedSubAccountMixin, BaseService):
-    def __init__(self, transport, default_sub_account_id: str | None) -> None:
+    def __init__(
+        self,
+        transport,
+        default_sub_account_id: str | None,
+        catalogs: CatalogManager | None = None,
+    ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
+        self._catalogs = catalogs or CatalogManager()
 
     async def get_spot_fee_rates(
         self,
@@ -38,5 +45,5 @@ class AsyncFeeService(ScopedSubAccountMixin, BaseService):
             FeeServiceClient,
             lambda client, req: client.get_spot_fee_rates(req),
             request,
-            spot_fee_rates_list_from_proto,
+            lambda msg: spot_fee_rates_list_from_proto(msg, self._catalogs),
         )

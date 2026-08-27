@@ -5,6 +5,8 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import msgspec
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
@@ -69,7 +71,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import normalize_raw_symbol_filter, resolve_symbol_id
+from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
 
 
@@ -253,6 +255,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit
         )
+        normalized = msgspec.structs.replace(
+            normalized,
+            symbol_id=resolve_symbol_id(
+                self._catalogs,
+                symbol=normalized.symbol,
+                symbol_id=normalized.symbol_id,
+                label="orders.create",
+            ),
+        )
         proto_request = create_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -310,11 +321,16 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit
         )
-        symbol_id = (
-            self._catalogs.symbol_id_for_symbol(normalized.symbol)
-            if normalized.symbol
-            else normalized.symbol_id
+        normalized = msgspec.structs.replace(
+            normalized,
+            symbol_id=resolve_symbol_id(
+                self._catalogs,
+                symbol=normalized.symbol,
+                symbol_id=normalized.symbol_id,
+                label="orders.preview",
+            ),
         )
+        symbol_id = normalized.symbol_id
         proto_request = preview_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -386,6 +402,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
         proto_request = modify_order_to_proto(
             symbol=symbol,
+            symbol_id=resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
+            ),
             key=key,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
@@ -414,10 +433,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         dry_run: bool = False,
         request_id: str | None = None,
     ) -> CancelAllOrdersResult:
-        resolved_symbol = normalize_raw_symbol_filter(symbol, label="orders.cancel_all symbol")
+        if symbol:
+            await self._ensure_catalogs()
         proto_request = cancel_all_orders_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
-            symbol=resolved_symbol,
+            symbol_id=resolve_optional_symbol_id(
+                self._catalogs, symbol=symbol, label="orders.cancel_all symbol"
+            ),
             side=side,
             dry_run=dry_run,
             request_id=request_id,
@@ -493,7 +515,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        items: list[CreateOrderRequest | dict],
+        items: list[CreateOrderRequest | dict[str, Any]],
         sub_account_id: str | None = None,
         symbol: str | None = None,
         request_id: str | None = None,
@@ -512,8 +534,26 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     scale_symbol = str(item["symbol"])
         await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, scale_symbol, *qty_values)
+        resolved_items: list[CreateOrderRequest] = []
+        for item in items:
+            normalized = (
+                item
+                if isinstance(item, CreateOrderRequest)
+                else normalize_create_order_request(item)
+            )
+            resolved_items.append(
+                msgspec.structs.replace(
+                    normalized,
+                    symbol_id=resolve_symbol_id(
+                        self._catalogs,
+                        symbol=normalized.symbol,
+                        symbol_id=normalized.symbol_id,
+                        label="batch_create",
+                    ),
+                )
+            )
         proto_request = batch_create_orders_to_proto(
-            items=items,
+            items=resolved_items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             allow_partial=allow_partial,
@@ -558,13 +598,14 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         side: str | None = None,
         request_id: str | None = None,
     ) -> CancelAllAfterResult:
-        resolved_symbol = normalize_raw_symbol_filter(
-            symbol, label="orders.cancel_all_after symbol"
-        )
+        if symbol:
+            await self._ensure_catalogs()
         proto_request = cancel_all_after_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             timeout_sec=timeout_sec,
-            symbol=resolved_symbol,
+            symbol_id=resolve_optional_symbol_id(
+                self._catalogs, symbol=symbol, label="orders.cancel_all_after symbol"
+            ),
             side=side,
             request_id=request_id,
         )

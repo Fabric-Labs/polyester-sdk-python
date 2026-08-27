@@ -100,7 +100,6 @@ def test_spot_fee_rates_decode_rows() -> None:
         fee_rates=[
             fees_pb2.SpotFeeRate(
                 symbol_id=7,
-                symbol="BTC-USDT",
                 maker_fee_rate_percent="0.01",
                 taker_fee_rate_percent="0.04",
                 vip_tier=2,
@@ -111,7 +110,7 @@ def test_spot_fee_rates_decode_rows() -> None:
     assert len(result.fee_rates) == 1
     row = result.fee_rates[0]
     assert row.symbol_id == 7
-    assert row.symbol == "BTC-USDT"
+    assert row.symbol == ""
     assert row.vip_tier == 2
 
 

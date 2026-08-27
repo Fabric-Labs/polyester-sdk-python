@@ -10,18 +10,16 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class SpotFeeRate(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "maker_fee_rate_percent", "taker_fee_rate_percent", "vip_tier")
+    __slots__ = ("symbol_id", "maker_fee_rate_percent", "taker_fee_rate_percent", "vip_tier")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
     MAKER_FEE_RATE_PERCENT_FIELD_NUMBER: _ClassVar[int]
     TAKER_FEE_RATE_PERCENT_FIELD_NUMBER: _ClassVar[int]
     VIP_TIER_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
-    symbol: str
     maker_fee_rate_percent: str
     taker_fee_rate_percent: str
     vip_tier: int
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., maker_fee_rate_percent: _Optional[str] = ..., taker_fee_rate_percent: _Optional[str] = ..., vip_tier: _Optional[int] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., maker_fee_rate_percent: _Optional[str] = ..., taker_fee_rate_percent: _Optional[str] = ..., vip_tier: _Optional[int] = ...) -> None: ...
 
 class GetSpotFeeRatesRequest(_message.Message):
     __slots__ = ("subaccount_id", "symbol_id")

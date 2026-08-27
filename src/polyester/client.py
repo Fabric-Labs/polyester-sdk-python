@@ -132,7 +132,9 @@ class AsyncPolyester:
         self.candles = self.market_data
         self.market_overview = AsyncMarketOverviewService(
             self._transport,
+            catalogs=self.catalogs,
             realtime=self.realtime,
+            wait_for_catalogs=self.wait_for_catalogs,
         )
         self.zipper = AsyncZipperService(
             self._transport,
@@ -190,7 +192,9 @@ class AsyncPolyester:
             self._transport, self.catalogs, default_sub_account_id
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
-        self.fees = AsyncFeeService(self._transport, default_sub_account_id)
+        self.fees = AsyncFeeService(
+            self._transport, default_sub_account_id, catalogs=self.catalogs
+        )
         self.api_keys = AsyncApiKeysService(
             self._transport,
             default_sub_account_id,

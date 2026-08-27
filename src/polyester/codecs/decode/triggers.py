@@ -116,7 +116,7 @@ def _timestamp(ts) -> datetime | None:
 def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
     """Project runtime execution state (``stop``/``trailing``/``twap_state``/
     ``ladder_state``) onto the discriminated ``TriggerDetails`` payload."""
-    symbol = msg.symbol or None
+    symbol = None
     symbol_id = int(msg.symbol_id)
     if has_field(msg, "stop"):
         stop = msg.stop
@@ -231,7 +231,7 @@ def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | Non
 
 def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
     """Derive the thick trigger projection from the configuration oneof."""
-    symbol = msg.symbol or None
+    symbol = None
     cfg = _TriggerConfig()
     if has_field(msg, "stop_loss") or has_field(msg, "take_profit"):
         conditional = msg.stop_loss if has_field(msg, "stop_loss") else msg.take_profit
@@ -282,7 +282,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         trigger_id=format_uint64_id(msg.trigger_id),
         subaccount_id=format_uint64_id(msg.subaccount_id) if msg.subaccount_id else "",
         symbol_id=int(msg.symbol_id),
-        symbol=msg.symbol,
+        symbol="",
         trigger_type=cfg.trigger_type,
         status=_trigger_status_label(msg.status),
         parent_order_id=parent_order_id,
@@ -292,7 +292,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         qty=Quantity.from_scaled(
             int(msg.qty_scaled),
             scale=quantity_scale,
-            symbol=msg.symbol or None,
+            symbol=None,
             symbol_id=int(msg.symbol_id),
         ),
         limit_price=cfg.limit_price,

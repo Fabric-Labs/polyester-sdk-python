@@ -75,6 +75,7 @@ def test_batch_create_decimal_qty_without_resolved_scale_raises() -> None:
             items=[
                 {
                     "symbol": "BTC-USD",
+                    "symbol_id": 1,
                     "side": "buy",
                     "order_type": "limit",
                     "qty": "0.1",
@@ -88,6 +89,7 @@ def test_modify_decimal_qty_without_resolved_scale_raises() -> None:
     with pytest.raises(PolyesterValidationError, match="explicit quantity_scale"):
         modify_order_to_proto(
             symbol="BTC-USD",
+            symbol_id=1,
             key=OrderId(1),
             new_qty="0.5",
         )

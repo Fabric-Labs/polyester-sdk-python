@@ -63,7 +63,6 @@ from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
 from polyester.models.policies import (
     ApiPoliciesList,
     ApiPolicy,
-    PerpMarketRule,
     SpotMarketRule,
     SubaccountPoliciesList,
     SubaccountPolicy,
@@ -253,7 +252,6 @@ __all__ = [
     "OrderbookData",
     "OrderbookLevel",
     "OrdersList",
-    "PerpMarketRule",
     "ResolvedAccount",
     "ResolvedAccountsList",
     "RiskLeg",

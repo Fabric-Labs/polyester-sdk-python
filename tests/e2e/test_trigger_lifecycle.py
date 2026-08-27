@@ -80,7 +80,10 @@ async def test_trigger_pause_resume_cancel(
         assert paused.trigger_id == created.trigger_id
         assert paused.status == "paused"
 
-        resumed = await live_client.triggers.resume(trigger_id=created.trigger_id)
+        resumed = await live_client.triggers.resume(
+            trigger_id=created.trigger_id,
+            symbol=trade_symbol,
+        )
         assert resumed.trigger_id == created.trigger_id
         assert resumed.status == "armed"
 

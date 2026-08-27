@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 import msgspec
@@ -79,7 +80,7 @@ def _item_order_key(item: dict[str, Any], *, label: str) -> OrderKey:
 
 
 def normalize_create_order_request(
-    request: CreateOrderRequest | None = None,
+    request: CreateOrderRequest | Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> CreateOrderRequest:
     if request is not None and kwargs:
@@ -178,8 +179,12 @@ def order_intent_from_request(
         raise PolyesterValidationError(
             "max_quote_debit is only valid for buy market or limit IOC orders"
         )
+    if request.symbol_id is None or int(request.symbol_id) == 0:
+        raise PolyesterValidationError(
+            "orders.create requires a resolved symbol_id; pass symbol_id or wait for catalogs"
+        )
     intent = orders_pb2.OrderIntent(
-        symbol=request.symbol or "",
+        symbol_id=int(request.symbol_id),
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
     )
     if request.qty is not None:
@@ -731,7 +736,7 @@ def batch_replace_item_to_proto(
 
 def batch_create_orders_to_proto(
     *,
-    items: list[CreateOrderRequest | dict[str, Any]],
+    items: Sequence[CreateOrderRequest | Mapping[str, Any]],
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
     allow_partial: bool = False,
@@ -749,7 +754,7 @@ def batch_create_orders_to_proto(
         if isinstance(item, CreateOrderRequest):
             normalized = item
         else:
-            normalized = normalize_create_order_request(cast(Any, item))
+            normalized = normalize_create_order_request(item)
         proto.items.append(order_intent_from_request(normalized, quantity_scale=quantity_scale))
     return proto
 
@@ -785,7 +790,7 @@ def cancel_all_after_to_proto(
     *,
     sub_account_id: str | int | None = None,
     timeout_sec: int,
-    symbol: str | None = None,
+    symbol_id: int | None = None,
     side: str | None = None,
     request_id: str | None = None,
 ) -> orders_pb2.CancelAllAfterRequest:
@@ -795,8 +800,8 @@ def cancel_all_after_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
-    if symbol:
-        proto.symbol = symbol
+    if symbol_id:
+        proto.symbol_id = int(symbol_id)
     if side:
         key = side.lower()
         if key not in ORDER_SIDE_TO_PROTO:
@@ -832,6 +837,7 @@ def batch_replace_orders_to_proto(
 def modify_order_to_proto(
     *,
     symbol: str,
+    symbol_id: int,
     key: OrderKey,
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
@@ -847,8 +853,11 @@ def modify_order_to_proto(
             "modify requires new_price, new_qty, and/or new_attached_risk"
         )
 
+    if symbol_id <= 0:
+        raise PolyesterValidationError("modify requires a resolved symbol_id")
     proto = orders_pb2.ModifyOrderRequest(
         request_id=optional_request_id(request_id) or f"mod-{uuid.uuid4().hex[:12]}",
+        symbol_id=int(symbol_id),
     )
     set_order_key(proto, key, op="modify")
     if sub_account_id is not None:
@@ -881,7 +890,7 @@ def modify_order_to_proto(
 def cancel_all_orders_to_proto(
     *,
     sub_account_id: str | int | None = None,
-    symbol: str | None = None,
+    symbol_id: int | None = None,
     side: str | None = None,
     dry_run: bool = False,
     request_id: str | None = None,
@@ -892,8 +901,8 @@ def cancel_all_orders_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
-    if symbol:
-        proto.symbol = symbol
+    if symbol_id:
+        proto.symbol_id = int(symbol_id)
     if side:
         key = side.lower()
         if key not in ORDER_SIDE_TO_PROTO:

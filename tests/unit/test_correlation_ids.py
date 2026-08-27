@@ -25,6 +25,7 @@ def test_correlation_id_boundaries_and_charset() -> None:
 def test_order_encoders_reject_invalid_correlation_ids() -> None:
     request = CreateOrderRequest(
         symbol="BTC-USDT",
+        symbol_id=1,
         side="buy",
         order_type="market",
         qty="1",

@@ -411,10 +411,12 @@ entry = await client.address_book.update_entry(
 `created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
 
 Invalid status and event-type labels raise `PolyesterValidationError`.
-Endpoints that wire raw `symbol` / `symbols` strings forward trimmed filters
-to the API (unknown symbols are not rejected locally). Paths that encode
-`symbol_id` still resolve through the hydrated catalog and fail closed on
-unknown symbols.
+Connect requests and responses use numeric `symbol_id`. Public methods still
+accept display `symbol` strings and resolve them through the hydrated catalog
+after `wait_for_catalogs()`. Unknown symbols fail closed. Only
+`get_spot_config` returns both `symbol` and `symbol_id`; other Connect
+payloads are ID-only. Display `symbol` on models such as market overview,
+fees, triggers, and policy rules is filled from the catalog when available.
 
 Unknown values raise `PolyesterValidationError` (they do not silently return
 an empty list). Response `status` uses the same labels (British spelling

@@ -92,6 +92,7 @@ def _conditional_child(
 def create_trigger_to_proto(
     *,
     symbol: str,
+    symbol_id: int,
     trigger_type: str,
     side: str,
     qty: object,
@@ -118,6 +119,8 @@ def create_trigger_to_proto(
     ladder_distribution: str | None = None,
     quantity_scale: int,
 ) -> triggers_pb2.CreateTriggerRequest:
+    if symbol_id <= 0:
+        raise PolyesterValidationError("create trigger requires a resolved symbol_id")
     type_key = trigger_type.lower().replace("-", "_")
     if type_key not in TRIGGER_TYPE_TO_PROTO:
         raise PolyesterValidationError(
@@ -132,7 +135,7 @@ def create_trigger_to_proto(
     side_proto = orders_pb2.BUY if side_key == "buy" else orders_pb2.SELL
 
     intent = triggers_pb2.TriggerIntent(
-        symbol=symbol,
+        symbol_id=symbol_id,
         qty_scaled=resolve_qty_scaled(qty, quantity_scale, "qty", symbol=symbol),  # type: ignore[arg-type]
     )
     validated_trigger_id = optional_client_id(client_trigger_id, "client_trigger_id")
@@ -254,6 +257,7 @@ def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | Non
 def modify_trigger_to_proto(
     *,
     trigger_id: str | int,
+    symbol_id: int,
     sub_account_id: str | int | None = None,
     trigger_price: Any | None = None,
     limit_price: Any | None = None,
@@ -279,8 +283,11 @@ def modify_trigger_to_proto(
             "trailing_distance_ticks, trailing_distance_bps, activation_price, "
             "max_slippage_ticks, or max_slippage_bps"
         )
+    if symbol_id <= 0:
+        raise PolyesterValidationError("modify trigger requires a resolved symbol_id")
     proto = triggers_pb2.ModifyTriggerRequest(
         trigger_id=id_to_int(trigger_id, "trigger_id"),
+        symbol_id=int(symbol_id),
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")

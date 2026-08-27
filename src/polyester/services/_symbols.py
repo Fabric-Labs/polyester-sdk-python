@@ -13,7 +13,9 @@ def resolve_symbol_id(
 ) -> int:
     if symbol_id is not None:
         if int(symbol_id) == 0:
-            raise PolyesterValidationError(f"{label} symbol_id must be non-zero when explicitly supplied")
+            raise PolyesterValidationError(
+                f"{label} symbol_id must be non-zero when explicitly supplied"
+            )
         return int(symbol_id)
     if symbol and catalogs is not None:
         resolved = catalogs.symbol_id_for_symbol(symbol)

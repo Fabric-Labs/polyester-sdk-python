@@ -39,7 +39,6 @@ from polyester.codecs.orders import (
 from polyester.codecs.realtime_decode import decode_order_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterTransportError, PolyesterValidationError
-from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
@@ -72,6 +71,7 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
 
 

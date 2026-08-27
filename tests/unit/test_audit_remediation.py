@@ -15,7 +15,6 @@ from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.gen.orders.v1 import orders_pb2
-from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
 from polyester.services.market_overview import AsyncMarketOverviewService

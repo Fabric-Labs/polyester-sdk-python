@@ -515,7 +515,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        items: list[CreateOrderRequest | dict],
+        items: list[CreateOrderRequest | dict[str, Any]],
         sub_account_id: str | None = None,
         symbol: str | None = None,
         request_id: str | None = None,

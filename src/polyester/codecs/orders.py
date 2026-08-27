@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 import msgspec
@@ -79,7 +80,7 @@ def _item_order_key(item: dict[str, Any], *, label: str) -> OrderKey:
 
 
 def normalize_create_order_request(
-    request: CreateOrderRequest | None = None,
+    request: CreateOrderRequest | Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> CreateOrderRequest:
     if request is not None and kwargs:
@@ -735,7 +736,7 @@ def batch_replace_item_to_proto(
 
 def batch_create_orders_to_proto(
     *,
-    items: list[CreateOrderRequest | dict[str, Any]],
+    items: Sequence[CreateOrderRequest | Mapping[str, Any]],
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
     allow_partial: bool = False,
@@ -753,7 +754,7 @@ def batch_create_orders_to_proto(
         if isinstance(item, CreateOrderRequest):
             normalized = item
         else:
-            normalized = normalize_create_order_request(cast(Any, item))
+            normalized = normalize_create_order_request(item)
         proto.items.append(order_intent_from_request(normalized, quantity_scale=quantity_scale))
     return proto
 

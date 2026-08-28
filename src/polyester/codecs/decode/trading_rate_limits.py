@@ -37,7 +37,7 @@ def trading_rate_limit_rule_from_proto(
             int(msg.policy_class),
             unknown_prefix="UNKNOWN_TRADING_RATE_LIMIT_CLASS",
         ),
-        tier=int(msg.tier),
+        vip_tier=int(msg.vip_tier),
         quota_weight=int(msg.quota_weight),
         period_ms=int(msg.period_ms),
         burst_weight=int(msg.burst_weight),

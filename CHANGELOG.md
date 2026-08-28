@@ -14,6 +14,15 @@
 - Policy models dropped perpetual rules and unenforced money-movement fields.
   `READ_TRANSFER_DESTINATIONS` is now `READ_ADDRESS_BOOK`.
 - Removed `PerpMarketRule`.
+- `TradingRateLimitRule.tier` is now `vip_tier`.
+- `TriggerEvent.reason` is removed. Canceled/failed triggers and events
+  expose typed `cancel_reason` / `failure_reason` labels.
+- `trades.list(after_match_id=...)` requires `symbol` or `symbol_id`.
+
+### Added
+- `trades.list(after_match_id=...)` durable fill replay cursor.
+- Address-book `get_view(minimum_view_revision=...)` plus `view_revision`
+  on the view and invalidation events.
 
 ## 0.1.0a45
 

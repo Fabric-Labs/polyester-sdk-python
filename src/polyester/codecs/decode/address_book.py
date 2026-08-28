@@ -421,6 +421,7 @@ def address_book_view_from_proto(
         tags=[address_book_tag_summary_from_proto(item) for item in msg.tags],
         withdraw_whitelist=withdraw,
         recent_destinations_truncated=bool(msg.recent_destinations_truncated),
+        view_revision=int(msg.view_revision),
     )
 
 

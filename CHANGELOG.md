@@ -15,6 +15,13 @@
   `READ_TRANSFER_DESTINATIONS` is now `READ_ADDRESS_BOOK`.
 - Removed `PerpMarketRule`.
 
+### Docs
+- README links the sibling
+  [`polyester-examples-python`](https://github.com/Fabric-Labs/polyester-examples-python)
+  cookbook near the top.
+- README examples use placeholder `YOUR_ACCOUNT_ID` and mix `ETH-USDT` /
+  `SOL-USDT` instead of a live Account ID and `BNB-USDT`.
+
 ## 0.1.0a45
 
 Git tag: `v0.1.0a45`.

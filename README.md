@@ -220,7 +220,7 @@ async with AsyncPolyester(
     default_sub_account_id="",  # main account; omit subaccount scoping
 ) as client:
     result = await client.orders.create(
-        symbol="ETH-USDT",
+        symbol="BTC-USDT",
         side="buy",
         order_type="limit",
         tif="gtc",
@@ -250,7 +250,7 @@ nested `child.execution` wrapper.
 
 ```python
 result = await client.orders.create(
-    symbol="ETH-USDT",
+    symbol="BTC-USDT",
     side="buy",
     order_type="limit",
     tif="gtc",
@@ -277,14 +277,14 @@ catalog `quote_quantity_scale`. Typed budgets must use
 and validate against `client.catalogs.quote_quantity_scale_for_symbol`.
 
 ```python
-quote_scale = client.catalogs.quote_quantity_scale_for_symbol("ETH-USDT")
+quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BTC-USDT")
 assert quote_scale is not None  # await client.wait_for_catalogs() first
 result = await client.orders.create(
-    symbol="ETH-USDT",
+    symbol="BTC-USDT",
     side="buy",
     order_type="market",
     max_quote_debit=Quantity.from_quote_decimal_str(
-        "25.00", quote_scale, symbol="ETH-USDT"
+        "25.00", quote_scale, symbol="BTC-USDT"
     ),
 )
 ```
@@ -325,7 +325,7 @@ Stay in integer space; no string round-trip:
 from polyester import Price, Quantity
 
 result = await client.orders.create(
-    symbol="SOL-USDT",
+    symbol="BTC-USDT",
     side="buy",
     order_type="limit",
     tif="gtc",
@@ -528,7 +528,7 @@ if current is not None:
     print(current.close, current.is_closed)
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 
-subscription = await client.market_data.subscribe_trades(symbol="SOL-USDT")
+subscription = await client.market_data.subscribe_trades(symbol="BTC-USDT")
 subscription.set_on_error(lambda error: print(f"realtime interruption: {error}"))
 async with subscription:
     async for trade in subscription:

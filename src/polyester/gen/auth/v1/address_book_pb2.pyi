@@ -626,33 +626,39 @@ class GetWithdrawWhitelistViewResponse(_message.Message):
     def __init__(self, view: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ...) -> None: ...
 
 class GetAddressBookViewRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit")
+    __slots__ = ("subaccount_id", "limit", "minimum_view_revision")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
+    MINIMUM_VIEW_REVISION_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     limit: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ...) -> None: ...
+    minimum_view_revision: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., minimum_view_revision: _Optional[int] = ...) -> None: ...
 
 class GetAddressBookViewResponse(_message.Message):
-    __slots__ = ("books", "entries", "recent_destinations", "tags", "withdraw_whitelist", "recent_destinations_truncated")
+    __slots__ = ("books", "entries", "recent_destinations", "tags", "withdraw_whitelist", "recent_destinations_truncated", "view_revision")
     BOOKS_FIELD_NUMBER: _ClassVar[int]
     ENTRIES_FIELD_NUMBER: _ClassVar[int]
     RECENT_DESTINATIONS_FIELD_NUMBER: _ClassVar[int]
     TAGS_FIELD_NUMBER: _ClassVar[int]
     WITHDRAW_WHITELIST_FIELD_NUMBER: _ClassVar[int]
     RECENT_DESTINATIONS_TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    VIEW_REVISION_FIELD_NUMBER: _ClassVar[int]
     books: _containers.RepeatedCompositeFieldContainer[AddressBook]
     entries: AddressBookEntriesView
     recent_destinations: AddressBookRecentDestinationsView
     tags: _containers.RepeatedCompositeFieldContainer[AddressBookTagSummary]
     withdraw_whitelist: WithdrawWhitelistView
     recent_destinations_truncated: bool
-    def __init__(self, books: _Optional[_Iterable[_Union[AddressBook, _Mapping]]] = ..., entries: _Optional[_Union[AddressBookEntriesView, _Mapping]] = ..., recent_destinations: _Optional[_Union[AddressBookRecentDestinationsView, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTagSummary, _Mapping]]] = ..., withdraw_whitelist: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ..., recent_destinations_truncated: _Optional[bool] = ...) -> None: ...
+    view_revision: int
+    def __init__(self, books: _Optional[_Iterable[_Union[AddressBook, _Mapping]]] = ..., entries: _Optional[_Union[AddressBookEntriesView, _Mapping]] = ..., recent_destinations: _Optional[_Union[AddressBookRecentDestinationsView, _Mapping]] = ..., tags: _Optional[_Iterable[_Union[AddressBookTagSummary, _Mapping]]] = ..., withdraw_whitelist: _Optional[_Union[WithdrawWhitelistView, _Mapping]] = ..., recent_destinations_truncated: _Optional[bool] = ..., view_revision: _Optional[int] = ...) -> None: ...
 
 class AddressBookViewInvalidated(_message.Message):
-    __slots__ = ("scope", "invalidated_at")
+    __slots__ = ("scope", "invalidated_at", "view_revision")
     SCOPE_FIELD_NUMBER: _ClassVar[int]
     INVALIDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    VIEW_REVISION_FIELD_NUMBER: _ClassVar[int]
     scope: AccountScopeRef
     invalidated_at: _timestamp_pb2.Timestamp
-    def __init__(self, scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., invalidated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    view_revision: int
+    def __init__(self, scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., invalidated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., view_revision: _Optional[int] = ...) -> None: ...

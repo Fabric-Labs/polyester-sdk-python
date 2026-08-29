@@ -112,12 +112,18 @@ class FinishTOTPEnrollmentRequest(_message.Message):
     def __init__(self, enrollment_id: _Optional[str] = ..., code: _Optional[str] = ...) -> None: ...
 
 class FinishTOTPEnrollmentResponse(_message.Message):
-    __slots__ = ("factor", "recovery_codes")
+    __slots__ = ("factor", "recovery_codes", "session", "access_token", "access_token_expires_at")
     FACTOR_FIELD_NUMBER: _ClassVar[int]
     RECOVERY_CODES_FIELD_NUMBER: _ClassVar[int]
+    SESSION_FIELD_NUMBER: _ClassVar[int]
+    ACCESS_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    ACCESS_TOKEN_EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     factor: MFAFactor
     recovery_codes: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, factor: _Optional[_Union[MFAFactor, _Mapping]] = ..., recovery_codes: _Optional[_Iterable[str]] = ...) -> None: ...
+    session: SessionInfo
+    access_token: str
+    access_token_expires_at: _timestamp_pb2.Timestamp
+    def __init__(self, factor: _Optional[_Union[MFAFactor, _Mapping]] = ..., recovery_codes: _Optional[_Iterable[str]] = ..., session: _Optional[_Union[SessionInfo, _Mapping]] = ..., access_token: _Optional[str] = ..., access_token_expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class BeginPasskeyEnrollmentRequest(_message.Message):
     __slots__ = ("label",)
@@ -144,12 +150,18 @@ class FinishPasskeyEnrollmentRequest(_message.Message):
     def __init__(self, enrollment_id: _Optional[str] = ..., credential: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ...) -> None: ...
 
 class FinishPasskeyEnrollmentResponse(_message.Message):
-    __slots__ = ("factor", "recovery_codes")
+    __slots__ = ("factor", "recovery_codes", "session", "access_token", "access_token_expires_at")
     FACTOR_FIELD_NUMBER: _ClassVar[int]
     RECOVERY_CODES_FIELD_NUMBER: _ClassVar[int]
+    SESSION_FIELD_NUMBER: _ClassVar[int]
+    ACCESS_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    ACCESS_TOKEN_EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     factor: MFAFactor
     recovery_codes: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, factor: _Optional[_Union[MFAFactor, _Mapping]] = ..., recovery_codes: _Optional[_Iterable[str]] = ...) -> None: ...
+    session: SessionInfo
+    access_token: str
+    access_token_expires_at: _timestamp_pb2.Timestamp
+    def __init__(self, factor: _Optional[_Union[MFAFactor, _Mapping]] = ..., recovery_codes: _Optional[_Iterable[str]] = ..., session: _Optional[_Union[SessionInfo, _Mapping]] = ..., access_token: _Optional[str] = ..., access_token_expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class BeginMFAChallengeRequest(_message.Message):
     __slots__ = ("purpose",)

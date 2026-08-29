@@ -455,6 +455,93 @@ class SubaccountServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+class SubaccountRoleService(Protocol):
+    async def list_subaccount_roles(self, request: auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_effective_subaccount_permissions(self, request: auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+
+class SubaccountRoleServiceASGIApplication(ConnectASGIApplication[SubaccountRoleService]):
+    def __init__(self, service: SubaccountRoleService | AsyncGenerator[SubaccountRoleService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
+        super().__init__(
+            service=service,
+            endpoints=lambda svc: {
+                "/auth.v1.SubaccountRoleService/ListSubaccountRoles": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListSubaccountRoles",
+                        service_name="auth.v1.SubaccountRoleService",
+                        input=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest,
+                        output=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_subaccount_roles,
+                ),
+                "/auth.v1.SubaccountRoleService/GetEffectiveSubaccountPermissions": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetEffectiveSubaccountPermissions",
+                        service_name="auth.v1.SubaccountRoleService",
+                        input=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest,
+                        output=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_effective_subaccount_permissions,
+                ),
+            },
+            interceptors=interceptors,
+            read_max_bytes=read_max_bytes,
+            compressions=compressions,
+            codecs=codecs,
+        )
+
+    @property
+    def path(self) -> str:
+        """Returns the URL path to mount the application to when serving multiple applications."""
+        return "/auth.v1.SubaccountRoleService"
+
+
+class SubaccountRoleServiceClient(ConnectClient):
+    async def list_subaccount_roles(
+        self,
+        request: auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListSubaccountRoles",
+                service_name="auth.v1.SubaccountRoleService",
+                input=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest,
+                output=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_effective_subaccount_permissions(
+        self,
+        request: auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetEffectiveSubaccountPermissions",
+                service_name="auth.v1.SubaccountRoleService",
+                input=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest,
+                output=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -879,6 +966,91 @@ class SubaccountServiceClientSync(ConnectClientSync):
                 service_name="auth.v1.SubaccountService",
                 input=auth_dot_v1_dot_subaccounts__pb2.RespondSubaccountInviteRequest,
                 output=auth_dot_v1_dot_subaccounts__pb2.RespondSubaccountInviteResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+class SubaccountRoleServiceSync(Protocol):
+    def list_subaccount_roles(self, request: auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_effective_subaccount_permissions(self, request: auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+
+class SubaccountRoleServiceWSGIApplication(ConnectWSGIApplication):
+    def __init__(self, service: SubaccountRoleServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
+        super().__init__(
+            endpoints={
+                "/auth.v1.SubaccountRoleService/ListSubaccountRoles": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListSubaccountRoles",
+                        service_name="auth.v1.SubaccountRoleService",
+                        input=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest,
+                        output=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_subaccount_roles,
+                ),
+                "/auth.v1.SubaccountRoleService/GetEffectiveSubaccountPermissions": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetEffectiveSubaccountPermissions",
+                        service_name="auth.v1.SubaccountRoleService",
+                        input=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest,
+                        output=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_effective_subaccount_permissions,
+                ),
+            },
+            interceptors=interceptors,
+            read_max_bytes=read_max_bytes,
+            compressions=compressions,
+            codecs=codecs,
+        )
+
+    @property
+    def path(self) -> str:
+        """Returns the URL path to mount the application to when serving multiple applications."""
+        return "/auth.v1.SubaccountRoleService"
+
+
+class SubaccountRoleServiceClientSync(ConnectClientSync):
+    def list_subaccount_roles(
+        self,
+        request: auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListSubaccountRoles",
+                service_name="auth.v1.SubaccountRoleService",
+                input=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesRequest,
+                output=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountRolesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_effective_subaccount_permissions(
+        self,
+        request: auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetEffectiveSubaccountPermissions",
+                service_name="auth.v1.SubaccountRoleService",
+                input=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsRequest,
+                output=auth_dot_v1_dot_subaccounts__pb2.GetEffectiveSubaccountPermissionsResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

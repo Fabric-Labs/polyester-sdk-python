@@ -24,7 +24,7 @@ async def main() -> None:
 
         # Uncomment when your API key has trade policy on devnet:
         # created = await client.orders.create(
-        #     symbol="BNB-USDT",
+        #     symbol="BTC-USDT",
         #     side="buy",
         #     order_type="limit",
         #     tif="gtc",

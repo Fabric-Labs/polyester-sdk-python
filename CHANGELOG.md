@@ -24,6 +24,13 @@
 - Address-book `get_view(minimum_view_revision=...)` plus `view_revision`
   on the view and invalidation events.
 
+### Docs
+- README links the sibling
+  [`polyester-examples-python`](https://github.com/Fabric-Labs/polyester-examples-python)
+  cookbook near the top.
+- README examples use placeholder `YOUR_ACCOUNT_ID` and `BTC-USDT`
+  instead of a live Account ID and `BNB-USDT`.
+
 ## 0.1.0a45
 
 Git tag: `v0.1.0a45`.

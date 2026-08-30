@@ -87,6 +87,12 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Examples
+
+Runnable cookbook examples live in the sibling repo
+[`polyester-examples-python`](https://github.com/Fabric-Labs/polyester-examples-python)
+(REST market data, realtime streams, decimal + scaled-int order paths, and bots).
+
 ## Quickstart
 
 Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
@@ -128,7 +134,7 @@ asyncio.run(main())
 | --- | --- | --- |
 | API key id | **API** → create or view key | `api_key_id` |
 | API private key | Shown once when the key is created | `api_private_key` |
-| Account ID | **Profile** → **Account ID** (e.g. `RLxqJGUDg92`) | `default_account_id` |
+| Account ID | **Profile** → **Account ID** | `default_account_id` |
 
 Pass all credentials as **constructor parameters**. The SDK does not read
 environment variables unless you pass them in yourself (or use `from_env()` in
@@ -173,7 +179,7 @@ from polyester import AsyncPolyester
 client = AsyncPolyester(
     api_key_id="ak_...",
     api_private_key="...",
-    default_account_id="RLxqJGUDg92",
+    default_account_id="YOUR_ACCOUNT_ID",
 )
 ```
 
@@ -210,11 +216,11 @@ from polyester.models import ClientOrderId
 async with AsyncPolyester(
     api_key_id="ak_...",
     api_private_key="...",
-    default_account_id="RLxqJGUDg92",
+    default_account_id="YOUR_ACCOUNT_ID",
     default_sub_account_id="",  # main account; omit subaccount scoping
 ) as client:
     result = await client.orders.create(
-        symbol="BNB-USDT",
+        symbol="BTC-USDT",
         side="buy",
         order_type="limit",
         tif="gtc",
@@ -244,7 +250,7 @@ nested `child.execution` wrapper.
 
 ```python
 result = await client.orders.create(
-    symbol="BNB-USDT",
+    symbol="BTC-USDT",
     side="buy",
     order_type="limit",
     tif="gtc",
@@ -271,14 +277,14 @@ catalog `quote_quantity_scale`. Typed budgets must use
 and validate against `client.catalogs.quote_quantity_scale_for_symbol`.
 
 ```python
-quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BNB-USDT")
+quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BTC-USDT")
 assert quote_scale is not None  # await client.wait_for_catalogs() first
 result = await client.orders.create(
-    symbol="BNB-USDT",
+    symbol="BTC-USDT",
     side="buy",
     order_type="market",
     max_quote_debit=Quantity.from_quote_decimal_str(
-        "25.00", quote_scale, symbol="BNB-USDT"
+        "25.00", quote_scale, symbol="BTC-USDT"
     ),
 )
 ```
@@ -319,7 +325,7 @@ Stay in integer space; no string round-trip:
 from polyester import Price, Quantity
 
 result = await client.orders.create(
-    symbol="BNB-USDT",
+    symbol="BTC-USDT",
     side="buy",
     order_type="limit",
     tif="gtc",
@@ -529,7 +535,7 @@ if current is not None:
     print(current.close, current.is_closed)
 trades = await client.market_data.get_trades(symbol="BTC-USDT", limit=20)
 
-subscription = await client.market_data.subscribe_trades(symbol="BNB-USDT")
+subscription = await client.market_data.subscribe_trades(symbol="BTC-USDT")
 subscription.set_on_error(lambda error: print(f"realtime interruption: {error}"))
 async with subscription:
     async for trade in subscription:
@@ -597,7 +603,7 @@ from polyester import Polyester
 with Polyester(
     api_key_id="ak_...",
     api_private_key="...",
-    default_account_id="RLxqJGUDg92",
+    default_account_id="YOUR_ACCOUNT_ID",
 ) as client:
     balances = client.balances.list()
 ```

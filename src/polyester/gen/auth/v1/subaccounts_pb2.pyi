@@ -29,6 +29,35 @@ class SubaccountRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ADMIN: _ClassVar[SubaccountRole]
     OWNER: _ClassVar[SubaccountRole]
 
+class SubaccountPermission(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SUBACCOUNT_PERMISSION_UNSPECIFIED: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_SUBACCOUNT: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_BALANCES: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_SPOT: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_TRADE_SPOT: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_MEMBERS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_MEMBERS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_INVITES: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_INVITES: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_API_KEYS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_API_KEYS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_ACTIVITY: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER: _ClassVar[SubaccountPermission]
+
 class SubaccountInviteStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SUBACCOUNT_INVITE_STATUS_UNSPECIFIED: _ClassVar[SubaccountInviteStatus]
@@ -88,6 +117,32 @@ LEVERAGED_TRADER: SubaccountRole
 TREASURY: SubaccountRole
 ADMIN: SubaccountRole
 OWNER: SubaccountRole
+SUBACCOUNT_PERMISSION_UNSPECIFIED: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_SUBACCOUNT: SubaccountPermission
+SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_BALANCES: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_SPOT: SubaccountPermission
+SUBACCOUNT_PERMISSION_TRADE_SPOT: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS: SubaccountPermission
+SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER: SubaccountPermission
+SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_MEMBERS: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_MEMBERS: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_INVITES: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_INVITES: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_API_KEYS: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_API_KEYS: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_ACTIVITY: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT: SubaccountPermission
+SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS: SubaccountPermission
+SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER: SubaccountPermission
 SUBACCOUNT_INVITE_STATUS_UNSPECIFIED: SubaccountInviteStatus
 SUBACCOUNT_INVITE_STATUS_PENDING: SubaccountInviteStatus
 SUBACCOUNT_INVITE_STATUS_ACCEPTED: SubaccountInviteStatus
@@ -126,6 +181,60 @@ ACTIVITY_SOURCE_UNSPECIFIED: ActivityEventSource
 ACTIVITY_SOURCE_WEB: ActivityEventSource
 ACTIVITY_SOURCE_MOBILE: ActivityEventSource
 ACTIVITY_SOURCE_API: ActivityEventSource
+
+class SubaccountPermissionDefinition(_message.Message):
+    __slots__ = ("permission", "display_name", "description", "policy_action")
+    PERMISSION_FIELD_NUMBER: _ClassVar[int]
+    DISPLAY_NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    POLICY_ACTION_FIELD_NUMBER: _ClassVar[int]
+    permission: SubaccountPermission
+    display_name: str
+    description: str
+    policy_action: _policies_pb2.PolicyAction
+    def __init__(self, permission: _Optional[_Union[SubaccountPermission, str]] = ..., display_name: _Optional[str] = ..., description: _Optional[str] = ..., policy_action: _Optional[_Union[_policies_pb2.PolicyAction, str]] = ...) -> None: ...
+
+class SubaccountRoleDefinition(_message.Message):
+    __slots__ = ("role", "display_name", "description", "assignable", "permissions")
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    DISPLAY_NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    ASSIGNABLE_FIELD_NUMBER: _ClassVar[int]
+    PERMISSIONS_FIELD_NUMBER: _ClassVar[int]
+    role: SubaccountRole
+    display_name: str
+    description: str
+    assignable: bool
+    permissions: _containers.RepeatedScalarFieldContainer[SubaccountPermission]
+    def __init__(self, role: _Optional[_Union[SubaccountRole, str]] = ..., display_name: _Optional[str] = ..., description: _Optional[str] = ..., assignable: _Optional[bool] = ..., permissions: _Optional[_Iterable[_Union[SubaccountPermission, str]]] = ...) -> None: ...
+
+class ListSubaccountRolesRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ListSubaccountRolesResponse(_message.Message):
+    __slots__ = ("permissions", "roles")
+    PERMISSIONS_FIELD_NUMBER: _ClassVar[int]
+    ROLES_FIELD_NUMBER: _ClassVar[int]
+    permissions: _containers.RepeatedCompositeFieldContainer[SubaccountPermissionDefinition]
+    roles: _containers.RepeatedCompositeFieldContainer[SubaccountRoleDefinition]
+    def __init__(self, permissions: _Optional[_Iterable[_Union[SubaccountPermissionDefinition, _Mapping]]] = ..., roles: _Optional[_Iterable[_Union[SubaccountRoleDefinition, _Mapping]]] = ...) -> None: ...
+
+class GetEffectiveSubaccountPermissionsRequest(_message.Message):
+    __slots__ = ("subaccount_id",)
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
+
+class GetEffectiveSubaccountPermissionsResponse(_message.Message):
+    __slots__ = ("role", "permissions", "subaccount_policy_id")
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    PERMISSIONS_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    role: SubaccountRole
+    permissions: _containers.RepeatedScalarFieldContainer[SubaccountPermission]
+    subaccount_policy_id: int
+    def __init__(self, role: _Optional[_Union[SubaccountRole, str]] = ..., permissions: _Optional[_Iterable[_Union[SubaccountPermission, str]]] = ..., subaccount_policy_id: _Optional[int] = ...) -> None: ...
 
 class SubaccountRoleView(_message.Message):
     __slots__ = ("subaccount_id", "role")

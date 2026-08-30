@@ -24,18 +24,18 @@ TRADING_RATE_LIMIT_CLASS_PLACE: TradingRateLimitClass
 TRADING_RATE_LIMIT_CLASS_CANCEL: TradingRateLimitClass
 
 class TradingRateLimitRule(_message.Message):
-    __slots__ = ("policy_class", "tier", "quota_weight", "period_ms", "burst_weight")
+    __slots__ = ("policy_class", "vip_tier", "quota_weight", "period_ms", "burst_weight")
     POLICY_CLASS_FIELD_NUMBER: _ClassVar[int]
-    TIER_FIELD_NUMBER: _ClassVar[int]
+    VIP_TIER_FIELD_NUMBER: _ClassVar[int]
     QUOTA_WEIGHT_FIELD_NUMBER: _ClassVar[int]
     PERIOD_MS_FIELD_NUMBER: _ClassVar[int]
     BURST_WEIGHT_FIELD_NUMBER: _ClassVar[int]
     policy_class: TradingRateLimitClass
-    tier: int
+    vip_tier: int
     quota_weight: int
     period_ms: int
     burst_weight: int
-    def __init__(self, policy_class: _Optional[_Union[TradingRateLimitClass, str]] = ..., tier: _Optional[int] = ..., quota_weight: _Optional[int] = ..., period_ms: _Optional[int] = ..., burst_weight: _Optional[int] = ...) -> None: ...
+    def __init__(self, policy_class: _Optional[_Union[TradingRateLimitClass, str]] = ..., vip_tier: _Optional[int] = ..., quota_weight: _Optional[int] = ..., period_ms: _Optional[int] = ..., burst_weight: _Optional[int] = ...) -> None: ...
 
 class GetRateLimitConfigRequest(_message.Message):
     __slots__ = ()

@@ -24,6 +24,14 @@
 - Address-book `get_view(minimum_view_revision=...)` plus `view_revision`
   on the view and invalidation events.
 
+### Removed
+- Unused handwritten Connect header and body helpers. Generated Connect
+  clients own unary requests, including `application/proto` for binary.
+
+### Testing
+- Compatibility coverage for unary content type, codec body bytes, and
+  API-key signatures on binary and JSON wire formats.
+
 ### Docs
 - README links the sibling
   [`polyester-examples-python`](https://github.com/Fabric-Labs/polyester-examples-python)

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import httpx
 from connectrpc.code import Code
 from connectrpc.errors import ConnectError
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester._wire import map_connect_error
 from polyester.codecs.decode.orders import preview_order_from_proto
-from polyester.connect_transport import raise_for_status
 from polyester.errors import PolyesterRateLimitError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
@@ -87,20 +85,6 @@ def test_map_connect_error_preserves_absent_optional_fields() -> None:
     assert mapped.detail.retry_after_ms is None
     assert mapped.detail.policy_version is None
     assert mapped.detail.reason == "AUTHORITY_UNAVAILABLE"
-
-
-def test_http_429_prefers_retry_after_ms_header() -> None:
-    response = httpx.Response(
-        429,
-        text="slow down",
-        headers={"Retry-After-Ms": "1500"},
-    )
-    try:
-        raise_for_status(response)
-    except PolyesterRateLimitError as exc:
-        assert exc.retry_after == 1.5
-    else:
-        raise AssertionError("expected PolyesterRateLimitError")
 
 
 def test_preview_rejection_surfaces_rate_limit_detail() -> None:

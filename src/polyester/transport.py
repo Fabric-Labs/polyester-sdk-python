@@ -9,7 +9,6 @@ from connectrpc.interceptor import UnaryInterceptor
 
 from polyester.auth import ApiKeyCredentials
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
-from polyester.connect_transport import connect_headers as build_connect_headers
 from polyester.errors import PolyesterAuthError, PolyesterTransportError
 from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
 
@@ -67,9 +66,6 @@ class TransportFactory:
     def __repr__(self) -> str:
         creds = "[REDACTED]" if self.credentials is not None else None
         return f"TransportFactory(config={self.config!r}, credentials={creds})"
-
-    def connect_headers(self) -> dict[str, str]:
-        return build_connect_headers(wire_format=self.config.wire_format)
 
     def _client_kwargs(self) -> dict:
         return {

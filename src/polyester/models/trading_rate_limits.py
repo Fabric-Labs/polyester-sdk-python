@@ -9,7 +9,7 @@ class TradingRateLimitRule(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Weighted placement or cancellation quota for one VIP tier."""
 
     policy_class: str = ""
-    tier: int = 0
+    vip_tier: int = 0
     quota_weight: int = 0
     period_ms: int = 0
     burst_weight: int = 0

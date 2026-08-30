@@ -43,6 +43,58 @@ class TriggerEventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVENT_UPDATED: _ClassVar[TriggerEventType]
     EVENT_FAILED: _ClassVar[TriggerEventType]
 
+class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    TRIGGER_CANCEL_REASON_UNSPECIFIED: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_USER_REQUEST: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_OCO: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_MISSING_REASON_CODE: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_INTERNAL_ERROR: _ClassVar[TriggerCancelReason]
+
+class TriggerFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    TRIGGER_FAILURE_REASON_UNSPECIFIED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_PAIR_DISABLED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MIN_NOTIONAL: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_TICK_SIZE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_RISK_LIMIT: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MARKET_HALTED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_ENGINE_BUSY: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_ORDER_UNKNOWN: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_POST_ONLY_CROSS: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_EMPTY_BOOK: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_STALE_QUOTE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MIN_QUANTITY: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_STEP_SIZE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_INVALID_SIZING: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_RATE_LIMITED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_INTERNAL_ERROR: _ClassVar[TriggerFailureReason]
+
 class LadderDistribution(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     LADDER_DISTRIBUTION_UNSPECIFIED: _ClassVar[LadderDistribution]
@@ -68,6 +120,52 @@ EVENT_FIRED: TriggerEventType
 EVENT_CANCELED: TriggerEventType
 EVENT_UPDATED: TriggerEventType
 EVENT_FAILED: TriggerEventType
+TRIGGER_CANCEL_REASON_UNSPECIFIED: TriggerCancelReason
+TRIGGER_CANCEL_REASON_USER_REQUEST: TriggerCancelReason
+TRIGGER_CANCEL_REASON_OCO: TriggerCancelReason
+TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL: TriggerCancelReason
+TRIGGER_CANCEL_REASON_MISSING_REASON_CODE: TriggerCancelReason
+TRIGGER_CANCEL_REASON_INTERNAL_ERROR: TriggerCancelReason
+TRIGGER_FAILURE_REASON_UNSPECIFIED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL: TriggerFailureReason
+TRIGGER_FAILURE_REASON_PAIR_DISABLED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MIN_NOTIONAL: TriggerFailureReason
+TRIGGER_FAILURE_REASON_TICK_SIZE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS: TriggerFailureReason
+TRIGGER_FAILURE_REASON_RISK_LIMIT: TriggerFailureReason
+TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MARKET_HALTED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_ENGINE_BUSY: TriggerFailureReason
+TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN: TriggerFailureReason
+TRIGGER_FAILURE_REASON_ORDER_UNKNOWN: TriggerFailureReason
+TRIGGER_FAILURE_REASON_POST_ONLY_CROSS: TriggerFailureReason
+TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION: TriggerFailureReason
+TRIGGER_FAILURE_REASON_EMPTY_BOOK: TriggerFailureReason
+TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY: TriggerFailureReason
+TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_STALE_QUOTE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MIN_QUANTITY: TriggerFailureReason
+TRIGGER_FAILURE_REASON_STEP_SIZE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_INVALID_SIZING: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL: TriggerFailureReason
+TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID: TriggerFailureReason
+TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL: TriggerFailureReason
+TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_RATE_LIMITED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY: TriggerFailureReason
+TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY: TriggerFailureReason
+TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL: TriggerFailureReason
+TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS: TriggerFailureReason
+TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_INTERNAL_ERROR: TriggerFailureReason
 LADDER_DISTRIBUTION_UNSPECIFIED: LadderDistribution
 LINEAR: LadderDistribution
 GEOMETRIC: LadderDistribution
@@ -272,7 +370,7 @@ class ListTriggerEventsRequest(_message.Message):
     def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class TriggerEvent(_message.Message):
-    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_type", "event_type", "ts_ns", "child_seq", "child_order_id", "fire_price_ticks", "reason")
+    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_type", "event_type", "ts_ns", "child_seq", "child_order_id", "fire_price_ticks", "cancel_reason", "failure_reason")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
@@ -282,7 +380,8 @@ class TriggerEvent(_message.Message):
     CHILD_SEQ_FIELD_NUMBER: _ClassVar[int]
     CHILD_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     FIRE_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
-    REASON_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_REASON_FIELD_NUMBER: _ClassVar[int]
+    FAILURE_REASON_FIELD_NUMBER: _ClassVar[int]
     trigger_id: int
     subaccount_id: int
     symbol_id: int
@@ -292,8 +391,9 @@ class TriggerEvent(_message.Message):
     child_seq: int
     child_order_id: int
     fire_price_ticks: int
-    reason: str
-    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_price_ticks: _Optional[int] = ..., reason: _Optional[str] = ...) -> None: ...
+    cancel_reason: TriggerCancelReason
+    failure_reason: TriggerFailureReason
+    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_price_ticks: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ...) -> None: ...
 
 class ListTriggerEventsResponse(_message.Message):
     __slots__ = ("events", "next_page_token")
@@ -460,12 +560,14 @@ class LadderDetails(_message.Message):
     def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ...) -> None: ...
 
 class Trigger(_message.Message):
-    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "status", "parent_order_id", "qty_scaled", "fee_asset", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "created_at", "updated_at", "armed_at", "completed_at")
+    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "status", "parent_order_id", "cancel_reason", "failure_reason", "qty_scaled", "fee_asset", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "created_at", "updated_at", "armed_at", "completed_at")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     PARENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_REASON_FIELD_NUMBER: _ClassVar[int]
+    FAILURE_REASON_FIELD_NUMBER: _ClassVar[int]
     QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
     SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
@@ -488,6 +590,8 @@ class Trigger(_message.Message):
     symbol_id: int
     status: TriggerStatus
     parent_order_id: int
+    cancel_reason: TriggerCancelReason
+    failure_reason: TriggerFailureReason
     qty_scaled: int
     fee_asset: _orders_pb2.FeeAsset
     self_trade_prevention_mode: _orders_pb2.SelfTradePreventionMode
@@ -505,4 +609,4 @@ class Trigger(_message.Message):
     updated_at: _timestamp_pb2.Timestamp
     armed_at: _timestamp_pb2.Timestamp
     completed_at: _timestamp_pb2.Timestamp
-    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., parent_order_id: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., stop_loss: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., take_profit: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopTrigger, _Mapping]] = ..., twap: _Optional[_Union[TwapTrigger, _Mapping]] = ..., ladder: _Optional[_Union[LadderTrigger, _Mapping]] = ..., stop: _Optional[_Union[StopDetails, _Mapping]] = ..., trailing: _Optional[_Union[TrailingDetails, _Mapping]] = ..., twap_state: _Optional[_Union[TwapDetails, _Mapping]] = ..., ladder_state: _Optional[_Union[LadderDetails, _Mapping]] = ..., client_trigger_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., armed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., parent_order_id: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ..., qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., stop_loss: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., take_profit: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopTrigger, _Mapping]] = ..., twap: _Optional[_Union[TwapTrigger, _Mapping]] = ..., ladder: _Optional[_Union[LadderTrigger, _Mapping]] = ..., stop: _Optional[_Union[StopDetails, _Mapping]] = ..., trailing: _Optional[_Union[TrailingDetails, _Mapping]] = ..., twap_state: _Optional[_Union[TwapDetails, _Mapping]] = ..., ladder_state: _Optional[_Union[LadderDetails, _Mapping]] = ..., client_trigger_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., armed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...

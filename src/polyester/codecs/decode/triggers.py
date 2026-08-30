@@ -48,12 +48,14 @@ _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
     triggers_pb2.EVENT_FIRED: "fired",
     triggers_pb2.EVENT_CANCELED: "canceled",
     triggers_pb2.EVENT_UPDATED: "updated",
+    triggers_pb2.EVENT_FAILED: "failed",
 }
 _TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
     "fired": triggers_pb2.EVENT_FIRED,
     "canceled": triggers_pb2.EVENT_CANCELED,
     "cancelled": triggers_pb2.EVENT_CANCELED,
     "updated": triggers_pb2.EVENT_UPDATED,
+    "failed": triggers_pb2.EVENT_FAILED,
 }
 
 
@@ -85,7 +87,8 @@ def trigger_event_type_from_label(label: str) -> int:
     key = label.strip().lower()
     if key not in _TRIGGER_EVENT_TYPE_FROM_LABEL:
         raise PolyesterValidationError(
-            f"invalid trigger event type {label!r}; expected one of: fired, canceled, updated"
+            f"invalid trigger event type {label!r}; "
+            "expected one of: fired, canceled, updated, failed"
         )
     return _TRIGGER_EVENT_TYPE_FROM_LABEL[key]
 
@@ -308,6 +311,12 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         armed_at=_timestamp(msg.armed_at) if has_field(msg, "armed_at") else None,
         completed_at=_timestamp(msg.completed_at) if has_field(msg, "completed_at") else None,
         details=details,
+        cancel_reason=_terminal_reason_label(
+            triggers_pb2.TriggerCancelReason, msg, "cancel_reason"
+        ),
+        failure_reason=_terminal_reason_label(
+            triggers_pb2.TriggerFailureReason, msg, "failure_reason"
+        ),
     )
 
 
@@ -365,8 +374,19 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
             if msg.HasField("fire_price_ticks")
             else None
         ),
-        reason=msg.reason,
+        cancel_reason=_terminal_reason_label(
+            triggers_pb2.TriggerCancelReason, msg, "cancel_reason"
+        ),
+        failure_reason=_terminal_reason_label(
+            triggers_pb2.TriggerFailureReason, msg, "failure_reason"
+        ),
     )
+
+
+def _terminal_reason_label(enum_cls: object, msg: object, field: str) -> str:
+    if not has_field(msg, field):
+        return ""
+    return proto_enum_name(enum_cls, int(getattr(msg, field)))  # type: ignore[arg-type]
 
 
 def trigger_events_list_from_proto(

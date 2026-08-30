@@ -322,7 +322,7 @@ class GetOrderHistoryResponse(_message.Message):
     def __init__(self, orders: _Optional[_Iterable[_Union[Order, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetUserTradesRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "side", "start_ts_ns", "end_ts_ns", "limit", "page_token")
+    __slots__ = ("subaccount_id", "symbol_id", "side", "start_ts_ns", "end_ts_ns", "limit", "page_token", "after_match_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
@@ -330,6 +330,7 @@ class GetUserTradesRequest(_message.Message):
     END_TS_NS_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    AFTER_MATCH_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol_id: int
     side: _orders_pb2.Side
@@ -337,7 +338,8 @@ class GetUserTradesRequest(_message.Message):
     end_ts_ns: int
     limit: int
     page_token: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., start_ts_ns: _Optional[int] = ..., end_ts_ns: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+    after_match_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., start_ts_ns: _Optional[int] = ..., end_ts_ns: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., after_match_id: _Optional[int] = ...) -> None: ...
 
 class GetUserTradesResponse(_message.Message):
     __slots__ = ("trades", "next_page_token")

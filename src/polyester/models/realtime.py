@@ -6,6 +6,7 @@ import msgspec
 class AddressBookViewInvalidation(msgspec.Struct, kw_only=True, omit_defaults=True):
     scope: str = ""
     invalidated_at: str = ""
+    view_revision: int = 0
 
 
 class OrderBookDeltaUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):

@@ -216,3 +216,4 @@ class AddressBookView(msgspec.Struct, kw_only=True, omit_defaults=True):
     tags: list[AddressBookTagSummary] | None = None
     withdraw_whitelist: WithdrawWhitelistView | None = None
     recent_destinations_truncated: bool = False
+    view_revision: int = 0

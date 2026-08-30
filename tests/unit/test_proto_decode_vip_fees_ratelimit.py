@@ -121,14 +121,14 @@ def test_rate_limit_config_uses_full_policy_class_names() -> None:
         rules=[
             ratelimit_pb2.TradingRateLimitRule(
                 policy_class=ratelimit_pb2.TRADING_RATE_LIMIT_CLASS_PLACE,
-                tier=0,
+                vip_tier=0,
                 quota_weight=100,
                 period_ms=1000,
                 burst_weight=20,
             ),
             ratelimit_pb2.TradingRateLimitRule(
                 policy_class=99,
-                tier=1,
+                vip_tier=1,
                 quota_weight=50,
                 period_ms=1000,
                 burst_weight=10,
@@ -144,7 +144,7 @@ def test_rate_limit_config_uses_full_policy_class_names() -> None:
 def test_trading_rate_limits_decode_account_and_api_key_rules() -> None:
     rule = ratelimit_pb2.TradingRateLimitRule(
         policy_class=ratelimit_pb2.TRADING_RATE_LIMIT_CLASS_CANCEL,
-        tier=3,
+        vip_tier=3,
         quota_weight=200,
         period_ms=500,
         burst_weight=40,
@@ -157,4 +157,4 @@ def test_trading_rate_limits_decode_account_and_api_key_rules() -> None:
     result = trading_rate_limits_from_proto(msg)
     assert result.effective_from is None
     assert result.rules[0].policy_class == "TRADING_RATE_LIMIT_CLASS_CANCEL"
-    assert result.api_key_rules[0].tier == 3
+    assert result.api_key_rules[0].vip_tier == 3

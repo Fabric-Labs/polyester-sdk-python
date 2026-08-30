@@ -6,6 +6,7 @@ import pytest
 
 from polyester.codecs.address_book import create_entry_to_proto, update_entry_to_proto
 from polyester.codecs.decode.address_book import (
+    address_book_view_from_proto,
     entry_from_create_proto,
     entry_from_update_proto,
 )
@@ -153,3 +154,23 @@ async def test_update_service_sends_new_tags_mask() -> None:
         )
     assert list(capture.request.update_mask.paths) == ["new_tags"]
     assert capture.request.entry.new_tags[0].name == "appended"
+
+
+@pytest.mark.asyncio
+async def test_get_view_wires_minimum_view_revision() -> None:
+    capture = CaptureUnary(address_book_pb2.GetAddressBookViewResponse(view_revision=9))
+    with patch("polyester.services.address_book.unary_auth_decoded", capture):
+        service = AsyncAddressBookService(
+            transport=MagicMock(),
+            default_sub_account_id=None,
+        )
+        view = await service.get_view(minimum_view_revision=9)
+    assert capture.request.minimum_view_revision == 9
+    assert view.view_revision == 9
+
+
+def test_address_book_view_maps_view_revision() -> None:
+    view = address_book_view_from_proto(
+        address_book_pb2.GetAddressBookViewResponse(view_revision=4)
+    )
+    assert view.view_revision == 4

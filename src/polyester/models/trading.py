@@ -243,6 +243,8 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     armed_at: datetime | None = None
     completed_at: datetime | None = None
     details: TriggerDetails | None = None
+    cancel_reason: str = ""
+    failure_reason: str = ""
 
 
 class TriggersList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -299,7 +301,8 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     child_seq: int = 0
     child_order_id: str = ""
     fire_price: Price | None = None
-    reason: str = ""
+    cancel_reason: str = ""
+    failure_reason: str = ""
 
 
 class TriggerEventsList(msgspec.Struct, kw_only=True, omit_defaults=True):

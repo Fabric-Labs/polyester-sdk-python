@@ -157,7 +157,6 @@ def test_trigger_events_list_from_proto() -> None:
                 child_seq=3,
                 child_order_id=77,
                 fire_price_ticks=100,
-                reason="hit",
             )
         ],
         next_page_token="evt-page-2",
@@ -171,7 +170,8 @@ def test_trigger_events_list_from_proto() -> None:
     assert event.child_seq == 3
     assert event.child_order_id == format_id(77)
     assert event.fire_price is not None and event.fire_price.ticks == 100
-    assert event.reason == "hit"
+    assert event.cancel_reason == ""
+    assert event.failure_reason == ""
     assert result.next_page_token == "evt-page-2"
 
 
@@ -189,6 +189,33 @@ def test_trigger_event_absent_fire_price() -> None:
     result = trigger_events_list_from_proto(msg)
     assert len(result.events) == 1
     assert result.events[0].fire_price is None
+
+
+def test_trigger_event_terminal_reasons() -> None:
+    canceled = trigger_events_list_from_proto(
+        triggers_pb2.ListTriggerEventsResponse(
+            events=[
+                triggers_pb2.TriggerEvent(
+                    trigger_id=1,
+                    event_type=triggers_pb2.EVENT_CANCELED,
+                    cancel_reason=triggers_pb2.TRIGGER_CANCEL_REASON_USER_REQUEST,
+                )
+            ]
+        )
+    ).events[0]
+    assert canceled.cancel_reason == "user_request"
+    assert canceled.failure_reason == ""
+
+    failed = trigger_from_proto(
+        triggers_pb2.Trigger(
+            trigger_id=2,
+            symbol_id=1,
+            status=triggers_pb2.STATUS_FAILED,
+            failure_reason=triggers_pb2.TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS,
+        )
+    )
+    assert failed.failure_reason == "insufficient_funds"
+    assert failed.cancel_reason == ""
 
 
 def test_trigger_event_type_from_label() -> None:

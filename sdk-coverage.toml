@@ -7,6 +7,10 @@ service = "auth.v1.MFAService"
 reason = "MFA enrollment and step-up are outside the API-key SDK surface."
 
 [[allowlist]]
+service = "auth.v1.SubaccountRoleService"
+reason = "Subaccount role catalog RPCs are JWT/session-only; outside the API-key SDK surface."
+
+[[allowlist]]
 procedure = "/auth.v1.AuthService/GetNonce"
 reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
 

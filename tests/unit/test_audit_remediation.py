@@ -14,11 +14,12 @@ from polyester.codecs.decode.triggers import (
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
-from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
 from polyester.services.market_overview import AsyncMarketOverviewService
 from polyester.services.orders import AsyncOrdersService
+from polyester.services.trades import AsyncTradesService
 from polyester.services.triggers import AsyncTriggersService
 from tests.unit.support import CaptureUnary
 
@@ -162,3 +163,28 @@ def test_ts_ns_decodes_millisecond_shaped_values() -> None:
         quantity_scale=4,
     )
     assert trade.ts_ns == "1700000000000"
+
+
+@pytest.mark.asyncio
+async def test_trades_list_after_match_id_requires_symbol() -> None:
+    service = AsyncTradesService(MagicMock(), _catalogs(), None)
+    with pytest.raises(PolyesterValidationError, match="Unknown symbol|symbol"):
+        await service.list(after_match_id=12)
+
+
+@pytest.mark.asyncio
+async def test_trades_list_after_match_id_wires_symbol_and_cursor() -> None:
+    capture = CaptureUnary(orders_read_pb2.GetUserTradesResponse())
+    service = AsyncTradesService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.trades.unary_auth_decoded", capture):
+        await service.list(symbol="BTC-USDT", after_match_id=12, limit=5)
+    assert capture.request.symbol_id == 1
+    assert capture.request.after_match_id == 12
+    assert capture.request.limit == 5
+
+
+@pytest.mark.asyncio
+async def test_trades_list_rejects_non_positive_after_match_id() -> None:
+    service = AsyncTradesService(MagicMock(), _catalogs(), None)
+    with pytest.raises(PolyesterValidationError, match="after_match_id"):
+        await service.list(symbol="BTC-USDT", after_match_id=0)

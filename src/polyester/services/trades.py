@@ -4,6 +4,7 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import user_trades_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_user_trade_bytes
+from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import GetUserTradesRequest
 from polyester.models import UserTrade, UserTradesList
@@ -39,12 +40,25 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         sub_account_id: str | None = None,
         symbol: str | None = None,
         symbol_id: int | None = None,
+        after_match_id: int | None = None,
         limit: int = 100,
         page_token: str | None = None,
     ) -> UserTradesList:
         validated_limit = validate_limit(limit)
         request = GetUserTradesRequest(limit=validated_limit)
-        if symbol is not None or symbol_id is not None:
+        if after_match_id is not None:
+            if int(after_match_id) <= 0:
+                raise PolyesterValidationError(
+                    "trades.list after_match_id must be a positive match id"
+                )
+            request.symbol_id = resolve_symbol_id(
+                self._catalogs,
+                symbol=symbol,
+                symbol_id=symbol_id,
+                label="trades.list",
+            )
+            request.after_match_id = int(after_match_id)
+        elif symbol is not None or symbol_id is not None:
             request.symbol_id = resolve_symbol_id(
                 self._catalogs,
                 symbol=symbol,

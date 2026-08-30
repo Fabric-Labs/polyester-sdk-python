@@ -216,6 +216,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         limit: int = 50,
+        minimum_view_revision: int = 0,
     ) -> AddressBookView:
         request = GetAddressBookViewRequest(limit=validate_limit(limit))
         parsed_sub = parse_optional_subaccount_id(
@@ -223,6 +224,8 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
+        if minimum_view_revision:
+            request.minimum_view_revision = int(minimum_view_revision)
         return await unary_auth_decoded(
             self._transport,
             AddressBookServiceClient,

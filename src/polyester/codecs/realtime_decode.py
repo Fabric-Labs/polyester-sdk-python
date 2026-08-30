@@ -147,7 +147,11 @@ def decode_address_book_invalidation_bytes(payload: bytes) -> AddressBookViewInv
     invalidated_at = ""
     if msg.HasField("invalidated_at"):
         invalidated_at = msg.invalidated_at.ToJsonString()
-    return AddressBookViewInvalidation(scope=scope, invalidated_at=invalidated_at)
+    return AddressBookViewInvalidation(
+        scope=scope,
+        invalidated_at=invalidated_at,
+        view_revision=int(msg.view_revision),
+    )
 
 
 def decode_orderbook_delta_bytes(payload: bytes) -> OrderBookDeltaUpdate:

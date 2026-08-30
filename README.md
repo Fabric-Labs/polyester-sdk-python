@@ -360,6 +360,9 @@ percents per listed symbol (optional `symbol_id` filter). That is the live effec
 surface, not a guaranteed quote of every future fill. The completed user-trade record still
 owns the exact charge.
 
+`trades.list(after_match_id=...)` is a durable fill-replay cursor and requires
+`symbol` or `symbol_id`.
+
 ## VIP, spot fees, and trading rate limits
 
 Public catalog reads need no credentials. Authenticated VIP status, effective spot fees, and
@@ -367,7 +370,8 @@ account trading limits require an API key. `GetVIPStatus` has no subaccount sele
 API-key callers receive the owning root group only. USD amounts and fee percents are decimal
 strings. Optional qualification metrics, timestamps, and next-tier thresholds stay omitted
 when unset. `policy_class` uses full protobuf enum names
-(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`).
+(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Rate-limit rules expose
+`vip_tier` (not `tier`).
 
 ```python
 tiers = await client.vip.list_vip_tiers()
@@ -381,6 +385,8 @@ limits = await client.rate_limits.get_trading_rate_limits()
 
 Address-book reads (`list_books`, `list_entries`, `get_view`) and writes
 (`create_entry`, `update_entry`, `delete_entry`, tag CRUD) are wrapped.
+`get_view(minimum_view_revision=...)` asks the server for a newer snapshot;
+the view and invalidation events expose `view_revision`.
 Create and update accept `new_tags` so a tag can be created and attached in
 the same request. Update is a durable PATCH: pass `expected_revision` from a
 prior read and only the fields you set are selected. When `tag_ids` is also
@@ -430,7 +436,8 @@ exposes `post_only`. Create/modify accept the same shape as a dict or
 `orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
 return only child orders created by that trigger (TWAP/ladder slices).
 Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
-(`fire_price_ticks` is optional on the wire).
+(`fire_price_ticks` is optional on the wire). Canceled and failed triggers
+expose typed `cancel_reason` / `failure_reason` labels (empty when unset).
 
 ## Balances: funding vs trading
 

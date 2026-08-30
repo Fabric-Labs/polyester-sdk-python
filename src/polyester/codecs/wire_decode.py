@@ -495,6 +495,12 @@ def decode_trigger(data: dict[str, Any]) -> Trigger:
         client_trigger_id=str(
             _field(data, "clientTriggerId", "client_trigger_id", default="") or ""
         ),
+        cancel_reason=str(
+            _field(data, "cancelReason", "cancel_reason", default="") or ""
+        ),
+        failure_reason=str(
+            _field(data, "failureReason", "failure_reason", default="") or ""
+        ),
     )
 
 
@@ -601,7 +607,12 @@ def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
         child_seq=int(_field(data, "childSeq", "child_seq", default=0) or 0),
         child_order_id=_id_str(child_order_raw) if int(child_order_raw) else "",
         fire_price=Price.from_ticks(int(fire_raw)) if int(fire_raw) else None,
-        reason=str(_field(data, "reason", default="") or ""),
+        cancel_reason=str(
+            _field(data, "cancelReason", "cancel_reason", default="") or ""
+        ),
+        failure_reason=str(
+            _field(data, "failureReason", "failure_reason", default="") or ""
+        ),
     )
 
 

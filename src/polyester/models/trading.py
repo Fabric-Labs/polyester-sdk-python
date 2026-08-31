@@ -11,6 +11,14 @@ from polyester.types.money import AssetAmount, Price, Quantity
 
 
 class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Spot order snapshot.
+
+    ``orig_qty`` is the current accepted total quantity and changes after a
+    successful modify. ``cum_qty`` is cumulative fills; ``leaves_qty`` is
+    remaining working quantity. Retain the first submitted quantity separately
+    if you need it.
+    """
+
     order_id: str
     symbol_id: int
     client_order_id: str = ""
@@ -258,6 +266,21 @@ class TriggerMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     status: str = ""
 
 
+class TransferSide(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One display side of a ledger transfer.
+
+    ``kind`` is a snake_case label (funding_account, trading_account,
+    external_address, private_counterparty, fee_account, system_account).
+    ``chain_id`` is the Zipper ``ChainConfig.chain_id`` for external-address
+    sides, not an EIP-155 or Polyester chain id.
+    """
+
+    kind: str = ""
+    account_id: str = ""
+    address: str = ""
+    chain_id: int | None = None
+
+
 class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     asset_id: int = 0
     amount: str = "0"
@@ -267,6 +290,8 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     pending: bool = False
     tx_id: str = ""
     is_debit: bool = False
+    source: TransferSide | None = None
+    destination: TransferSide | None = None
 
 
 class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):

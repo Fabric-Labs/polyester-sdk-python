@@ -52,6 +52,17 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
     assert order.version == 7
 
 
+def test_order_orig_qty_is_current_accepted_total() -> None:
+    before = order_from_proto(
+        Order(order_id=1, symbol_id=3, orig_qty_scaled=100, leaves_qty_scaled=100)
+    )
+    after = order_from_proto(
+        Order(order_id=1, symbol_id=3, orig_qty_scaled=150, leaves_qty_scaled=150)
+    )
+    assert before.orig_qty is not None and before.orig_qty.scaled == 100
+    assert after.orig_qty is not None and after.orig_qty.scaled == 150
+
+
 def test_order_from_proto_maps_attached_risk() -> None:
     from polyester.gen.orders.v1.orders_read_pb2 import (
         AttachedRisk as ProtoAttachedRisk,

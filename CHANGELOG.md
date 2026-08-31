@@ -20,9 +20,20 @@
 - `trades.list(after_match_id=...)` requires `symbol` or `symbol_id`.
 
 ### Added
+- `LedgerTransfer.source` / `destination` (`TransferSide`) including optional
+  `chain_id` for external-address sides. This is the Zipper
+  `ChainConfig.chain_id`, not an EIP-155 or Polyester chain id.
 - `trades.list(after_match_id=...)` durable fill replay cursor.
 - Address-book `get_view(minimum_view_revision=...)` plus `view_revision`
   on the view and invalidation events.
+
+### Changed
+- `Order.orig_qty` is documented as the current accepted total (updates after
+  a successful modify). Batch-create `request_id` is the batch idempotency
+  key; item `client_order_id` remains optional.
+- Trigger modify omits `activation_price` / `max_slippage_*` to preserve
+  current values and sends explicit zero to clear them. Create/modify reject
+  `max_slippage_bps` outside 1–10000; modify still accepts `0` to clear.
 
 ### Removed
 - Unused handwritten Connect header and body helpers. Generated Connect

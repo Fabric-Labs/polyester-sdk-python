@@ -59,6 +59,7 @@ async def test_order_round_trip(
     assert order_detail.order is not None
     assert order_detail.order.client_order_id == client_order_id
     assert order_detail.order.order_id == created.order_id
+    assert order_detail.order.orig_qty is not None and order_detail.order.orig_qty.scaled > 0
 
     try:
         cancelled = await live_client.orders.cancel(

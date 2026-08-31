@@ -226,14 +226,16 @@ class ListTransfersRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., ts_min_us: _Optional[int] = ..., ts_max_us: _Optional[int] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., ledger: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class TransferSide(_message.Message):
-    __slots__ = ("kind", "account_id", "address")
+    __slots__ = ("kind", "account_id", "address", "chain_id")
     KIND_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     kind: TransferSideKind
     account_id: int
     address: str
-    def __init__(self, kind: _Optional[_Union[TransferSideKind, str]] = ..., account_id: _Optional[int] = ..., address: _Optional[str] = ...) -> None: ...
+    chain_id: int
+    def __init__(self, kind: _Optional[_Union[TransferSideKind, str]] = ..., account_id: _Optional[int] = ..., address: _Optional[str] = ..., chain_id: _Optional[int] = ...) -> None: ...
 
 class TransferRow(_message.Message):
     __slots__ = ("asset_id", "amount_e18", "transfer_code", "account_code", "ts_us", "balance_after_e18", "is_debit", "link_id", "flow_id", "source", "destination")

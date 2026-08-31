@@ -50,6 +50,7 @@ from polyester.models.trading import (
     ResolvedAccountsList,
     TransferDestination,
     TransferDestinationsList,
+    TransferSide,
     TransfersList,
     Trigger,
     TriggerEvent,
@@ -524,6 +525,19 @@ def decode_trigger_mutation(data: dict[str, Any]) -> TriggerMutationResult:
     )
 
 
+def _decode_transfer_side(data: Any) -> TransferSide | None:
+    if not isinstance(data, dict):
+        return None
+    kind = str(_field(data, "kind", default="") or "")
+    account_id = str(_field(data, "accountId", "account_id", default="") or "")
+    address = str(_field(data, "address", default="") or "")
+    raw_chain = _field(data, "chainId", "chain_id")
+    chain_id = int(raw_chain) if raw_chain not in (None, "") else None
+    if not kind and not account_id and not address and chain_id is None:
+        return None
+    return TransferSide(kind=kind, account_id=account_id, address=address, chain_id=chain_id)
+
+
 def decode_ledger_transfer(data: dict[str, Any]) -> LedgerTransfer:
     return LedgerTransfer(
         asset_id=int(_field(data, "assetId", "asset_id", default=0) or 0),
@@ -534,6 +548,8 @@ def decode_ledger_transfer(data: dict[str, Any]) -> LedgerTransfer:
         pending=bool(_field(data, "pending", default=False)),
         tx_id=str(_field(data, "txId", "tx_id", default="") or ""),
         is_debit=bool(_field(data, "isDebit", "is_debit", default=False)),
+        source=_decode_transfer_side(_field(data, "source")),
+        destination=_decode_transfer_side(_field(data, "destination")),
     )
 
 

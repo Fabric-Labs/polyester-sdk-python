@@ -39,6 +39,14 @@ LADDER_DISTRIBUTION_TO_PROTO = {
     "geometric": "GEOMETRIC",
     "weighted_favorable": "WEIGHTED_FAVORABLE",
 }
+MAX_SLIPPAGE_BPS = 10_000
+
+
+def _validate_slippage_bps(bps: int, *, allow_clear: bool) -> None:
+    if allow_clear and bps == 0:
+        return
+    if bps < 1 or bps > MAX_SLIPPAGE_BPS:
+        raise PolyesterValidationError("max_slippage_bps must be between 1 and 10000")
 
 
 def _conditional_child(
@@ -195,6 +203,7 @@ def create_trigger_to_proto(
         if max_slippage_ticks is not None:
             trailing.max_slippage_ticks = max_slippage_ticks
         if max_slippage_bps is not None:
+            _validate_slippage_bps(max_slippage_bps, allow_clear=False)
             trailing.max_slippage_bps = max_slippage_bps
     elif type_key == "twap":
         twap = intent.twap
@@ -269,11 +278,11 @@ def modify_trigger_to_proto(
 ) -> triggers_pb2.ModifyTriggerRequest:
     if not any(
         (
-            trigger_price,
-            limit_price,
+            trigger_price is not None,
+            limit_price is not None,
             trailing_distance_ticks is not None,
             trailing_distance_bps is not None,
-            activation_price,
+            activation_price is not None,
             max_slippage_ticks is not None,
             max_slippage_bps is not None,
         )
@@ -304,5 +313,6 @@ def modify_trigger_to_proto(
     if max_slippage_ticks is not None:
         proto.max_slippage_ticks = max_slippage_ticks
     if max_slippage_bps is not None:
+        _validate_slippage_bps(max_slippage_bps, allow_clear=True)
         proto.max_slippage_bps = max_slippage_bps
     return proto

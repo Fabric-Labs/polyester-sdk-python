@@ -239,7 +239,10 @@ creates. **Set a stable non-empty value when you may retry** after an ambiguous
 transport/server failure, and reuse that same id on retry / reconciliation -
 without it you cannot safely tell whether the first attempt admitted the order.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
-`-`. Batch create, cancel, and replace accept at most 20 items. Treat a cancel
+`-`. Batch create, cancel, and replace accept at most 20 items. `batch_create`
+always sends `request_id` (caller value or a generated `batch-create-*` key);
+that batch-level id is the idempotency boundary, so per-item `client_order_id`
+may be omitted. Treat a cancel
 response as an admission acknowledgement and reconcile with `list_open` before
 releasing local state.
 
@@ -334,6 +337,7 @@ result = await client.orders.create(
     post_only=True,
 )
 # Reads expose the same types: order.price.ticks, order.orig_qty.scaled
+# orig_qty is the current accepted total and changes after a successful modify.
 ```
 
 Compatible values from fills/books can be passed back into writes when the
@@ -438,6 +442,12 @@ an empty list). Response `status` uses the same labels (British spelling
 `order.attached_risk` (take-profit / stop-loss / trailing-stop). `Order` also
 exposes `post_only`. Create/modify accept the same shape as a dict or
 `AttachedRisk`.
+
+When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
+`max_slippage_bps` to preserve the current values. Send an explicit zero
+(`Price.from_ticks(0)` or `0`) to clear an existing activation price or
+maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
+modify still accepts `0` to clear.
 
 `orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
 return only child orders created by that trigger (TWAP/ladder slices).

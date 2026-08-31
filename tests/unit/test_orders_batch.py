@@ -83,6 +83,8 @@ def test_batch_create_orders_to_proto_from_create_order_request() -> None:
     )
     proto = batch_create_orders_to_proto(items=[item], quantity_scale=8)
     assert len(proto.items) == 1
+    assert proto.request_id, "batch create must send a non-empty request_id"
+    assert proto.items[0].client_order_id == ""
     assert proto.items[0].base_qty_scaled == 50_000_000
     assert proto.items[0].limit_gtc.price_ticks == 100_000_000
 

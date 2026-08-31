@@ -1,8 +1,9 @@
 import pytest
 
-from polyester.codecs.triggers import create_trigger_to_proto
+from polyester.codecs.triggers import create_trigger_to_proto, modify_trigger_to_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.types.money import Price
 
 
 def test_create_trigger_stop_loss_maps_core_fields() -> None:
@@ -162,3 +163,52 @@ def test_create_trigger_rejects_non_linear_ladder_distribution() -> None:
             assert "ladder_distribution" in str(exc)
         else:
             raise AssertionError("expected PolyesterValidationError")
+
+
+def test_modify_trigger_omits_unset_fields_and_clears_with_zero() -> None:
+    cleared = modify_trigger_to_proto(
+        trigger_id="1",
+        symbol_id=7,
+        activation_price=Price.from_ticks(0),
+        max_slippage_bps=0,
+    )
+    assert cleared.HasField("activation_price_ticks")
+    assert cleared.activation_price_ticks == 0
+    assert cleared.WhichOneof("max_slippage") == "max_slippage_bps"
+    assert cleared.max_slippage_bps == 0
+    assert not cleared.HasField("trigger_price_ticks")
+
+    preserved = modify_trigger_to_proto(
+        trigger_id="1",
+        symbol_id=7,
+        trigger_price="101",
+    )
+    assert not preserved.HasField("activation_price_ticks")
+    assert preserved.WhichOneof("max_slippage") is None
+
+
+def test_trigger_slippage_bps_cap() -> None:
+    create_trigger_to_proto(
+        symbol="BTC-USDT",
+        symbol_id=1,
+        trigger_type="trailing_stop",
+        side="sell",
+        qty="0.1",
+        quantity_scale=8,
+        trailing_distance_bps=100,
+        max_slippage_bps=10000,
+    )
+    with pytest.raises(PolyesterValidationError, match="1 and 10000"):
+        create_trigger_to_proto(
+            symbol="BTC-USDT",
+            symbol_id=1,
+            trigger_type="trailing_stop",
+            side="sell",
+            qty="0.1",
+            quantity_scale=8,
+            trailing_distance_bps=100,
+            max_slippage_bps=10001,
+        )
+    with pytest.raises(PolyesterValidationError, match="1 and 10000"):
+        modify_trigger_to_proto(trigger_id="1", symbol_id=7, max_slippage_bps=10001)
+    modify_trigger_to_proto(trigger_id="1", symbol_id=7, max_slippage_bps=0)

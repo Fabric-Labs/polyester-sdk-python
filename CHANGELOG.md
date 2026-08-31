@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a46
+
+Git tag: `v0.1.0a46`.
+
 ### Breaking
 - Connect market, order, trigger, fee, policy, and orderbook payloads are
   `symbol_id`-only. `GetSpotConfig` is the remaining message that still

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+- `Order.attached_risk` legs expose typed `AttachedRiskLegState` runtime
+  status, armed/terminal nanosecond timestamps, trigger ID, and child-order ID,
+  including state-only wrappers returned when policy inclusion is disabled.
+
+### Fixed
+- Attached and standalone trailing-stop basis-point fields validate within
+  1–10,000 before protobuf assignment; explicit zero clears remain available
+  only on trigger modify.
+- Batch create rejects duplicate non-empty client order IDs while continuing
+  to allow omitted/generated IDs.
+- Attached-risk decode preserves stop-loss and trailing-stop legs together in
+  malformed or legacy responses instead of hiding observable state.
+- Buffered stale orderbook resets no longer clear or rewind newer snapshots.
+- Ladder trigger ranges require resolved minimum price ticks to be strictly
+  less than maximum price ticks.
+
 ## 0.1.0a46
 
 Git tag: `v0.1.0a46`.

@@ -39,11 +39,22 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     attached_risk: AttachedRisk | None = None
 
 
+class AttachedRiskLegState(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Runtime state for one attached take-profit, stop-loss, or trailing leg."""
+
+    status: str = ""
+    armed_ts_ns: str = ""
+    terminal_ts_ns: str = ""
+    trigger_id: str = ""
+    child_order_id: str = ""
+
+
 class RiskLeg(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_price: Price | None = None
     trigger_price_source: str = ""
     order_type: str = ""
     limit_price: Price | None = None
+    state: AttachedRiskLegState | None = None
 
 
 class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -62,6 +73,7 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
     activation_price: Price | None = None
     trigger_price_source: str = ""
     order_type: str = ""
+    state: AttachedRiskLegState | None = None
 
 
 class AttachedRisk(msgspec.Struct, kw_only=True, omit_defaults=True):

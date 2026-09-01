@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.bps import validate_bps
 from polyester.codecs.correlation_id import optional_client_id
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
@@ -39,14 +40,6 @@ LADDER_DISTRIBUTION_TO_PROTO = {
     "geometric": "GEOMETRIC",
     "weighted_favorable": "WEIGHTED_FAVORABLE",
 }
-MAX_SLIPPAGE_BPS = 10_000
-
-
-def _validate_slippage_bps(bps: int, *, allow_clear: bool) -> None:
-    if allow_clear and bps == 0:
-        return
-    if bps < 1 or bps > MAX_SLIPPAGE_BPS:
-        raise PolyesterValidationError("max_slippage_bps must be between 1 and 10000")
 
 
 def _conditional_child(
@@ -195,7 +188,9 @@ def create_trigger_to_proto(
         if trailing_distance_ticks is not None:
             trailing.trailing_distance_ticks = trailing_distance_ticks
         if trailing_distance_bps is not None:
-            trailing.trailing_distance_bps = trailing_distance_bps
+            trailing.trailing_distance_bps = validate_bps(
+                trailing_distance_bps, "trailing_distance_bps"
+            )
         if activation_price is not None:
             trailing.activation_price_ticks = resolve_price_ticks(
                 activation_price, "activation_price", symbol=symbol
@@ -203,8 +198,7 @@ def create_trigger_to_proto(
         if max_slippage_ticks is not None:
             trailing.max_slippage_ticks = max_slippage_ticks
         if max_slippage_bps is not None:
-            _validate_slippage_bps(max_slippage_bps, allow_clear=False)
-            trailing.max_slippage_bps = max_slippage_bps
+            trailing.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
     elif type_key == "twap":
         twap = intent.twap
         twap.side = side_proto
@@ -228,14 +222,28 @@ def create_trigger_to_proto(
         ladder = intent.ladder
         ladder.side = side_proto
         ladder.SetInParent()
+        price_min_ticks = None
+        price_max_ticks = None
         if ladder_price_min is not None:
-            ladder.price_min_ticks = resolve_price_ticks(
+            price_min_ticks = resolve_price_ticks(
                 ladder_price_min, "ladder_price_min", symbol=symbol
             )  # type: ignore[arg-type]
         if ladder_price_max is not None:
-            ladder.price_max_ticks = resolve_price_ticks(
+            price_max_ticks = resolve_price_ticks(
                 ladder_price_max, "ladder_price_max", symbol=symbol
             )  # type: ignore[arg-type]
+        if (
+            price_min_ticks is not None
+            and price_max_ticks is not None
+            and price_min_ticks >= price_max_ticks
+        ):
+            raise PolyesterValidationError(
+                "ladder_price_min must be strictly less than ladder_price_max"
+            )
+        if price_min_ticks is not None:
+            ladder.price_min_ticks = price_min_ticks
+        if price_max_ticks is not None:
+            ladder.price_max_ticks = price_max_ticks
         if ladder_levels is not None:
             ladder.levels = ladder_levels
         if post_only:
@@ -307,12 +315,19 @@ def modify_trigger_to_proto(
     if trailing_distance_ticks is not None:
         proto.trailing_distance_ticks = trailing_distance_ticks
     if trailing_distance_bps is not None:
-        proto.trailing_distance_bps = trailing_distance_bps
+        proto.trailing_distance_bps = validate_bps(
+            trailing_distance_bps,
+            "trailing_distance_bps",
+            allow_clear=True,
+        )
     if activation_price is not None:
         proto.activation_price_ticks = resolve_price_ticks(activation_price, "activation_price")  # type: ignore[arg-type]
     if max_slippage_ticks is not None:
         proto.max_slippage_ticks = max_slippage_ticks
     if max_slippage_bps is not None:
-        _validate_slippage_bps(max_slippage_bps, allow_clear=True)
-        proto.max_slippage_bps = max_slippage_bps
+        proto.max_slippage_bps = validate_bps(
+            max_slippage_bps,
+            "max_slippage_bps",
+            allow_clear=True,
+        )
     return proto

@@ -179,8 +179,15 @@ def apply_delta(
     if seq_start < 0 or seq_end < seq_start:
         return current_book_seq, True
 
-    comparison_seq = 0 if delta.reset else current_book_seq
-    if comparison_seq != 0 and seq_start > comparison_seq + 1:
+    # A reset is a complete replacement through seq_end. A snapshot at the
+    # same or newer sequence is already authoritative, so a buffered reset
+    # must not clear or rewind it. A reset that reaches a newer sequence can
+    # safely replace the book even if its range starts before or after the
+    # current sequence.
+    if delta.reset and seq_end <= current_book_seq:
+        return current_book_seq, False
+
+    if not delta.reset and current_book_seq != 0 and seq_start > current_book_seq + 1:
         return current_book_seq, True
 
     if not delta.reset and seq_end <= current_book_seq:

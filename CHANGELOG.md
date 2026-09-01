@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a47
+
+Git tag: `v0.1.0a47`.
+
 ### Added
 - `Order.attached_risk` legs expose typed `AttachedRiskLegState` runtime
   status, armed/terminal nanosecond timestamps, trigger ID, and child-order ID,

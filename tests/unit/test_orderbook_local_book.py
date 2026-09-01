@@ -102,13 +102,13 @@ def test_apply_delta_reset_clears_book() -> None:
         current_book_seq=5,
         delta=OrderBookDeltaUpdate(
             reset=True,
-            book_seq_start="0",
-            book_seq_end="1",
+            book_seq_start="6",
+            book_seq_end="6",
             bids=[("50", "1")],
         ),
     )
     assert refresh is False
-    assert seq == 1
+    assert seq == 6
     assert bids == {50: 1}
     assert asks == {}
 

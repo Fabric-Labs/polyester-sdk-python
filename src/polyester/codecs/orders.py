@@ -7,6 +7,7 @@ from typing import Any, cast
 import msgspec
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.bps import validate_bps
 from polyester.codecs.correlation_id import (
     optional_client_id,
     optional_request_id,
@@ -56,9 +57,7 @@ def require_order_key(key: OrderKey, op: str) -> OrderKey:
         if not str(key.value).strip():
             raise PolyesterValidationError(f"{op} requires a non-empty ClientOrderId")
         return key
-    raise PolyesterValidationError(
-        f"{op} requires an OrderKey (OrderId or ClientOrderId)"
-    )
+    raise PolyesterValidationError(f"{op} requires an OrderKey (OrderId or ClientOrderId)")
 
 
 def set_order_key(target: Any, key: OrderKey, *, op: str) -> None:
@@ -173,8 +172,7 @@ def order_intent_from_request(
             "orders.create requires exactly one of qty or max_quote_debit"
         )
     if request.max_quote_debit is not None and (
-        request.side != "buy"
-        or (request.order_type == "limit" and (request.tif or "gtc") != "ioc")
+        request.side != "buy" or (request.order_type == "limit" and (request.tif or "gtc") != "ioc")
     ):
         raise PolyesterValidationError(
             "max_quote_debit is only valid for buy market or limit IOC orders"
@@ -453,9 +451,7 @@ def _risk_execution_from_friendly(
     label = str(order_type).strip().lower() if order_type is not None else "market"
     if label in {"market", "market_ioc"}:
         if limit_price is not None:
-            raise PolyesterValidationError(
-                f"{field_name} MARKET child must not set limit_price"
-            )
+            raise PolyesterValidationError(f"{field_name} MARKET child must not set limit_price")
         child.market_ioc.SetInParent()
         return child
     if label in {"limit", "limit_gtc"}:
@@ -513,9 +509,7 @@ def _risk_execution_from_child(
                 ticks, f"{field_name}.child.limit_gtc.price_ticks"
             )
         else:
-            raise PolyesterValidationError(
-                f"{field_name} LIMIT child requires limit_price"
-            )
+            raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
         return execution
     if has_market:
         market = _mapping_get(child, "market_ioc", "marketIoc")
@@ -597,24 +591,21 @@ def _trailing_stop_from_dict(
     dist_ticks = _mapping_get(
         data, "trailing_distance_ticks", "trailingDistanceTicks", "distance_ticks"
     )
-    dist_bps = _mapping_get(
-        data, "trailing_distance_bps", "trailingDistanceBps", "distance_bps"
-    )
+    dist_bps = _mapping_get(data, "trailing_distance_bps", "trailingDistanceBps", "distance_bps")
     if dist_ticks is None and dist_bps is None:
         raise PolyesterValidationError(
             "trailing_stop requires trailing_distance_ticks or trailing_distance_bps"
         )
     if dist_ticks is not None and dist_bps is not None:
         raise PolyesterValidationError(
-            "trailing_stop requires exactly one of trailing_distance_ticks "
-            "or trailing_distance_bps"
+            "trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps"
         )
 
     proto = orders_pb2.TrailingStopPolicy()
     if dist_ticks is not None:
         proto.trailing_distance_ticks = _positive_int(dist_ticks, "trailing_distance_ticks")
     else:
-        proto.trailing_distance_bps = _positive_int(dist_bps, "trailing_distance_bps")
+        proto.trailing_distance_bps = validate_bps(dist_bps, "trailing_distance_bps")
 
     slip_ticks = _mapping_get(data, "max_slippage_ticks", "maxSlippageTicks")
     slip_bps = _mapping_get(data, "max_slippage_bps", "maxSlippageBps")
@@ -625,7 +616,7 @@ def _trailing_stop_from_dict(
     if slip_ticks is not None:
         proto.max_slippage_ticks = _positive_int(slip_ticks, "max_slippage_ticks")
     if slip_bps is not None:
-        proto.max_slippage_bps = _positive_int(slip_bps, "max_slippage_bps")
+        proto.max_slippage_bps = validate_bps(slip_bps, "max_slippage_bps")
 
     activation = _mapping_get(data, "activation_price", "activationPrice")
     activation_ticks = _mapping_get(data, "activation_price_ticks", "activationPriceTicks")
@@ -638,9 +629,7 @@ def _trailing_stop_from_dict(
             activation, "attached_risk.trailing_stop.activation_price", symbol=symbol
         )
     elif activation_ticks is not None:
-        proto.activation_price_ticks = _positive_int(
-            activation_ticks, "activation_price_ticks"
-        )
+        proto.activation_price_ticks = _positive_int(activation_ticks, "activation_price_ticks")
     return proto
 
 
@@ -661,9 +650,7 @@ def risk_policy_from_dict(
     if isinstance(data, AttachedRisk):
         data = _attached_risk_to_dict(data)
         if not data:
-            raise PolyesterValidationError(
-                "attached_risk requires take_profit and/or a stop leg"
-            )
+            raise PolyesterValidationError("attached_risk requires take_profit and/or a stop leg")
     elif not isinstance(data, dict):
         raise PolyesterValidationError("attached_risk must be an object or AttachedRisk")
     if not data:
@@ -718,9 +705,7 @@ def batch_replace_item_to_proto(
     new_price = item.get("new_price")
     new_qty = item.get("new_qty")
     if new_price is None and new_qty is None:
-        raise PolyesterValidationError(
-            "each batch item requires new_price and/or new_qty"
-        )
+        raise PolyesterValidationError("each batch item requires new_price and/or new_qty")
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
@@ -750,12 +735,21 @@ def batch_create_orders_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+    seen_client_order_ids: set[str] = set()
     for item in items:
         if isinstance(item, CreateOrderRequest):
             normalized = item
         else:
             normalized = normalize_create_order_request(item)
-        proto.items.append(order_intent_from_request(normalized, quantity_scale=quantity_scale))
+        intent = order_intent_from_request(normalized, quantity_scale=quantity_scale)
+        client_order_id = intent.client_order_id
+        if client_order_id and client_order_id in seen_client_order_ids:
+            raise PolyesterValidationError(
+                f"batch_create has duplicate client_order_id {client_order_id!r}"
+            )
+        if client_order_id:
+            seen_client_order_ids.add(client_order_id)
+        proto.items.append(intent)
     return proto
 
 
@@ -878,9 +872,7 @@ def modify_order_to_proto(
             )
         proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
     if new_client_order_id:
-        proto.new_client_order_id = required_client_id(
-            new_client_order_id, "new_client_order_id"
-        )
+        proto.new_client_order_id = required_client_id(new_client_order_id, "new_client_order_id")
     risk = risk_policy_from_dict(new_attached_risk, symbol=symbol)
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
@@ -986,8 +978,7 @@ def resolve_quote_quantity_scale(
     if isinstance(value, Quantity):
         if value.scale is None:
             raise PolyesterValidationError(
-                "quote amount scale is required; use "
-                "Quantity.from_quote_scaled/from_quote_decimal"
+                "quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal"
             )
         if value.scale != catalog_scale:
             raise PolyesterValidationError(

@@ -439,15 +439,20 @@ an empty list). Response `status` uses the same labels (British spelling
 `cancelled`).
 
 `orders.get(..., include_attached_risk=True)` returns policy data on
-`order.attached_risk` (take-profit / stop-loss / trailing-stop). `Order` also
-exposes `post_only`. Create/modify accept the same shape as a dict or
-`AttachedRisk`.
+`order.attached_risk` (take-profit / stop-loss / trailing-stop). Independently,
+`include_attached_risk_state=True` can return state-only leg wrappers when
+policy inclusion is false. Each returned `RiskLeg` / `TrailingStop` exposes
+that runtime `AttachedRiskLegState` at `.state` with `status`, nanosecond
+armed/terminal timestamps, `trigger_id`, and `child_order_id`; absent policy
+fields remain unset. `Order` also exposes `post_only`. Create/modify accept the
+same policy shape as a dict or `AttachedRisk`.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
 (`Price.from_ticks(0)` or `0`) to clear an existing activation price or
 maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
-modify still accepts `0` to clear.
+modify still accepts `0` to clear. Trailing distance in bps uses the same
+1–10000 range; trigger modify accepts `0` to clear.
 
 `orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
 return only child orders created by that trigger (TWAP/ladder slices).

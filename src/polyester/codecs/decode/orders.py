@@ -19,6 +19,7 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
 )
 from polyester.models import (
     AttachedRisk,
+    AttachedRiskLegState,
     BatchCancelOrdersResult,
     BatchCancelResultItem,
     BatchCreateOrdersResult,
@@ -88,9 +89,41 @@ def _risk_execution_order_type(child) -> tuple[str, int | None]:
     return "", None
 
 
-def _risk_leg_from_policy(policy) -> RiskLeg | None:
-    if policy is None or not policy.trigger_price_ticks:
+def _attached_risk_state_from_proto(msg) -> AttachedRiskLegState | None:
+    if msg is None:
         return None
+    return AttachedRiskLegState(
+        status=(
+            proto_enum_name(orders_read_pb2.AttachedRiskLegState.Status, msg.status)
+            if msg.status
+            else ""
+        ),
+        armed_ts_ns=ts_ns_string_from_response(
+            msg.armed_ts_ns,
+            context="AttachedRiskLegState",
+            field_name="armed_ts_ns",
+            empty_when_zero=True,
+        ),
+        terminal_ts_ns=ts_ns_string_from_response(
+            msg.terminal_ts_ns,
+            context="AttachedRiskLegState",
+            field_name="terminal_ts_ns",
+            empty_when_zero=True,
+        ),
+        trigger_id=(format_uint64_id(msg.trigger_id) if msg.HasField("trigger_id") else ""),
+        child_order_id=(
+            format_uint64_id(msg.child_order_id) if msg.HasField("child_order_id") else ""
+        ),
+    )
+
+
+def _risk_leg_from_policy(
+    policy,
+    *,
+    state: AttachedRiskLegState | None = None,
+) -> RiskLeg | None:
+    if policy is None or not policy.trigger_price_ticks:
+        return RiskLeg(state=state) if state is not None else None
     order_type, limit_ticks = _risk_execution_order_type(
         policy.child if policy.HasField("child") else None
     )
@@ -98,18 +131,23 @@ def _risk_leg_from_policy(policy) -> RiskLeg | None:
         trigger_price=_price(policy.trigger_price_ticks),
         order_type=order_type,
         limit_price=_price(limit_ticks) if limit_ticks else None,
+        state=state,
     )
 
 
-def _trailing_stop_from_policy(policy) -> TrailingStop | None:
+def _trailing_stop_from_policy(
+    policy,
+    *,
+    state: AttachedRiskLegState | None = None,
+) -> TrailingStop | None:
     if policy is None:
-        return None
+        return TrailingStop(state=state) if state is not None else None
     distance_ticks = int(policy.trailing_distance_ticks)
     distance_bps = int(policy.trailing_distance_bps)
     # Missing or non-positive distance is not a usable trailing stop; omit
     # rather than fabricating a zero-distance stop.
     if distance_ticks <= 0 and distance_bps <= 0:
-        return None
+        return TrailingStop(state=state) if state is not None else None
     max_slippage_ticks = int(policy.max_slippage_ticks)
     max_slippage_bps = int(policy.max_slippage_bps)
     return TrailingStop(
@@ -120,6 +158,7 @@ def _trailing_stop_from_policy(policy) -> TrailingStop | None:
         activation_price=(
             _price(policy.activation_price_ticks) if policy.activation_price_ticks else None
         ),
+        state=state,
     )
 
 
@@ -127,15 +166,35 @@ def _attached_risk_from_proto(msg) -> AttachedRisk | None:
     if msg is None:
         return None
     take_profit = None
-    if msg.HasField("take_profit") and msg.take_profit.HasField("policy"):
-        take_profit = _risk_leg_from_policy(msg.take_profit.policy)
+    if msg.HasField("take_profit"):
+        take_profit = _risk_leg_from_policy(
+            msg.take_profit.policy if msg.take_profit.HasField("policy") else None,
+            state=(
+                _attached_risk_state_from_proto(msg.take_profit.state)
+                if msg.take_profit.HasField("state")
+                else None
+            ),
+        )
     trailing_stop = None
-    if msg.HasField("trailing_stop") and msg.trailing_stop.HasField("policy"):
-        trailing_stop = _trailing_stop_from_policy(msg.trailing_stop.policy)
+    if msg.HasField("trailing_stop"):
+        trailing_stop = _trailing_stop_from_policy(
+            msg.trailing_stop.policy if msg.trailing_stop.HasField("policy") else None,
+            state=(
+                _attached_risk_state_from_proto(msg.trailing_stop.state)
+                if msg.trailing_stop.HasField("state")
+                else None
+            ),
+        )
     stop_loss = None
-    # Match TS: when trailing is present, stop-loss is suppressed.
-    if trailing_stop is None and msg.HasField("stop_loss") and msg.stop_loss.HasField("policy"):
-        stop_loss = _risk_leg_from_policy(msg.stop_loss.policy)
+    if msg.HasField("stop_loss"):
+        stop_loss = _risk_leg_from_policy(
+            msg.stop_loss.policy if msg.stop_loss.HasField("policy") else None,
+            state=(
+                _attached_risk_state_from_proto(msg.stop_loss.state)
+                if msg.stop_loss.HasField("state")
+                else None
+            ),
+        )
     if take_profit is None and stop_loss is None and trailing_stop is None:
         return None
     return AttachedRisk(

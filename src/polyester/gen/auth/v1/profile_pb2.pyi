@@ -111,3 +111,25 @@ class GetUsernameHistoryResponse(_message.Message):
     HISTORY_FIELD_NUMBER: _ClassVar[int]
     history: _containers.RepeatedCompositeFieldContainer[UsernameHistoryEntry]
     def __init__(self, history: _Optional[_Iterable[_Union[UsernameHistoryEntry, _Mapping]]] = ...) -> None: ...
+
+class GenerateUsernameOptionsRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GenerateUsernameOptionsResponse(_message.Message):
+    __slots__ = ("usernames", "offer_token", "expires_at")
+    USERNAMES_FIELD_NUMBER: _ClassVar[int]
+    OFFER_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    usernames: _containers.RepeatedScalarFieldContainer[str]
+    offer_token: str
+    expires_at: _timestamp_pb2.Timestamp
+    def __init__(self, usernames: _Optional[_Iterable[str]] = ..., offer_token: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ClaimGeneratedUsernameRequest(_message.Message):
+    __slots__ = ("offer_token", "option_index")
+    OFFER_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    OPTION_INDEX_FIELD_NUMBER: _ClassVar[int]
+    offer_token: str
+    option_index: int
+    def __init__(self, offer_token: _Optional[str] = ..., option_index: _Optional[int] = ...) -> None: ...

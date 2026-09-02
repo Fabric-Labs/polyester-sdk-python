@@ -19,6 +19,12 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class SubaccountStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SUBACCOUNT_STATUS_UNSPECIFIED: _ClassVar[SubaccountStatus]
+    SUBACCOUNT_STATUS_ACTIVE: _ClassVar[SubaccountStatus]
+    SUBACCOUNT_STATUS_DISABLED: _ClassVar[SubaccountStatus]
+
 class SubaccountRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SUBACCOUNT_ROLE_UNSPECIFIED: _ClassVar[SubaccountRole]
@@ -110,6 +116,9 @@ class ActivityEventSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTIVITY_SOURCE_WEB: _ClassVar[ActivityEventSource]
     ACTIVITY_SOURCE_MOBILE: _ClassVar[ActivityEventSource]
     ACTIVITY_SOURCE_API: _ClassVar[ActivityEventSource]
+SUBACCOUNT_STATUS_UNSPECIFIED: SubaccountStatus
+SUBACCOUNT_STATUS_ACTIVE: SubaccountStatus
+SUBACCOUNT_STATUS_DISABLED: SubaccountStatus
 SUBACCOUNT_ROLE_UNSPECIFIED: SubaccountRole
 VIEWER: SubaccountRole
 TRADER: SubaccountRole
@@ -266,7 +275,7 @@ class Subaccount(_message.Message):
     label: str
     icon: str
     color: str
-    status: str
+    status: SubaccountStatus
     smart_account_address: str
     owner_username: str
     owner_avatar_url: str
@@ -276,7 +285,7 @@ class Subaccount(_message.Message):
     smart_account_salt_nonce: int
     updated_at: _timestamp_pb2.Timestamp
     revision: int
-    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[_Union[SubaccountStatus, str]] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountsRequest(_message.Message):
     __slots__ = ()
@@ -331,8 +340,8 @@ class SubaccountUpdateSpec(_message.Message):
     label: str
     icon: str
     color: str
-    status: str
-    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[str] = ...) -> None: ...
+    status: SubaccountStatus
+    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[_Union[SubaccountStatus, str]] = ...) -> None: ...
 
 class UpdateSubaccountRequest(_message.Message):
     __slots__ = ("subaccount_id", "subaccount", "update_mask", "expected_revision")

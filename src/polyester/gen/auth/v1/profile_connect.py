@@ -27,6 +27,12 @@ class ProfileService(Protocol):
     async def get_username_history(self, request: auth_dot_v1_dot_profile__pb2.GetUsernameHistoryRequest, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.GetUsernameHistoryResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def generate_username_options(self, request: auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def claim_generated_username(self, request: auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.UserProfile:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class ProfileServiceASGIApplication(ConnectASGIApplication[ProfileService]):
     def __init__(self, service: ProfileService | AsyncGenerator[ProfileService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -62,6 +68,26 @@ class ProfileServiceASGIApplication(ConnectASGIApplication[ProfileService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_username_history,
+                ),
+                "/auth.v1.ProfileService/GenerateUsernameOptions": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GenerateUsernameOptions",
+                        service_name="auth.v1.ProfileService",
+                        input=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest,
+                        output=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.generate_username_options,
+                ),
+                "/auth.v1.ProfileService/ClaimGeneratedUsername": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ClaimGeneratedUsername",
+                        service_name="auth.v1.ProfileService",
+                        input=auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest,
+                        output=auth_dot_v1_dot_profile__pb2.UserProfile,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.claim_generated_username,
                 ),
             },
             interceptors=interceptors,
@@ -137,6 +163,46 @@ class ProfileServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def generate_username_options(
+        self,
+        request: auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GenerateUsernameOptions",
+                service_name="auth.v1.ProfileService",
+                input=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest,
+                output=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def claim_generated_username(
+        self,
+        request: auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_profile__pb2.UserProfile:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ClaimGeneratedUsername",
+                service_name="auth.v1.ProfileService",
+                input=auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest,
+                output=auth_dot_v1_dot_profile__pb2.UserProfile,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -147,6 +213,10 @@ class ProfileServiceSync(Protocol):
     def update_profile(self, request: auth_dot_v1_dot_profile__pb2.UserProfilePatch, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.UserProfile:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_username_history(self, request: auth_dot_v1_dot_profile__pb2.GetUsernameHistoryRequest, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.GetUsernameHistoryResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def generate_username_options(self, request: auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def claim_generated_username(self, request: auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest, ctx: RequestContext) -> auth_dot_v1_dot_profile__pb2.UserProfile:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -183,6 +253,26 @@ class ProfileServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_username_history,
+                ),
+                "/auth.v1.ProfileService/GenerateUsernameOptions": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GenerateUsernameOptions",
+                        service_name="auth.v1.ProfileService",
+                        input=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest,
+                        output=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.generate_username_options,
+                ),
+                "/auth.v1.ProfileService/ClaimGeneratedUsername": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ClaimGeneratedUsername",
+                        service_name="auth.v1.ProfileService",
+                        input=auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest,
+                        output=auth_dot_v1_dot_profile__pb2.UserProfile,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.claim_generated_username,
                 ),
             },
             interceptors=interceptors,
@@ -252,6 +342,46 @@ class ProfileServiceClientSync(ConnectClientSync):
                 service_name="auth.v1.ProfileService",
                 input=auth_dot_v1_dot_profile__pb2.GetUsernameHistoryRequest,
                 output=auth_dot_v1_dot_profile__pb2.GetUsernameHistoryResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def generate_username_options(
+        self,
+        request: auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GenerateUsernameOptions",
+                service_name="auth.v1.ProfileService",
+                input=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsRequest,
+                output=auth_dot_v1_dot_profile__pb2.GenerateUsernameOptionsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def claim_generated_username(
+        self,
+        request: auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_profile__pb2.UserProfile:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ClaimGeneratedUsername",
+                service_name="auth.v1.ProfileService",
+                input=auth_dot_v1_dot_profile__pb2.ClaimGeneratedUsernameRequest,
+                output=auth_dot_v1_dot_profile__pb2.UserProfile,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

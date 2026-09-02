@@ -155,11 +155,11 @@ class MeResponse(_message.Message):
     ROOT_SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     SESSION_FIELD_NUMBER: _ClassVar[int]
     account_id: int
-    api_key_id: int
+    api_key_id: str
     username: str
     root_smart_account_address: str
     session: _mfa_pb2.SessionInfo
-    def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[int] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
+    def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
 
 class AuthErrorDetail(_message.Message):
     __slots__ = ("code", "message")

@@ -114,7 +114,7 @@ def test_resolved_accounts_from_proto() -> None:
         matches=[
             resolve_pb2.ResolvedAccount(
                 smart_account_address="0x123",
-                kind="subaccount",
+                kind=resolve_pb2.ResolvedAccount.SUB,
                 account_id=99,
             )
         ]
@@ -122,6 +122,7 @@ def test_resolved_accounts_from_proto() -> None:
     result = resolved_accounts_from_proto(msg)
     assert len(result.matches) == 1
     assert result.matches[0].account_id == format_id(99)
+    assert result.matches[0].kind == "sub"
 
 
 def test_market_trades_from_proto() -> None:

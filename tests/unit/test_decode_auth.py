@@ -18,13 +18,13 @@ from polyester.gen.auth.v1 import auth_pb2, profile_pb2, subaccounts_pb2
 def test_me_from_proto_formats_ids_and_session() -> None:
     msg = auth_pb2.MeResponse(
         account_id=123456,
-        api_key_id=99,
+        api_key_id="ak_0123456789abcdef0123456789abcdef",
         username="alice",
         root_smart_account_address="0xabc",
     )
     result = me_from_proto(msg)
     assert result.account_id == format_id(123456)
-    assert result.api_key_id == format_id(99)
+    assert result.api_key_id == "ak_0123456789abcdef0123456789abcdef"
     assert result.username == "alice"
     assert result.root_smart_account_address == "0xabc"
     assert result.session is None
@@ -71,11 +71,20 @@ def test_subaccount_freshness_and_activity_enums() -> None:
     subaccount = subaccount_from_proto(
         subaccounts_pb2.Subaccount(
             id=12,
+            status=subaccounts_pb2.SUBACCOUNT_STATUS_ACTIVE,
             updated_at=Timestamp(seconds=3, nanos=123_456_000),
         )
     )
+    assert subaccount.status == "active"
     assert subaccount.updated_at is not None
     assert subaccount.updated_at.microsecond == 123_456
+    assert (
+        subaccount_from_proto(
+            subaccounts_pb2.Subaccount(status=subaccounts_pb2.SUBACCOUNT_STATUS_DISABLED)
+        ).status
+        == "disabled"
+    )
+    assert subaccount_from_proto(subaccounts_pb2.Subaccount()).status == ""
 
     event = subaccount_activity_event_from_proto(
         subaccounts_pb2.ActivityEvent(

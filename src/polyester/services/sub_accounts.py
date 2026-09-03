@@ -9,6 +9,7 @@ from polyester.codecs.decode.sub_accounts import (
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_api_key_bytes, decode_subaccount_bytes
+from polyester.codecs.sub_accounts import invite_direction_from_label
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1.subaccounts_connect import (
     SubaccountServiceClient,
@@ -85,7 +86,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             include_invites=include_invites,
             include_policy=include_policy,
             include_balances=include_balances,
-            invites_direction=invites_direction,
+            invites_direction=invite_direction_from_label(invites_direction),
         )
         return await unary_auth_decoded(
             self._transport,
@@ -119,7 +120,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             self._transport,
             SubaccountServiceClient,
             lambda client, req: client.list_subaccount_invites(req),
-            ListSubaccountInvitesRequest(direction=direction),
+            ListSubaccountInvitesRequest(direction=invite_direction_from_label(direction)),
             subaccount_invites_list_from_proto,
         )
 

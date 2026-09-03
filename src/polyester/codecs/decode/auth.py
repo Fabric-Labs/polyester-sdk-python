@@ -18,7 +18,7 @@ def me_from_proto(msg: auth_pb2.MeResponse) -> MeResult:
         session = protobuf_to_public_dict(msg.session)
     return MeResult(
         account_id=format_uint64_id(msg.account_id) if msg.account_id else "",
-        api_key_id=format_uint64_id(msg.api_key_id) if msg.api_key_id else "",
+        api_key_id=(msg.api_key_id or "").strip(),
         username=msg.username,
         root_smart_account_address=msg.root_smart_account_address,
         session=session,

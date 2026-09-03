@@ -14,7 +14,7 @@ from connectrpc.interceptor import Interceptor, InterceptorSync
 from connectrpc.method import IdempotencyLevel, MethodInfo
 from connectrpc.request import Headers, RequestContext
 from connectrpc.server import ConnectASGIApplication, ConnectWSGIApplication, Endpoint, EndpointSync
-import vip.v1.vip_pb2 as vip_dot_v1_dot_vip__pb2
+import polyester.gen.vip.v1.vip_pb2 as vip_dot_v1_dot_vip__pb2
 
 
 class VIPService(Protocol):

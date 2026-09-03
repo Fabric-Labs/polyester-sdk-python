@@ -163,6 +163,14 @@ class AssetGrouping(_message.Message):
     symbol: str
     def __init__(self, id: _Optional[int] = ..., symbol: _Optional[str] = ...) -> None: ...
 
+class PortfolioAccountGrouping(_message.Message):
+    __slots__ = ("account_id", "remaining")
+    ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    REMAINING_FIELD_NUMBER: _ClassVar[int]
+    account_id: int
+    remaining: bool
+    def __init__(self, account_id: _Optional[int] = ..., remaining: _Optional[bool] = ...) -> None: ...
+
 class GetEquityHistorySeriesRequest(_message.Message):
     __slots__ = ("subaccount_id", "range", "account_codes", "group_by")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -176,14 +184,16 @@ class GetEquityHistorySeriesRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., account_codes: _Optional[_Iterable[_Union[_catalog_pb2.AccountCode, str]]] = ..., group_by: _Optional[_Union[EquityGroupBy, str]] = ...) -> None: ...
 
 class EquitySeries(_message.Message):
-    __slots__ = ("account", "asset", "equity_q")
+    __slots__ = ("account", "asset", "portfolio_account", "equity_q")
     ACCOUNT_FIELD_NUMBER: _ClassVar[int]
     ASSET_FIELD_NUMBER: _ClassVar[int]
+    PORTFOLIO_ACCOUNT_FIELD_NUMBER: _ClassVar[int]
     EQUITY_Q_FIELD_NUMBER: _ClassVar[int]
     account: AccountGrouping
     asset: AssetGrouping
+    portfolio_account: PortfolioAccountGrouping
     equity_q: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, account: _Optional[_Union[AccountGrouping, _Mapping]] = ..., asset: _Optional[_Union[AssetGrouping, _Mapping]] = ..., equity_q: _Optional[_Iterable[int]] = ...) -> None: ...
+    def __init__(self, account: _Optional[_Union[AccountGrouping, _Mapping]] = ..., asset: _Optional[_Union[AssetGrouping, _Mapping]] = ..., portfolio_account: _Optional[_Union[PortfolioAccountGrouping, _Mapping]] = ..., equity_q: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class GetEquityHistorySeriesResponse(_message.Message):
     __slots__ = ("range", "bucket", "start_ts_sec", "end_ts_sec", "quote_asset", "points", "series", "btc_prices_q")
@@ -204,6 +214,70 @@ class GetEquityHistorySeriesResponse(_message.Message):
     series: _containers.RepeatedCompositeFieldContainer[EquitySeries]
     btc_prices_q: _containers.RepeatedScalarFieldContainer[int]
     def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., quote_asset: _Optional[str] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[EquitySeries, _Mapping]]] = ..., btc_prices_q: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class GetPortfolioEquityHistorySeriesRequest(_message.Message):
+    __slots__ = ("range",)
+    RANGE_FIELD_NUMBER: _ClassVar[int]
+    range: BalanceRange
+    def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ...) -> None: ...
+
+class GetPortfolioEquityHistorySeriesResponse(_message.Message):
+    __slots__ = ("range", "bucket", "start_ts_sec", "end_ts_sec", "quote_asset", "points", "series", "btc_prices_q")
+    RANGE_FIELD_NUMBER: _ClassVar[int]
+    BUCKET_FIELD_NUMBER: _ClassVar[int]
+    START_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    END_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    QUOTE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    POINTS_FIELD_NUMBER: _ClassVar[int]
+    SERIES_FIELD_NUMBER: _ClassVar[int]
+    BTC_PRICES_Q_FIELD_NUMBER: _ClassVar[int]
+    range: BalanceRange
+    bucket: str
+    start_ts_sec: int
+    end_ts_sec: int
+    quote_asset: str
+    points: int
+    series: _containers.RepeatedCompositeFieldContainer[EquitySeries]
+    btc_prices_q: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, range: _Optional[_Union[BalanceRange, str]] = ..., bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., quote_asset: _Optional[str] = ..., points: _Optional[int] = ..., series: _Optional[_Iterable[_Union[EquitySeries, _Mapping]]] = ..., btc_prices_q: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class PortfolioAccountEquity(_message.Message):
+    __slots__ = ("account_id", "equity_q", "top_asset_ids")
+    ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    EQUITY_Q_FIELD_NUMBER: _ClassVar[int]
+    TOP_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    account_id: int
+    equity_q: int
+    top_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, account_id: _Optional[int] = ..., equity_q: _Optional[int] = ..., top_asset_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class PortfolioAssetEquity(_message.Message):
+    __slots__ = ("asset_id", "balance_q", "equity_q")
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    BALANCE_Q_FIELD_NUMBER: _ClassVar[int]
+    EQUITY_Q_FIELD_NUMBER: _ClassVar[int]
+    asset_id: int
+    balance_q: int
+    equity_q: int
+    def __init__(self, asset_id: _Optional[int] = ..., balance_q: _Optional[int] = ..., equity_q: _Optional[int] = ...) -> None: ...
+
+class GetPortfolioEquitySnapshotRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetPortfolioEquitySnapshotResponse(_message.Message):
+    __slots__ = ("quote_asset", "total_equity_q", "accounts", "assets", "btc_price_q")
+    QUOTE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_EQUITY_Q_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNTS_FIELD_NUMBER: _ClassVar[int]
+    ASSETS_FIELD_NUMBER: _ClassVar[int]
+    BTC_PRICE_Q_FIELD_NUMBER: _ClassVar[int]
+    quote_asset: str
+    total_equity_q: int
+    accounts: _containers.RepeatedCompositeFieldContainer[PortfolioAccountEquity]
+    assets: _containers.RepeatedCompositeFieldContainer[PortfolioAssetEquity]
+    btc_price_q: int
+    def __init__(self, quote_asset: _Optional[str] = ..., total_equity_q: _Optional[int] = ..., accounts: _Optional[_Iterable[_Union[PortfolioAccountEquity, _Mapping]]] = ..., assets: _Optional[_Iterable[_Union[PortfolioAssetEquity, _Mapping]]] = ..., btc_price_q: _Optional[int] = ...) -> None: ...
 
 class ListTransfersRequest(_message.Message):
     __slots__ = ("subaccount_id", "limit", "reversed", "ts_min_us", "ts_max_us", "transfer_code", "ledger", "page_token")

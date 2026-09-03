@@ -55,6 +55,17 @@ def _decimal_string_from_input(raw: str | Decimal, field_name: str) -> str:
     return text
 
 
+def _trim_trailing_frac_zeros(raw: str) -> str:
+    """Drop insignificant trailing zeros so formatters like toFixed() survive scale checks."""
+    if "." not in raw:
+        return raw
+    int_part, frac_part = raw.split(".", 1)
+    frac_part = frac_part.rstrip("0")
+    if not frac_part:
+        return int_part or "0"
+    return f"{int_part}.{frac_part}"
+
+
 def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, str | None]:
     """Strict decimal→scaled. Returns (ok, scaled, failure_reason). Never rounds."""
     if scale < 0 or scale > MAX_PROTOCOL_SCALE:
@@ -62,6 +73,7 @@ def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, s
     raw = decimal.strip()
     if not _STRICT_DECIMAL.match(raw):
         return False, None, "invalid"
+    raw = _trim_trailing_frac_zeros(raw)
     int_part, _, frac_part = raw.partition(".")
     if len(frac_part) > scale:
         return False, None, "precision"

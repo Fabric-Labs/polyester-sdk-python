@@ -27,6 +27,14 @@ def test_decimal_codecs_are_exact_integer_scaled() -> None:
     assert parse_qty_scaled("0.10000000", 8) == 10_000_000
 
 
+def test_qty_string_accepts_trailing_zeros_beyond_scale() -> None:
+    """POLY-4685: extra zeros past scale are padding, not extra precision."""
+    assert parse_qty_scaled("1.500000000", 8) == 150_000_000
+    assert parse_qty_scaled("1.500000000", 8) == parse_qty_scaled("1.5", 8)
+    with pytest.raises(PolyesterValidationError, match="at most 8 decimal places"):
+        parse_qty_scaled("1.500000001", 8)
+
+
 def test_price_rejects_trailing_dot_and_accepts_trimmed_whitespace() -> None:
     with pytest.raises(PolyesterValidationError):
         parse_price_ticks("65000.")

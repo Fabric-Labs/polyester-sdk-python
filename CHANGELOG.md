@@ -10,7 +10,7 @@ Git tag: `v0.1.0a49`.
 - Qty/price **strings** with trailing zeros past scale are accepted when the
   value is exact after trim. `"1.500000000"` at scale 8 matches `"1.5"`;
   `"1.500000001"` still rejects. This is the string/`toFixed()` path, not
-  `Decimal` (POLY-4685).
+  `Decimal`.
 
 ## 0.1.0a48
 

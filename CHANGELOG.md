@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a48
+
+Git tag: `v0.1.0a48`.
+
 ### Breaking
 - `MeResult.api_key_id` is the public `ak_` + 32-hex string from
   `MeResponse.api_key_id`, not a formatted numeric ID. It is empty when the

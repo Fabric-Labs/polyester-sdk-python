@@ -178,7 +178,7 @@ def test_response_contract_classification_and_required_entities() -> None:
     with pytest.raises(PolyesterResponseContractError):
         cancel_all_from_proto(
             orders_pb2.CancelAllOrdersResponse(
-                status="submitted",
+                status=orders_pb2.CancelAllOrdersResponse.SUBMITTED,
                 matched_orders=2,
                 submitted_cancels=1,
             )

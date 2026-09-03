@@ -243,7 +243,7 @@ def test_batch_cancel_from_proto() -> None:
     msg = orders_pb2.BatchCancelOrdersResponse(
         results=[
             orders_pb2.BatchCancelResultItem(
-                status="accepted",
+                status=orders_pb2.BatchCancelResultItem.ACCEPTED,
                 order_id=55,
                 client_order_id="cid-x",
                 code="ok",
@@ -261,14 +261,14 @@ def test_batch_cancel_from_proto() -> None:
 
 def test_batch_cancel_rejects_count_mismatch_and_unknown_status() -> None:
     mismatch = orders_pb2.BatchCancelOrdersResponse(
-        results=[orders_pb2.BatchCancelResultItem(status="accepted")],
+        results=[orders_pb2.BatchCancelResultItem(status=orders_pb2.BatchCancelResultItem.ACCEPTED)],
         rejected_count=1,
     )
     with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
         batch_cancel_from_proto(mismatch)
 
     unknown = orders_pb2.BatchCancelOrdersResponse(
-        results=[orders_pb2.BatchCancelResultItem(status="maybe")],
+        results=[orders_pb2.BatchCancelResultItem(status=99)],
         accepted_count=1,
     )
     with pytest.raises(PolyesterResponseContractError, match="unknown status"):
@@ -389,7 +389,7 @@ def test_batch_replace_settled_means_status_reconciled_not_final() -> None:
 
 def test_cancel_all_after_from_proto() -> None:
     msg = orders_pb2.CancelAllAfterResponse(
-        status="armed",
+        status=orders_pb2.CancelAllAfterResponse.ARMED,
         effective_timeout_sec=120,
         expires_at_ts_ns=1_700_000_000_000_000_000,
     )
@@ -402,7 +402,7 @@ def test_cancel_all_after_from_proto() -> None:
 def test_cancel_all_requires_known_status() -> None:
     ok = cancel_all_from_proto(
         orders_pb2.CancelAllOrdersResponse(
-            status="submitted",
+            status=orders_pb2.CancelAllOrdersResponse.SUBMITTED,
             matched_orders=3,
             submitted_cancels=2,
             failed_cancels=1,
@@ -410,10 +410,16 @@ def test_cancel_all_requires_known_status() -> None:
     )
     assert ok.status == "submitted"
     assert ok.failed_cancels == 1
-    assert cancel_all_from_proto(orders_pb2.CancelAllOrdersResponse(status="dry_run")).status == (
-        "dry_run"
+    assert (
+        cancel_all_from_proto(
+            orders_pb2.CancelAllOrdersResponse(status=orders_pb2.CancelAllOrdersResponse.DRY_RUN)
+        ).status
+        == "dry_run"
     )
-    for status in ("", "ok", "maybe", "accepted"):
+    for status in (
+        orders_pb2.CancelAllOrdersResponse.STATUS_UNSPECIFIED,
+        99,
+    ):
         with pytest.raises(PolyesterResponseContractError, match="unknown status"):
             cancel_all_from_proto(
                 orders_pb2.CancelAllOrdersResponse(status=status, matched_orders=1)
@@ -421,7 +427,10 @@ def test_cancel_all_requires_known_status() -> None:
 
 
 def test_cancel_all_after_rejects_unknown_status() -> None:
-    for status in ("", "ok", "submitted", "maybe"):
+    for status in (
+        orders_pb2.CancelAllAfterResponse.STATUS_UNSPECIFIED,
+        99,
+    ):
         with pytest.raises(PolyesterResponseContractError, match="unknown status"):
             cancel_all_after_from_proto(
                 orders_pb2.CancelAllAfterResponse(status=status, effective_timeout_sec=10)

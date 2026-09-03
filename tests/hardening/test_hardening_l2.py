@@ -1091,7 +1091,11 @@ async def test_l2_close_during_snapshot_retry_cancels_fetch_and_socket() -> None
 @pytest.mark.asyncio
 async def test_l2_batch_cancel_rejects_inconsistent_counts_via_public_service() -> None:
     response = orders_pb2.BatchCancelOrdersResponse(
-        results=[orders_pb2.BatchCancelResultItem(status="accepted", order_id=9)],
+        results=[
+            orders_pb2.BatchCancelResultItem(
+                status=orders_pb2.BatchCancelResultItem.ACCEPTED, order_id=9
+            )
+        ],
         accepted_count=0,
         rejected_count=1,
     )

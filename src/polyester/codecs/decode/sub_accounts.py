@@ -32,6 +32,10 @@ def _invite_status_from_proto(value: int) -> str:
     return name or "pending"
 
 
+def _subaccount_status_from_proto(value: int) -> str:
+    return proto_enum_name(subaccounts_pb2.SubaccountStatus, value)
+
+
 def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
     return SubAccount(
         id=format_uint64_id(msg.id),
@@ -39,7 +43,7 @@ def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
         label=msg.label,
         icon=msg.icon,
         color=msg.color,
-        status=msg.status,
+        status=_subaccount_status_from_proto(msg.status),
         smart_account_address=msg.smart_account_address,
         owner_username=msg.owner_username,
         owner_avatar_url=msg.owner_avatar_url,

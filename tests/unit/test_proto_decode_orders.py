@@ -288,8 +288,10 @@ def test_preview_order_rejects_missing_evaluated_at() -> None:
 
 
 def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:
-    msg = orders_pb2.CancelOrderResponse(status="cancelled", order_id=42)
+    msg = orders_pb2.CancelOrderResponse(
+        status=orders_pb2.CancelOrderResponse.ACCEPTED, order_id=42
+    )
     result = order_mutation_from_proto(msg)
-    assert result.status == "cancelled"
+    assert result.status == "accepted"
     assert result.order_id == format_id(42)
     assert result.client_order_id == ""

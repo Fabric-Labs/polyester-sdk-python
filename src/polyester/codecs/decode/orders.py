@@ -293,19 +293,39 @@ def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
     return GetOrderResult(order=order, trades=trades)
 
 
+def _cancel_order_status(value: int) -> str:
+    name = proto_enum_name(orders_pb2.CancelOrderResponse.Status, value)
+    return name if name == "accepted" else ""
+
+
+def _cancel_all_status(value: int) -> str:
+    name = proto_enum_name(orders_pb2.CancelAllOrdersResponse.Status, value)
+    return name if name in {"submitted", "dry_run"} else ""
+
+
+def _cancel_all_after_status(value: int) -> str:
+    name = proto_enum_name(orders_pb2.CancelAllAfterResponse.Status, value)
+    return name if name in {"armed", "disabled"} else ""
+
+
+def _batch_cancel_item_status(value: int) -> str:
+    name = proto_enum_name(orders_pb2.BatchCancelResultItem.Status, value)
+    return name if name in {"accepted", "rejected"} else ""
+
+
 def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> OrderMutationResult:
     client_order_id = getattr(msg, "client_order_id", "") or ""
+    message_name = msg.DESCRIPTOR.name
     # CreateOrderResponse no longer carries a status field (POLY-3701): reaching
     # the client means the order was admitted, so synthesize "accepted".
-    if any(field.name == "status" for field in msg.DESCRIPTOR.fields):
-        status = msg.status
+    if message_name == "CancelOrderResponse":
+        status = _cancel_order_status(msg.status)
     else:
         status = "accepted"
-    message_name = msg.DESCRIPTOR.name
     if message_name == "CreateOrderResponse":
         if not msg.order_id:
             raise PolyesterResponseContractError("CreateOrder", "missing order_id")
-    elif message_name == "CancelOrderResponse" and (not msg.order_id or not str(status).strip()):
+    elif message_name == "CancelOrderResponse" and (not msg.order_id or not status):
         raise PolyesterResponseContractError("CancelOrder", "missing order_id or status")
     return OrderMutationResult(
         status=status,
@@ -411,12 +431,12 @@ def modify_order_from_proto(msg: orders_pb2.ModifyOrderResponse) -> ModifyOrderR
 
 
 def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllOrdersResult:
-    status = (msg.status or "").strip()
-    if not status or status.lower() not in {"submitted", "dry_run"}:
+    status = _cancel_all_status(msg.status)
+    if not status:
         raise PolyesterResponseContractError(
             "CancelAllOrders", f"invalid CancelAllOrders response: unknown status {msg.status!r}"
         )
-    if status.lower() == "submitted" and (
+    if status == "submitted" and (
         int(msg.submitted_cancels) + int(msg.failed_cancels) != int(msg.matched_orders)
     ):
         raise PolyesterResponseContractError(
@@ -425,13 +445,13 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
             f"matched={msg.matched_orders} submitted={msg.submitted_cancels} "
             f"failed={msg.failed_cancels}",
         )
-    if status.lower() == "dry_run" and (msg.submitted_cancels or msg.failed_cancels):
+    if status == "dry_run" and (msg.submitted_cancels or msg.failed_cancels):
         raise PolyesterResponseContractError(
             "CancelAllOrders",
             "dry_run response unexpectedly reports submitted or failed cancels",
         )
     return CancelAllOrdersResult(
-        status=msg.status,
+        status=status,
         matched_orders=int(msg.matched_orders),
         submitted_cancels=int(msg.submitted_cancels),
         failed_cancels=int(msg.failed_cancels),
@@ -671,7 +691,7 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
     decoded_accepted = 0
     decoded_rejected = 0
     for item in msg.results:
-        status = item.status.lower()
+        status = _batch_cancel_item_status(item.status)
         if status == "accepted":
             decoded_accepted += 1
         elif status == "rejected":
@@ -683,7 +703,7 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
 
     results = [
         BatchCancelResultItem(
-            status=item.status,
+            status=_batch_cancel_item_status(item.status),
             order_id=format_uint64_id(item.order_id) if item.order_id else "",
             client_order_id=item.client_order_id,
             code=item.code,
@@ -716,13 +736,13 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
 
 
 def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> CancelAllAfterResult:
-    status = (msg.status or "").strip()
-    if not status or status.lower() not in {"armed", "disabled"}:
+    status = _cancel_all_after_status(msg.status)
+    if not status:
         raise PolyesterResponseContractError(
             "CancelAllAfter", f"invalid CancelAllAfter response: unknown status {msg.status!r}"
         )
     return CancelAllAfterResult(
-        status=msg.status,
+        status=status,
         effective_timeout_sec=int(msg.effective_timeout_sec),
         expires_at_ts_ns=ts_ns_string_from_response(
             msg.expires_at_ts_ns,

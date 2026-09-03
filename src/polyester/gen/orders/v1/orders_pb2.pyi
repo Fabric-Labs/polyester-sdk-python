@@ -390,15 +390,21 @@ class CancelOrderRequest(_message.Message):
 
 class CancelOrderResponse(_message.Message):
     __slots__ = ("status", "order_id", "ts", "ts_ns")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATUS_UNSPECIFIED: _ClassVar[CancelOrderResponse.Status]
+        ACCEPTED: _ClassVar[CancelOrderResponse.Status]
+    STATUS_UNSPECIFIED: CancelOrderResponse.Status
+    ACCEPTED: CancelOrderResponse.Status
     STATUS_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     TS_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
-    status: str
+    status: CancelOrderResponse.Status
     order_id: int
     ts: _timestamp_pb2.Timestamp
     ts_ns: int
-    def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    def __init__(self, status: _Optional[_Union[CancelOrderResponse.Status, str]] = ..., order_id: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class FieldViolation(_message.Message):
     __slots__ = ("field_path", "rule_id", "message")
@@ -496,19 +502,27 @@ class CancelAllOrdersRequest(_message.Message):
 
 class CancelAllOrdersResponse(_message.Message):
     __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATUS_UNSPECIFIED: _ClassVar[CancelAllOrdersResponse.Status]
+        SUBMITTED: _ClassVar[CancelAllOrdersResponse.Status]
+        DRY_RUN: _ClassVar[CancelAllOrdersResponse.Status]
+    STATUS_UNSPECIFIED: CancelAllOrdersResponse.Status
+    SUBMITTED: CancelAllOrdersResponse.Status
+    DRY_RUN: CancelAllOrdersResponse.Status
     STATUS_FIELD_NUMBER: _ClassVar[int]
     MATCHED_ORDERS_FIELD_NUMBER: _ClassVar[int]
     SUBMITTED_CANCELS_FIELD_NUMBER: _ClassVar[int]
     FAILED_CANCELS_FIELD_NUMBER: _ClassVar[int]
     TS_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
-    status: str
+    status: CancelAllOrdersResponse.Status
     matched_orders: int
     submitted_cancels: int
     failed_cancels: int
     ts: _timestamp_pb2.Timestamp
     ts_ns: int
-    def __init__(self, status: _Optional[str] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class CancelAllAfterRequest(_message.Message):
     __slots__ = ("subaccount_id", "timeout_sec", "symbol_id", "side", "request_id")
@@ -526,17 +540,25 @@ class CancelAllAfterRequest(_message.Message):
 
 class CancelAllAfterResponse(_message.Message):
     __slots__ = ("status", "effective_timeout_sec", "expires_at_ts_ns", "ts", "ts_ns")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATUS_UNSPECIFIED: _ClassVar[CancelAllAfterResponse.Status]
+        ARMED: _ClassVar[CancelAllAfterResponse.Status]
+        DISABLED: _ClassVar[CancelAllAfterResponse.Status]
+    STATUS_UNSPECIFIED: CancelAllAfterResponse.Status
+    ARMED: CancelAllAfterResponse.Status
+    DISABLED: CancelAllAfterResponse.Status
     STATUS_FIELD_NUMBER: _ClassVar[int]
     EFFECTIVE_TIMEOUT_SEC_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
     TS_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
-    status: str
+    status: CancelAllAfterResponse.Status
     effective_timeout_sec: int
     expires_at_ts_ns: int
     ts: _timestamp_pb2.Timestamp
     ts_ns: int
-    def __init__(self, status: _Optional[str] = ..., effective_timeout_sec: _Optional[int] = ..., expires_at_ts_ns: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    def __init__(self, status: _Optional[_Union[CancelAllAfterResponse.Status, str]] = ..., effective_timeout_sec: _Optional[int] = ..., expires_at_ts_ns: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class BatchCreateAccepted(_message.Message):
     __slots__ = ("order_id", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id", "resolved_base_qty_scaled", "submitted_max_quote_debit_scaled")
@@ -716,17 +738,25 @@ class BatchCancelItem(_message.Message):
 
 class BatchCancelResultItem(_message.Message):
     __slots__ = ("status", "order_id", "client_order_id", "code", "error")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATUS_UNSPECIFIED: _ClassVar[BatchCancelResultItem.Status]
+        ACCEPTED: _ClassVar[BatchCancelResultItem.Status]
+        REJECTED: _ClassVar[BatchCancelResultItem.Status]
+    STATUS_UNSPECIFIED: BatchCancelResultItem.Status
+    ACCEPTED: BatchCancelResultItem.Status
+    REJECTED: BatchCancelResultItem.Status
     STATUS_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
-    status: str
+    status: BatchCancelResultItem.Status
     order_id: int
     client_order_id: str
     code: str
     error: ErrorDetail
-    def __init__(self, status: _Optional[str] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., error: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
+    def __init__(self, status: _Optional[_Union[BatchCancelResultItem.Status, str]] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., error: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
 
 class BatchCancelOrdersRequest(_message.Message):
     __slots__ = ("subaccount_id", "request_id", "items")

@@ -9,8 +9,17 @@ from polyester.codecs.decode.trading_rate_limits import (
 )
 from polyester.codecs.decode.vip import vip_status_from_proto, vip_tiers_list_from_proto
 from polyester.gen.fees.v1 import fees_pb2
+from polyester.gen.fees.v1.fees_connect import FeeServiceClient
 from polyester.gen.ratelimit.v1 import ratelimit_pb2
+from polyester.gen.ratelimit.v1.ratelimit_connect import RateLimitServiceClient
 from polyester.gen.vip.v1 import vip_pb2
+from polyester.gen.vip.v1.vip_connect import VIPServiceClient
+
+
+def test_generated_connect_clients_import_from_package() -> None:
+    assert FeeServiceClient.__name__ == "FeeServiceClient"
+    assert VIPServiceClient.__name__ == "VIPServiceClient"
+    assert RateLimitServiceClient.__name__ == "RateLimitServiceClient"
 
 
 def _ts(seconds: int, nanos: int = 0) -> Timestamp:

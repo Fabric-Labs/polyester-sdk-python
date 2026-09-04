@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from google.protobuf.message import Message
 
-from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, u128_to_str
+from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name, u128_to_str
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.models import (
     AssetBalance,
@@ -76,17 +76,26 @@ def equity_history_series_from_proto(msg: ledger_read_pb2.EquitySeries) -> Equit
     account_name = ""
     asset_id = 0
     asset_symbol = ""
+    portfolio_account_id = ""
+    portfolio_remaining = False
     if msg.HasField("account"):
         account_code = int(msg.account.account_code)
         account_name = msg.account.name
     elif msg.HasField("asset"):
         asset_id = int(msg.asset.id)
         asset_symbol = msg.asset.symbol
+    elif msg.HasField("portfolio_account"):
+        grouping = msg.portfolio_account
+        if has_field(grouping, "account_id"):
+            portfolio_account_id = format_uint64_id(int(grouping.account_id))
+        portfolio_remaining = bool(grouping.remaining)
     return EquityHistorySeries(
         account_code=account_code,
         account_name=account_name,
         asset_id=asset_id,
         asset_symbol=asset_symbol,
+        portfolio_account_id=portfolio_account_id,
+        portfolio_remaining=portfolio_remaining,
         equity_q=[int(v) for v in msg.equity_q],
     )
 

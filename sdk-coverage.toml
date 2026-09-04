@@ -73,3 +73,11 @@ reason = "Invite mutations require interactive JWT/session."
 [[allowlist]]
 procedure = "/auth.v1.AddressBookService/CopyAddressBookEntry"
 reason = "Address-book copy remains unwrapped; create/update/delete entry and tag CRUD are wrapped."
+
+[[allowlist]]
+procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquityHistorySeries"
+reason = "Root portfolio equity history requires an interactive root-account session; API keys and subaccount-scoped sessions are not supported."
+
+[[allowlist]]
+procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot"
+reason = "Root portfolio equity snapshot requires an interactive root-account session; API keys and subaccount-scoped sessions are not supported."

@@ -24,6 +24,12 @@ class LedgerReadService(Protocol):
     async def get_equity_history_series(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetEquityHistorySeriesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetEquityHistorySeriesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_portfolio_equity_history_series(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_portfolio_equity_snapshot(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def list_transfers(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -58,6 +64,26 @@ class LedgerReadServiceASGIApplication(ConnectASGIApplication[LedgerReadService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_equity_history_series,
+                ),
+                "/ledger.read.v1.LedgerReadService/GetPortfolioEquityHistorySeries": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetPortfolioEquityHistorySeries",
+                        service_name="ledger.read.v1.LedgerReadService",
+                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest,
+                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_portfolio_equity_history_series,
+                ),
+                "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetPortfolioEquitySnapshot",
+                        service_name="ledger.read.v1.LedgerReadService",
+                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest,
+                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_portfolio_equity_snapshot,
                 ),
                 "/ledger.read.v1.LedgerReadService/ListTransfers": Endpoint.unary(
                     method=MethodInfo(
@@ -143,6 +169,46 @@ class LedgerReadServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_portfolio_equity_history_series(
+        self,
+        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPortfolioEquityHistorySeries",
+                service_name="ledger.read.v1.LedgerReadService",
+                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest,
+                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_portfolio_equity_snapshot(
+        self,
+        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPortfolioEquitySnapshot",
+                service_name="ledger.read.v1.LedgerReadService",
+                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest,
+                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def list_transfers(
         self,
         request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersRequest,
@@ -212,6 +278,10 @@ class LedgerReadServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_equity_history_series(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetEquityHistorySeriesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetEquityHistorySeriesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_portfolio_equity_history_series(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_portfolio_equity_snapshot(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_transfers(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_holds(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse:
@@ -243,6 +313,26 @@ class LedgerReadServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_equity_history_series,
+                ),
+                "/ledger.read.v1.LedgerReadService/GetPortfolioEquityHistorySeries": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetPortfolioEquityHistorySeries",
+                        service_name="ledger.read.v1.LedgerReadService",
+                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest,
+                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_portfolio_equity_history_series,
+                ),
+                "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetPortfolioEquitySnapshot",
+                        service_name="ledger.read.v1.LedgerReadService",
+                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest,
+                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_portfolio_equity_snapshot,
                 ),
                 "/ledger.read.v1.LedgerReadService/ListTransfers": EndpointSync.unary(
                     method=MethodInfo(
@@ -322,6 +412,46 @@ class LedgerReadServiceClientSync(ConnectClientSync):
                 service_name="ledger.read.v1.LedgerReadService",
                 input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetEquityHistorySeriesRequest,
                 output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetEquityHistorySeriesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_portfolio_equity_history_series(
+        self,
+        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPortfolioEquityHistorySeries",
+                service_name="ledger.read.v1.LedgerReadService",
+                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesRequest,
+                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquityHistorySeriesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_portfolio_equity_snapshot(
+        self,
+        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPortfolioEquitySnapshot",
+                service_name="ledger.read.v1.LedgerReadService",
+                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest,
+                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -685,22 +685,32 @@ def decode_balance_history(data: dict[str, Any]) -> BalanceHistory:
 def decode_equity_history_series(data: dict[str, Any]) -> EquityHistorySeries:
     account = _field(data, "account")
     asset = _field(data, "asset")
+    portfolio = _field(data, "portfolioAccount", "portfolio_account")
     account_code = 0
     account_name = ""
     asset_id = 0
     asset_symbol = ""
+    portfolio_account_id = ""
+    portfolio_remaining = False
     if isinstance(account, dict):
         account_code = int(_field(account, "code", default=0) or 0)
         account_name = str(_field(account, "name", default="") or "")
-    if isinstance(asset, dict):
+    elif isinstance(asset, dict):
         asset_id = int(_field(asset, "id", default=0) or 0)
         asset_symbol = str(_field(asset, "symbol", default="") or "")
+    elif isinstance(portfolio, dict):
+        raw_account_id = _field(portfolio, "accountId", "account_id")
+        if raw_account_id not in (None, ""):
+            portfolio_account_id = _id_str(raw_account_id)
+        portfolio_remaining = bool(_field(portfolio, "remaining", default=False))
     equity_q = _field(data, "equityQ", "equity_q", default=[]) or []
     return EquityHistorySeries(
         account_code=account_code,
         account_name=account_name,
         asset_id=asset_id,
         asset_symbol=asset_symbol,
+        portfolio_account_id=portfolio_account_id,
+        portfolio_remaining=portfolio_remaining,
         equity_q=[int(v) for v in equity_q],
     )
 

@@ -367,6 +367,8 @@ class EquityHistorySeries(msgspec.Struct, kw_only=True, omit_defaults=True):
     account_name: str = ""
     asset_id: int = 0
     asset_symbol: str = ""
+    portfolio_account_id: str = ""
+    portfolio_remaining: bool = False
     equity_q: list[int] = []
 
 

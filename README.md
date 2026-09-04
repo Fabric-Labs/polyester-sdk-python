@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a49`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0a50`). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -69,7 +69,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a49"
+pip install "polyester-sdk==0.1.0a50"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.

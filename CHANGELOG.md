@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a50
+
+Git tag: `v0.1.0a50`.
+
 ### Changed
 - Generated Connect/protobuf bindings now include
   `GetPortfolioEquityHistorySeries` and `GetPortfolioEquitySnapshot`. Those
@@ -10,8 +14,8 @@
 - Equity history decode maps the additive `EquitySeries.portfolio_account`
   grouping (`account_id`, `remaining`) so the shared series type keeps
   portfolio identity instead of dropping it.
-- Re-applied `polyester.gen.*` imports in the fees, VIP, and rate-limit
-  Connect clients after proto regeneration.
+- Trigger modify proto validation is stricter: trigger price and trailing
+  distance must be positive, and slippage / trailing BPS stay in 1–10000.
 
 ## 0.1.0a49
 

@@ -11,12 +11,71 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_CODE_UNSPECIFIED: _ClassVar[ErrorCode]
+    ERROR_CODE_INSUFFICIENT_FUNDS: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_REQUEST: _ClassVar[ErrorCode]
+    ERROR_CODE_UNAUTHENTICATED: _ClassVar[ErrorCode]
+    ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
+    ERROR_CODE_RATE_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_INTERNAL_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_SUBACCOUNT_ID: _ClassVar[ErrorCode]
+    ERROR_CODE_SUBACCOUNT_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_SOURCE_ACCOUNT_INACTIVE: _ClassVar[ErrorCode]
+    ERROR_CODE_UNSUPPORTED_ASSET: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_AMOUNT: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_DESTINATION: _ClassVar[ErrorCode]
+    ERROR_CODE_DESTINATION_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_DESTINATION_INACTIVE: _ClassVar[ErrorCode]
+    ERROR_CODE_SAME_SOURCE_DESTINATION: _ClassVar[ErrorCode]
+    ERROR_CODE_DESTINATION_NOT_WHITELISTED: _ClassVar[ErrorCode]
+    ERROR_CODE_SMART_ACCOUNT_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_STEP_UP_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_IDEMPOTENCY_CONFLICT: _ClassVar[ErrorCode]
+    ERROR_CODE_FUNDS_LOCK_CONFLICT: _ClassVar[ErrorCode]
+    ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_POLICY_DENIED: _ClassVar[ErrorCode]
+    ERROR_CODE_FAILED_PRECONDITION: _ClassVar[ErrorCode]
+    ERROR_CODE_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_CONFLICT: _ClassVar[ErrorCode]
+
 class InternalTransferStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     INTERNAL_TRANSFER_STATUS_UNSPECIFIED: _ClassVar[InternalTransferStatus]
     INTERNAL_TRANSFER_STATUS_ACCEPTED: _ClassVar[InternalTransferStatus]
     INTERNAL_TRANSFER_STATUS_REJECTED: _ClassVar[InternalTransferStatus]
     INTERNAL_TRANSFER_STATUS_FAILED: _ClassVar[InternalTransferStatus]
+ERROR_CODE_UNSPECIFIED: ErrorCode
+ERROR_CODE_INSUFFICIENT_FUNDS: ErrorCode
+ERROR_CODE_INVALID_REQUEST: ErrorCode
+ERROR_CODE_UNAUTHENTICATED: ErrorCode
+ERROR_CODE_PERMISSION_DENIED: ErrorCode
+ERROR_CODE_RATE_LIMIT_EXCEEDED: ErrorCode
+ERROR_CODE_SERVICE_UNAVAILABLE: ErrorCode
+ERROR_CODE_INTERNAL_ERROR: ErrorCode
+ERROR_CODE_INVALID_SUBACCOUNT_ID: ErrorCode
+ERROR_CODE_SUBACCOUNT_NOT_FOUND: ErrorCode
+ERROR_CODE_SOURCE_ACCOUNT_INACTIVE: ErrorCode
+ERROR_CODE_UNSUPPORTED_ASSET: ErrorCode
+ERROR_CODE_INVALID_AMOUNT: ErrorCode
+ERROR_CODE_INVALID_DESTINATION: ErrorCode
+ERROR_CODE_DESTINATION_NOT_FOUND: ErrorCode
+ERROR_CODE_DESTINATION_INACTIVE: ErrorCode
+ERROR_CODE_SAME_SOURCE_DESTINATION: ErrorCode
+ERROR_CODE_DESTINATION_NOT_WHITELISTED: ErrorCode
+ERROR_CODE_SMART_ACCOUNT_UNAVAILABLE: ErrorCode
+ERROR_CODE_STEP_UP_UNAVAILABLE: ErrorCode
+ERROR_CODE_IDEMPOTENCY_CONFLICT: ErrorCode
+ERROR_CODE_FUNDS_LOCK_CONFLICT: ErrorCode
+ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE: ErrorCode
+ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE: ErrorCode
+ERROR_CODE_POLICY_DENIED: ErrorCode
+ERROR_CODE_FAILED_PRECONDITION: ErrorCode
+ERROR_CODE_NOT_FOUND: ErrorCode
+ERROR_CODE_CONFLICT: ErrorCode
 INTERNAL_TRANSFER_STATUS_UNSPECIFIED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_ACCEPTED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_REJECTED: InternalTransferStatus
@@ -49,6 +108,12 @@ class ResolvedDestination(_message.Message):
     subaccount_public_id: str
     smart_account_address: str
     def __init__(self, root_account_public_id: _Optional[str] = ..., subaccount_public_id: _Optional[str] = ..., smart_account_address: _Optional[str] = ...) -> None: ...
+
+class ErrorDetail(_message.Message):
+    __slots__ = ("code",)
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    code: ErrorCode
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class CreateInternalTransferResponse(_message.Message):
     __slots__ = ("request_id", "transfer_id", "accepted_at_ts_ns", "asset_id", "asset_code", "u_asset_id", "amount_e18", "destination", "status")

@@ -56,6 +56,7 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_MFA_ELEVATION_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_MFA_LAST_FACTOR_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_INTERNAL_ERROR: _ClassVar[AuthErrorCode]
+    AUTH_TERMS_NOT_ACCEPTED: _ClassVar[AuthErrorCode]
 AUTH_UNSPECIFIED: AuthErrorCode
 AUTH_USERNAME_INVALID: AuthErrorCode
 AUTH_USERNAME_TAKEN: AuthErrorCode
@@ -96,6 +97,7 @@ AUTH_REVISION_CONFLICT: AuthErrorCode
 AUTH_MFA_ELEVATION_REQUIRED: AuthErrorCode
 AUTH_MFA_LAST_FACTOR_REQUIRED: AuthErrorCode
 AUTH_INTERNAL_ERROR: AuthErrorCode
+AUTH_TERMS_NOT_ACCEPTED: AuthErrorCode
 
 class GetNonceRequest(_message.Message):
     __slots__ = ("smart_account_address",)
@@ -168,3 +170,11 @@ class AuthErrorDetail(_message.Message):
     code: AuthErrorCode
     message: str
     def __init__(self, code: _Optional[_Union[AuthErrorCode, str]] = ..., message: _Optional[str] = ...) -> None: ...
+
+class AcceptTermsRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class AcceptTermsResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

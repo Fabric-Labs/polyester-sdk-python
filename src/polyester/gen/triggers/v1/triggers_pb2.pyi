@@ -234,8 +234,12 @@ class TrailingStopTrigger(_message.Message):
     def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ...) -> None: ...
 
 class TwapMarketIoc(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("max_slippage_ticks", "max_slippage_bps")
+    MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
+    max_slippage_ticks: int
+    max_slippage_bps: int
+    def __init__(self, max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ...) -> None: ...
 
 class TwapLimitGtc(_message.Message):
     __slots__ = ("price_ticks",)
@@ -548,16 +552,20 @@ class TwapDetails(_message.Message):
     def __init__(self, twap_duration_ms: _Optional[int] = ..., twap_slice_interval_ms: _Optional[int] = ..., slice_idx: _Optional[int] = ..., slice_count: _Optional[int] = ..., executed_qty_scaled: _Optional[int] = ...) -> None: ...
 
 class LadderDetails(_message.Message):
-    __slots__ = ("ladder_price_min_ticks", "ladder_price_max_ticks", "ladder_levels", "ladder_distribution")
+    __slots__ = ("ladder_price_min_ticks", "ladder_price_max_ticks", "ladder_levels", "ladder_distribution", "executed_qty_scaled", "executed_levels")
     LADDER_PRICE_MIN_TICKS_FIELD_NUMBER: _ClassVar[int]
     LADDER_PRICE_MAX_TICKS_FIELD_NUMBER: _ClassVar[int]
     LADDER_LEVELS_FIELD_NUMBER: _ClassVar[int]
     LADDER_DISTRIBUTION_FIELD_NUMBER: _ClassVar[int]
+    EXECUTED_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    EXECUTED_LEVELS_FIELD_NUMBER: _ClassVar[int]
     ladder_price_min_ticks: int
     ladder_price_max_ticks: int
     ladder_levels: int
     ladder_distribution: LadderDistribution
-    def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ...) -> None: ...
+    executed_qty_scaled: int
+    executed_levels: int
+    def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ..., executed_qty_scaled: _Optional[int] = ..., executed_levels: _Optional[int] = ...) -> None: ...
 
 class Trigger(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "status", "parent_order_id", "cancel_reason", "failure_reason", "qty_scaled", "fee_asset", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "created_at", "updated_at", "armed_at", "completed_at")

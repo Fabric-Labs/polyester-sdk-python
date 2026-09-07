@@ -39,7 +39,7 @@ class AccountIdentity(_message.Message):
     def __init__(self, account_id: _Optional[int] = ..., username: _Optional[str] = ..., avatar_url: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ...) -> None: ...
 
 class UserProfile(_message.Message):
-    __slots__ = ("username", "bio", "website", "twitter", "twitter_verified", "discord", "discord_verified", "avatar_url", "created_at", "next_username_change_at", "vip_tier", "username_unlocked")
+    __slots__ = ("username", "bio", "website", "twitter", "twitter_verified", "discord", "discord_verified", "avatar_url", "created_at", "next_username_change_at", "vip_tier", "username_unlocked", "current_terms_accepted")
     USERNAME_FIELD_NUMBER: _ClassVar[int]
     BIO_FIELD_NUMBER: _ClassVar[int]
     WEBSITE_FIELD_NUMBER: _ClassVar[int]
@@ -52,6 +52,7 @@ class UserProfile(_message.Message):
     NEXT_USERNAME_CHANGE_AT_FIELD_NUMBER: _ClassVar[int]
     VIP_TIER_FIELD_NUMBER: _ClassVar[int]
     USERNAME_UNLOCKED_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_TERMS_ACCEPTED_FIELD_NUMBER: _ClassVar[int]
     username: str
     bio: str
     website: str
@@ -64,7 +65,8 @@ class UserProfile(_message.Message):
     next_username_change_at: _timestamp_pb2.Timestamp
     vip_tier: int
     username_unlocked: bool
-    def __init__(self, username: _Optional[str] = ..., bio: _Optional[str] = ..., website: _Optional[str] = ..., twitter: _Optional[str] = ..., twitter_verified: _Optional[bool] = ..., discord: _Optional[str] = ..., discord_verified: _Optional[bool] = ..., avatar_url: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., next_username_change_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., vip_tier: _Optional[int] = ..., username_unlocked: _Optional[bool] = ...) -> None: ...
+    current_terms_accepted: bool
+    def __init__(self, username: _Optional[str] = ..., bio: _Optional[str] = ..., website: _Optional[str] = ..., twitter: _Optional[str] = ..., twitter_verified: _Optional[bool] = ..., discord: _Optional[str] = ..., discord_verified: _Optional[bool] = ..., avatar_url: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., next_username_change_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., vip_tier: _Optional[int] = ..., username_unlocked: _Optional[bool] = ..., current_terms_accepted: _Optional[bool] = ...) -> None: ...
 
 class UserProfilePatch(_message.Message):
     __slots__ = ("username", "bio", "website", "twitter", "avatar_url")

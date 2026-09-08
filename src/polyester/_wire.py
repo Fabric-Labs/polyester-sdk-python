@@ -20,8 +20,10 @@ from polyester.errors import (
     PolyesterTransportError,
 )
 from polyester.gen.auth.v1 import auth_pb2
+from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
+from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 _ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
@@ -46,6 +48,14 @@ def _unpack_error_detail(detail: Message) -> Message | None:
             order_detail = orders_pb2.ErrorDetail()
             detail.Unpack(order_detail)
             return order_detail
+        if detail.Is(withdraw_pb2.ErrorDetail.DESCRIPTOR):
+            withdraw_detail = withdraw_pb2.ErrorDetail()
+            detail.Unpack(withdraw_detail)
+            return withdraw_detail
+        if detail.Is(transfer_pb2.ErrorDetail.DESCRIPTOR):
+            transfer_detail = transfer_pb2.ErrorDetail()
+            detail.Unpack(transfer_detail)
+            return transfer_detail
         if detail.Is(ratelimit_pb2.RateLimitDetail.DESCRIPTOR):
             rate_limit = ratelimit_pb2.RateLimitDetail()
             detail.Unpack(rate_limit)
@@ -90,6 +100,29 @@ def map_connect_error(exc: ConnectError):
                     return PolyesterAuthError(error_message)
                 if code_name.startswith("ERROR_CODE_"):
                     return PolyesterApiError(error_message, code=code_name)
+                return PolyesterApiError(error_message, code=code_name)
+            if full_name == "chain.withdraw.v1.ErrorDetail":
+                code_name = withdraw_pb2.ErrorCode.Name(unpacked.code)
+                if (
+                    "UNAUTHENTICATED" in code_name
+                    or "PERMISSION" in code_name
+                    or "API_KEY" in code_name
+                    or "WALLET_BINDING" in code_name
+                ):
+                    return PolyesterAuthError(error_message)
+                if code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
+                    return _rate_limit_error(error_message)
+                return PolyesterApiError(error_message, code=code_name)
+            if full_name == "transfer.v1.ErrorDetail":
+                code_name = transfer_pb2.ErrorCode.Name(unpacked.code)
+                if (
+                    "UNAUTHENTICATED" in code_name
+                    or "PERMISSION" in code_name
+                    or "POLICY" in code_name
+                ):
+                    return PolyesterAuthError(error_message)
+                if code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
+                    return _rate_limit_error(error_message)
                 return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
     if is_cloudflare_browser_ban(error_message):

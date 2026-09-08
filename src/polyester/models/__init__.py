@@ -58,6 +58,8 @@ from polyester.models.market import (
     MarketOverviewList,
     MarketTrade,
     MarketTradesResult,
+    SpotPairVolumeSeries,
+    SpotVolumeHistory,
 )
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
 from polyester.models.policies import (
@@ -263,6 +265,8 @@ __all__ = [
     "SpotFeeRate",
     "SpotFeeRatesList",
     "SpotMarketRule",
+    "SpotPairVolumeSeries",
+    "SpotVolumeHistory",
     "SubAccount",
     "SubAccountActivityEvent",
     "SubAccountActivityList",

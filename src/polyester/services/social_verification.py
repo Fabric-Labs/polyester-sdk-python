@@ -25,16 +25,20 @@ class AsyncSocialVerificationService(BaseService):
         self,
         *,
         provider: str,
-        method: str,
-        handle: str,
+        method: str | None = None,
+        handle: str | None = None,
     ) -> ApiData:
         request = sv_pb2.StartSocialVerificationRequest(
             provider=resolve_proto_enum(
                 sv_pb2, provider, aliases=_PROVIDER_ALIASES, field_name="provider"
             ),
-            method=resolve_proto_enum(sv_pb2, method, aliases=_METHOD_ALIASES, field_name="method"),
-            handle=handle,
         )
+        if method:
+            request.method = resolve_proto_enum(
+                sv_pb2, method, aliases=_METHOD_ALIASES, field_name="method"
+            )
+        if handle:
+            request.handle = handle
         return await unary_auth_decoded(
             self._transport,
             SocialVerificationServiceClient,

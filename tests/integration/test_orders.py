@@ -44,6 +44,7 @@ async def test_orders_list_history(live_client, smoke_symbol):
 
 
 @pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
 async def test_orders_cancel_all_dry_run(live_client, smoke_symbol):
     result = await live_client.orders.cancel_all(symbol=smoke_symbol, dry_run=True)
     assert result.status

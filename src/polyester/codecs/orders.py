@@ -883,6 +883,7 @@ def cancel_all_orders_to_proto(
     *,
     sub_account_id: str | int | None = None,
     symbol_id: int | None = None,
+    symbol_ids: list[int] | None = None,
     side: str | None = None,
     dry_run: bool = False,
     request_id: str | None = None,
@@ -893,8 +894,28 @@ def cancel_all_orders_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
-    if symbol_id:
-        proto.symbol_id = int(symbol_id)
+    if symbol_id and symbol_ids:
+        raise PolyesterValidationError(
+            "cancel_all accepts only one of symbol_id or symbol_ids"
+        )
+    resolved_ids: list[int] = []
+    if symbol_ids:
+        resolved_ids = [int(value) for value in symbol_ids]
+    elif symbol_id:
+        resolved_ids = [int(symbol_id)]
+    seen: set[int] = set()
+    unique_ids: list[int] = []
+    for value in resolved_ids:
+        if value <= 0:
+            raise PolyesterValidationError("cancel_all symbol_ids must be positive")
+        if value in seen:
+            continue
+        seen.add(value)
+        unique_ids.append(value)
+    if len(unique_ids) > 100:
+        raise PolyesterValidationError("cancel_all accepts at most 100 symbol_ids")
+    if unique_ids:
+        proto.symbol_ids.extend(unique_ids)
     if side:
         key = side.lower()
         if key not in ORDER_SIDE_TO_PROTO:

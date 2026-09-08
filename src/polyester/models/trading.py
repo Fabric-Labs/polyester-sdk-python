@@ -228,6 +228,8 @@ class TriggerLadderDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
     ladder_price_max: Price | None = None
     ladder_levels: int = 0
     ladder_distribution: str = ""
+    executed_levels: int = 0
+    executed_qty: Quantity | None = None
 
 
 class TriggerDetails(msgspec.Struct, kw_only=True, omit_defaults=True):

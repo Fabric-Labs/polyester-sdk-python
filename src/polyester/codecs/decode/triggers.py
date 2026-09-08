@@ -175,6 +175,7 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
         )
     if has_field(msg, "ladder_state"):
         ladder = msg.ladder_state
+        executed_scaled = int(ladder.executed_qty_scaled)
         return TriggerDetails(
             case="ladder",
             ladder=TriggerLadderDetails(
@@ -183,6 +184,16 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
                 ladder_levels=int(ladder.ladder_levels),
                 ladder_distribution=proto_enum_name(
                     triggers_pb2.LadderDistribution, ladder.ladder_distribution
+                ),
+                executed_levels=int(ladder.executed_levels),
+                executed_qty=(
+                    Quantity.from_scaled(
+                        executed_scaled,
+                        symbol=symbol,
+                        symbol_id=symbol_id,
+                    )
+                    if executed_scaled
+                    else None
                 ),
             ),
         )

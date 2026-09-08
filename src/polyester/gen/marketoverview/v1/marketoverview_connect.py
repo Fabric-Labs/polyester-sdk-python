@@ -18,6 +18,9 @@ import polyester.gen.marketoverview.v1.marketoverview_pb2 as marketoverview_dot_
 
 
 class MarketOverviewService(Protocol):
+    async def get_spot_volume_history(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def list_market_overview(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -27,6 +30,16 @@ class MarketOverviewServiceASGIApplication(ConnectASGIApplication[MarketOverview
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/marketoverview.v1.MarketOverviewService/GetSpotVolumeHistory": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetSpotVolumeHistory",
+                        service_name="marketoverview.v1.MarketOverviewService",
+                        input=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
+                        output=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_spot_volume_history,
+                ),
                 "/marketoverview.v1.MarketOverviewService/ListMarketOverview": Endpoint.unary(
                     method=MethodInfo(
                         name="ListMarketOverview",
@@ -51,6 +64,26 @@ class MarketOverviewServiceASGIApplication(ConnectASGIApplication[MarketOverview
 
 
 class MarketOverviewServiceClient(ConnectClient):
+    async def get_spot_volume_history(
+        self,
+        request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetSpotVolumeHistory",
+                service_name="marketoverview.v1.MarketOverviewService",
+                input=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
+                output=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def list_market_overview(
         self,
         request: marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewRequest,
@@ -76,6 +109,8 @@ class MarketOverviewServiceClient(ConnectClient):
 
 
 class MarketOverviewServiceSync(Protocol):
+    def get_spot_volume_history(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_market_overview(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -84,6 +119,16 @@ class MarketOverviewServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: MarketOverviewServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/marketoverview.v1.MarketOverviewService/GetSpotVolumeHistory": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetSpotVolumeHistory",
+                        service_name="marketoverview.v1.MarketOverviewService",
+                        input=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
+                        output=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_spot_volume_history,
+                ),
                 "/marketoverview.v1.MarketOverviewService/ListMarketOverview": EndpointSync.unary(
                     method=MethodInfo(
                         name="ListMarketOverview",
@@ -108,6 +153,26 @@ class MarketOverviewServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class MarketOverviewServiceClientSync(ConnectClientSync):
+    def get_spot_volume_history(
+        self,
+        request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetSpotVolumeHistory",
+                service_name="marketoverview.v1.MarketOverviewService",
+                input=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
+                output=marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     def list_market_overview(
         self,
         request: marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewRequest,

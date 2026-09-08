@@ -96,6 +96,7 @@ def candle_point_from_proto(
         low=_decode_price_field(msg.low),
         close=_decode_price_field(msg.close),
         volume=_decode_volume_field(msg.volume, scale=volume_scale),
+        quote_volume=str(msg.quote_volume or ""),
         is_closed=bool(msg.is_closed),
     )
 
@@ -125,6 +126,9 @@ def candles_columns_from_proto(
         "close": len(msg.close),
         "volume": len(msg.volume),
     }
+    quote_volumes = list(msg.quote_volume)
+    if quote_volumes and len(quote_volumes) != row_count:
+        lengths["quote_volume"] = len(quote_volumes)
     if any(length != row_count for length in lengths.values()):
         rendered = ", ".join(
             [f"ts_sec={row_count}", *(f"{name}={length}" for name, length in lengths.items())]
@@ -144,6 +148,7 @@ def candles_columns_from_proto(
                     msg.volume[index],
                     scale=volume_scale,
                 ),
+                quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
             )
         )
     return CandlesResult(

@@ -71,7 +71,11 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
+from polyester.services._symbols import (
+    resolve_cancel_all_symbol_ids,
+    resolve_optional_symbol_id,
+    resolve_symbol_id,
+)
 from polyester.services._validation import validate_limit
 
 
@@ -429,16 +433,22 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         symbol: str | None = None,
+        symbols: list[str] | None = None,
+        symbol_ids: list[int] | None = None,
         side: str | None = None,
         dry_run: bool = False,
         request_id: str | None = None,
     ) -> CancelAllOrdersResult:
-        if symbol:
+        if symbol or symbols:
             await self._ensure_catalogs()
         proto_request = cancel_all_orders_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
-            symbol_id=resolve_optional_symbol_id(
-                self._catalogs, symbol=symbol, label="orders.cancel_all symbol"
+            symbol_ids=resolve_cancel_all_symbol_ids(
+                self._catalogs,
+                symbol=symbol,
+                symbols=symbols,
+                symbol_ids=symbol_ids,
+                label="orders.cancel_all",
             ),
             side=side,
             dry_run=dry_run,

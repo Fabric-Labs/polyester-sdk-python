@@ -164,6 +164,8 @@ def test_market_overview_list_from_proto() -> None:
     assert result.markets[0].symbol == ""
     assert result.markets[0].index_price is not None
     assert result.markets[0].index_price.ticks == 49_500
+    assert result.markets[0].volume_24h_quote_scaled == "1000000"
+    assert result.markets[0].volume_24h_usd_scaled is None
 
 
 def test_orderbook_from_proto() -> None:

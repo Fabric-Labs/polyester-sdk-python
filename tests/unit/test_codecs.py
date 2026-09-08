@@ -101,7 +101,7 @@ def test_modify_trigger_to_proto() -> None:
 def test_cancel_all_orders_to_proto() -> None:
     proto = cancel_all_orders_to_proto(symbol_id=3, dry_run=True)
     assert proto.dry_run is True
-    assert proto.symbol_id == 3
+    assert list(proto.symbol_ids) == [3]
 
 
 def test_create_order_to_wire_maps_public_strings() -> None:

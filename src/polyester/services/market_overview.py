@@ -6,12 +6,19 @@ import contextlib
 from collections.abc import Awaitable, Callable
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.decode.market_overview import market_overview_list_from_proto
+from polyester.codecs.decode.market_overview import (
+    market_overview_list_from_proto,
+    spot_volume_history_from_proto,
+)
 from polyester.codecs.realtime_decode import decode_market_overview_batch_bytes
+from polyester.errors import PolyesterValidationError
 from polyester.gen.marketoverview.v1.marketoverview_connect import MarketOverviewServiceClient
-from polyester.gen.marketoverview.v1.marketoverview_pb2 import ListMarketOverviewRequest
+from polyester.gen.marketoverview.v1.marketoverview_pb2 import (
+    GetSpotVolumeHistoryRequest,
+    ListMarketOverviewRequest,
+)
 from polyester.market_overview.subscription import MarketOverviewSubscription
-from polyester.models.market import MarketOverviewEntry, MarketOverviewList
+from polyester.models.market import MarketOverviewEntry, MarketOverviewList, SpotVolumeHistory
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.services._base import BaseService
@@ -66,6 +73,54 @@ class AsyncMarketOverviewService(BaseService):
             lambda client, req: client.list_market_overview(req),
             request,
             lambda msg: market_overview_list_from_proto(msg, self._catalogs),
+        )
+
+    async def get_spot_volume_history(
+        self,
+        *,
+        symbols: builtins.list[str] | None = None,
+        symbol_ids: builtins.list[int] | None = None,
+    ) -> SpotVolumeHistory:
+        """Trailing 24-hour USD volume samples for configured spot pairs.
+
+        Omit both filters to select every configured pair. Send at most 2,000
+        distinct positive pair IDs. Do not sum the overlapping samples.
+        """
+        if symbols and symbol_ids:
+            raise PolyesterValidationError(
+                "market_overview.get_spot_volume_history accepts only one of symbols or symbol_ids"
+            )
+        request = GetSpotVolumeHistoryRequest()
+        resolved: list[int] = []
+        if symbol_ids:
+            seen: set[int] = set()
+            for value in symbol_ids:
+                sid = int(value)
+                if sid <= 0:
+                    raise PolyesterValidationError(
+                        "market_overview.get_spot_volume_history symbol_ids must be positive"
+                    )
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                resolved.append(sid)
+        elif symbols:
+            await self._ensure_catalogs()
+            resolved = resolve_symbol_ids(
+                self._catalogs, symbols, label="market_overview.get_spot_volume_history symbols"
+            )
+        if len(resolved) > 2_000:
+            raise PolyesterValidationError(
+                "market_overview.get_spot_volume_history accepts at most 2000 symbol_ids"
+            )
+        if resolved:
+            request.symbol_id.extend(resolved)
+        return await unary_public_decoded(
+            self._transport,
+            MarketOverviewServiceClient,
+            lambda client, req: client.get_spot_volume_history(req),
+            request,
+            lambda msg: spot_volume_history_from_proto(msg, self._catalogs),
         )
 
     async def subscribe(self) -> AsyncSubscription[MarketOverviewList]:

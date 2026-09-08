@@ -215,7 +215,18 @@ def create_trigger_to_proto(
             else:
                 twap.limit_gtc.SetInParent()
         else:
-            twap.market_ioc.SetInParent()
+            if max_slippage_ticks is not None and max_slippage_bps is not None:
+                raise PolyesterValidationError(
+                    "twap market_ioc allows at most one of max_slippage_ticks or max_slippage_bps"
+                )
+            if max_slippage_ticks is not None:
+                twap.market_ioc.max_slippage_ticks = max_slippage_ticks
+            elif max_slippage_bps is not None:
+                twap.market_ioc.max_slippage_bps = validate_bps(
+                    max_slippage_bps, "max_slippage_bps"
+                )
+            else:
+                twap.market_ioc.SetInParent()
     else:  # ladder
         if ladder_distribution is not None and ladder_distribution.lower() != "linear":
             raise PolyesterValidationError("ladder_distribution must be linear")

@@ -30,7 +30,10 @@ from polyester.codecs.decode.market_data import (
     candles_from_proto,
     market_trades_from_proto,
 )
-from polyester.codecs.decode.market_overview import market_overview_list_from_proto
+from polyester.codecs.decode.market_overview import (
+    market_overview_list_from_proto,
+    spot_volume_history_from_proto,
+)
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.decode.orders import (
     batch_replace_from_proto,
@@ -91,6 +94,7 @@ __all__ = [
     "holds_list_from_proto",
     "internal_transfer_from_proto",
     "market_overview_list_from_proto",
+    "spot_volume_history_from_proto",
     "market_trades_from_proto",
     "modify_order_from_proto",
     "order_mutation_from_proto",

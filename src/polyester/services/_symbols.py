@@ -98,3 +98,67 @@ def normalize_raw_symbol_filters(
         if item is not None:
             resolved.append(item)
     return resolved
+
+
+MAX_CANCEL_ALL_SYMBOL_IDS = 100
+
+
+def resolve_cancel_all_symbol_ids(
+    catalogs: CatalogManager | None,
+    *,
+    symbol: str | None = None,
+    symbols: list[str] | None = None,
+    symbol_ids: list[int] | None = None,
+    label: str = "orders.cancel_all",
+) -> list[int]:
+    """Resolve cancel-all Connect ``symbol_ids``.
+
+    Empty means all symbols. Duplicates are ignored. At most 100 positive IDs
+    are accepted. ``symbol``, ``symbols``, and ``symbol_ids`` are mutually
+    exclusive once any of them selects at least one pair.
+    """
+    normalized_symbol = normalize_raw_symbol_filter(symbol, label=f"{label} symbol")
+    normalized_symbols = normalize_raw_symbol_filters(symbols, label=f"{label} symbols")
+    raw_ids = [int(value) for value in symbol_ids] if symbol_ids else []
+    selected = sum(
+        1 for group in (normalized_symbol, normalized_symbols, raw_ids) if group
+    )
+    if selected > 1:
+        raise PolyesterValidationError(
+            f"{label} accepts only one of symbol, symbols, or symbol_ids"
+        )
+
+    resolved: list[int] = []
+    if raw_ids:
+        for value in raw_ids:
+            if value <= 0:
+                raise PolyesterValidationError(
+                    f"{label} symbol_ids must be positive"
+                )
+            resolved.append(value)
+    elif normalized_symbol is not None:
+        resolved.append(
+            resolve_symbol_id(
+                catalogs,
+                symbol=normalized_symbol,
+                symbol_id=None,
+                label=f"{label} symbol",
+            )
+        )
+    elif normalized_symbols:
+        resolved.extend(
+            resolve_symbol_ids(catalogs, normalized_symbols, label=f"{label} symbols")
+        )
+
+    unique: list[int] = []
+    seen: set[int] = set()
+    for value in resolved:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    if len(unique) > MAX_CANCEL_ALL_SYMBOL_IDS:
+        raise PolyesterValidationError(
+            f"{label} accepts at most {MAX_CANCEL_ALL_SYMBOL_IDS} symbol_ids"
+        )
+    return unique

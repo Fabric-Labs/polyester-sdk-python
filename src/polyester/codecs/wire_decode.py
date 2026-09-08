@@ -71,6 +71,13 @@ def _field(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
     return default
 
 
+def _optional_scaled_field(data: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        if key in data and data[key] is not None and data[key] != "":
+            return str(data[key])
+    return None
+
+
 _WIRE_ENUM_PREFIXES = (
     "SIDE_",
     "ORDER_TYPE_",
@@ -263,6 +270,7 @@ def decode_candle(data: dict[str, Any], *, volume_scale: int) -> Candle:
             _field(data, "volume", default="") or "",
             scale=volume_scale,
         ),
+        quote_volume=str(_field(data, "quoteVolume", "quote_volume", default="") or ""),
         is_closed=bool(_field(data, "isClosed", "is_closed", default=False)),
     )
 
@@ -289,6 +297,7 @@ def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int) -> list
     lows = _field(data, "low", default=[]) or []
     closes = _field(data, "close", default=[]) or []
     volumes = _field(data, "volume", default=[]) or []
+    quote_volumes = _field(data, "quoteVolume", "quote_volume", default=[]) or []
     candles: list[Candle] = []
     for index, ts in enumerate(ts_list):
         candles.append(
@@ -302,6 +311,7 @@ def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int) -> list
                     volumes[index] if index < len(volumes) else "",
                     scale=volume_scale,
                 ),
+                quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
             )
         )
     return candles
@@ -321,8 +331,14 @@ def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
         if int(index_ticks)
         else None,
         change_24h_bp=str(_field(data, "change24hBp", "change_24h_bp", default="") or ""),
-        volume_24h_quote_scaled=str(
-            _field(data, "volume24hQuoteScaled", "volume_24h_quote_scaled", default="") or ""
+        volume_24h_base_scaled=_optional_scaled_field(
+            data, "volume24hBaseScaled", "volume_24h_base_scaled"
+        ),
+        volume_24h_quote_scaled=_optional_scaled_field(
+            data, "volume24hQuoteScaled", "volume_24h_quote_scaled"
+        ),
+        volume_24h_usd_scaled=_optional_scaled_field(
+            data, "volume24hUsdScaled", "volume_24h_usd_scaled"
         ),
     )
 

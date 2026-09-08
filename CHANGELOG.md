@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Breaking
+- `orders.cancel_all` now sends repeated Connect `symbol_ids` instead of a
+  single `symbol_id`. Callers can pass `symbol`, `symbols`, or `symbol_ids`
+  (mutually exclusive). An empty collection still matches all symbols; at most
+  100 positive IDs are accepted and duplicates are ignored. Reuse `request_id`
+  only when retrying identical cancellation criteria, and handle
+  `ERROR_CODE_CANCEL_REQUEST_EXPIRED`.
+
+### Added
+- `market_overview.get_spot_volume_history` wraps the public
+  `GetSpotVolumeHistory` RPC (trailing 24-hour USD volume samples). Omit
+  filters for every configured pair, or send up to 2,000 distinct positive
+  pair IDs.
+- Candle decode now preserves exact traded `quote_volume` decimal strings on
+  `CandlePoint`, `Candle`, and columnar candle responses.
+- Market overview rows expose optional `volume_24h_base_scaled`,
+  `volume_24h_quote_scaled`, and canonical `volume_24h_usd_scaled` (1e6 USD
+  scale). Absent values stay `None` when the signed 64-bit amount or USD
+  valuation is unavailable.
+- Ladder trigger details decode `executed_levels` and `executed_qty`.
+- TWAP market-IOC create can set per-slice `max_slippage_ticks` or
+  `max_slippage_bps`.
+- Connect withdraw and internal-transfer failures unpack the new
+  `ErrorDetail` / `ErrorCode` types.
+- Social verification `start` accepts Discord without `handle` and with an
+  omitted method (server default is channel verification).
+
+### Changed
+- Generated Connect/protobuf bindings now include `AuthService.AcceptTerms`.
+  That RPC stays JWT/session-only and is not wrapped in this API-key SDK.
+  `AUTH_TERMS_NOT_ACCEPTED` is surfaced from Connect error details.
+- Restored `polyester.gen.*` imports in the fees, VIP, and rate-limit Connect
+  clients after generated output reverted them to proto-relative imports.
+
 ## 0.1.0a50
 
 Git tag: `v0.1.0a50`.

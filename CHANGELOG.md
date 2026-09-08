@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a51
+
+Git tag: `v0.1.0a51`.
+
 ### Breaking
 - `orders.cancel_all` now sends repeated Connect `symbol_ids` instead of a
   single `symbol_id`. Callers can pass `symbol`, `symbols`, or `symbol_ids`

@@ -24,6 +24,9 @@ class AuthService(Protocol):
     async def login_with_wallet(self, request: auth_dot_v1_dot_auth__pb2.LoginWithWalletRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.LoginWithWalletResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def accept_terms(self, request: auth_dot_v1_dot_auth__pb2.AcceptTermsRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.AcceptTermsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def me(self, request: auth_dot_v1_dot_auth__pb2.MeRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.MeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -52,6 +55,16 @@ class AuthServiceASGIApplication(ConnectASGIApplication[AuthService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.login_with_wallet,
+                ),
+                "/auth.v1.AuthService/AcceptTerms": Endpoint.unary(
+                    method=MethodInfo(
+                        name="AcceptTerms",
+                        service_name="auth.v1.AuthService",
+                        input=auth_dot_v1_dot_auth__pb2.AcceptTermsRequest,
+                        output=auth_dot_v1_dot_auth__pb2.AcceptTermsResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.accept_terms,
                 ),
                 "/auth.v1.AuthService/Me": Endpoint.unary(
                     method=MethodInfo(
@@ -117,6 +130,26 @@ class AuthServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def accept_terms(
+        self,
+        request: auth_dot_v1_dot_auth__pb2.AcceptTermsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_auth__pb2.AcceptTermsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="AcceptTerms",
+                service_name="auth.v1.AuthService",
+                input=auth_dot_v1_dot_auth__pb2.AcceptTermsRequest,
+                output=auth_dot_v1_dot_auth__pb2.AcceptTermsResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def me(
         self,
         request: auth_dot_v1_dot_auth__pb2.MeRequest,
@@ -146,6 +179,8 @@ class AuthServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def login_with_wallet(self, request: auth_dot_v1_dot_auth__pb2.LoginWithWalletRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.LoginWithWalletResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def accept_terms(self, request: auth_dot_v1_dot_auth__pb2.AcceptTermsRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.AcceptTermsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def me(self, request: auth_dot_v1_dot_auth__pb2.MeRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.MeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -173,6 +208,16 @@ class AuthServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.login_with_wallet,
+                ),
+                "/auth.v1.AuthService/AcceptTerms": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="AcceptTerms",
+                        service_name="auth.v1.AuthService",
+                        input=auth_dot_v1_dot_auth__pb2.AcceptTermsRequest,
+                        output=auth_dot_v1_dot_auth__pb2.AcceptTermsResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.accept_terms,
                 ),
                 "/auth.v1.AuthService/Me": EndpointSync.unary(
                     method=MethodInfo(
@@ -233,6 +278,26 @@ class AuthServiceClientSync(ConnectClientSync):
                 input=auth_dot_v1_dot_auth__pb2.LoginWithWalletRequest,
                 output=auth_dot_v1_dot_auth__pb2.LoginWithWalletResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def accept_terms(
+        self,
+        request: auth_dot_v1_dot_auth__pb2.AcceptTermsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_auth__pb2.AcceptTermsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="AcceptTerms",
+                service_name="auth.v1.AuthService",
+                input=auth_dot_v1_dot_auth__pb2.AcceptTermsRequest,
+                output=auth_dot_v1_dot_auth__pb2.AcceptTermsResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
             ),
             headers=headers,
             timeout_ms=timeout_ms,

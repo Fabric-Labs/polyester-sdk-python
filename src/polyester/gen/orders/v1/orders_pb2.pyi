@@ -118,6 +118,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN: _ClassVar[ErrorCode]
     ERROR_CODE_POLICY_SPOT_READ_DENY: _ClassVar[ErrorCode]
     ERROR_CODE_API_KEY_SPOT_READ_DENY: _ClassVar[ErrorCode]
+    ERROR_CODE_CANCEL_REQUEST_EXPIRED: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -244,6 +245,7 @@ ERROR_CODE_RATE_LIMIT_EXCEEDED: ErrorCode
 ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN: ErrorCode
 ERROR_CODE_POLICY_SPOT_READ_DENY: ErrorCode
 ERROR_CODE_API_KEY_SPOT_READ_DENY: ErrorCode
+ERROR_CODE_CANCEL_REQUEST_EXPIRED: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -487,18 +489,18 @@ class RiskPolicy(_message.Message):
     def __init__(self, take_profit: _Optional[_Union[TakeProfitPolicy, _Mapping]] = ..., stop_loss: _Optional[_Union[StopLossPolicy, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopPolicy, _Mapping]] = ..., oco: _Optional[bool] = ...) -> None: ...
 
 class CancelAllOrdersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "side", "dry_run", "request_id")
+    __slots__ = ("subaccount_id", "symbol_ids", "side", "dry_run", "request_id")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_IDS_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     DRY_RUN_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
-    symbol_id: int
+    symbol_ids: _containers.RepeatedScalarFieldContainer[int]
     side: Side
     dry_run: bool
     request_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_ids: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ...) -> None: ...
 
 class CancelAllOrdersResponse(_message.Message):
     __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns")

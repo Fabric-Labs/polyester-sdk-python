@@ -23,7 +23,7 @@ class MarketOrderBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     MARKET_ORDER_BY_UNSPECIFIED: _ClassVar[MarketOrderBy]
     ORDER_BY_CHANGE_24H_BPS: _ClassVar[MarketOrderBy]
-    ORDER_BY_VOLUME_24H_QUOTE: _ClassVar[MarketOrderBy]
+    ORDER_BY_VOLUME_24H_USD: _ClassVar[MarketOrderBy]
     ORDER_BY_LAST_PRICE: _ClassVar[MarketOrderBy]
     ORDER_BY_DATE_ADDED: _ClassVar[MarketOrderBy]
 
@@ -48,7 +48,7 @@ SPARKLINE_1W: SparklineInterval
 SPARKLINE_1M: SparklineInterval
 MARKET_ORDER_BY_UNSPECIFIED: MarketOrderBy
 ORDER_BY_CHANGE_24H_BPS: MarketOrderBy
-ORDER_BY_VOLUME_24H_QUOTE: MarketOrderBy
+ORDER_BY_VOLUME_24H_USD: MarketOrderBy
 ORDER_BY_LAST_PRICE: MarketOrderBy
 ORDER_BY_DATE_ADDED: MarketOrderBy
 SORT_DIRECTION_UNSPECIFIED: SortDirection
@@ -76,7 +76,7 @@ class Sparkline(_message.Message):
     def __init__(self, interval: _Optional[_Union[SparklineInterval, str]] = ..., close_ticks: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class MarketOverview(_message.Message):
-    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks")
+    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "volume_24h_usd_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LAST_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     LAST_TRADE_TS_NS_FIELD_NUMBER: _ClassVar[int]
@@ -85,6 +85,7 @@ class MarketOverview(_message.Message):
     LOW_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
     VOLUME_24H_BASE_SCALED_FIELD_NUMBER: _ClassVar[int]
     VOLUME_24H_QUOTE_SCALED_FIELD_NUMBER: _ClassVar[int]
+    VOLUME_24H_USD_SCALED_FIELD_NUMBER: _ClassVar[int]
     LISTED_TS_NS_FIELD_NUMBER: _ClassVar[int]
     BEST_BID_TICKS_FIELD_NUMBER: _ClassVar[int]
     BEST_BID_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -100,6 +101,7 @@ class MarketOverview(_message.Message):
     low_24h_ticks: int
     volume_24h_base_scaled: int
     volume_24h_quote_scaled: int
+    volume_24h_usd_scaled: int
     listed_ts_ns: int
     best_bid_ticks: int
     best_bid_qty_scaled: int
@@ -107,7 +109,7 @@ class MarketOverview(_message.Message):
     best_ask_qty_scaled: int
     sparklines: _containers.RepeatedCompositeFieldContainer[Sparkline]
     index_price_ticks: int
-    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., volume_24h_usd_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ...) -> None: ...
 
 class ListMarketOverviewRequest(_message.Message):
     __slots__ = ("symbol_id", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals")
@@ -142,3 +144,33 @@ class MarketOverviewBatch(_message.Message):
     markets: _containers.RepeatedCompositeFieldContainer[MarketOverview]
     ts_ns: int
     def __init__(self, markets: _Optional[_Iterable[_Union[MarketOverview, _Mapping]]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+
+class GetSpotVolumeHistoryRequest(_message.Message):
+    __slots__ = ("symbol_id",)
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, symbol_id: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class SpotPairVolumeSeries(_message.Message):
+    __slots__ = ("symbol_id", "volume_usd_scaled")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    VOLUME_USD_SCALED_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: int
+    volume_usd_scaled: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, symbol_id: _Optional[int] = ..., volume_usd_scaled: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class GetSpotVolumeHistoryResponse(_message.Message):
+    __slots__ = ("bucket", "start_ts_sec", "end_ts_sec", "points", "pairs", "total_volume_usd_scaled")
+    BUCKET_FIELD_NUMBER: _ClassVar[int]
+    START_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    END_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    POINTS_FIELD_NUMBER: _ClassVar[int]
+    PAIRS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_VOLUME_USD_SCALED_FIELD_NUMBER: _ClassVar[int]
+    bucket: str
+    start_ts_sec: int
+    end_ts_sec: int
+    points: int
+    pairs: _containers.RepeatedCompositeFieldContainer[SpotPairVolumeSeries]
+    total_volume_usd_scaled: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., points: _Optional[int] = ..., pairs: _Optional[_Iterable[_Union[SpotPairVolumeSeries, _Mapping]]] = ..., total_volume_usd_scaled: _Optional[_Iterable[int]] = ...) -> None: ...

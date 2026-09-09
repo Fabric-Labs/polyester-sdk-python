@@ -57,8 +57,9 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     max_quote_debit: Any | None = None
     price: Any | None = None
     sub_account_id: str | None = None
-    # Optional. Set a stable non-empty value when you may retry after an
-    # ambiguous failure, and reuse that same id on retry/reconciliation.
+    # Optional. Set a stable non-empty value so you can reconcile after an
+    # ambiguous failure. Look up that id before creating again; a second
+    # create with the same id is always a conflict if the first attempt admitted.
     client_order_id: str | None = None
     post_only: bool = False
     expires_at: str | None = None

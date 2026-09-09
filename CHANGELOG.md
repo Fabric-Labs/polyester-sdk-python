@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- Document that a reused `client_order_id` on create is a conflict after the
+  first admission (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`). Reconcile with
+  `get` / `list_open` before creating again.
+
 ## 0.1.0a51
 
 Git tag: `v0.1.0a51`.

@@ -235,9 +235,13 @@ async with AsyncPolyester(
 ```
 
 `client_order_id` is **optional** (matches the API). Omit it for one-shot
-creates. **Set a stable non-empty value when you may retry** after an ambiguous
-transport/server failure, and reuse that same id on retry / reconciliation -
-without it you cannot safely tell whether the first attempt admitted the order.
+creates. **Set a stable non-empty value when you may need to reconcile** after
+an ambiguous transport/server failure. Without it you cannot tell whether the
+first attempt admitted the order. After an unknown outcome, look up that id
+(`get` / `list_open`) before creating again. A second create with the same id
+is rejected (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`) even when the payload
+matches. Only create again with that id if reconciliation shows the first
+attempt did not admit.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create, cancel, and replace accept at most 20 items. `batch_create`
 always sends `request_id` (caller value or a generated `batch-create-*` key);

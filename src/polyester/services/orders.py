@@ -225,8 +225,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     ) -> OrderMutationResult:
         """Create an order.
 
-        ``client_order_id`` is optional. Set a stable non-empty value when you
-        may retry after an ambiguous failure, and reuse that same id on retry.
+        ``client_order_id`` is optional. Set a stable non-empty value so you
+        can reconcile after an ambiguous failure. Look up that id before
+        creating again; a second create with the same id is a conflict if the
+        first attempt admitted.
         """
         if account is not None:
             kwargs = {

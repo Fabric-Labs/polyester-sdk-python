@@ -65,3 +65,39 @@ class SpotVolumeHistory(msgspec.Struct, kw_only=True, omit_defaults=True):
     points: int = 0
     pairs: list[SpotPairVolumeSeries] = []
     total_volume_usd_scaled: list[int] = []
+
+
+class CurrencyMetadata(msgspec.Struct, kw_only=True, omit_defaults=True):
+    code: str = ""
+    default_english_name: str = ""
+    symbol: str = ""
+    fraction_digits: int = 0
+
+
+class CurrencyConversionConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
+    fiat: list[CurrencyMetadata] = msgspec.field(default_factory=list)
+    stablecoins: list[CurrencyMetadata] = msgspec.field(default_factory=list)
+
+
+class FiatConversionRate(msgspec.Struct, kw_only=True, omit_defaults=True):
+    code: str = ""
+    units_per_usd_e8: int = 0
+
+
+class FiatConversionSnapshot(msgspec.Struct, kw_only=True, omit_defaults=True):
+    rates: list[FiatConversionRate] = msgspec.field(default_factory=list)
+    source_ts_sec: int = 0
+    stale: bool = False
+
+
+class StablecoinConversionRate(msgspec.Struct, kw_only=True, omit_defaults=True):
+    code: str = ""
+    usd_per_unit_e8: int = 0
+    source_ts_sec: int = 0
+    stale: bool = False
+
+
+class CurrencyConversionRates(msgspec.Struct, kw_only=True, omit_defaults=True):
+    fiat: FiatConversionSnapshot | None = None
+    stablecoins: list[StablecoinConversionRate] = msgspec.field(default_factory=list)
+    snapshot_ts_sec: int = 0

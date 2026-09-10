@@ -7,6 +7,8 @@ from collections.abc import Awaitable, Callable
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.market_overview import (
+    currency_conversion_config_from_proto,
+    currency_conversion_rates_from_proto,
     market_overview_list_from_proto,
     spot_volume_history_from_proto,
 )
@@ -14,11 +16,19 @@ from polyester.codecs.realtime_decode import decode_market_overview_batch_bytes
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketoverview.v1.marketoverview_connect import MarketOverviewServiceClient
 from polyester.gen.marketoverview.v1.marketoverview_pb2 import (
+    GetCurrencyConversionConfigRequest,
+    GetCurrencyConversionRatesRequest,
     GetSpotVolumeHistoryRequest,
     ListMarketOverviewRequest,
 )
 from polyester.market_overview.subscription import MarketOverviewSubscription
-from polyester.models.market import MarketOverviewEntry, MarketOverviewList, SpotVolumeHistory
+from polyester.models.market import (
+    CurrencyConversionConfig,
+    CurrencyConversionRates,
+    MarketOverviewEntry,
+    MarketOverviewList,
+    SpotVolumeHistory,
+)
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
 from polyester.services._base import BaseService
@@ -121,6 +131,38 @@ class AsyncMarketOverviewService(BaseService):
             lambda client, req: client.get_spot_volume_history(req),
             request,
             lambda msg: spot_volume_history_from_proto(msg, self._catalogs),
+        )
+
+    async def get_currency_conversion_config(self) -> CurrencyConversionConfig:
+        """Supported fiat and stablecoin display metadata.
+
+        Entries are ordered by code. Names, symbols, and fraction digits are
+        presentation defaults; fraction digits do not specify rate precision.
+        Configuration remains available before rates are observed.
+        """
+        return await unary_public_decoded(
+            self._transport,
+            MarketOverviewServiceClient,
+            lambda client, req: client.get_currency_conversion_config(req),
+            GetCurrencyConversionConfigRequest(),
+            currency_conversion_config_from_proto,
+        )
+
+    async def get_currency_conversion_rates(self) -> CurrencyConversionRates:
+        """Fiat units per USD and USD per stablecoin unit.
+
+        Fiat ``units_per_usd_e8`` is currency units per 1 USD, scaled by 1e8
+        (USD identity is 100_000_000). Stablecoin ``usd_per_unit_e8`` is
+        observed USD per unit at the same scale. A missing fiat snapshot or
+        omitted stablecoin is unobserved, not zero. The request fails with
+        unavailable (HTTP 503) before any observation exists.
+        """
+        return await unary_public_decoded(
+            self._transport,
+            MarketOverviewServiceClient,
+            lambda client, req: client.get_currency_conversion_rates(req),
+            GetCurrencyConversionRatesRequest(),
+            currency_conversion_rates_from_proto,
         )
 
     async def subscribe(self) -> AsyncSubscription[MarketOverviewList]:

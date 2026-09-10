@@ -2,7 +2,24 @@
 
 ## Unreleased
 
+### Breaking
+- `DepositWithdrawConfig.polyester_chain_id` is removed. The zipper config
+  no longer publishes a dedicated Polyester chain id.
+
+### Added
+- `market_overview.get_currency_conversion_config` and
+  `get_currency_conversion_rates` wrap the public currency-conversion RPCs.
+  Fiat `units_per_usd_e8` is currency units per 1 USD at 1e8 scale (USD
+  identity is 100_000_000). Stablecoin `usd_per_unit_e8` is observed USD
+  per unit at the same scale. A missing fiat snapshot or omitted
+  stablecoin is unobserved, not zero. Rates fail with unavailable
+  (HTTP 503) before any observation exists. Fraction digits are
+  presentation defaults, not rate precision.
+
 ### Changed
+- Restored `polyester.gen.*` imports in the fees, VIP, and rate-limit Connect
+  clients after generated output reverted them to proto-relative imports.
+
 - Document that a reused `client_order_id` on create is a conflict after the
   first admission (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`). Reconcile with
   `get` / `list_open` before creating again.

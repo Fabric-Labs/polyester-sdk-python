@@ -174,3 +174,71 @@ class GetSpotVolumeHistoryResponse(_message.Message):
     pairs: _containers.RepeatedCompositeFieldContainer[SpotPairVolumeSeries]
     total_volume_usd_scaled: _containers.RepeatedScalarFieldContainer[int]
     def __init__(self, bucket: _Optional[str] = ..., start_ts_sec: _Optional[int] = ..., end_ts_sec: _Optional[int] = ..., points: _Optional[int] = ..., pairs: _Optional[_Iterable[_Union[SpotPairVolumeSeries, _Mapping]]] = ..., total_volume_usd_scaled: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class CurrencyMetadata(_message.Message):
+    __slots__ = ("code", "default_english_name", "symbol", "fraction_digits")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_ENGLISH_NAME_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    FRACTION_DIGITS_FIELD_NUMBER: _ClassVar[int]
+    code: str
+    default_english_name: str
+    symbol: str
+    fraction_digits: int
+    def __init__(self, code: _Optional[str] = ..., default_english_name: _Optional[str] = ..., symbol: _Optional[str] = ..., fraction_digits: _Optional[int] = ...) -> None: ...
+
+class GetCurrencyConversionConfigRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetCurrencyConversionConfigResponse(_message.Message):
+    __slots__ = ("fiat", "stablecoins")
+    FIAT_FIELD_NUMBER: _ClassVar[int]
+    STABLECOINS_FIELD_NUMBER: _ClassVar[int]
+    fiat: _containers.RepeatedCompositeFieldContainer[CurrencyMetadata]
+    stablecoins: _containers.RepeatedCompositeFieldContainer[CurrencyMetadata]
+    def __init__(self, fiat: _Optional[_Iterable[_Union[CurrencyMetadata, _Mapping]]] = ..., stablecoins: _Optional[_Iterable[_Union[CurrencyMetadata, _Mapping]]] = ...) -> None: ...
+
+class FiatConversionRate(_message.Message):
+    __slots__ = ("code", "units_per_usd_e8")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    UNITS_PER_USD_E8_FIELD_NUMBER: _ClassVar[int]
+    code: str
+    units_per_usd_e8: int
+    def __init__(self, code: _Optional[str] = ..., units_per_usd_e8: _Optional[int] = ...) -> None: ...
+
+class FiatConversionSnapshot(_message.Message):
+    __slots__ = ("rates", "source_ts_sec", "stale")
+    RATES_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    STALE_FIELD_NUMBER: _ClassVar[int]
+    rates: _containers.RepeatedCompositeFieldContainer[FiatConversionRate]
+    source_ts_sec: int
+    stale: bool
+    def __init__(self, rates: _Optional[_Iterable[_Union[FiatConversionRate, _Mapping]]] = ..., source_ts_sec: _Optional[int] = ..., stale: _Optional[bool] = ...) -> None: ...
+
+class StablecoinConversionRate(_message.Message):
+    __slots__ = ("code", "usd_per_unit_e8", "source_ts_sec", "stale")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    USD_PER_UNIT_E8_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    STALE_FIELD_NUMBER: _ClassVar[int]
+    code: str
+    usd_per_unit_e8: int
+    source_ts_sec: int
+    stale: bool
+    def __init__(self, code: _Optional[str] = ..., usd_per_unit_e8: _Optional[int] = ..., source_ts_sec: _Optional[int] = ..., stale: _Optional[bool] = ...) -> None: ...
+
+class GetCurrencyConversionRatesRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetCurrencyConversionRatesResponse(_message.Message):
+    __slots__ = ("fiat", "stablecoins", "snapshot_ts_sec")
+    FIAT_FIELD_NUMBER: _ClassVar[int]
+    STABLECOINS_FIELD_NUMBER: _ClassVar[int]
+    SNAPSHOT_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    fiat: FiatConversionSnapshot
+    stablecoins: _containers.RepeatedCompositeFieldContainer[StablecoinConversionRate]
+    snapshot_ts_sec: int
+    def __init__(self, fiat: _Optional[_Union[FiatConversionSnapshot, _Mapping]] = ..., stablecoins: _Optional[_Iterable[_Union[StablecoinConversionRate, _Mapping]]] = ..., snapshot_ts_sec: _Optional[int] = ...) -> None: ...

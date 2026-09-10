@@ -6,7 +6,6 @@ from polyester.gen.chain.zipper.v1 import zipper_pb2
 def test_deposit_withdraw_config_from_proto_normalizes_supply_and_tokens() -> None:
     msg = zipper_pb2.GetDepositWithdrawConfigResponse(
         ts_sec=1_700_000_000,
-        polyester_chain_id=1,
         chains=[
             zipper_pb2.ChainConfig(
                 chain_id=1,

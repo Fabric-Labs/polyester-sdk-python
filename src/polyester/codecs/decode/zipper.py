@@ -94,7 +94,6 @@ def deposit_withdraw_config_from_proto(
         chains=chains,
         assets=assets,
         contracts=contracts,
-        polyester_chain_id=int(msg.polyester_chain_id),
         ts_ms=ts_ms,
     )
 

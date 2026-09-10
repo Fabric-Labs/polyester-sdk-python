@@ -115,7 +115,6 @@ class CatalogManager:
                 for asset in config.assets
             ],
             "contracts": [msgspec_to_dict(item) for item in config.contracts],
-            "polyesterChainId": config.polyester_chain_id,
             "tsSec": config.ts_ms // 1000 if config.ts_ms else 0,
         }
 

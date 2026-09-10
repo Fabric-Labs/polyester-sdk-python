@@ -4,10 +4,16 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.proto_helpers import has_field
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.models.market import (
+    CurrencyConversionConfig,
+    CurrencyConversionRates,
+    CurrencyMetadata,
+    FiatConversionRate,
+    FiatConversionSnapshot,
     MarketOverviewEntry,
     MarketOverviewList,
     SpotPairVolumeSeries,
     SpotVolumeHistory,
+    StablecoinConversionRate,
 )
 from polyester.types.money import Price
 
@@ -71,4 +77,61 @@ def spot_volume_history_from_proto(
         points=int(msg.points),
         pairs=pairs,
         total_volume_usd_scaled=[int(value) for value in msg.total_volume_usd_scaled],
+    )
+
+
+def currency_metadata_from_proto(msg: marketoverview_pb2.CurrencyMetadata) -> CurrencyMetadata:
+    return CurrencyMetadata(
+        code=str(msg.code),
+        default_english_name=str(msg.default_english_name),
+        symbol=str(msg.symbol),
+        fraction_digits=int(msg.fraction_digits),
+    )
+
+
+def currency_conversion_config_from_proto(
+    msg: marketoverview_pb2.GetCurrencyConversionConfigResponse,
+) -> CurrencyConversionConfig:
+    return CurrencyConversionConfig(
+        fiat=[currency_metadata_from_proto(item) for item in msg.fiat],
+        stablecoins=[currency_metadata_from_proto(item) for item in msg.stablecoins],
+    )
+
+
+def fiat_conversion_snapshot_from_proto(
+    msg: marketoverview_pb2.FiatConversionSnapshot,
+) -> FiatConversionSnapshot:
+    return FiatConversionSnapshot(
+        rates=[
+            FiatConversionRate(
+                code=str(item.code),
+                units_per_usd_e8=int(item.units_per_usd_e8),
+            )
+            for item in msg.rates
+        ],
+        source_ts_sec=int(msg.source_ts_sec),
+        stale=bool(msg.stale),
+    )
+
+
+def currency_conversion_rates_from_proto(
+    msg: marketoverview_pb2.GetCurrencyConversionRatesResponse,
+) -> CurrencyConversionRates:
+    fiat = (
+        fiat_conversion_snapshot_from_proto(msg.fiat)
+        if has_field(msg, "fiat")
+        else None
+    )
+    return CurrencyConversionRates(
+        fiat=fiat,
+        stablecoins=[
+            StablecoinConversionRate(
+                code=str(item.code),
+                usd_per_unit_e8=int(item.usd_per_unit_e8),
+                source_ts_sec=int(item.source_ts_sec),
+                stale=bool(item.stale),
+            )
+            for item in msg.stablecoins
+        ],
+        snapshot_ts_sec=int(msg.snapshot_ts_sec),
     )

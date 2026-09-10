@@ -18,6 +18,12 @@ import polyester.gen.marketoverview.v1.marketoverview_pb2 as marketoverview_dot_
 
 
 class MarketOverviewService(Protocol):
+    async def get_currency_conversion_config(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_currency_conversion_rates(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_spot_volume_history(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -30,6 +36,26 @@ class MarketOverviewServiceASGIApplication(ConnectASGIApplication[MarketOverview
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/marketoverview.v1.MarketOverviewService/GetCurrencyConversionConfig": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetCurrencyConversionConfig",
+                        service_name="marketoverview.v1.MarketOverviewService",
+                        input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest,
+                        output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_currency_conversion_config,
+                ),
+                "/marketoverview.v1.MarketOverviewService/GetCurrencyConversionRates": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetCurrencyConversionRates",
+                        service_name="marketoverview.v1.MarketOverviewService",
+                        input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest,
+                        output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_currency_conversion_rates,
+                ),
                 "/marketoverview.v1.MarketOverviewService/GetSpotVolumeHistory": Endpoint.unary(
                     method=MethodInfo(
                         name="GetSpotVolumeHistory",
@@ -64,6 +90,46 @@ class MarketOverviewServiceASGIApplication(ConnectASGIApplication[MarketOverview
 
 
 class MarketOverviewServiceClient(ConnectClient):
+    async def get_currency_conversion_config(
+        self,
+        request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCurrencyConversionConfig",
+                service_name="marketoverview.v1.MarketOverviewService",
+                input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest,
+                output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_currency_conversion_rates(
+        self,
+        request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCurrencyConversionRates",
+                service_name="marketoverview.v1.MarketOverviewService",
+                input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest,
+                output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def get_spot_volume_history(
         self,
         request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,
@@ -109,6 +175,10 @@ class MarketOverviewServiceClient(ConnectClient):
 
 
 class MarketOverviewServiceSync(Protocol):
+    def get_currency_conversion_config(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_currency_conversion_rates(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_spot_volume_history(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_market_overview(self, request: marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewRequest, ctx: RequestContext) -> marketoverview_dot_v1_dot_marketoverview__pb2.ListMarketOverviewResponse:
@@ -119,6 +189,26 @@ class MarketOverviewServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: MarketOverviewServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/marketoverview.v1.MarketOverviewService/GetCurrencyConversionConfig": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetCurrencyConversionConfig",
+                        service_name="marketoverview.v1.MarketOverviewService",
+                        input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest,
+                        output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_currency_conversion_config,
+                ),
+                "/marketoverview.v1.MarketOverviewService/GetCurrencyConversionRates": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetCurrencyConversionRates",
+                        service_name="marketoverview.v1.MarketOverviewService",
+                        input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest,
+                        output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_currency_conversion_rates,
+                ),
                 "/marketoverview.v1.MarketOverviewService/GetSpotVolumeHistory": EndpointSync.unary(
                     method=MethodInfo(
                         name="GetSpotVolumeHistory",
@@ -153,6 +243,46 @@ class MarketOverviewServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class MarketOverviewServiceClientSync(ConnectClientSync):
+    def get_currency_conversion_config(
+        self,
+        request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCurrencyConversionConfig",
+                service_name="marketoverview.v1.MarketOverviewService",
+                input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigRequest,
+                output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionConfigResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_currency_conversion_rates(
+        self,
+        request: marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCurrencyConversionRates",
+                service_name="marketoverview.v1.MarketOverviewService",
+                input=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesRequest,
+                output=marketoverview_dot_v1_dot_marketoverview__pb2.GetCurrencyConversionRatesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     def get_spot_volume_history(
         self,
         request: marketoverview_dot_v1_dot_marketoverview__pb2.GetSpotVolumeHistoryRequest,

@@ -103,7 +103,6 @@ class DepositWithdrawConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
     chains: list[ZipperChainConfig] = msgspec.field(default_factory=list)
     assets: list[ZipperAssetConfig] = msgspec.field(default_factory=list)
     contracts: list[ZipperChainContractConfig] = msgspec.field(default_factory=list)
-    polyester_chain_id: int = 0
     ts_ms: int = 0
 
 

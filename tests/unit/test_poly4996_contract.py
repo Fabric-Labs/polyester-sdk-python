@@ -9,6 +9,8 @@ from connectrpc.errors import ConnectError
 from polyester._wire import map_connect_error
 from polyester.codecs.decode.market_data import candle_point_from_proto, candles_columns_from_proto
 from polyester.codecs.decode.market_overview import (
+    currency_conversion_config_from_proto,
+    currency_conversion_rates_from_proto,
     market_overview_entry_from_proto,
     spot_volume_history_from_proto,
 )
@@ -185,6 +187,82 @@ def test_spot_volume_history_from_proto() -> None:
     assert result.pairs[0].symbol_id == 7
     assert result.pairs[0].volume_usd_scaled == [1, 2]
     assert result.total_volume_usd_scaled == [3, 4]
+
+
+def test_currency_conversion_config_from_proto() -> None:
+    result = currency_conversion_config_from_proto(
+        marketoverview_pb2.GetCurrencyConversionConfigResponse(
+            fiat=[
+                marketoverview_pb2.CurrencyMetadata(
+                    code="EUR",
+                    default_english_name="Euro",
+                    symbol="€",
+                    fraction_digits=2,
+                ),
+                marketoverview_pb2.CurrencyMetadata(
+                    code="USD",
+                    default_english_name="US Dollar",
+                    symbol="$",
+                    fraction_digits=2,
+                ),
+            ],
+            stablecoins=[
+                marketoverview_pb2.CurrencyMetadata(
+                    code="USDT",
+                    default_english_name="Tether",
+                    symbol="USDT",
+                    fraction_digits=2,
+                )
+            ],
+        )
+    )
+    assert [item.code for item in result.fiat] == ["EUR", "USD"]
+    assert result.fiat[0].symbol == "€"
+    assert result.fiat[0].fraction_digits == 2
+    assert result.stablecoins[0].code == "USDT"
+
+
+def test_currency_conversion_rates_preserve_e8_and_absent_fiat() -> None:
+    present = currency_conversion_rates_from_proto(
+        marketoverview_pb2.GetCurrencyConversionRatesResponse(
+            fiat=marketoverview_pb2.FiatConversionSnapshot(
+                rates=[
+                    marketoverview_pb2.FiatConversionRate(
+                        code="USD",
+                        units_per_usd_e8=100_000_000,
+                    ),
+                    marketoverview_pb2.FiatConversionRate(
+                        code="EUR",
+                        units_per_usd_e8=92_000_000,
+                    ),
+                ],
+                source_ts_sec=1_700_000_000,
+                stale=True,
+            ),
+            stablecoins=[
+                marketoverview_pb2.StablecoinConversionRate(
+                    code="USDT",
+                    usd_per_unit_e8=99_990_000,
+                    source_ts_sec=1_700_000_005,
+                    stale=False,
+                )
+            ],
+            snapshot_ts_sec=1_700_000_010,
+        )
+    )
+    assert present.fiat is not None
+    assert present.fiat.stale is True
+    assert present.fiat.rates[0].code == "USD"
+    assert present.fiat.rates[0].units_per_usd_e8 == 100_000_000
+    assert present.stablecoins[0].usd_per_unit_e8 == 99_990_000
+    assert present.snapshot_ts_sec == 1_700_000_010
+
+    absent = currency_conversion_rates_from_proto(
+        marketoverview_pb2.GetCurrencyConversionRatesResponse(snapshot_ts_sec=7)
+    )
+    assert absent.fiat is None
+    assert absent.stablecoins == []
+    assert absent.snapshot_ts_sec == 7
 
 
 def test_empty_orderbook_with_zero_sequence_is_success() -> None:

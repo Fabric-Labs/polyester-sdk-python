@@ -14,7 +14,7 @@ from connectrpc.interceptor import Interceptor, InterceptorSync
 from connectrpc.method import IdempotencyLevel, MethodInfo
 from connectrpc.request import Headers, RequestContext
 from connectrpc.server import ConnectASGIApplication, ConnectWSGIApplication, Endpoint, EndpointSync
-import polyester.gen.ratelimit.v1.ratelimit_pb2 as ratelimit_dot_v1_dot_ratelimit__pb2
+import ratelimit.v1.ratelimit_pb2 as ratelimit_dot_v1_dot_ratelimit__pb2
 
 
 class RateLimitService(Protocol):

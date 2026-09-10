@@ -116,15 +116,13 @@ class GetDepositWithdrawConfigRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class GetDepositWithdrawConfigResponse(_message.Message):
-    __slots__ = ("chains", "assets", "ts_sec", "polyester_chain_id", "contracts")
+    __slots__ = ("chains", "assets", "ts_sec", "contracts")
     CHAINS_FIELD_NUMBER: _ClassVar[int]
     ASSETS_FIELD_NUMBER: _ClassVar[int]
     TS_SEC_FIELD_NUMBER: _ClassVar[int]
-    POLYESTER_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     CONTRACTS_FIELD_NUMBER: _ClassVar[int]
     chains: _containers.RepeatedCompositeFieldContainer[ChainConfig]
     assets: _containers.RepeatedCompositeFieldContainer[AssetConfig]
     ts_sec: int
-    polyester_chain_id: int
     contracts: _containers.RepeatedCompositeFieldContainer[ChainContractConfig]
-    def __init__(self, chains: _Optional[_Iterable[_Union[ChainConfig, _Mapping]]] = ..., assets: _Optional[_Iterable[_Union[AssetConfig, _Mapping]]] = ..., ts_sec: _Optional[int] = ..., polyester_chain_id: _Optional[int] = ..., contracts: _Optional[_Iterable[_Union[ChainContractConfig, _Mapping]]] = ...) -> None: ...
+    def __init__(self, chains: _Optional[_Iterable[_Union[ChainConfig, _Mapping]]] = ..., assets: _Optional[_Iterable[_Union[AssetConfig, _Mapping]]] = ..., ts_sec: _Optional[int] = ..., contracts: _Optional[_Iterable[_Union[ChainContractConfig, _Mapping]]] = ...) -> None: ...

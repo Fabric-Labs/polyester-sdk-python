@@ -14,6 +14,12 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class WalletChallengePurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WALLET_PROOF_UNSPECIFIED: _ClassVar[WalletChallengePurpose]
+    LOGIN: _ClassVar[WalletChallengePurpose]
+    CREATE_SUBACCOUNT: _ClassVar[WalletChallengePurpose]
+
 class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     AUTH_UNSPECIFIED: _ClassVar[AuthErrorCode]
@@ -57,6 +63,9 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_MFA_LAST_FACTOR_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_INTERNAL_ERROR: _ClassVar[AuthErrorCode]
     AUTH_TERMS_NOT_ACCEPTED: _ClassVar[AuthErrorCode]
+WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
+LOGIN: WalletChallengePurpose
+CREATE_SUBACCOUNT: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
 AUTH_USERNAME_INVALID: AuthErrorCode
 AUTH_USERNAME_TAKEN: AuthErrorCode
@@ -99,37 +108,41 @@ AUTH_MFA_LAST_FACTOR_REQUIRED: AuthErrorCode
 AUTH_INTERNAL_ERROR: AuthErrorCode
 AUTH_TERMS_NOT_ACCEPTED: AuthErrorCode
 
-class GetNonceRequest(_message.Message):
-    __slots__ = ("smart_account_address",)
+class CreateWalletChallengeRequest(_message.Message):
+    __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    SIGNER_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    URI_FIELD_NUMBER: _ClassVar[int]
+    PURPOSE_FIELD_NUMBER: _ClassVar[int]
     smart_account_address: str
-    def __init__(self, smart_account_address: _Optional[str] = ...) -> None: ...
+    signer_address: str
+    uri: str
+    purpose: WalletChallengePurpose
+    def __init__(self, smart_account_address: _Optional[str] = ..., signer_address: _Optional[str] = ..., uri: _Optional[str] = ..., purpose: _Optional[_Union[WalletChallengePurpose, str]] = ...) -> None: ...
 
-class GetNonceResponse(_message.Message):
-    __slots__ = ("nonce", "expires_at")
-    NONCE_FIELD_NUMBER: _ClassVar[int]
+class CreateWalletChallengeResponse(_message.Message):
+    __slots__ = ("message", "expires_at")
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
-    nonce: str
+    message: str
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, nonce: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, message: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class LoginWithWalletRequest(_message.Message):
-    __slots__ = ("smart_account_address", "nonce", "signature", "user_agent", "ip", "primary_wallet_address", "wallet_provider")
+    __slots__ = ("smart_account_address", "signature", "user_agent", "ip", "wallet_provider", "message")
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
-    NONCE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     USER_AGENT_FIELD_NUMBER: _ClassVar[int]
     IP_FIELD_NUMBER: _ClassVar[int]
-    PRIMARY_WALLET_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     WALLET_PROVIDER_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
     smart_account_address: str
-    nonce: str
     signature: str
     user_agent: str
     ip: str
-    primary_wallet_address: str
     wallet_provider: str
-    def __init__(self, smart_account_address: _Optional[str] = ..., nonce: _Optional[str] = ..., signature: _Optional[str] = ..., user_agent: _Optional[str] = ..., ip: _Optional[str] = ..., primary_wallet_address: _Optional[str] = ..., wallet_provider: _Optional[str] = ...) -> None: ...
+    message: str
+    def __init__(self, smart_account_address: _Optional[str] = ..., signature: _Optional[str] = ..., user_agent: _Optional[str] = ..., ip: _Optional[str] = ..., wallet_provider: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class LoginWithWalletResponse(_message.Message):
     __slots__ = ("access_token", "expires_at", "account_id", "username", "session")

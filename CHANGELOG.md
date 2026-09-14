@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- CI rejects proto-relative Connect imports (`import fees.v1...`) so a gen
+  drop cannot merge until `scripts/rewrite_connect_imports.py` remaps them
+  to `polyester.gen.*`.
+
 ### Changed
 - Restored `polyester.gen.*` imports in the fees, VIP, and rate-limit Connect
   clients after generated output reverted them to proto-relative imports.

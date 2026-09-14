@@ -29,6 +29,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+          python -c "import polyester"
+
+      - name: Reject proto-relative Connect imports
+        run: python scripts/check_connect_imports.py
 
       - name: Reject private ledger.write gen
         run: |

@@ -29,12 +29,16 @@ from polyester.chain.destination import (
     encode_withdraw_destination_hex,
 )
 from polyester.chain.environment import (
+    POLYESTER_DEVNET_ENVIRONMENT,
     POLYESTER_TESTNET_ENVIRONMENT,
     AccountAbstractionEnvironment,
     ContractsEnvironment,
     EntryPointConfig,
     PolyesterChainEnvironment,
+    PolyesterEnvironment,
     SafeDeploymentConfig,
+    create_polyester_environment,
+    environment_from_name,
 )
 from polyester.chain.fees import ZipperFeeQuote, quote_zipper_fee
 from polyester.chain.safe import (
@@ -51,8 +55,12 @@ __all__ = [
     "ContractsEnvironment",
     "EntryPointConfig",
     "GuardApproval",
+    "POLYESTER_DEVNET_ENVIRONMENT",
     "POLYESTER_TESTNET_ENVIRONMENT",
     "PolyesterChainEnvironment",
+    "PolyesterEnvironment",
+    "create_polyester_environment",
+    "environment_from_name",
     "PolyesterSmartAccount",
     "PredictedSafe",
     "SafeDeploymentConfig",

@@ -25,8 +25,14 @@ FAR_ABOVE_BUY_STOP_PRICE_HINTS: dict[str, str] = {
 
 
 def live_client_kwargs_from_env(**overrides) -> dict | None:
-    """Load devnet credentials from env; return ``AsyncPolyester`` constructor kwargs."""
+    """Load live-test constructor kwargs from ``POLYESTER_*`` process env.
+
+    Honors ``POLYESTER_ENV`` / ``POLYESTER_ENVIRONMENT`` the same way
+    ``AsyncPolyester.from_env`` does, plus optional URL overrides.
+    """
     from polyester.auth import ACCOUNT_ID_ENV, load_api_key_credentials
+    from polyester.client import API_URL_ENV, WS_URL_ENV
+    from polyester.environment import ENV_NAME_ENV, ENV_NAME_ENV_ALIAS, environment_from_name
 
     creds = load_api_key_credentials()
     if creds is None:
@@ -36,12 +42,19 @@ def live_client_kwargs_from_env(**overrides) -> dict | None:
         "api_private_key": creds.private_key,
         **overrides,
     }
+    if "environment" not in kwargs:
+        env_name = os.getenv(ENV_NAME_ENV) or os.getenv(ENV_NAME_ENV_ALIAS)
+        if env_name:
+            kwargs["environment"] = environment_from_name(env_name)
     account_id = os.getenv(ACCOUNT_ID_ENV)
     if account_id:
         kwargs["default_account_id"] = account_id.strip()
-    api_url = os.getenv("POLYESTER_API_URL")
+    api_url = os.getenv(API_URL_ENV)
     if api_url:
         kwargs["api_url"] = api_url.strip()
+    ws_url = os.getenv(WS_URL_ENV)
+    if ws_url:
+        kwargs["ws_url"] = ws_url.strip()
     return kwargs
 
 

@@ -1,16 +1,63 @@
 from decimal import Decimal
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from polyester import POLYESTER_DEVNET_ENVIRONMENT, POLYESTER_TESTNET_ENVIRONMENT
+from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV
 from tests.helpers import (
     FAR_ABOVE_BUY_STOP_PRICE_HINTS,
     FAR_BELOW_BUY_PRICE_HINTS,
     base_asset_id_for_symbol,
     far_below_price_from_last_ticks,
     ledger_id_for_asset_symbol,
+    live_client_kwargs_from_env,
     min_base_qty_for_pair,
     pick_smoke_symbol,
     pick_trade_symbol,
     quote_asset_id_for_symbol,
 )
+
+
+def _private_key_hex() -> str:
+    return Ed25519PrivateKey.generate().private_bytes_raw().hex()
+
+
+def test_live_client_kwargs_honors_polyester_env(monkeypatch) -> None:
+    monkeypatch.setenv(API_KEY_ID_ENV, "ak_live")
+    monkeypatch.setenv(API_PRIVATE_KEY_ENV, _private_key_hex())
+    monkeypatch.setenv("POLYESTER_ENV", "testnet")
+    monkeypatch.delenv("POLYESTER_API_URL", raising=False)
+    kwargs = live_client_kwargs_from_env()
+    assert kwargs is not None
+    assert kwargs["environment"] is POLYESTER_TESTNET_ENVIRONMENT
+
+
+def test_live_client_kwargs_default_omits_environment(monkeypatch) -> None:
+    monkeypatch.setenv(API_KEY_ID_ENV, "ak_live")
+    monkeypatch.setenv(API_PRIVATE_KEY_ENV, _private_key_hex())
+    monkeypatch.delenv("POLYESTER_ENV", raising=False)
+    monkeypatch.delenv("POLYESTER_ENVIRONMENT", raising=False)
+    kwargs = live_client_kwargs_from_env()
+    assert kwargs is not None
+    assert "environment" not in kwargs
+
+
+def test_live_client_kwargs_explicit_environment_wins(monkeypatch) -> None:
+    monkeypatch.setenv(API_KEY_ID_ENV, "ak_live")
+    monkeypatch.setenv(API_PRIVATE_KEY_ENV, _private_key_hex())
+    monkeypatch.setenv("POLYESTER_ENV", "testnet")
+    kwargs = live_client_kwargs_from_env(environment=POLYESTER_DEVNET_ENVIRONMENT)
+    assert kwargs is not None
+    assert kwargs["environment"] is POLYESTER_DEVNET_ENVIRONMENT
+
+
+def test_live_client_kwargs_reads_ws_url(monkeypatch) -> None:
+    monkeypatch.setenv(API_KEY_ID_ENV, "ak_live")
+    monkeypatch.setenv(API_PRIVATE_KEY_ENV, _private_key_hex())
+    monkeypatch.setenv("POLYESTER_WS_URL", "wss://mm.internal.example")
+    kwargs = live_client_kwargs_from_env()
+    assert kwargs is not None
+    assert kwargs["ws_url"] == "wss://mm.internal.example"
 
 
 def test_pick_smoke_symbol_uses_canonical_trade_selection(monkeypatch):

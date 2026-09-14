@@ -10,7 +10,7 @@ from eth_utils import to_canonical_address, to_checksum_address
 
 from polyester.chain._deps import require_eth_abi
 from polyester.chain.environment import (
-    POLYESTER_TESTNET_ENVIRONMENT,
+    POLYESTER_DEVNET_ENVIRONMENT,
     PolyesterChainEnvironment,
     SafeDeploymentConfig,
 )
@@ -122,7 +122,7 @@ def predict_safe_address_with_data(
     require_eth_abi()
     if not owners:
         raise ValueError("owners must be non-empty")
-    env = environment or POLYESTER_TESTNET_ENVIRONMENT
+    env = environment or POLYESTER_DEVNET_ENVIRONMENT
     cfg = safe or env.account_abstraction.safe
     owners_cs = [to_checksum_address(o) for o in owners]
     thresh = threshold if threshold is not None else len(owners_cs)

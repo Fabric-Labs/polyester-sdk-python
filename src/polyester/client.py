@@ -13,6 +13,14 @@ from polyester.auth import (
     load_api_key_credentials,
 )
 from polyester.catalogs import CatalogManager
+from polyester.environment import (
+    ENV_NAME_ENV,
+    ENV_NAME_ENV_ALIAS,
+    POLYESTER_DEVNET_ENVIRONMENT,
+    PolyesterEnvironment,
+    environment_from_name,
+    parse_polyester_environment,
+)
 from polyester.errors import PolyesterError, PolyesterTransportError, PolyesterValidationError
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
@@ -50,14 +58,6 @@ from polyester.sync_subscribe import (
 )
 from polyester.sync_subscribe import (
     subscribe_sync as _subscribe_sync_impl,
-)
-from polyester.environment import (
-    ENV_NAME_ENV,
-    ENV_NAME_ENV_ALIAS,
-    POLYESTER_DEVNET_ENVIRONMENT,
-    PolyesterEnvironment,
-    environment_from_name,
-    parse_polyester_environment,
 )
 from polyester.transport import TransportConfig, TransportFactory
 

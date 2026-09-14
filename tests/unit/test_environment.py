@@ -22,7 +22,10 @@ def test_devnet_preset_matches_typescript_and_zipper_extras() -> None:
     assert env.rpc_url == "https://rpc.polyester.tech"
     assert env.chain_id == 888168
     assert env.account_abstraction.entry_point.version == "0.7"
-    assert env.account_abstraction.entry_point.address == "0x59a4B77766509c4507D79eFF8089474eC3daC174"
+    assert (
+        env.account_abstraction.entry_point.address
+        == "0x59a4B77766509c4507D79eFF8089474eC3daC174"
+    )
     assert env.contracts.trading_gateway_address == "0xD3fecf5D39131e23b6B0f872cA0a21c8A5a30932"
     assert env.contracts.funding_account_address == "0xBfF4F6224BC10f233dDB1E61E770d9832aabC7c4"
     assert env.contracts.guard_registry_address == "0xd71F60FD6f784Cc0aD8c25441568C48705D95f64"
@@ -53,8 +56,8 @@ def test_presets_are_distinct() -> None:
 
 
 def test_default_client_urls_match_devnet() -> None:
-    assert DEFAULT_API_URL == POLYESTER_DEVNET_ENVIRONMENT.api_url
-    assert DEFAULT_WS_URL == POLYESTER_DEVNET_ENVIRONMENT.websocket_url
+    assert POLYESTER_DEVNET_ENVIRONMENT.api_url == DEFAULT_API_URL
+    assert POLYESTER_DEVNET_ENVIRONMENT.websocket_url == DEFAULT_WS_URL
 
 
 def test_environment_from_name() -> None:

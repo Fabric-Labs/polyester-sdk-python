@@ -12,7 +12,7 @@ from decimal import Decimal
 import pytest
 
 from polyester.chain import (
-    POLYESTER_TESTNET_ENVIRONMENT,
+    POLYESTER_DEVNET_ENVIRONMENT,
     PolyesterSmartAccount,
     encode_funding_withdraw_to_chain,
     encode_trading_gateway_deposit,
@@ -79,7 +79,7 @@ async def test_funding_to_trading_userop(live_client, funded_enabled, mutation_e
 
     account = PolyesterSmartAccount(owner_private_key=owner)
     call = encode_trading_gateway_deposit(
-        trading_gateway=POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
+        trading_gateway=POLYESTER_DEVNET_ENVIRONMENT.contracts.trading_gateway_address,
         u_asset_id=asset.u_asset_id,
         quantity_scaled=quantity,
     )
@@ -129,7 +129,7 @@ async def test_funding_withdraw_to_chain_userop(live_client, funded_enabled, mut
     fee = quote_zipper_fee(
         chain_id=chain_id,
         z_token=variant.z_token.address,
-        zipper_endpoint=POLYESTER_TESTNET_ENVIRONMENT.contracts.zipper_endpoint_address,
+        zipper_endpoint=POLYESTER_DEVNET_ENVIRONMENT.contracts.zipper_endpoint_address,
     )
     max_fee = fee.fee + fee.fee // 10
     if z_amount <= max_fee:
@@ -140,7 +140,7 @@ async def test_funding_withdraw_to_chain_userop(live_client, funded_enabled, mut
 
     account = PolyesterSmartAccount(owner_private_key=owner)
     call = encode_funding_withdraw_to_chain(
-        funding_account=POLYESTER_TESTNET_ENVIRONMENT.contracts.funding_account_address,
+        funding_account=POLYESTER_DEVNET_ENVIRONMENT.contracts.funding_account_address,
         chain_id=chain_id,
         z_token=variant.z_token.address,
         withdraw_destination=encode_withdraw_destination(

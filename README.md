@@ -108,10 +108,11 @@ insufficient.
 ```python
 import asyncio
 
-from polyester import AsyncPolyester
+from polyester import AsyncPolyester, POLYESTER_DEVNET_ENVIRONMENT
 
 async def main() -> None:
     async with AsyncPolyester(
+        environment=POLYESTER_DEVNET_ENVIRONMENT,
         api_key_id="ak_...",           # from API key creation
         api_private_key="...",       # 64-char hex secret from API key creation
         default_account_id="...",    # Profile → Account ID (see below)
@@ -136,9 +137,15 @@ asyncio.run(main())
 | API private key | Shown once when the key is created | `api_private_key` |
 | Account ID | **Profile** → **Account ID** | `default_account_id` |
 
+Pass an `environment` preset so API, websocket, RPC, and contract pins stay
+together. `POLYESTER_DEVNET_ENVIRONMENT` is the constructor default.
+`POLYESTER_TESTNET_ENVIRONMENT` targets public testnet (`api-testnet.polyester.com`,
+chain `888169`). Custom / VPC endpoints use `create_polyester_environment` or
+`environment.with_urls(...)`. `api_url` / `ws_url` remain as transport overrides.
+
 Pass all credentials as **constructor parameters**. The SDK does not read
 environment variables unless you pass them in yourself (or use `from_env()` in
-scripts; see below).
+scripts; see below). `from_env()` also reads `POLYESTER_ENV=devnet|testnet`.
 
 `api_private_key` accepts the 64-character hex Ed25519 secret from key creation,
 or raw 32-byte key material.
@@ -493,7 +500,7 @@ SDK notes:
 
 ```python
 from polyester.chain import (
-    POLYESTER_TESTNET_ENVIRONMENT,
+    POLYESTER_DEVNET_ENVIRONMENT,
     PolyesterSmartAccount,
     encode_trading_gateway_deposit,
     encode_funding_withdraw_to_chain,
@@ -505,7 +512,7 @@ account = PolyesterSmartAccount(owner_private_key="0x…")  # caller-supplied EO
 
 # Funding → Trading
 deposit = encode_trading_gateway_deposit(
-    trading_gateway=POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
+    trading_gateway=POLYESTER_DEVNET_ENVIRONMENT.contracts.trading_gateway_address,
     u_asset_id="0x…",
     quantity_scaled=10**18,  # 1 USDT at 18 decimals
 )
@@ -515,10 +522,10 @@ account.send_calls([deposit])
 fee = quote_zipper_fee(
     chain_id=6,  # BSC testnet Zipper id
     z_token="0x…",
-    zipper_endpoint=POLYESTER_TESTNET_ENVIRONMENT.contracts.zipper_endpoint_address,
+    zipper_endpoint=POLYESTER_DEVNET_ENVIRONMENT.contracts.zipper_endpoint_address,
 )
 withdraw = encode_funding_withdraw_to_chain(
-    funding_account=POLYESTER_TESTNET_ENVIRONMENT.contracts.funding_account_address,
+    funding_account=POLYESTER_DEVNET_ENVIRONMENT.contracts.funding_account_address,
     chain_id=6,
     z_token="0x…",
     withdraw_destination=encode_withdraw_destination(address="0x…", is_case_sensitive=False),
@@ -645,6 +652,12 @@ python -m pytest tests/unit tests/hardening -q
 ```bash
 # Public smoke (read-only smoke; no mutation/funded)
 python -m pytest -m "public_smoke" -q
+
+# Named-environment pins vs live Zipper catalog (no API key)
+python -m pytest tests/integration/test_environment_pins.py -q
+
+# Credentialed live follows POLYESTER_ENV=devnet|testnet (and optional URL overrides)
+# POLYESTER_ENV=testnet python -m pytest -m "credentialed and not mutation and not funded" -q
 
 # Credentialed live integration (requires API-key env)
 python -m pytest -m "credentialed and not mutation and not funded" -q

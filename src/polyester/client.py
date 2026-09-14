@@ -51,16 +51,28 @@ from polyester.sync_subscribe import (
 from polyester.sync_subscribe import (
     subscribe_sync as _subscribe_sync_impl,
 )
+from polyester.environment import (
+    ENV_NAME_ENV,
+    ENV_NAME_ENV_ALIAS,
+    POLYESTER_DEVNET_ENVIRONMENT,
+    PolyesterEnvironment,
+    environment_from_name,
+    parse_polyester_environment,
+)
 from polyester.transport import TransportConfig, TransportFactory
 
-DEFAULT_API_URL = "https://api-devnet.polyester.ai"
-DEFAULT_WS_URL = "wss://api-devnet.polyester.ai"
+DEFAULT_API_URL = POLYESTER_DEVNET_ENVIRONMENT.api_url
+DEFAULT_WS_URL = POLYESTER_DEVNET_ENVIRONMENT.websocket_url
 API_URL_ENV = "POLYESTER_API_URL"
 WS_URL_ENV = "POLYESTER_WS_URL"
 
 
 def _apply_from_env(overrides: dict[str, Any]) -> dict[str, Any]:
     """Fill missing constructor kwargs from ``POLYESTER_*`` process env."""
+    if "environment" not in overrides:
+        env_name = os.getenv(ENV_NAME_ENV) or os.getenv(ENV_NAME_ENV_ALIAS)
+        if env_name:
+            overrides["environment"] = environment_from_name(env_name)
     if "api_key_id" not in overrides:
         api_key_id = os.getenv(API_KEY_ID_ENV)
         if api_key_id:
@@ -88,18 +100,21 @@ class AsyncPolyester:
     def __init__(
         self,
         *,
+        environment: PolyesterEnvironment | None = None,
         api_key_id: str | None = None,
         api_private_key: str | bytes | None = None,
-        api_url: str = DEFAULT_API_URL,
-        ws_url: str = DEFAULT_WS_URL,
+        api_url: str | None = None,
+        ws_url: str | None = None,
         default_sub_account_id: str | None = None,
         default_account_id: str | int | None = None,
         timeout: float = 10.0,
         wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
     ) -> None:
-        self.api_url = api_url
-        self.ws_url = ws_url
+        resolved = parse_polyester_environment(environment or POLYESTER_DEVNET_ENVIRONMENT)
+        self.environment = resolved
+        self.api_url = api_url if api_url is not None else resolved.api_url
+        self.ws_url = ws_url if ws_url is not None else resolved.websocket_url
         self.default_sub_account_id = default_sub_account_id
         self.default_account_id = default_account_id
         self.catalogs = CatalogManager()
@@ -110,15 +125,15 @@ class AsyncPolyester:
         )
         self._transport = TransportFactory(
             TransportConfig(
-                api_url=api_url,
+                api_url=self.api_url,
                 timeout=timeout,
                 wire_format=wire_format,
             ),
             credentials=credentials,
         )
         self.realtime = AsyncRealtimeClient(
-            ws_url,
-            api_url=api_url,
+            self.ws_url,
+            api_url=self.api_url,
             credentials=credentials,
             http=self._transport.public_http,
         )

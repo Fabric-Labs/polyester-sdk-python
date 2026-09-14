@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+### Breaking
+- `POLYESTER_TESTNET_ENVIRONMENT` is now public testnet (`api-testnet.polyester.com`,
+  chain `888169`). The previous preset (devnet URLs, chain `888168`) is
+  `POLYESTER_DEVNET_ENVIRONMENT` and remains the client / chain-helper default.
+
 ### Added
+- First-class `PolyesterEnvironment` passed to `AsyncPolyester` /
+  `Polyester`. Named presets, `create_polyester_environment`,
+  `environment.with_urls(...)` for custom / VPC endpoints, and
+  `POLYESTER_ENV=devnet|testnet` for `from_env()`.
 - CI rejects proto-relative Connect imports (`import fees.v1...`) so a gen
   drop cannot merge until `scripts/rewrite_connect_imports.py` remaps them
   to `polyester.gen.*`.

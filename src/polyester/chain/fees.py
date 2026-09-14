@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from eth_abi import encode
 from eth_utils import function_signature_to_4byte_selector, to_hex
 
-from polyester.chain.environment import POLYESTER_TESTNET_ENVIRONMENT, PolyesterChainEnvironment
+from polyester.chain.environment import POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment
 from polyester.chain.rpc import JsonRpcClient
 from polyester.errors import PolyesterValidationError
 
@@ -42,7 +42,7 @@ def quote_zipper_fee(
     if not endpoint.startswith("0x") or len(endpoint) != 42:
         raise PolyesterValidationError("zipper_endpoint must be a 20-byte 0x-prefixed address")
 
-    env = environment or POLYESTER_TESTNET_ENVIRONMENT
+    env = environment or POLYESTER_DEVNET_ENVIRONMENT
     client = rpc or JsonRpcClient(env.rpc_url)
     fee_factory_sel = function_signature_to_4byte_selector("feeFactory()")
     ff_raw = client.request(

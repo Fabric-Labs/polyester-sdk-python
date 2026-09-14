@@ -12,7 +12,7 @@ from eth_account.messages import encode_typed_data
 from eth_utils import to_checksum_address, to_hex
 
 from polyester.chain.calldata import ChainCall
-from polyester.chain.environment import POLYESTER_TESTNET_ENVIRONMENT, PolyesterChainEnvironment
+from polyester.chain.environment import POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment
 from polyester.chain.rpc import JsonRpcClient
 from polyester.chain.safe import predict_safe_address_with_data
 
@@ -171,7 +171,7 @@ class PolyesterSmartAccount:
     ) -> None:
         key = owner_private_key if owner_private_key.startswith("0x") else f"0x{owner_private_key}"
         self._owner = Account.from_key(key)
-        self.environment = environment or POLYESTER_TESTNET_ENVIRONMENT
+        self.environment = environment or POLYESTER_DEVNET_ENVIRONMENT
         self.salt_nonce = salt_nonce
         predicted = predict_safe_address_with_data(
             owners=[self._owner.address],

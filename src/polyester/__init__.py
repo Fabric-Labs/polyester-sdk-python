@@ -1,5 +1,16 @@
 from polyester._version import __version__
 from polyester.client import AsyncPolyester, Polyester
+from polyester.environment import (
+    POLYESTER_DEVNET_ENVIRONMENT,
+    POLYESTER_TESTNET_ENVIRONMENT,
+    AccountAbstractionEnvironment,
+    ContractsEnvironment,
+    EntryPointConfig,
+    PolyesterEnvironment,
+    SafeDeploymentConfig,
+    create_polyester_environment,
+    environment_from_name,
+)
 from polyester.codecs.ledger_amounts import LEDGER_SCALE, format_ledger_u128
 from polyester.codecs.scalars import MAX_PROTOCOL_SCALE
 from polyester.codecs.withdraw import (
@@ -45,10 +56,19 @@ __all__ = [
     "AUTH_STEP_UP_REQUIRED",
     "AssetAmount",
     "AsyncPolyester",
+    "AccountAbstractionEnvironment",
+    "ContractsEnvironment",
+    "EntryPointConfig",
     "LEDGER_SCALE",
     "MAX_PROTOCOL_SCALE",
+    "POLYESTER_DEVNET_ENVIRONMENT",
+    "POLYESTER_TESTNET_ENVIRONMENT",
     "Polyester",
+    "PolyesterEnvironment",
     "PolyesterApiError",
+    "SafeDeploymentConfig",
+    "create_polyester_environment",
+    "environment_from_name",
     "PolyesterAuthError",
     "PolyesterError",
     "PreparedTradingWithdraw",

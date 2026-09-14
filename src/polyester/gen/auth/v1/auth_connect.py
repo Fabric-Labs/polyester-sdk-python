@@ -18,7 +18,7 @@ import polyester.gen.auth.v1.auth_pb2 as auth_dot_v1_dot_auth__pb2
 
 
 class AuthService(Protocol):
-    async def get_nonce(self, request: auth_dot_v1_dot_auth__pb2.GetNonceRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.GetNonceResponse:
+    async def create_wallet_challenge(self, request: auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def login_with_wallet(self, request: auth_dot_v1_dot_auth__pb2.LoginWithWalletRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.LoginWithWalletResponse:
@@ -36,15 +36,15 @@ class AuthServiceASGIApplication(ConnectASGIApplication[AuthService]):
         super().__init__(
             service=service,
             endpoints=lambda svc: {
-                "/auth.v1.AuthService/GetNonce": Endpoint.unary(
+                "/auth.v1.AuthService/CreateWalletChallenge": Endpoint.unary(
                     method=MethodInfo(
-                        name="GetNonce",
+                        name="CreateWalletChallenge",
                         service_name="auth.v1.AuthService",
-                        input=auth_dot_v1_dot_auth__pb2.GetNonceRequest,
-                        output=auth_dot_v1_dot_auth__pb2.GetNonceResponse,
+                        input=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest,
+                        output=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=svc.get_nonce,
+                    function=svc.create_wallet_challenge,
                 ),
                 "/auth.v1.AuthService/LoginWithWallet": Endpoint.unary(
                     method=MethodInfo(
@@ -90,20 +90,20 @@ class AuthServiceASGIApplication(ConnectASGIApplication[AuthService]):
 
 
 class AuthServiceClient(ConnectClient):
-    async def get_nonce(
+    async def create_wallet_challenge(
         self,
-        request: auth_dot_v1_dot_auth__pb2.GetNonceRequest,
+        request: auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_auth__pb2.GetNonceResponse:
+    ) -> auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse:
         return await self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="GetNonce",
+                name="CreateWalletChallenge",
                 service_name="auth.v1.AuthService",
-                input=auth_dot_v1_dot_auth__pb2.GetNonceRequest,
-                output=auth_dot_v1_dot_auth__pb2.GetNonceResponse,
+                input=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest,
+                output=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -175,7 +175,7 @@ class AuthServiceClient(ConnectClient):
 
 
 class AuthServiceSync(Protocol):
-    def get_nonce(self, request: auth_dot_v1_dot_auth__pb2.GetNonceRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.GetNonceResponse:
+    def create_wallet_challenge(self, request: auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def login_with_wallet(self, request: auth_dot_v1_dot_auth__pb2.LoginWithWalletRequest, ctx: RequestContext) -> auth_dot_v1_dot_auth__pb2.LoginWithWalletResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -189,15 +189,15 @@ class AuthServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: AuthServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
-                "/auth.v1.AuthService/GetNonce": EndpointSync.unary(
+                "/auth.v1.AuthService/CreateWalletChallenge": EndpointSync.unary(
                     method=MethodInfo(
-                        name="GetNonce",
+                        name="CreateWalletChallenge",
                         service_name="auth.v1.AuthService",
-                        input=auth_dot_v1_dot_auth__pb2.GetNonceRequest,
-                        output=auth_dot_v1_dot_auth__pb2.GetNonceResponse,
+                        input=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest,
+                        output=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=service.get_nonce,
+                    function=service.create_wallet_challenge,
                 ),
                 "/auth.v1.AuthService/LoginWithWallet": EndpointSync.unary(
                     method=MethodInfo(
@@ -243,20 +243,20 @@ class AuthServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class AuthServiceClientSync(ConnectClientSync):
-    def get_nonce(
+    def create_wallet_challenge(
         self,
-        request: auth_dot_v1_dot_auth__pb2.GetNonceRequest,
+        request: auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_auth__pb2.GetNonceResponse:
+    ) -> auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse:
         return self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="GetNonce",
+                name="CreateWalletChallenge",
                 service_name="auth.v1.AuthService",
-                input=auth_dot_v1_dot_auth__pb2.GetNonceRequest,
-                output=auth_dot_v1_dot_auth__pb2.GetNonceResponse,
+                input=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeRequest,
+                output=auth_dot_v1_dot_auth__pb2.CreateWalletChallengeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

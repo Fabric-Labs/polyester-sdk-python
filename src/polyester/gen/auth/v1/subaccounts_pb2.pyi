@@ -309,24 +309,20 @@ class ListSubaccountsResponse(_message.Message):
     def __init__(self, subaccounts: _Optional[_Iterable[_Union[Subaccount, _Mapping]]] = ..., total_created: _Optional[int] = ...) -> None: ...
 
 class CreateSubaccountRequest(_message.Message):
-    __slots__ = ("label", "icon", "color", "smart_account_address", "nonce", "signature", "primary_wallet_address", "wallet_provider")
+    __slots__ = ("label", "icon", "color", "smart_account_address", "message", "signature")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
     COLOR_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
-    NONCE_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
-    PRIMARY_WALLET_ADDRESS_FIELD_NUMBER: _ClassVar[int]
-    WALLET_PROVIDER_FIELD_NUMBER: _ClassVar[int]
     label: str
     icon: str
     color: str
     smart_account_address: str
-    nonce: str
+    message: str
     signature: str
-    primary_wallet_address: str
-    wallet_provider: str
-    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., nonce: _Optional[str] = ..., signature: _Optional[str] = ..., primary_wallet_address: _Optional[str] = ..., wallet_provider: _Optional[str] = ...) -> None: ...
+    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., message: _Optional[str] = ..., signature: _Optional[str] = ...) -> None: ...
 
 class CreateSubaccountResponse(_message.Message):
     __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce", "revision")

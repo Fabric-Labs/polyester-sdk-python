@@ -6,11 +6,24 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from polyester.auth import ApiKeyCredentials, canonical_signing_string
 from polyester.gen.auth.v1.auth_connect import AuthServiceClient
-from polyester.gen.auth.v1.auth_pb2 import GetNonceRequest, GetNonceResponse
+from polyester.gen.auth.v1.auth_pb2 import (
+    CreateWalletChallengeRequest,
+    CreateWalletChallengeResponse,
+    WalletChallengePurpose,
+)
 from polyester.transport import TransportConfig, TransportFactory, codec_for_config
 
 _ADDRESS = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-_PROCEDURE = "/auth.v1.AuthService/GetNonce"
+_PROCEDURE = "/auth.v1.AuthService/CreateWalletChallenge"
+
+
+def _challenge_request() -> CreateWalletChallengeRequest:
+    return CreateWalletChallengeRequest(
+        smart_account_address=_ADDRESS,
+        signer_address=_ADDRESS,
+        uri="https://example.test",
+        purpose=WalletChallengePurpose.LOGIN,
+    )
 
 
 def _media_type(value: str | None) -> str:
@@ -29,7 +42,7 @@ def test_unary_codecs_use_connect_unary_media_types() -> None:
 
 
 def test_codec_for_config_encodes_the_active_wire_format() -> None:
-    request = GetNonceRequest(smart_account_address=_ADDRESS)
+    request = _challenge_request()
     binary = codec_for_config(TransportConfig(api_url="https://example.test"))
     json_codec = codec_for_config(
         TransportConfig(api_url="https://example.test", wire_format="json")
@@ -56,10 +69,12 @@ async def test_authenticated_unary_signs_transmitted_codec_bytes(
 ) -> None:
     private = Ed25519PrivateKey.generate()
     credentials = ApiKeyCredentials(key_id="ak_test", private_key=private.private_bytes_raw())
-    request = GetNonceRequest(smart_account_address=_ADDRESS)
+    request = _challenge_request()
     api_url = httpserver.url_for("/").rstrip("/")
     codec = codec_for_config(TransportConfig(api_url=api_url, wire_format=wire_format))
-    response_body = b"{}" if wire_format == "json" else GetNonceResponse().SerializeToString()
+    response_body = (
+        b"{}" if wire_format == "json" else CreateWalletChallengeResponse().SerializeToString()
+    )
     httpserver.expect_request(_PROCEDURE, method="POST").respond_with_data(
         response_body,
         content_type=content_type,
@@ -71,7 +86,7 @@ async def test_authenticated_unary_signs_transmitted_codec_bytes(
     )
     try:
         client = factory.create_auth_client(AuthServiceClient)
-        await client.get_nonce(request)
+        await client.create_wallet_challenge(request)
     finally:
         await factory.aclose()
 

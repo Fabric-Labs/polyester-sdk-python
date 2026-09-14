@@ -14,7 +14,7 @@ from connectrpc.interceptor import Interceptor, InterceptorSync
 from connectrpc.method import IdempotencyLevel, MethodInfo
 from connectrpc.request import Headers, RequestContext
 from connectrpc.server import ConnectASGIApplication, ConnectWSGIApplication, Endpoint, EndpointSync
-import polyester.gen.fees.v1.fees_pb2 as fees_dot_v1_dot_fees__pb2
+import fees.v1.fees_pb2 as fees_dot_v1_dot_fees__pb2
 
 
 class FeeService(Protocol):

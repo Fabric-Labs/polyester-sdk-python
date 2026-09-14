@@ -8,6 +8,14 @@
   `POLYESTER_DEVNET_ENVIRONMENT` and remains the client / chain-helper default.
 
 ### Added
+- Paginated order lineage history: `Order.lineage` / `UserTrade.lineage`
+  (`id` + one-based `generation`), `GetOrderResult.transfers` /
+  `next_page_token`, and `UserTradesList.transfers`. `orders.get` accepts
+  `include_execution_history`, `limit`, and `page_token`. `trades.list`
+  accepts mutually exclusive `order_id` / `lineage_id`, optional
+  `through_generation` (requires `lineage_id`), and `include_transfers`.
+  `wait_for_order_trades_complete` pages execution history; an empty page
+  is not a settlement watermark. `cum_qty` / `avg_px` are lineage-cumulative.
 - First-class `PolyesterEnvironment` passed to `AsyncPolyester` /
   `Polyester`. Named presets, `create_polyester_environment`,
   `environment.with_urls(...)` for custom / VPC endpoints, and

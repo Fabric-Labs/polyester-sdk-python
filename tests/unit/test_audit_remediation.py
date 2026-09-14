@@ -17,6 +17,7 @@ from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
+from polyester.models import OrderId
 from polyester.services.market_overview import AsyncMarketOverviewService
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.trades import AsyncTradesService
@@ -188,3 +189,56 @@ async def test_trades_list_rejects_non_positive_after_match_id() -> None:
     service = AsyncTradesService(MagicMock(), _catalogs(), None)
     with pytest.raises(PolyesterValidationError, match="after_match_id"):
         await service.list(symbol="BTC-USDT", after_match_id=0)
+
+
+@pytest.mark.asyncio
+async def test_trades_list_order_id_and_lineage_id_are_mutually_exclusive() -> None:
+    service = AsyncTradesService(MagicMock(), _catalogs(), None)
+    with pytest.raises(PolyesterValidationError, match="mutually exclusive"):
+        await service.list(order_id=1, lineage_id=2)
+
+
+@pytest.mark.asyncio
+async def test_trades_list_through_generation_requires_lineage_id() -> None:
+    service = AsyncTradesService(MagicMock(), _catalogs(), None)
+    with pytest.raises(PolyesterValidationError, match="through_generation"):
+        await service.list(through_generation=1)
+
+
+@pytest.mark.asyncio
+async def test_trades_list_wires_lineage_scope_and_transfers() -> None:
+    capture = CaptureUnary(orders_read_pb2.GetUserTradesResponse())
+    service = AsyncTradesService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.trades.unary_auth_decoded", capture):
+        await service.list(lineage_id=7, through_generation=2, include_transfers=True, limit=8)
+    assert capture.request.lineage_id == 7
+    assert capture.request.through_generation == 2
+    assert capture.request.include_transfers is True
+    assert capture.request.limit == 8
+
+
+@pytest.mark.asyncio
+async def test_orders_get_wires_execution_history_pagination() -> None:
+    capture = CaptureUnary(orders_read_pb2.GetOrderResponse())
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.orders.unary_auth_decoded", capture):
+        await service.get(
+            key=OrderId(11),
+            include_execution_history=True,
+            limit=25,
+            page_token="page-2",
+        )
+    assert capture.request.include_execution_history is True
+    assert capture.request.limit == 25
+    assert capture.request.page_token == "page-2"
+
+
+@pytest.mark.asyncio
+async def test_orders_get_rejects_pagination_without_execution_history() -> None:
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with pytest.raises(PolyesterValidationError, match="include_execution_history"):
+        await service.get(
+            key=OrderId(11),
+            include_execution_history=False,
+            limit=10,
+        )

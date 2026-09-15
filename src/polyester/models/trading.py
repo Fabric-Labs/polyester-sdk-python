@@ -14,9 +14,10 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Spot order snapshot.
 
     ``orig_qty`` is the current accepted total quantity and changes after a
-    successful modify. ``cum_qty`` is cumulative fills; ``leaves_qty`` is
-    remaining working quantity. Retain the first submitted quantity separately
-    if you need it.
+    successful modify. ``cum_qty`` and ``avg_px`` are cumulative execution
+    values across the lineage through the returned generation, not values
+    limited to one physical order. ``leaves_qty`` is remaining working
+    quantity. Retain the first submitted quantity separately if you need it.
     """
 
     order_id: str
@@ -37,6 +38,37 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     fee_asset: str = ""
     submitted_max_quote_debit_scaled: str = ""
     attached_risk: AttachedRisk | None = None
+    lineage: OrderLineage | None = None
+
+
+class OrderLineage(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Stable replacement-chain identity for an order or execution.
+
+    ``id`` is the first generation's public order ID and stays stable across
+    accepted replacements. ``generation`` is one-based and identifies the
+    accepted replacement generation, not per-order state ``version``.
+    """
+
+    id: str = ""
+    generation: int = 0
+
+
+class OrderTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Settlement leg linked to a match on an order or user-trades page.
+
+    Identify a match by ``(symbol_id, match_id)``. Deduplicate repeated
+    settlement legs across pages by ``tx_id``.
+    """
+
+    match_id: str = ""
+    symbol_id: int = 0
+    asset_id: int = 0
+    amount_e18: str = "0"
+    is_debit: bool = False
+    transfer_code: int = 0
+    account_code: int = 0
+    ts_ns: str = ""
+    tx_id: str = ""
 
 
 class AttachedRiskLegState(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -122,6 +154,8 @@ class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
 class GetOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     order: Order | None = None
     trades: list[UserTrade] = []
+    transfers: list[OrderTransfer] = []
+    next_page_token: str = ""
 
 
 class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -139,10 +173,12 @@ class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     # True when fee_amount_e18 is a rebate credit instead of a fee debit.
     # Proto3 omits false, so sparse wire encoding only sets this for rebates.
     fee_is_rebate: bool = False
+    lineage: OrderLineage | None = None
 
 
 class UserTradesList(msgspec.Struct, kw_only=True, omit_defaults=True):
     trades: list[UserTrade]
+    transfers: list[OrderTransfer] = []
     next_page_token: str = ""
 
 

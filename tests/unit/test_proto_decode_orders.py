@@ -8,15 +8,20 @@ from polyester.codecs.decode.orders import (
     order_mutation_from_proto,
     orders_list_from_proto,
     preview_order_from_proto,
+    user_trades_list_from_proto,
 )
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError
+from polyester.gen.ledger.v1 import catalog_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOpenOrdersResponse,
     GetOrderResponse,
+    GetUserTradesResponse,
     Order,
+    OrderLineage,
     OrderStatus,
+    OrderTransfer,
     UserTrade,
 )
 
@@ -163,6 +168,89 @@ def test_get_order_from_proto_includes_trades() -> None:
     assert result.trades[0].fee_asset == "base"
     assert result.trades[0].referral_share_amount_e18 == "2"
     assert result.trades[0].fee_is_rebate is True
+
+
+def test_order_from_proto_maps_lineage() -> None:
+    order = order_from_proto(
+        Order(
+            order_id=11,
+            symbol_id=2,
+            lineage=OrderLineage(id=7, generation=3),
+        )
+    )
+    assert order.lineage is not None
+    assert order.lineage.id == format_id(7)
+    assert order.lineage.generation == 3
+
+
+def test_get_order_from_proto_includes_transfers_and_page_token() -> None:
+    from polyester.gen.polyester.type.v1 import u128_pb2
+
+    msg = GetOrderResponse(
+        order=Order(
+            order_id=11,
+            symbol_id=2,
+            lineage=OrderLineage(id=7, generation=2),
+        ),
+        trades=[
+            UserTrade(
+                symbol_id=2,
+                match_id=99,
+                order_id=7,
+                lineage=OrderLineage(id=7, generation=1),
+            )
+        ],
+        transfers=[
+            OrderTransfer(
+                match_id=99,
+                symbol_id=2,
+                asset_id=1,
+                amount_e18=u128_pb2.U128(hi=0, lo=8),
+                is_debit=True,
+                transfer_code=catalog_pb2.TRADE_QUOTE,
+                account_code=catalog_pb2.TRADING,
+                ts_ns=1_700_000_000_000_000_000,
+                tx_id="tx-1",
+            )
+        ],
+        next_page_token="page-2",
+    )
+    result = get_order_from_proto(msg)
+    assert result.order is not None
+    assert result.order.lineage is not None
+    assert result.order.lineage.id == format_id(7)
+    assert result.order.lineage.generation == 2
+    assert result.trades[0].lineage is not None
+    assert result.trades[0].lineage.generation == 1
+    assert len(result.transfers) == 1
+    assert result.transfers[0].match_id == "99"
+    assert result.transfers[0].symbol_id == 2
+    assert result.transfers[0].amount_e18 == "8"
+    assert result.transfers[0].is_debit is True
+    assert result.transfers[0].tx_id == "tx-1"
+    assert result.next_page_token == "page-2"
+
+
+def test_user_trades_list_from_proto_includes_transfers() -> None:
+    from polyester.gen.polyester.type.v1 import u128_pb2
+
+    result = user_trades_list_from_proto(
+        GetUserTradesResponse(
+            trades=[UserTrade(symbol_id=2, match_id=5, order_id=11)],
+            transfers=[
+                OrderTransfer(
+                    match_id=5,
+                    symbol_id=2,
+                    amount_e18=u128_pb2.U128(hi=0, lo=3),
+                    tx_id="tx-2",
+                )
+            ],
+            next_page_token="more",
+        )
+    )
+    assert len(result.trades) == 1
+    assert result.transfers[0].tx_id == "tx-2"
+    assert result.next_page_token == "more"
 
 
 def test_modify_order_from_proto_action_taken_enum() -> None:

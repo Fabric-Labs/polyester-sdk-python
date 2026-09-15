@@ -4,6 +4,7 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import user_trades_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_user_trade_bytes
+from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import GetUserTradesRequest
@@ -41,11 +42,49 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         symbol: str | None = None,
         symbol_id: int | None = None,
         after_match_id: int | None = None,
+        order_id: str | int | None = None,
+        lineage_id: str | int | None = None,
+        through_generation: int | None = None,
+        include_transfers: bool = False,
         limit: int = 100,
         page_token: str | None = None,
     ) -> UserTradesList:
+        """List user fills, optionally scoped to one physical order or lineage.
+
+        ``order_id`` and ``lineage_id`` are mutually exclusive. Use
+        ``order_id`` for one physical order or ``lineage_id`` for executions
+        across accepted replacements. ``through_generation`` is an inclusive
+        ceiling and requires ``lineage_id``. Set ``include_transfers`` to
+        receive settlement legs; identify a match by ``(symbol_id, match_id)``
+        and deduplicate repeated legs across pages by ``tx_id``.
+        """
+        if order_id is not None and lineage_id is not None:
+            raise PolyesterValidationError(
+                "trades.list order_id and lineage_id are mutually exclusive"
+            )
+        if through_generation is not None and lineage_id is None:
+            raise PolyesterValidationError(
+                "trades.list through_generation requires lineage_id"
+            )
+        if through_generation is not None:
+            if isinstance(through_generation, bool) or not isinstance(through_generation, int):
+                raise PolyesterValidationError(
+                    "trades.list through_generation must be a positive integer"
+                )
+            if through_generation <= 0:
+                raise PolyesterValidationError(
+                    "trades.list through_generation must be a positive integer"
+                )
         validated_limit = validate_limit(limit)
         request = GetUserTradesRequest(limit=validated_limit)
+        if order_id is not None:
+            request.order_id = id_to_int(order_id, "order_id")
+        if lineage_id is not None:
+            request.lineage_id = id_to_int(lineage_id, "lineage_id")
+        if through_generation is not None:
+            request.through_generation = through_generation
+        if include_transfers:
+            request.include_transfers = True
         if after_match_id is not None:
             if int(after_match_id) <= 0:
                 raise PolyesterValidationError(

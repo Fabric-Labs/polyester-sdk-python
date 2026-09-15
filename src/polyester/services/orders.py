@@ -197,11 +197,35 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         sub_account_id: str | None = None,
         include_attached_risk: bool = False,
         include_attached_risk_state: bool = False,
+        include_execution_history: bool | None = None,
+        limit: int | None = None,
+        page_token: str | None = None,
     ) -> GetOrderResult:
+        """Fetch one order and an optional page of lineage execution history.
+
+        Execution history is enabled by default on the server. Pass
+        ``include_execution_history=False`` for state-only polling and omit
+        ``limit`` / ``page_token``. Continue pagination with the same physical
+        ``order_id`` and ``next_page_token``. An empty page is not a
+        settlement watermark; ``cum_qty`` / ``avg_px`` are lineage-cumulative.
+        """
+        if include_execution_history is False and (
+            limit is not None or (page_token is not None and page_token != "")
+        ):
+            raise PolyesterValidationError(
+                "orders.get limit and page_token require include_execution_history"
+            )
         request = GetOrderRequest(
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
         )
+        if include_execution_history is not None:
+            request.include_execution_history = include_execution_history
+        validated_limit = validate_limit(limit, allow_none=True)
+        if validated_limit is not None:
+            request.limit = validated_limit
+        if page_token:
+            request.page_token = page_token
         set_order_key(request, key, op="get")
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -654,9 +678,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     ) -> GetOrderResult:
         """Poll ``get`` until projected trade qtys sum to order ``cum_qty`` or timeout.
 
-        GetOrder can report ``cum_qty`` before every fill is visible on the trades
-        list (eventual consistency). Prefer this helper after fills instead of
-        treating a single get as final trade projection.
+        GetOrder can report lineage-cumulative ``cum_qty`` before every fill is
+        visible on the trades list (eventual consistency). This helper pages
+        execution history and does not treat an empty page as a watermark.
         """
         return await wait_for_order_trades_complete(
             self,
@@ -681,7 +705,8 @@ async def wait_for_order_trades_complete(
     deadline = time.monotonic() + max(timeout, 0.0)
     last: GetOrderResult | None = None
     while True:
-        last = await orders.get(
+        last = await _get_order_execution_pages(
+            orders,
             key=key,
             account=account,
             sub_account_id=sub_account_id,
@@ -693,6 +718,39 @@ async def wait_for_order_trades_complete(
                 f"timed out waiting for order trades to match cum_qty (key={key!r})"
             )
         await asyncio.sleep(max(poll_interval, 0.0))
+
+
+async def _get_order_execution_pages(
+    orders: AsyncOrdersService,
+    *,
+    key: OrderKey,
+    account: AccountScope | None = None,
+    sub_account_id: str | None = None,
+) -> GetOrderResult:
+    page_token: str | None = None
+    trades: list = []
+    transfers: list = []
+    order = None
+    while True:
+        page = await orders.get(
+            key=key,
+            account=account,
+            sub_account_id=sub_account_id,
+            include_execution_history=True,
+            page_token=page_token,
+        )
+        if page.order is not None:
+            order = page.order
+        trades.extend(page.trades)
+        transfers.extend(page.transfers)
+        if not page.next_page_token:
+            return GetOrderResult(
+                order=order,
+                trades=trades,
+                transfers=transfers,
+                next_page_token="",
+            )
+        page_token = page.next_page_token
 
 
 def _order_trades_projection_complete(result: GetOrderResult) -> bool:

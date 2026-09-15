@@ -17,6 +17,12 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     OrderStatus,
     UserTrade,
 )
+from polyester.gen.orders.v1.orders_read_pb2 import (
+    OrderLineage as ProtoOrderLineage,
+)
+from polyester.gen.orders.v1.orders_read_pb2 import (
+    OrderTransfer as ProtoOrderTransfer,
+)
 from polyester.models import (
     AttachedRisk,
     AttachedRiskLegState,
@@ -34,8 +40,10 @@ from polyester.models import (
     ModifyOrderResult,
     OrderErrorDetail,
     OrderFieldViolation,
+    OrderLineage,
     OrderMutationResult,
     OrdersList,
+    OrderTransfer,
     PreviewOrderResult,
     RiskLeg,
     TrailingStop,
@@ -205,6 +213,30 @@ def _attached_risk_from_proto(msg) -> AttachedRisk | None:
     )
 
 
+def order_lineage_from_proto(msg: ProtoOrderLineage | None) -> OrderLineage | None:
+    if msg is None or (not msg.id and not msg.generation):
+        return None
+    return OrderLineage(id=format_uint64_id(msg.id), generation=int(msg.generation))
+
+
+def order_transfer_from_proto(msg: ProtoOrderTransfer) -> OrderTransfer:
+    return OrderTransfer(
+        match_id=str(msg.match_id) if msg.match_id else "",
+        symbol_id=int(msg.symbol_id),
+        asset_id=int(msg.asset_id),
+        amount_e18=u128_from_proto(msg.amount_e18) if msg.HasField("amount_e18") else "0",
+        is_debit=bool(msg.is_debit),
+        transfer_code=int(msg.transfer_code),
+        account_code=int(msg.account_code),
+        ts_ns=ts_ns_string_from_response(
+            msg.ts_ns,
+            context="OrderTransfer",
+            empty_when_zero=True,
+        ),
+        tx_id=msg.tx_id,
+    )
+
+
 def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> PublicOrder:
     status = proto_enum_name(OrderStatus, msg.status) if msg.status else ""
     symbol_id = int(msg.symbol_id)
@@ -242,6 +274,11 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
             else ""
         ),
         attached_risk=attached,
+        lineage=(
+            order_lineage_from_proto(msg.lineage)
+            if "lineage" in msg.DESCRIPTOR.fields_by_name and msg.HasField("lineage")
+            else None
+        ),
     )
 
 
@@ -277,12 +314,18 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
             empty_when_zero=True,
         ),
         fee_is_rebate=bool(msg.fee_is_rebate),
+        lineage=(
+            order_lineage_from_proto(msg.lineage)
+            if "lineage" in msg.DESCRIPTOR.fields_by_name and msg.HasField("lineage")
+            else None
+        ),
     )
 
 
 def user_trades_list_from_proto(msg) -> UserTradesList:
     return UserTradesList(
         trades=[user_trade_from_proto(item) for item in msg.trades],
+        transfers=[order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])],
         next_page_token=msg.next_page_token,
     )
 
@@ -290,7 +333,14 @@ def user_trades_list_from_proto(msg) -> UserTradesList:
 def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
     order = order_from_proto(msg.order) if msg.HasField("order") else None
     trades = [user_trade_from_proto(item) for item in msg.trades]
-    return GetOrderResult(order=order, trades=trades)
+    transfers = [order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])]
+    next_page_token = getattr(msg, "next_page_token", "") or ""
+    return GetOrderResult(
+        order=order,
+        trades=trades,
+        transfers=transfers,
+        next_page_token=next_page_token,
+    )
 
 
 def _cancel_order_status(value: int) -> str:

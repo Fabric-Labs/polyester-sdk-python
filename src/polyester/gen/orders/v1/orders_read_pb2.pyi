@@ -153,8 +153,16 @@ class AttachedRisk(_message.Message):
     oco: bool
     def __init__(self, take_profit: _Optional[_Union[AttachedRiskTakeProfit, _Mapping]] = ..., stop_loss: _Optional[_Union[AttachedRiskStopLoss, _Mapping]] = ..., trailing_stop: _Optional[_Union[AttachedRiskTrailingStop, _Mapping]] = ..., oco: _Optional[bool] = ...) -> None: ...
 
+class OrderLineage(_message.Message):
+    __slots__ = ("id", "generation")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    GENERATION_FIELD_NUMBER: _ClassVar[int]
+    id: int
+    generation: int
+    def __init__(self, id: _Optional[int] = ..., generation: _Optional[int] = ...) -> None: ...
+
 class Order(_message.Message):
-    __slots__ = ("order_id", "symbol_id", "client_order_id", "side", "status", "order_type", "time_in_force", "self_trade_prevention_mode", "fee_asset", "post_only", "orig_qty_scaled", "cum_qty_scaled", "leaves_qty_scaled", "avg_price_ticks", "price_ticks", "created_ts_ns", "terminal_ts_ns", "terminal_reason_code", "terminal_reason", "attached_risk", "origin", "market_client_ref_price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "version", "batch_request_id", "submitted_max_quote_debit_scaled")
+    __slots__ = ("order_id", "symbol_id", "client_order_id", "side", "status", "order_type", "time_in_force", "self_trade_prevention_mode", "fee_asset", "post_only", "orig_qty_scaled", "cum_qty_scaled", "leaves_qty_scaled", "avg_price_ticks", "price_ticks", "created_ts_ns", "terminal_ts_ns", "terminal_reason_code", "terminal_reason", "attached_risk", "origin", "market_client_ref_price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "version", "batch_request_id", "submitted_max_quote_debit_scaled", "lineage")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -182,6 +190,7 @@ class Order(_message.Message):
     VERSION_FIELD_NUMBER: _ClassVar[int]
     BATCH_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     SUBMITTED_MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
+    LINEAGE_FIELD_NUMBER: _ClassVar[int]
     order_id: int
     symbol_id: int
     client_order_id: str
@@ -209,10 +218,11 @@ class Order(_message.Message):
     version: int
     batch_request_id: int
     submitted_max_quote_debit_scaled: int
-    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., terminal_reason_code: _Optional[int] = ..., terminal_reason: _Optional[str] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ..., batch_request_id: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ...) -> None: ...
+    lineage: OrderLineage
+    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., terminal_reason_code: _Optional[int] = ..., terminal_reason: _Optional[str] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ..., batch_request_id: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ..., lineage: _Optional[_Union[OrderLineage, _Mapping]] = ...) -> None: ...
 
 class UserTrade(_message.Message):
-    __slots__ = ("symbol_id", "match_id", "order_id", "side", "is_maker", "price_ticks", "qty_scaled", "fee_amount_e18", "fee_asset", "referral_share_amount_e18", "ts_ns", "fee_is_rebate")
+    __slots__ = ("symbol_id", "match_id", "order_id", "side", "is_maker", "price_ticks", "qty_scaled", "fee_amount_e18", "fee_asset", "referral_share_amount_e18", "ts_ns", "fee_is_rebate", "lineage")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     MATCH_ID_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -225,6 +235,7 @@ class UserTrade(_message.Message):
     REFERRAL_SHARE_AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
     FEE_IS_REBATE_FIELD_NUMBER: _ClassVar[int]
+    LINEAGE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     match_id: int
     order_id: int
@@ -237,11 +248,13 @@ class UserTrade(_message.Message):
     referral_share_amount_e18: _u128_pb2.U128
     ts_ns: int
     fee_is_rebate: bool
-    def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., is_maker: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., referral_share_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., ts_ns: _Optional[int] = ..., fee_is_rebate: _Optional[bool] = ...) -> None: ...
+    lineage: OrderLineage
+    def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., is_maker: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., referral_share_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., ts_ns: _Optional[int] = ..., fee_is_rebate: _Optional[bool] = ..., lineage: _Optional[_Union[OrderLineage, _Mapping]] = ...) -> None: ...
 
 class OrderTransfer(_message.Message):
-    __slots__ = ("match_id", "asset_id", "amount_e18", "is_debit", "transfer_code", "account_code", "ts_ns", "tx_id")
+    __slots__ = ("match_id", "symbol_id", "asset_id", "amount_e18", "is_debit", "transfer_code", "account_code", "ts_ns", "tx_id")
     MATCH_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     IS_DEBIT_FIELD_NUMBER: _ClassVar[int]
@@ -250,6 +263,7 @@ class OrderTransfer(_message.Message):
     TS_NS_FIELD_NUMBER: _ClassVar[int]
     TX_ID_FIELD_NUMBER: _ClassVar[int]
     match_id: int
+    symbol_id: int
     asset_id: int
     amount_e18: _u128_pb2.U128
     is_debit: bool
@@ -257,7 +271,7 @@ class OrderTransfer(_message.Message):
     account_code: _catalog_pb2.AccountCode
     ts_ns: int
     tx_id: str
-    def __init__(self, match_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., ts_ns: _Optional[int] = ..., tx_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, match_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., ts_ns: _Optional[int] = ..., tx_id: _Optional[str] = ...) -> None: ...
 
 class GetOpenOrdersRequest(_message.Message):
     __slots__ = ("subaccount_id", "symbol_id", "side", "limit", "page_token", "include_attached_risk", "include_attached_risk_state", "trigger_id")
@@ -322,7 +336,7 @@ class GetOrderHistoryResponse(_message.Message):
     def __init__(self, orders: _Optional[_Iterable[_Union[Order, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetUserTradesRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "side", "start_ts_ns", "end_ts_ns", "limit", "page_token", "after_match_id")
+    __slots__ = ("subaccount_id", "symbol_id", "side", "start_ts_ns", "end_ts_ns", "limit", "page_token", "after_match_id", "order_id", "lineage_id", "through_generation", "include_transfers")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
@@ -331,6 +345,10 @@ class GetUserTradesRequest(_message.Message):
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     AFTER_MATCH_ID_FIELD_NUMBER: _ClassVar[int]
+    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    LINEAGE_ID_FIELD_NUMBER: _ClassVar[int]
+    THROUGH_GENERATION_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_TRANSFERS_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol_id: int
     side: _orders_pb2.Side
@@ -339,39 +357,53 @@ class GetUserTradesRequest(_message.Message):
     limit: int
     page_token: str
     after_match_id: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., start_ts_ns: _Optional[int] = ..., end_ts_ns: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., after_match_id: _Optional[int] = ...) -> None: ...
+    order_id: int
+    lineage_id: int
+    through_generation: int
+    include_transfers: bool
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., start_ts_ns: _Optional[int] = ..., end_ts_ns: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., after_match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., lineage_id: _Optional[int] = ..., through_generation: _Optional[int] = ..., include_transfers: _Optional[bool] = ...) -> None: ...
 
 class GetUserTradesResponse(_message.Message):
-    __slots__ = ("trades", "next_page_token")
+    __slots__ = ("trades", "next_page_token", "transfers")
     TRADES_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    TRANSFERS_FIELD_NUMBER: _ClassVar[int]
     trades: _containers.RepeatedCompositeFieldContainer[UserTrade]
     next_page_token: str
-    def __init__(self, trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    transfers: _containers.RepeatedCompositeFieldContainer[OrderTransfer]
+    def __init__(self, trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., transfers: _Optional[_Iterable[_Union[OrderTransfer, _Mapping]]] = ...) -> None: ...
 
 class GetOrderRequest(_message.Message):
-    __slots__ = ("subaccount_id", "order_id", "client_order_id", "include_attached_risk", "include_attached_risk_state")
+    __slots__ = ("subaccount_id", "order_id", "client_order_id", "include_attached_risk", "include_attached_risk_state", "include_execution_history", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_ATTACHED_RISK_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_ATTACHED_RISK_STATE_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_EXECUTION_HISTORY_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     order_id: int
     client_order_id: str
     include_attached_risk: bool
     include_attached_risk_state: bool
-    def __init__(self, subaccount_id: _Optional[int] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ...) -> None: ...
+    include_execution_history: bool
+    limit: int
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ..., include_execution_history: _Optional[bool] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class GetOrderResponse(_message.Message):
-    __slots__ = ("order", "trades", "transfers")
+    __slots__ = ("order", "trades", "transfers", "next_page_token")
     ORDER_FIELD_NUMBER: _ClassVar[int]
     TRADES_FIELD_NUMBER: _ClassVar[int]
     TRANSFERS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     order: Order
     trades: _containers.RepeatedCompositeFieldContainer[UserTrade]
     transfers: _containers.RepeatedCompositeFieldContainer[OrderTransfer]
-    def __init__(self, order: _Optional[_Union[Order, _Mapping]] = ..., trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[OrderTransfer, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, order: _Optional[_Union[Order, _Mapping]] = ..., trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[OrderTransfer, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetBatchReplaceStatusRequest(_message.Message):
     __slots__ = ("subaccount_id", "batch_request_id")

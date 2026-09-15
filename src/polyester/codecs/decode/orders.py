@@ -14,10 +14,14 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOrderHistoryResponse,
     GetOrderResponse,
     Order,
-    OrderLineage as ProtoOrderLineage,
     OrderStatus,
-    OrderTransfer as ProtoOrderTransfer,
     UserTrade,
+)
+from polyester.gen.orders.v1.orders_read_pb2 import (
+    OrderLineage as ProtoOrderLineage,
+)
+from polyester.gen.orders.v1.orders_read_pb2 import (
+    OrderTransfer as ProtoOrderTransfer,
 )
 from polyester.models import (
     AttachedRisk,

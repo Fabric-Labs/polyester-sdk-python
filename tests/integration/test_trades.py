@@ -43,7 +43,11 @@ async def test_user_trades_list_order_and_lineage_filters(live_client, smoke_sym
         pytest.skip("no user trades on devnet; cannot exercise lineage filters")
     sample = listed.trades[0]
     assert sample.order_id
-    by_order = await live_client.trades.list(order_id=sample.order_id, include_transfers=True, limit=5)
+    by_order = await live_client.trades.list(
+        order_id=sample.order_id,
+        include_transfers=True,
+        limit=5,
+    )
     assert all(trade.order_id == sample.order_id for trade in by_order.trades)
     seen_tx: set[str] = set()
     for transfer in by_order.transfers:

@@ -12,8 +12,8 @@ from polyester.codecs.decode.orders import (
 )
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError
-from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.ledger.v1 import catalog_pb2
+from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetOpenOrdersResponse,
     GetOrderResponse,

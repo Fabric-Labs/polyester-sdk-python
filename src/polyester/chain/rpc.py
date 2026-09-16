@@ -83,10 +83,9 @@ class JsonRpcClient:
                 async with httpx.AsyncClient(
                     timeout=self._timeout,
                     headers=_HTTP_HEADERS,
-                ) as client:
-                    async with client.stream("POST", self._url, json=payload) as response:
-                        response.raise_for_status()
-                        raw = await _read_limited(response, MAX_JSONRPC_RESPONSE_BYTES)
+                ) as client, client.stream("POST", self._url, json=payload) as response:
+                    response.raise_for_status()
+                    raw = await _read_limited(response, MAX_JSONRPC_RESPONSE_BYTES)
         except TimeoutError as exc:
             raise JsonRpcError("json-rpc timed out") from exc
         except httpx.TimeoutException as exc:

@@ -39,6 +39,8 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     submitted_max_quote_debit_scaled: str = ""
     attached_risk: AttachedRisk | None = None
     lineage: OrderLineage | None = None
+    # RFC3339 UTC expiry for GTD orders; omitted for every other TIF.
+    expire_at: str | None = None
 
 
 class OrderLineage(msgspec.Struct, kw_only=True, omit_defaults=True):

@@ -77,6 +77,22 @@ def timestamp_to_ms(msg: Message | None) -> int:
     return seconds * 1000 + nanos // 1_000_000
 
 
+def timestamp_to_rfc3339(msg: Message | None) -> str | None:
+    """Encode a proto Timestamp as RFC3339 UTC, or None when unset/zero."""
+    if msg is None:
+        return None
+    seconds = int(getattr(msg, "seconds", 0) or 0)
+    nanos = int(getattr(msg, "nanos", 0) or 0)
+    if seconds == 0 and nanos == 0:
+        return None
+    from datetime import UTC, datetime
+
+    dt = datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
+    if nanos == 0:
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{nanos:09d}Z"
+
+
 def bytes_to_hex(value: bytes | None) -> str:
     if not value:
         return ""

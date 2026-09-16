@@ -230,7 +230,7 @@ async with AsyncPolyester(
         symbol="BTC-USDT",
         side="buy",
         order_type="limit",
-        tif="gtc",
+        tif="gtc",  # gtc, ioc, fok, or gtd (gtd requires expires_at)
         qty="0.01",
         price="100",
         post_only=True,

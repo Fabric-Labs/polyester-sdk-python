@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from polyester.codecs import (
@@ -102,6 +104,71 @@ def test_cancel_all_orders_to_proto() -> None:
     proto = cancel_all_orders_to_proto(symbol_id=3, dry_run=True)
     assert proto.dry_run is True
     assert list(proto.symbol_ids) == [3]
+
+
+def test_create_order_encodes_limit_gtd() -> None:
+    expire_at = (datetime.now(UTC) + timedelta(hours=1)).replace(microsecond=0)
+    req = normalize_create_order_request(
+        symbol="BTC-USD",
+        symbol_id=1,
+        side="buy",
+        order_type="limit",
+        tif="gtd",
+        qty="0.1",
+        price="50000",
+        post_only=True,
+        expires_at=expire_at.isoformat().replace("+00:00", "Z"),
+    )
+    proto = create_order_to_proto(req, quantity_scale=8)
+    assert proto.order.WhichOneof("execution") == "limit_gtd"
+    assert proto.order.limit_gtd.price_ticks == 50_000_000_000
+    assert proto.order.limit_gtd.post_only is True
+    assert proto.order.limit_gtd.expire_at.seconds == int(expire_at.timestamp())
+
+
+def test_create_order_gtd_requires_expires_at() -> None:
+    req = normalize_create_order_request(
+        symbol="BTC-USD",
+        symbol_id=1,
+        side="buy",
+        order_type="limit",
+        tif="gtd",
+        qty="0.1",
+        price="50000",
+    )
+    with pytest.raises(PolyesterValidationError, match="requires expires_at"):
+        create_order_to_proto(req, quantity_scale=8)
+
+
+def test_create_order_rejects_expires_at_outside_gtd() -> None:
+    expire_at = (datetime.now(UTC) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+    req = normalize_create_order_request(
+        symbol="BTC-USD",
+        symbol_id=1,
+        side="buy",
+        order_type="limit",
+        tif="gtc",
+        qty="0.1",
+        price="50000",
+        expires_at=expire_at,
+    )
+    with pytest.raises(PolyesterValidationError, match="only valid for limit GTD"):
+        create_order_to_proto(req, quantity_scale=8)
+
+
+def test_create_order_rejects_gtd_window() -> None:
+    req = normalize_create_order_request(
+        symbol="BTC-USD",
+        symbol_id=1,
+        side="buy",
+        order_type="limit",
+        tif="gtd",
+        qty="0.1",
+        price="50000",
+        expires_at=(datetime.now(UTC) + timedelta(days=31)).isoformat().replace("+00:00", "Z"),
+    )
+    with pytest.raises(PolyesterValidationError, match="1 second and 30 days"):
+        create_order_to_proto(req, quantity_scale=8)
 
 
 def test_create_order_to_wire_maps_public_strings() -> None:

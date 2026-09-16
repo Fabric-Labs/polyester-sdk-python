@@ -49,12 +49,27 @@ def test_order_from_proto_maps_enums_and_ids() -> None:
     assert order.status == "working"
     assert order.order_type == "limit"
     assert order.tif == "gtc"
+    assert order.expire_at is None
     assert order.post_only is True
     assert order.attached_risk is None
     assert order.orig_qty is not None and order.orig_qty.scaled == 100
     msg.version = 7
     order = order_from_proto(msg)
     assert order.version == 7
+
+
+def test_order_from_proto_maps_gtd_expire_at() -> None:
+    expire_at = Timestamp(seconds=1_700_000_000)
+    order = order_from_proto(
+        Order(
+            order_id=42,
+            symbol_id=3,
+            time_in_force=orders_pb2.GTD,
+            expire_at=expire_at,
+        )
+    )
+    assert order.tif == "gtd"
+    assert order.expire_at == "2023-11-14T22:13:20Z"
 
 
 def test_order_orig_qty_is_current_accepted_total() -> None:

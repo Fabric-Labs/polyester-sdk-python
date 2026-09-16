@@ -32,6 +32,7 @@ class TimeInForce(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     GTC: _ClassVar[TimeInForce]
     IOC: _ClassVar[TimeInForce]
     FOK: _ClassVar[TimeInForce]
+    GTD: _ClassVar[TimeInForce]
 
 class FeeAsset(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -168,6 +169,7 @@ TIME_IN_FORCE_UNSPECIFIED: TimeInForce
 GTC: TimeInForce
 IOC: TimeInForce
 FOK: TimeInForce
+GTD: TimeInForce
 FEE_ASSET_UNSPECIFIED: FeeAsset
 QUOTE: FeeAsset
 BASE: FeeAsset
@@ -286,6 +288,16 @@ class LimitGtc(_message.Message):
     post_only: bool
     def __init__(self, price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ...) -> None: ...
 
+class LimitGtd(_message.Message):
+    __slots__ = ("price_ticks", "post_only", "expire_at")
+    PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    POST_ONLY_FIELD_NUMBER: _ClassVar[int]
+    EXPIRE_AT_FIELD_NUMBER: _ClassVar[int]
+    price_ticks: int
+    post_only: bool
+    expire_at: _timestamp_pb2.Timestamp
+    def __init__(self, price_ticks: _Optional[int] = ..., post_only: _Optional[bool] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
 class LimitIoc(_message.Message):
     __slots__ = ("price_ticks",)
     PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
@@ -299,7 +311,7 @@ class LimitFok(_message.Message):
     def __init__(self, price_ticks: _Optional[int] = ...) -> None: ...
 
 class OrderIntent(_message.Message):
-    __slots__ = ("symbol_id", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "client_order_id", "fee_asset", "self_trade_prevention_mode", "attached_risk")
+    __slots__ = ("symbol_id", "side", "base_qty_scaled", "max_quote_debit_scaled", "market_ioc", "limit_gtc", "limit_ioc", "limit_fok", "limit_gtd", "client_order_id", "fee_asset", "self_trade_prevention_mode", "attached_risk")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     BASE_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -308,6 +320,7 @@ class OrderIntent(_message.Message):
     LIMIT_GTC_FIELD_NUMBER: _ClassVar[int]
     LIMIT_IOC_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FOK_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_GTD_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     FEE_ASSET_FIELD_NUMBER: _ClassVar[int]
     SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
@@ -320,11 +333,12 @@ class OrderIntent(_message.Message):
     limit_gtc: LimitGtc
     limit_ioc: LimitIoc
     limit_fok: LimitFok
+    limit_gtd: LimitGtd
     client_order_id: str
     fee_asset: FeeAsset
     self_trade_prevention_mode: SelfTradePreventionMode
     attached_risk: RiskPolicy
-    def __init__(self, symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., base_qty_scaled: _Optional[int] = ..., max_quote_debit_scaled: _Optional[int] = ..., market_ioc: _Optional[_Union[MarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[LimitGtc, _Mapping]] = ..., limit_ioc: _Optional[_Union[LimitIoc, _Mapping]] = ..., limit_fok: _Optional[_Union[LimitFok, _Mapping]] = ..., limit_gtd: _Optional[_Union[LimitGtd, _Mapping]] = ..., client_order_id: _Optional[str] = ..., fee_asset: _Optional[_Union[FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[SelfTradePreventionMode, str]] = ..., attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ...) -> None: ...
 
 class CreateOrderRequest(_message.Message):
     __slots__ = ("subaccount_id", "order")

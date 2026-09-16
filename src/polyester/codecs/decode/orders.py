@@ -6,7 +6,12 @@ from polyester.codecs.decode.invariants import (
     ts_ns_string_from_response,
 )
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
-from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
+from polyester.codecs.proto_helpers import (
+    format_uint64_id,
+    proto_enum_name,
+    timestamp_to_ms,
+    timestamp_to_rfc3339,
+)
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
@@ -277,6 +282,11 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         lineage=(
             order_lineage_from_proto(msg.lineage)
             if "lineage" in msg.DESCRIPTOR.fields_by_name and msg.HasField("lineage")
+            else None
+        ),
+        expire_at=(
+            timestamp_to_rfc3339(msg.expire_at)
+            if "expire_at" in msg.DESCRIPTOR.fields_by_name and msg.HasField("expire_at")
             else None
         ),
     )

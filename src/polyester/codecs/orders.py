@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 import msgspec
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.bps import validate_bps
@@ -28,14 +30,46 @@ from polyester.types.money import (
 
 ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
 ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
-TIF_TO_PROTO = {"gtc": "GTC", "ioc": "IOC", "fok": "FOK"}
+TIF_TO_PROTO = {"gtc": "GTC", "ioc": "IOC", "fok": "FOK", "gtd": "GTD"}
 FEE_ASSET_TO_PROTO = {"quote": "QUOTE", "base": "BASE"}
+_GTD_MIN_OFFSET = timedelta(seconds=1)
+_GTD_MAX_OFFSET = timedelta(days=30)
+_TIF_VALUES = "', '".join(TIF_TO_PROTO)
 MODIFY_BEHAVIOR_TO_PROTO = {
     "amend_or_replace": "AMEND_OR_REPLACE",
     "amend_only": "AMEND_ONLY",
     "replace_only": "REPLACE_ONLY",
 }
 MAX_BATCH_ITEMS = 20
+
+
+def parse_gtd_expire_at(
+    value: str,
+    *,
+    now: datetime | None = None,
+) -> Timestamp:
+    """Parse a UTC RFC3339 ``expires_at`` and enforce the 1s–30d GTD window."""
+    text = value.strip()
+    if not text:
+        raise PolyesterValidationError("tif='gtd' requires expires_at")
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise PolyesterValidationError("expires_at must be an RFC3339 UTC timestamp") from exc
+    if parsed.tzinfo is None:
+        raise PolyesterValidationError("expires_at must be timezone-aware UTC")
+    parsed = parsed.astimezone(UTC)
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    delta = parsed - current
+    if delta < _GTD_MIN_OFFSET or delta > _GTD_MAX_OFFSET:
+        raise PolyesterValidationError(
+            "expires_at must be between 1 second and 30 days after validation"
+        )
+    ts = Timestamp()
+    ts.FromDatetime(parsed)
+    return ts
 
 
 def validate_batch_size(operation: str, length: int) -> None:
@@ -122,7 +156,7 @@ def create_order_to_wire(
     if request.order_type not in ORDER_TYPE_TO_PROTO:
         raise PolyesterValidationError("order_type must be 'limit' or 'market'")
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
-        raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
+        raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
 
     payload = {
         "symbol": request.symbol,
@@ -130,6 +164,7 @@ def create_order_to_wire(
         "side": ORDER_SIDE_TO_PROTO[request.side],
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
         "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
+        "expireAt": request.expires_at if (request.tif or "gtc") == "gtd" else None,
         "qty_scaled": resolve_qty_scaled(
             cast(Any, request.qty),
             _codec_quantity_scale(request.qty, quantity_scale),
@@ -156,7 +191,7 @@ def order_intent_from_request(
 
     The flat ``order_type``/``tif``/``post_only`` inputs are mapped onto the
     explicit execution oneof (``market_ioc``/``limit_gtc``/``limit_ioc``/
-    ``limit_fok``) introduced in POLY-3701.
+    ``limit_fok``/``limit_gtd``) introduced in POLY-3701.
     """
     if request.symbol is None and request.symbol_id is None:
         raise PolyesterValidationError("orders.create requires symbol or symbol_id")
@@ -165,7 +200,7 @@ def order_intent_from_request(
     if request.order_type not in ORDER_TYPE_TO_PROTO:
         raise PolyesterValidationError("order_type must be 'limit' or 'market'")
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
-        raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
+        raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
 
     if (request.qty is None) == (request.max_quote_debit is None):
         raise PolyesterValidationError(
@@ -221,9 +256,14 @@ def order_intent_from_request(
         if request.price is not None
         else None
     )
+    tif = request.tif or "gtc"
+    if request.expires_at and tif != "gtd":
+        raise PolyesterValidationError("expires_at is only valid for limit GTD orders")
     if request.order_type == "market":
+        if tif == "gtd":
+            raise PolyesterValidationError("tif='gtd' is only valid for limit orders")
         if request.post_only:
-            raise PolyesterValidationError("post_only is only valid for limit GTC orders")
+            raise PolyesterValidationError("post_only is only valid for limit GTC or GTD orders")
         if request.price is not None:
             raise PolyesterValidationError(
                 "price is not valid for market orders; "
@@ -238,16 +278,26 @@ def order_intent_from_request(
                 symbol=request.symbol,
             )
     else:
-        tif = request.tif or "gtc"
         if tif == "gtc":
             intent.limit_gtc.SetInParent()
             if price_ticks is not None:
                 intent.limit_gtc.price_ticks = price_ticks
             if request.post_only:
                 intent.limit_gtc.post_only = True
+        elif tif == "gtd":
+            if not request.expires_at:
+                raise PolyesterValidationError("tif='gtd' requires expires_at")
+            intent.limit_gtd.SetInParent()
+            if price_ticks is not None:
+                intent.limit_gtd.price_ticks = price_ticks
+            if request.post_only:
+                intent.limit_gtd.post_only = True
+            intent.limit_gtd.expire_at.CopyFrom(parse_gtd_expire_at(request.expires_at))
         else:
             if request.post_only:
-                raise PolyesterValidationError("post_only is only valid for limit GTC orders")
+                raise PolyesterValidationError(
+                    "post_only is only valid for limit GTC or GTD orders"
+                )
             if tif == "ioc":
                 intent.limit_ioc.SetInParent()
                 if price_ticks is not None:

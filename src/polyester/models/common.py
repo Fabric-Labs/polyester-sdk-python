@@ -62,6 +62,8 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     # create with the same id is always a conflict if the first attempt admitted.
     client_order_id: str | None = None
     post_only: bool = False
+    # Required RFC3339 UTC timestamp when tif="gtd"; rejected otherwise.
+    # Maps to proto LimitGtd.expire_at (1 second–30 days after validation).
     expires_at: str | None = None
     # Friendly dict, proto-JSON, or AttachedRisk. Encoded in risk_policy_from_dict.
     attached_risk: Any | None = None

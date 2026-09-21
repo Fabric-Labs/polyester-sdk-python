@@ -112,6 +112,9 @@ def _item_order_key(item: dict[str, Any], *, label: str) -> OrderKey:
     return require_order_key(item.get("key"), label)  # type: ignore[arg-type]
 
 
+_CREATE_ORDER_FIELDS = frozenset(f.name for f in msgspec.structs.fields(CreateOrderRequest))
+
+
 def normalize_create_order_request(
     request: CreateOrderRequest | Mapping[str, Any] | None = None,
     **kwargs: Any,
@@ -119,6 +122,12 @@ def normalize_create_order_request(
     if request is not None and kwargs:
         raise PolyesterValidationError("Pass either request or keyword arguments, not both")
     data = request if request is not None else kwargs
+    if isinstance(data, Mapping):
+        unknown = sorted(str(key) for key in data if key not in _CREATE_ORDER_FIELDS)
+        if unknown:
+            raise PolyesterValidationError(
+                "unsupported create order argument(s): " + ", ".join(unknown)
+            )
     try:
         normalized = msgspec.convert(data, type=CreateOrderRequest)
     except (msgspec.ValidationError, TypeError) as exc:
@@ -277,7 +286,16 @@ def order_intent_from_request(
                 "market_client_ref_price",
                 symbol=request.symbol,
             )
+        _set_market_max_slippage(
+            market,
+            ticks=request.max_slippage_ticks,
+            bps=request.max_slippage_bps,
+        )
     else:
+        if request.max_slippage_ticks is not None or request.max_slippage_bps is not None:
+            raise PolyesterValidationError(
+                "max_slippage_ticks and max_slippage_bps are only valid for market orders"
+            )
         if tif == "gtc":
             intent.limit_gtc.SetInParent()
             if price_ticks is not None:
@@ -422,6 +440,22 @@ def _reject_trigger_price_source(data: dict[str, Any], *, field_name: str) -> No
         raise PolyesterValidationError(
             "attached risk always uses last trade; trigger_price_source cannot be supplied"
         )
+
+
+def _set_market_max_slippage(
+    market: orders_pb2.MarketIoc,
+    *,
+    ticks: int | None,
+    bps: int | None,
+) -> None:
+    if ticks is not None and bps is not None:
+        raise PolyesterValidationError(
+            "market_ioc allows at most one of max_slippage_ticks or max_slippage_bps"
+        )
+    if ticks is not None:
+        market.max_slippage_ticks = _positive_int(ticks, "max_slippage_ticks")
+    elif bps is not None:
+        market.max_slippage_bps = validate_bps(bps, "max_slippage_bps")
 
 
 def _positive_int(value: object, field_name: str) -> int:

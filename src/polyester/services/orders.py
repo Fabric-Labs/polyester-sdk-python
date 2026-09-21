@@ -263,23 +263,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if normalized.sub_account_id is None:
             resolved_sub = self._resolve_sub_account_id(None)
             if resolved_sub is not None:
-                normalized = CreateOrderRequest(
-                    symbol=normalized.symbol,
-                    symbol_id=normalized.symbol_id,
-                    side=normalized.side,
-                    order_type=normalized.order_type,
-                    tif=normalized.tif,
-                    qty=normalized.qty,
-                    max_quote_debit=normalized.max_quote_debit,
-                    price=normalized.price,
-                    sub_account_id=resolved_sub,
-                    client_order_id=normalized.client_order_id,
-                    post_only=normalized.post_only,
-                    expires_at=normalized.expires_at,
-                    attached_risk=normalized.attached_risk,
-                    market_client_ref_price=normalized.market_client_ref_price,
-                    fee_asset=normalized.fee_asset,
-                )
+                normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
         quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
         quote_quantity_scale = resolve_quote_quantity_scale(
@@ -329,23 +313,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if normalized.sub_account_id is None:
             resolved_sub = self._resolve_sub_account_id(None)
             if resolved_sub is not None:
-                normalized = CreateOrderRequest(
-                    symbol=normalized.symbol,
-                    symbol_id=normalized.symbol_id,
-                    side=normalized.side,
-                    order_type=normalized.order_type,
-                    tif=normalized.tif,
-                    qty=normalized.qty,
-                    max_quote_debit=normalized.max_quote_debit,
-                    price=normalized.price,
-                    sub_account_id=resolved_sub,
-                    client_order_id=normalized.client_order_id,
-                    post_only=normalized.post_only,
-                    expires_at=normalized.expires_at,
-                    attached_risk=normalized.attached_risk,
-                    market_client_ref_price=normalized.market_client_ref_price,
-                    fee_asset=normalized.fee_asset,
-                )
+                normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
         quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
         quote_quantity_scale = resolve_quote_quantity_scale(

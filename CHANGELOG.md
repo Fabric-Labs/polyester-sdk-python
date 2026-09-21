@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a55
+
+Git tag: `v0.1.0a55`.
+
 ### Added
 - Market-order create/preview now expose `max_slippage_bps` or
   `max_slippage_ticks` and serialize the chosen override onto

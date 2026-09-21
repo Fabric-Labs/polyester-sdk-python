@@ -1,8 +1,9 @@
 import datetime
 
-from polyester.gen.google.api import annotations_pb2 as _annotations_pb2
+from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
+from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
-from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2_1
+from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -12,6 +13,21 @@ from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ERROR_CODE_UNSPECIFIED: _ClassVar[ErrorCode]
+    ERROR_CODE_CLAIM_TEMPORARILY_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_UNAUTHENTICATED: _ClassVar[ErrorCode]
+    ERROR_CODE_RATE_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_CLAIM_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_CONFLICT: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_REQUEST: _ClassVar[ErrorCode]
+    ERROR_CODE_REQUEST_TOO_LARGE: _ClassVar[ErrorCode]
+    ERROR_CODE_SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_INTERNAL_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
+    ERROR_CODE_FAILED_PRECONDITION: _ClassVar[ErrorCode]
 
 class ClaimPolicy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -25,6 +41,18 @@ class DailyClaimState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CLAIM_PROCESSING: _ClassVar[DailyClaimState]
     CLAIM_CLAIMED: _ClassVar[DailyClaimState]
     CLAIM_UNAVAILABLE: _ClassVar[DailyClaimState]
+ERROR_CODE_UNSPECIFIED: ErrorCode
+ERROR_CODE_CLAIM_TEMPORARILY_UNAVAILABLE: ErrorCode
+ERROR_CODE_UNAUTHENTICATED: ErrorCode
+ERROR_CODE_RATE_LIMIT_EXCEEDED: ErrorCode
+ERROR_CODE_CLAIM_UNAVAILABLE: ErrorCode
+ERROR_CODE_CONFLICT: ErrorCode
+ERROR_CODE_INVALID_REQUEST: ErrorCode
+ERROR_CODE_REQUEST_TOO_LARGE: ErrorCode
+ERROR_CODE_SERVICE_UNAVAILABLE: ErrorCode
+ERROR_CODE_INTERNAL_ERROR: ErrorCode
+ERROR_CODE_PERMISSION_DENIED: ErrorCode
+ERROR_CODE_FAILED_PRECONDITION: ErrorCode
 POLICY_UNSPECIFIED: ClaimPolicy
 UTC_DAILY: ClaimPolicy
 CLAIM_UNSPECIFIED: DailyClaimState
@@ -32,6 +60,12 @@ CLAIM_AVAILABLE: DailyClaimState
 CLAIM_PROCESSING: DailyClaimState
 CLAIM_CLAIMED: DailyClaimState
 CLAIM_UNAVAILABLE: DailyClaimState
+
+class ErrorDetail(_message.Message):
+    __slots__ = ("code",)
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    code: ErrorCode
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class ClaimCampaign(_message.Message):
     __slots__ = ("campaign_id", "name", "description", "claim_policy")

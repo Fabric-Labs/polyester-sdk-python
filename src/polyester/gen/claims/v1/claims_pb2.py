@@ -22,13 +22,14 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as gnostic_dot_openapi_dot_v3_dot_annotations__pb2
 from polyester.gen.google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as gnostic_dot_openapi_dot_v3_dot_annotations__pb2
+from polyester.gen.polyester.api import options_pb2 as polyester_dot_api_dot_options__pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as polyester_dot_type_dot_v1_dot_u128__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63laims/v1/claims.proto\x12\tclaims.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cpolyester/type/v1/u128.proto\"\xa1\x01\n\rClaimCampaign\x12\x1f\n\x0b\x63\x61mpaign_id\x18\x01 \x01(\tR\ncampaignId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12 \n\x0b\x64\x65scription\x18\x03 \x01(\tR\x0b\x64\x65scription\x12\x39\n\x0c\x63laim_policy\x18\x04 \x01(\x0e\x32\x16.claims.v1.ClaimPolicyR\x0b\x63laimPolicy\"\x84\x01\n\x10\x44\x61ilyClaimReward\x12\x19\n\x08\x61sset_id\x18\x01 \x01(\rR\x07\x61ssetId\x12\x1d\n\nasset_code\x18\x02 \x01(\tR\tassetCode\x12\x36\n\namount_e18\x18\x03 \x01(\x0b\x32\x17.polyester.type.v1.U128R\tamountE18\"\x1c\n\x1aGetDailyClaimStatusRequest\"\x8e\x02\n\x1bGetDailyClaimStatusResponse\x12\x30\n\x05state\x18\x01 \x01(\x0e\x32\x1a.claims.v1.DailyClaimStateR\x05state\x12\x35\n\x08reset_at\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x07resetAt\x12\x35\n\x07rewards\x18\x03 \x03(\x0b\x32\x1b.claims.v1.DailyClaimRewardR\x07rewards\x12\x19\n\x08\x63laim_id\x18\x04 \x01(\tR\x07\x63laimId\x12\x34\n\x08\x63\x61mpaign\x18\x05 \x01(\x0b\x32\x18.claims.v1.ClaimCampaignR\x08\x63\x61mpaign\"\x19\n\x17\x43laimDailyRewardRequest\"P\n\x12\x44\x61ilyClaimTransfer\x12\x19\n\x08\x61sset_id\x18\x01 \x01(\rR\x07\x61ssetId\x12\x1f\n\x0btransfer_id\x18\x02 \x01(\tR\ntransferId\"\x83\x03\n\x18\x43laimDailyRewardResponse\x12\x19\n\x08\x63laim_id\x18\x01 \x01(\tR\x07\x63laimId\x12\x30\n\x05state\x18\x02 \x01(\x0e\x32\x1a.claims.v1.DailyClaimStateR\x05state\x12\x39\n\nclaimed_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tclaimedAt\x12\x35\n\x07rewards\x18\x04 \x03(\x0b\x32\x1b.claims.v1.DailyClaimRewardR\x07rewards\x12;\n\ttransfers\x18\x05 \x03(\x0b\x32\x1d.claims.v1.DailyClaimTransferR\ttransfers\x12\x35\n\x08reset_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x07resetAt\x12\x34\n\x08\x63\x61mpaign\x18\x07 \x01(\x0b\x32\x18.claims.v1.ClaimCampaignR\x08\x63\x61mpaign*4\n\x0b\x43laimPolicy\x12\x16\n\x12POLICY_UNSPECIFIED\x10\x00\x12\r\n\tUTC_DAILY\x10\x01*}\n\x0f\x44\x61ilyClaimState\x12\x15\n\x11\x43LAIM_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x43LAIM_AVAILABLE\x10\x01\x12\x14\n\x10\x43LAIM_PROCESSING\x10\x02\x12\x11\n\rCLAIM_CLAIMED\x10\x03\x12\x15\n\x11\x43LAIM_UNAVAILABLE\x10\x04\x32\xd8\x05\n\rClaimsService\x12\xd6\x02\n\x13GetDailyClaimStatus\x12%.claims.v1.GetDailyClaimStatusRequest\x1a&.claims.v1.GetDailyClaimStatusResponse\"\xef\x01\xbaG\xcc\x01\n\x0b\x44\x61ily Claim\x12\x16Get Daily Claim Status\x1a\xa4\x01Get today\'s reward and claim status for the authenticated root account. Requires a session JWT; API keys are not accepted. Future reward schedules are not returned.\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/trading/daily-claim\x12\xed\x02\n\x10\x43laimDailyReward\x12\".claims.v1.ClaimDailyRewardRequest\x1a#.claims.v1.ClaimDailyRewardResponse\"\x8f\x02\xbaG\xe3\x01\n\x0b\x44\x61ily Claim\x12\x12\x43laim Daily Reward\x1a\xbf\x01\x43laim today\'s reward once for the authenticated root account. Requires a session JWT; API keys are not accepted. All reward assets are transferred together, and retries return the same claim.\x82\xd3\xe4\x93\x02\"\"\x1d/v1/trading/daily-claim/claim:\x01*B\x8b\x01Z>github.com/Fabric-Labs/polyester-sdk-go/gen/claims/v1;claimsv1\xbaGH:F\n\x0b\x44\x61ily Claim\x12\x37\x44\x61ily campaign rewards for authenticated root accounts.b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63laims/v1/claims.proto\x12\tclaims.v1\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\x1a\x1cpolyester/type/v1/u128.proto\"7\n\x0b\x45rrorDetail\x12(\n\x04\x63ode\x18\x01 \x01(\x0e\x32\x14.claims.v1.ErrorCodeR\x04\x63ode\"\xa1\x01\n\rClaimCampaign\x12\x1f\n\x0b\x63\x61mpaign_id\x18\x01 \x01(\tR\ncampaignId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12 \n\x0b\x64\x65scription\x18\x03 \x01(\tR\x0b\x64\x65scription\x12\x39\n\x0c\x63laim_policy\x18\x04 \x01(\x0e\x32\x16.claims.v1.ClaimPolicyR\x0b\x63laimPolicy\"\x84\x01\n\x10\x44\x61ilyClaimReward\x12\x19\n\x08\x61sset_id\x18\x01 \x01(\rR\x07\x61ssetId\x12\x1d\n\nasset_code\x18\x02 \x01(\tR\tassetCode\x12\x36\n\namount_e18\x18\x03 \x01(\x0b\x32\x17.polyester.type.v1.U128R\tamountE18\"\x1c\n\x1aGetDailyClaimStatusRequest\"\x8e\x02\n\x1bGetDailyClaimStatusResponse\x12\x30\n\x05state\x18\x01 \x01(\x0e\x32\x1a.claims.v1.DailyClaimStateR\x05state\x12\x35\n\x08reset_at\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x07resetAt\x12\x35\n\x07rewards\x18\x03 \x03(\x0b\x32\x1b.claims.v1.DailyClaimRewardR\x07rewards\x12\x19\n\x08\x63laim_id\x18\x04 \x01(\tR\x07\x63laimId\x12\x34\n\x08\x63\x61mpaign\x18\x05 \x01(\x0b\x32\x18.claims.v1.ClaimCampaignR\x08\x63\x61mpaign\"\x19\n\x17\x43laimDailyRewardRequest\"P\n\x12\x44\x61ilyClaimTransfer\x12\x19\n\x08\x61sset_id\x18\x01 \x01(\rR\x07\x61ssetId\x12\x1f\n\x0btransfer_id\x18\x02 \x01(\tR\ntransferId\"\x83\x03\n\x18\x43laimDailyRewardResponse\x12\x19\n\x08\x63laim_id\x18\x01 \x01(\tR\x07\x63laimId\x12\x30\n\x05state\x18\x02 \x01(\x0e\x32\x1a.claims.v1.DailyClaimStateR\x05state\x12\x39\n\nclaimed_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tclaimedAt\x12\x35\n\x07rewards\x18\x04 \x03(\x0b\x32\x1b.claims.v1.DailyClaimRewardR\x07rewards\x12;\n\ttransfers\x18\x05 \x03(\x0b\x32\x1d.claims.v1.DailyClaimTransferR\ttransfers\x12\x35\n\x08reset_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x07resetAt\x12\x34\n\x08\x63\x61mpaign\x18\x07 \x01(\x0b\x32\x18.claims.v1.ClaimCampaignR\x08\x63\x61mpaign*\x9f\x03\n\tErrorCode\x12\x1a\n\x16\x45RROR_CODE_UNSPECIFIED\x10\x00\x12,\n(ERROR_CODE_CLAIM_TEMPORARILY_UNAVAILABLE\x10\x01\x12\x1e\n\x1a\x45RROR_CODE_UNAUTHENTICATED\x10\x02\x12\"\n\x1e\x45RROR_CODE_RATE_LIMIT_EXCEEDED\x10\x03\x12 \n\x1c\x45RROR_CODE_CLAIM_UNAVAILABLE\x10\x04\x12\x17\n\x13\x45RROR_CODE_CONFLICT\x10\x05\x12\x1e\n\x1a\x45RROR_CODE_INVALID_REQUEST\x10\x06\x12 \n\x1c\x45RROR_CODE_REQUEST_TOO_LARGE\x10\x07\x12\"\n\x1e\x45RROR_CODE_SERVICE_UNAVAILABLE\x10\x08\x12\x1d\n\x19\x45RROR_CODE_INTERNAL_ERROR\x10\t\x12 \n\x1c\x45RROR_CODE_PERMISSION_DENIED\x10\n\x12\"\n\x1e\x45RROR_CODE_FAILED_PRECONDITION\x10\x0b*4\n\x0b\x43laimPolicy\x12\x16\n\x12POLICY_UNSPECIFIED\x10\x00\x12\r\n\tUTC_DAILY\x10\x01*}\n\x0f\x44\x61ilyClaimState\x12\x15\n\x11\x43LAIM_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x43LAIM_AVAILABLE\x10\x01\x12\x14\n\x10\x43LAIM_PROCESSING\x10\x02\x12\x11\n\rCLAIM_CLAIMED\x10\x03\x12\x15\n\x11\x43LAIM_UNAVAILABLE\x10\x04\x32\xe2\x05\n\rClaimsService\x12\xdb\x02\n\x13GetDailyClaimStatus\x12%.claims.v1.GetDailyClaimStatusRequest\x1a&.claims.v1.GetDailyClaimStatusResponse\"\xf4\x01\xbaG\xcc\x01\n\x0b\x44\x61ily Claim\x12\x16Get Daily Claim Status\x1a\xa4\x01Get today\'s reward and claim status for the authenticated root account. Requires a session JWT; API keys are not accepted. Future reward schedules are not returned.\xa2\xb5\x18\x01\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/trading/daily-claim\x12\xf2\x02\n\x10\x43laimDailyReward\x12\".claims.v1.ClaimDailyRewardRequest\x1a#.claims.v1.ClaimDailyRewardResponse\"\x94\x02\xbaG\xe3\x01\n\x0b\x44\x61ily Claim\x12\x12\x43laim Daily Reward\x1a\xbf\x01\x43laim today\'s reward once for the authenticated root account. Requires a session JWT; API keys are not accepted. All reward assets are transferred together, and retries return the same claim.\xa2\xb5\x18\x01\x01\x82\xd3\xe4\x93\x02\"\"\x1d/v1/trading/daily-claim/claim:\x01*B\x8b\x01Z>github.com/Fabric-Labs/polyester-sdk-go/gen/claims/v1;claimsv1\xbaGH:F\n\x0b\x44\x61ily Claim\x12\x37\x44\x61ily campaign rewards for authenticated root accounts.b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,27 +38,31 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z>github.com/Fabric-Labs/polyester-sdk-go/gen/claims/v1;claimsv1\272GH:F\n\013Daily Claim\0227Daily campaign rewards for authenticated root accounts.'
   _globals['_CLAIMSSERVICE'].methods_by_name['GetDailyClaimStatus']._loaded_options = None
-  _globals['_CLAIMSSERVICE'].methods_by_name['GetDailyClaimStatus']._serialized_options = b'\272G\314\001\n\013Daily Claim\022\026Get Daily Claim Status\032\244\001Get today\'s reward and claim status for the authenticated root account. Requires a session JWT; API keys are not accepted. Future reward schedules are not returned.\202\323\344\223\002\031\022\027/v1/trading/daily-claim'
+  _globals['_CLAIMSSERVICE'].methods_by_name['GetDailyClaimStatus']._serialized_options = b'\272G\314\001\n\013Daily Claim\022\026Get Daily Claim Status\032\244\001Get today\'s reward and claim status for the authenticated root account. Requires a session JWT; API keys are not accepted. Future reward schedules are not returned.\242\265\030\001\001\202\323\344\223\002\031\022\027/v1/trading/daily-claim'
   _globals['_CLAIMSSERVICE'].methods_by_name['ClaimDailyReward']._loaded_options = None
-  _globals['_CLAIMSSERVICE'].methods_by_name['ClaimDailyReward']._serialized_options = b'\272G\343\001\n\013Daily Claim\022\022Claim Daily Reward\032\277\001Claim today\'s reward once for the authenticated root account. Requires a session JWT; API keys are not accepted. All reward assets are transferred together, and retries return the same claim.\202\323\344\223\002\"\"\035/v1/trading/daily-claim/claim:\001*'
-  _globals['_CLAIMPOLICY']._serialized_start=1269
-  _globals['_CLAIMPOLICY']._serialized_end=1321
-  _globals['_DAILYCLAIMSTATE']._serialized_start=1323
-  _globals['_DAILYCLAIMSTATE']._serialized_end=1448
-  _globals['_CLAIMCAMPAIGN']._serialized_start=169
-  _globals['_CLAIMCAMPAIGN']._serialized_end=330
-  _globals['_DAILYCLAIMREWARD']._serialized_start=333
-  _globals['_DAILYCLAIMREWARD']._serialized_end=465
-  _globals['_GETDAILYCLAIMSTATUSREQUEST']._serialized_start=467
-  _globals['_GETDAILYCLAIMSTATUSREQUEST']._serialized_end=495
-  _globals['_GETDAILYCLAIMSTATUSRESPONSE']._serialized_start=498
-  _globals['_GETDAILYCLAIMSTATUSRESPONSE']._serialized_end=768
-  _globals['_CLAIMDAILYREWARDREQUEST']._serialized_start=770
-  _globals['_CLAIMDAILYREWARDREQUEST']._serialized_end=795
-  _globals['_DAILYCLAIMTRANSFER']._serialized_start=797
-  _globals['_DAILYCLAIMTRANSFER']._serialized_end=877
-  _globals['_CLAIMDAILYREWARDRESPONSE']._serialized_start=880
-  _globals['_CLAIMDAILYREWARDRESPONSE']._serialized_end=1267
-  _globals['_CLAIMSSERVICE']._serialized_start=1451
-  _globals['_CLAIMSSERVICE']._serialized_end=2179
+  _globals['_CLAIMSSERVICE'].methods_by_name['ClaimDailyReward']._serialized_options = b'\272G\343\001\n\013Daily Claim\022\022Claim Daily Reward\032\277\001Claim today\'s reward once for the authenticated root account. Requires a session JWT; API keys are not accepted. All reward assets are transferred together, and retries return the same claim.\242\265\030\001\001\202\323\344\223\002\"\"\035/v1/trading/daily-claim/claim:\001*'
+  _globals['_ERRORCODE']._serialized_start=1356
+  _globals['_ERRORCODE']._serialized_end=1771
+  _globals['_CLAIMPOLICY']._serialized_start=1773
+  _globals['_CLAIMPOLICY']._serialized_end=1825
+  _globals['_DAILYCLAIMSTATE']._serialized_start=1827
+  _globals['_DAILYCLAIMSTATE']._serialized_end=1952
+  _globals['_ERRORDETAIL']._serialized_start=197
+  _globals['_ERRORDETAIL']._serialized_end=252
+  _globals['_CLAIMCAMPAIGN']._serialized_start=255
+  _globals['_CLAIMCAMPAIGN']._serialized_end=416
+  _globals['_DAILYCLAIMREWARD']._serialized_start=419
+  _globals['_DAILYCLAIMREWARD']._serialized_end=551
+  _globals['_GETDAILYCLAIMSTATUSREQUEST']._serialized_start=553
+  _globals['_GETDAILYCLAIMSTATUSREQUEST']._serialized_end=581
+  _globals['_GETDAILYCLAIMSTATUSRESPONSE']._serialized_start=584
+  _globals['_GETDAILYCLAIMSTATUSRESPONSE']._serialized_end=854
+  _globals['_CLAIMDAILYREWARDREQUEST']._serialized_start=856
+  _globals['_CLAIMDAILYREWARDREQUEST']._serialized_end=881
+  _globals['_DAILYCLAIMTRANSFER']._serialized_start=883
+  _globals['_DAILYCLAIMTRANSFER']._serialized_end=963
+  _globals['_CLAIMDAILYREWARDRESPONSE']._serialized_start=966
+  _globals['_CLAIMDAILYREWARDRESPONSE']._serialized_end=1353
+  _globals['_CLAIMSSERVICE']._serialized_start=1955
+  _globals['_CLAIMSSERVICE']._serialized_end=2693
 # @@protoc_insertion_point(module_scope)

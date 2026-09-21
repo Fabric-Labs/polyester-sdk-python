@@ -7,6 +7,8 @@ one client order if it is still open.
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 
 from polyester.errors import PolyesterApiError, PolyesterRouteNotFoundError
@@ -140,12 +142,11 @@ async def test_create_market_ioc_with_slippage_bps(
         flush=True,
     )
     if created.status in {"canceled", "rejected", "filled", "accepted"}:
-        # Admission is the POLY-5379 proof. IOC market may fill/cancel and drop
-        # out of get-by-client-id before the test can poll a terminal snapshot.
-        try:
+        # Admission proves the override reached the host. IOC market may
+        # fill/cancel and drop out of get-by-client-id before a terminal
+        # snapshot is visible.
+        with contextlib.suppress(Exception):
             await live_client.orders.cancel(key=ClientOrderId(client_order_id))
-        except Exception:
-            pass
         return
     try:
         detail = await wait_for_terminal_order(live_client, client_order_id)
@@ -157,7 +158,5 @@ async def test_create_market_ioc_with_slippage_bps(
             return
         raise
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await live_client.orders.cancel(key=ClientOrderId(client_order_id))
-        except Exception:
-            pass

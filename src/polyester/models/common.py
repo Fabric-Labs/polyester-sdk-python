@@ -69,6 +69,10 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     attached_risk: Any | None = None
     market_client_ref_price: Any | None = None
     fee_asset: str | None = None
+    # Market-IOC execution protection. Set at most one; both omitted keeps
+    # pair defaults. Rejected on limit orders. ``max_slippage_bps`` is 1–10000.
+    max_slippage_ticks: int | None = None
+    max_slippage_bps: int | None = None
 
 
 __all__ = [

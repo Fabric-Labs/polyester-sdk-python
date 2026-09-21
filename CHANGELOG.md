@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+- Market-order create/preview now expose `max_slippage_bps` or
+  `max_slippage_ticks` and serialize the chosen override onto
+  `OrderIntent.market_ioc`. Omit both to keep pair defaults. The fields
+  are mutually exclusive, bounded (`bps` 1–10000, ticks positive),
+  rejected on limit orders, and unknown create arguments now error
+  instead of being dropped.
+
 ## 0.1.0a54
 
 Git tag: `v0.1.0a54`.

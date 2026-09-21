@@ -316,7 +316,19 @@ prerequisite for order submission.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
-before overriding market slippage.
+before overriding pair defaults. Set at most one of `max_slippage_bps`
+(1–10000) or `max_slippage_ticks`. Omit both to keep the pair default. The
+fields are rejected on limit orders and if both are supplied.
+
+```python
+result = await client.orders.create(
+    symbol="BTC-USDT",
+    side="buy",
+    order_type="market",
+    qty="0.01",
+    max_slippage_bps=25,  # or max_slippage_ticks=10; not both
+)
+```
 
 Scaled transfer/withdraw `AssetAmount` inputs must carry their source scale.
 `AssetAmount.from_scaled(..., scale=None)` is accepted for composition only and

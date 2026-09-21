@@ -308,6 +308,28 @@ class ListSubaccountsResponse(_message.Message):
     total_created: int
     def __init__(self, subaccounts: _Optional[_Iterable[_Union[Subaccount, _Mapping]]] = ..., total_created: _Optional[int] = ...) -> None: ...
 
+class CreateSubaccountChallengeRequest(_message.Message):
+    __slots__ = ("owner_address", "uri")
+    OWNER_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    URI_FIELD_NUMBER: _ClassVar[int]
+    owner_address: str
+    uri: str
+    def __init__(self, owner_address: _Optional[str] = ..., uri: _Optional[str] = ...) -> None: ...
+
+class CreateSubaccountChallengeResponse(_message.Message):
+    __slots__ = ("message", "smart_account_address", "smart_account_salt_nonce", "expires_at", "polyester_chain_id")
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    POLYESTER_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    message: str
+    smart_account_address: str
+    smart_account_salt_nonce: int
+    expires_at: _timestamp_pb2.Timestamp
+    polyester_chain_id: int
+    def __init__(self, message: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., smart_account_salt_nonce: _Optional[int] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ...) -> None: ...
+
 class CreateSubaccountRequest(_message.Message):
     __slots__ = ("label", "icon", "color", "smart_account_address", "message", "signature")
     LABEL_FIELD_NUMBER: _ClassVar[int]

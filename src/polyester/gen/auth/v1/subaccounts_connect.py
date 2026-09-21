@@ -108,6 +108,9 @@ class SubaccountService(Protocol):
     async def list_subaccounts(self, request: auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def create_subaccount_challenge(self, request: auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def create_subaccount(self, request: auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -150,6 +153,16 @@ class SubaccountServiceASGIApplication(ConnectASGIApplication[SubaccountService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_subaccounts,
+                ),
+                "/auth.v1.SubaccountService/CreateSubaccountChallenge": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CreateSubaccountChallenge",
+                        service_name="auth.v1.SubaccountService",
+                        input=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest,
+                        output=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.create_subaccount_challenge,
                 ),
                 "/auth.v1.SubaccountService/CreateSubaccount": Endpoint.unary(
                     method=MethodInfo(
@@ -269,6 +282,26 @@ class SubaccountServiceClient(ConnectClient):
                 service_name="auth.v1.SubaccountService",
                 input=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsRequest,
                 output=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def create_subaccount_challenge(
+        self,
+        request: auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CreateSubaccountChallenge",
+                service_name="auth.v1.SubaccountService",
+                input=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest,
+                output=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -634,6 +667,8 @@ class SubaccountViewServiceClientSync(ConnectClientSync):
 class SubaccountServiceSync(Protocol):
     def list_subaccounts(self, request: auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def create_subaccount_challenge(self, request: auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_subaccount(self, request: auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def update_subaccount(self, request: auth_dot_v1_dot_subaccounts__pb2.UpdateSubaccountRequest, ctx: RequestContext) -> auth_dot_v1_dot_subaccounts__pb2.UpdateSubaccountResponse:
@@ -667,6 +702,16 @@ class SubaccountServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_subaccounts,
+                ),
+                "/auth.v1.SubaccountService/CreateSubaccountChallenge": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CreateSubaccountChallenge",
+                        service_name="auth.v1.SubaccountService",
+                        input=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest,
+                        output=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.create_subaccount_challenge,
                 ),
                 "/auth.v1.SubaccountService/CreateSubaccount": EndpointSync.unary(
                     method=MethodInfo(
@@ -786,6 +831,26 @@ class SubaccountServiceClientSync(ConnectClientSync):
                 service_name="auth.v1.SubaccountService",
                 input=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsRequest,
                 output=auth_dot_v1_dot_subaccounts__pb2.ListSubaccountsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def create_subaccount_challenge(
+        self,
+        request: auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CreateSubaccountChallenge",
+                service_name="auth.v1.SubaccountService",
+                input=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeRequest,
+                output=auth_dot_v1_dot_subaccounts__pb2.CreateSubaccountChallengeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

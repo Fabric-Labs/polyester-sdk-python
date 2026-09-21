@@ -6,6 +6,7 @@ from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
+from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -18,7 +19,6 @@ class WalletChallengePurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     WALLET_PROOF_UNSPECIFIED: _ClassVar[WalletChallengePurpose]
     LOGIN: _ClassVar[WalletChallengePurpose]
-    CREATE_SUBACCOUNT: _ClassVar[WalletChallengePurpose]
 
 class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -63,9 +63,11 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_MFA_LAST_FACTOR_REQUIRED: _ClassVar[AuthErrorCode]
     AUTH_INTERNAL_ERROR: _ClassVar[AuthErrorCode]
     AUTH_TERMS_NOT_ACCEPTED: _ClassVar[AuthErrorCode]
+    AUTH_SOCIAL_VERIFICATION_EXPIRED: _ClassVar[AuthErrorCode]
+    AUTH_SOCIAL_VERIFICATION_INVALID_STATE: _ClassVar[AuthErrorCode]
+    AUTH_SUBACCOUNT_CHALLENGE_INVALID: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
-CREATE_SUBACCOUNT: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
 AUTH_USERNAME_INVALID: AuthErrorCode
 AUTH_USERNAME_TAKEN: AuthErrorCode
@@ -107,6 +109,9 @@ AUTH_MFA_ELEVATION_REQUIRED: AuthErrorCode
 AUTH_MFA_LAST_FACTOR_REQUIRED: AuthErrorCode
 AUTH_INTERNAL_ERROR: AuthErrorCode
 AUTH_TERMS_NOT_ACCEPTED: AuthErrorCode
+AUTH_SOCIAL_VERIFICATION_EXPIRED: AuthErrorCode
+AUTH_SOCIAL_VERIFICATION_INVALID_STATE: AuthErrorCode
+AUTH_SUBACCOUNT_CHALLENGE_INVALID: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

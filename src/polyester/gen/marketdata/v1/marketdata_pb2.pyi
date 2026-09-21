@@ -236,18 +236,20 @@ class Candle(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[int] = ..., open: _Optional[int] = ..., high: _Optional[int] = ..., low: _Optional[int] = ..., close: _Optional[int] = ..., volume: _Optional[int] = ..., quote_volume: _Optional[str] = ...) -> None: ...
 
 class AssetConfig(_message.Message):
-    __slots__ = ("asset", "ledger_id", "name", "quantity_display_decimals", "quantity_scale")
+    __slots__ = ("asset", "ledger_id", "name", "quantity_display_decimals", "quantity_scale", "market_data_volume_scale")
     ASSET_FIELD_NUMBER: _ClassVar[int]
     LEDGER_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_DISPLAY_DECIMALS_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_SCALE_FIELD_NUMBER: _ClassVar[int]
+    MARKET_DATA_VOLUME_SCALE_FIELD_NUMBER: _ClassVar[int]
     asset: str
     ledger_id: int
     name: str
     quantity_display_decimals: int
     quantity_scale: int
-    def __init__(self, asset: _Optional[str] = ..., ledger_id: _Optional[int] = ..., name: _Optional[str] = ..., quantity_display_decimals: _Optional[int] = ..., quantity_scale: _Optional[int] = ...) -> None: ...
+    market_data_volume_scale: int
+    def __init__(self, asset: _Optional[str] = ..., ledger_id: _Optional[int] = ..., name: _Optional[str] = ..., quantity_display_decimals: _Optional[int] = ..., quantity_scale: _Optional[int] = ..., market_data_volume_scale: _Optional[int] = ...) -> None: ...
 
 class PairMarketdataConfig(_message.Message):
     __slots__ = ("orderbook_price_buckets",)
@@ -256,7 +258,7 @@ class PairMarketdataConfig(_message.Message):
     def __init__(self, orderbook_price_buckets: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class PairConfig(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "tick_size", "step_size", "min_notional_quote", "min_qty_base", "allow_buy_fee_from_base", "base_quantity_scale", "quote_quantity_scale", "marketdata", "listing_at", "delisting_at", "status", "default_market_slippage_bps_buy", "default_market_slippage_bps_sell", "max_client_ref_drift_bps")
+    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "tick_size", "step_size", "min_notional_quote", "min_qty_base", "allow_buy_fee_from_base", "base_quantity_scale", "quote_quantity_scale", "marketdata", "listing_at", "delisting_at", "status", "default_market_slippage_bps_buy", "default_market_slippage_bps_sell", "max_client_ref_drift_bps", "reference_price_scale")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     BASE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -275,6 +277,7 @@ class PairConfig(_message.Message):
     DEFAULT_MARKET_SLIPPAGE_BPS_BUY_FIELD_NUMBER: _ClassVar[int]
     DEFAULT_MARKET_SLIPPAGE_BPS_SELL_FIELD_NUMBER: _ClassVar[int]
     MAX_CLIENT_REF_DRIFT_BPS_FIELD_NUMBER: _ClassVar[int]
+    REFERENCE_PRICE_SCALE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     symbol: str
     base_asset: str
@@ -293,7 +296,8 @@ class PairConfig(_message.Message):
     default_market_slippage_bps_buy: int
     default_market_slippage_bps_sell: int
     max_client_ref_drift_bps: int
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_base: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ...) -> None: ...
+    reference_price_scale: int
+    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_base: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ..., reference_price_scale: _Optional[int] = ...) -> None: ...
 
 class GetSpotConfigRequest(_message.Message):
     __slots__ = ()

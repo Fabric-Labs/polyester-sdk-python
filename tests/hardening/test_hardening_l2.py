@@ -1181,13 +1181,21 @@ async def test_l2_batch_replace_rejects_inconsistent_counts_via_public_service()
 @pytest.mark.asyncio
 async def test_l2_columnar_candles_reject_misaligned_columns_via_public_service() -> None:
     spot = marketdata_pb2.GetSpotConfigResponse(
+        assets=[
+            marketdata_pb2.AssetConfig(
+                asset="BTC",
+                market_data_volume_scale=8,
+            )
+        ],
         pairs=[
             marketdata_pb2.PairConfig(
                 symbol="BTC-USDT",
                 symbol_id=1,
+                base_asset="BTC",
                 base_quantity_scale=8,
+                reference_price_scale=6,
             )
-        ]
+        ],
     )
     zipper = zipper_pb2.GetDepositWithdrawConfigResponse(
         assets=[zipper_pb2.AssetConfig(asset="USDT", ledger_id=99, quantity_scale=6)]

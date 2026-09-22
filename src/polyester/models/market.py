@@ -34,6 +34,7 @@ class CandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     symbol_id: int = 0
     timeframe: str = ""
     candles: list[Candle]
+    reference_candles: list[Candle] = msgspec.field(default_factory=list)
 
 
 class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -43,6 +44,7 @@ class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     index_price: Price | None = None
     change_24h_bp: str = ""
     volume_24h_base_scaled: str | None = None
+    volume_24h_base: str | None = None
     volume_24h_quote_scaled: str | None = None
     volume_24h_usd_scaled: str | None = None
 

@@ -375,6 +375,39 @@ class CatalogManager:
                 return int(value) if value is not None else None
         return None
 
+    def market_data_volume_scale_for_symbol_id(self, symbol_id: int) -> int | None:
+        """Return the base asset candle/overview volume scale, or None when missing.
+
+        Zero is valid and is returned as 0.
+        """
+        if self._unusable:
+            return None
+        pair = self._pair_for_symbol_id(symbol_id)
+        if pair is None:
+            return None
+        base = pair.get("base_asset")
+        if base is None:
+            base = pair.get("baseAsset")
+        if not isinstance(base, str) or not base:
+            return None
+        for asset in self._assets():
+            code = asset.get("asset")
+            if code != base:
+                continue
+            return _optional_int(
+                asset, "market_data_volume_scale", "marketDataVolumeScale"
+            )
+        return None
+
+    def reference_price_scale_for_symbol_id(self, symbol_id: int) -> int | None:
+        """Return the pair reference-candle price scale, or None when missing."""
+        if self._unusable:
+            return None
+        pair = self._pair_for_symbol_id(symbol_id)
+        if pair is None:
+            return None
+        return _optional_int(pair, "reference_price_scale", "referencePriceScale")
+
     def base_quantity_scale_for_symbol_id(self, symbol_id: int) -> int | None:
         if self._unusable:
             return None
@@ -467,6 +500,27 @@ class CatalogManager:
     def _pairs(self) -> list[dict[str, Any]]:
         pairs = self.spot_config.get("pairs") or self.spot_config.get("symbols") or []
         return [pair for pair in pairs if isinstance(pair, dict)]
+
+    def _assets(self) -> list[dict[str, Any]]:
+        assets = self.spot_config.get("assets") or []
+        return [asset for asset in assets if isinstance(asset, dict)]
+
+    def _pair_for_symbol_id(self, symbol_id: int) -> dict[str, Any] | None:
+        for pair in self._pairs():
+            value = pair.get("symbol_id")
+            if value is None:
+                value = pair.get("symbolId")
+            if value is not None and int(value) == int(symbol_id):
+                return pair
+        return None
+
+
+def _optional_int(row: dict[str, Any], *keys: str) -> int | None:
+    for key in keys:
+        if key not in row or row[key] is None:
+            continue
+        return int(row[key])
+    return None
 
 
 def msgspec_to_dict(value: object) -> dict[str, Any]:

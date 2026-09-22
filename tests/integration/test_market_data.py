@@ -29,6 +29,30 @@ async def test_get_trades(live_client, smoke_symbol):
 
 
 @pytest.mark.integration
+async def test_canonical_market_data_scales(live_client, smoke_symbol):
+    result = await live_client.market_data.get_spot_config()
+    assets = result.raw.get("assets") or []
+    assert assets
+    for asset in assets:
+        scale = asset.get("marketDataVolumeScale", asset.get("market_data_volume_scale"))
+        assert isinstance(scale, int)
+        assert 0 <= scale <= 18
+    for pair in result.raw.get("pairs") or []:
+        scale = pair.get("referencePriceScale", pair.get("reference_price_scale"))
+        assert isinstance(scale, int)
+        assert 0 <= scale <= 18
+    candles = await live_client.market_data.get_candles(symbol=smoke_symbol, limit=5)
+    for candle in candles.candles:
+        Decimal(candle.volume or "0")
+    referenced = await live_client.market_data.get_candles(
+        symbol=smoke_symbol, limit=5, include_reference=True
+    )
+    for candle in referenced.reference_candles:
+        Decimal(candle.open or "0")
+        Decimal(candle.volume or "0")
+
+
+@pytest.mark.integration
 async def test_get_candles(live_client, smoke_symbol):
     result = await live_client.market_data.get_candles(symbol=smoke_symbol, limit=5)
     assert isinstance(result, CandlesResult)

@@ -5,7 +5,7 @@ from polyester.codecs.decode.market_data import (
     candles_columns_from_proto,
     candles_from_proto,
 )
-from polyester.errors import PolyesterTransportError
+from polyester.errors import PolyesterTransportError, PolyesterValidationError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 
 
@@ -52,6 +52,48 @@ def test_candles_from_proto_uses_volume_scale() -> None:
     assert result.timeframe == "1m"
     assert result.candles[0].close == "2"
     assert result.candles[0].volume == "10"
+
+
+def test_reference_candles_use_reference_price_scale() -> None:
+    response = marketdata_pb2.GetCandlesResponse(
+        symbol_id=1,
+        timeframe=marketdata_pb2.MIN_1,
+        candles=[
+            marketdata_pb2.CandlePoint(
+                ts_sec=1,
+                open=1_000_000,
+                high=1_000_000,
+                low=1_000_000,
+                close=1_000_000,
+                volume=100_000_000,
+            )
+        ],
+        reference_candles=[
+            marketdata_pb2.CandlePoint(
+                ts_sec=1,
+                open=100_000_000,
+                high=100_000_000,
+                low=100_000_000,
+                close=100_000_000,
+                volume=100_000_000,
+            )
+        ],
+    )
+
+    result = candles_from_proto(response, volume_scale=8, reference_price_scale=8)
+
+    assert result.candles[0].open == "1"
+    assert result.candles[0].volume == "1"
+    assert result.reference_candles[0].open == "1"
+    assert result.reference_candles[0].volume == "1"
+
+
+def test_reference_candles_require_price_scale() -> None:
+    response = marketdata_pb2.GetCandlesResponse(
+        reference_candles=[marketdata_pb2.CandlePoint(ts_sec=1, open=1)]
+    )
+    with pytest.raises(PolyesterValidationError, match="reference_price_scale"):
+        candles_from_proto(response, volume_scale=8)
 
 
 def test_candles_columns_rejects_short_parallel_arrays() -> None:

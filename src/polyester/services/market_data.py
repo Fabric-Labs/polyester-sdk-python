@@ -128,6 +128,7 @@ class AsyncMarketDataService(BaseService):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         include_incomplete: bool = False,
+        include_reference: bool = False,
     ) -> CandlesResult:
         request = _build_candles_request(
             self._catalogs,
@@ -138,14 +139,22 @@ class AsyncMarketDataService(BaseService):
             start_time=start_time,
             end_time=end_time,
             include_incomplete=include_incomplete,
+            include_reference=include_reference,
         )
         volume_scale = _volume_scale_for_symbol_id(self._catalogs, request.symbol_id)
+        reference_price_scale = _reference_price_scale_for_symbol_id(
+            self._catalogs, request.symbol_id, required=include_reference
+        )
         return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_candles(req),
             request,
-            lambda msg: candles_from_proto(msg, volume_scale=volume_scale),
+            lambda msg: candles_from_proto(
+                msg,
+                volume_scale=volume_scale,
+                reference_price_scale=reference_price_scale,
+            ),
         )
 
     async def get_candles_columns(
@@ -158,6 +167,7 @@ class AsyncMarketDataService(BaseService):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         include_incomplete: bool = False,
+        include_reference: bool = False,
     ) -> CandlesResult:
         request = _build_candles_request(
             self._catalogs,
@@ -168,14 +178,22 @@ class AsyncMarketDataService(BaseService):
             start_time=start_time,
             end_time=end_time,
             include_incomplete=include_incomplete,
+            include_reference=include_reference,
         )
         volume_scale = _volume_scale_for_symbol_id(self._catalogs, request.symbol_id)
+        reference_price_scale = _reference_price_scale_for_symbol_id(
+            self._catalogs, request.symbol_id, required=include_reference
+        )
         return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,
             lambda client, req: client.get_candles_columns(req),
             request,
-            lambda msg: candles_columns_from_proto(msg, volume_scale=volume_scale),
+            lambda msg: candles_columns_from_proto(
+                msg,
+                volume_scale=volume_scale,
+                reference_price_scale=reference_price_scale,
+            ),
         )
 
     def subscribe_trades(
@@ -254,6 +272,7 @@ def _build_candles_request(
     start_time: datetime | None,
     end_time: datetime | None,
     include_incomplete: bool,
+    include_reference: bool = False,
 ) -> GetCandlesRequest:
     from polyester.gen.marketdata.v1 import marketdata_pb2
 
@@ -276,6 +295,7 @@ def _build_candles_request(
         timeframe=timeframe_enum,
         limit=validated_limit,
         include_incomplete=include_incomplete,
+        include_reference=include_reference,
     )
     if start_time is not None:
         request.start_time.CopyFrom(_datetime_to_timestamp(start_time))
@@ -291,7 +311,27 @@ def _datetime_to_timestamp(value: datetime) -> Timestamp:
 
 
 def _volume_scale_for_symbol_id(catalogs: CatalogManager | None, symbol_id: int) -> int:
-    return _quantity_scale_for_symbol_id(catalogs, symbol_id, label="candle volume")
+    scale = (
+        catalogs.market_data_volume_scale_for_symbol_id(symbol_id) if catalogs is not None else None
+    )
+    if scale is None:
+        raise PolyesterValidationError(
+            f"candle volume requires a hydrated market_data_volume_scale for symbol_id {symbol_id}"
+        )
+    return scale
+
+
+def _reference_price_scale_for_symbol_id(
+    catalogs: CatalogManager | None, symbol_id: int, *, required: bool
+) -> int | None:
+    scale = (
+        catalogs.reference_price_scale_for_symbol_id(symbol_id) if catalogs is not None else None
+    )
+    if scale is None and required:
+        raise PolyesterValidationError(
+            f"candle reference prices require reference_price_scale for symbol_id {symbol_id}"
+        )
+    return scale
 
 
 def _quantity_scale_for_symbol_id(

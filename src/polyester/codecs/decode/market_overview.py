@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.proto_helpers import has_field
+from polyester.codecs.scalars import format_qty_scaled
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.models.market import (
     CurrencyConversionConfig,
@@ -24,6 +25,18 @@ def _optional_scaled(msg: marketoverview_pb2.MarketOverview, field_name: str) ->
     return str(getattr(msg, field_name))
 
 
+def _decoded_base_volume(
+    msg: marketoverview_pb2.MarketOverview,
+    catalogs: CatalogManager | None,
+) -> str | None:
+    if catalogs is None or not has_field(msg, "volume_24h_base_scaled"):
+        return None
+    scale = catalogs.market_data_volume_scale_for_symbol_id(int(msg.symbol_id))
+    if scale is None:
+        return None
+    return format_qty_scaled(int(msg.volume_24h_base_scaled), scale)
+
+
 def market_overview_entry_from_proto(
     msg: marketoverview_pb2.MarketOverview,
     catalogs: CatalogManager | None = None,
@@ -42,6 +55,7 @@ def market_overview_entry_from_proto(
         else None,
         change_24h_bp=str(msg.change_24h_bps),
         volume_24h_base_scaled=_optional_scaled(msg, "volume_24h_base_scaled"),
+        volume_24h_base=_decoded_base_volume(msg, catalogs),
         volume_24h_quote_scaled=_optional_scaled(msg, "volume_24h_quote_scaled"),
         volume_24h_usd_scaled=_optional_scaled(msg, "volume_24h_usd_scaled"),
     )

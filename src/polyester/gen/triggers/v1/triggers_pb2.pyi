@@ -42,6 +42,7 @@ class TriggerEventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVENT_CANCELED: _ClassVar[TriggerEventType]
     EVENT_UPDATED: _ClassVar[TriggerEventType]
     EVENT_FAILED: _ClassVar[TriggerEventType]
+    EVENT_ACTIVATED: _ClassVar[TriggerEventType]
 
 class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -120,6 +121,7 @@ EVENT_FIRED: TriggerEventType
 EVENT_CANCELED: TriggerEventType
 EVENT_UPDATED: TriggerEventType
 EVENT_FAILED: TriggerEventType
+EVENT_ACTIVATED: TriggerEventType
 TRIGGER_CANCEL_REASON_UNSPECIFIED: TriggerCancelReason
 TRIGGER_CANCEL_REASON_USER_REQUEST: TriggerCancelReason
 TRIGGER_CANCEL_REASON_OCO: TriggerCancelReason
@@ -516,7 +518,7 @@ class StopDetails(_message.Message):
     def __init__(self, trigger_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., trigger_direction: _Optional[_Union[_orders_pb2.TriggerDirection, str]] = ...) -> None: ...
 
 class TrailingDetails(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "activation_price_ticks", "peak_price_ticks", "trough_price_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "trigger_price_source", "trigger_direction")
+    __slots__ = ("trailing_distance_ticks", "activation_price_ticks", "peak_price_ticks", "trough_price_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "trigger_price_source", "trigger_direction", "trigger_price_ticks")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     PEAK_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
@@ -526,6 +528,7 @@ class TrailingDetails(_message.Message):
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_DIRECTION_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     activation_price_ticks: int
     peak_price_ticks: int
@@ -535,7 +538,8 @@ class TrailingDetails(_message.Message):
     max_slippage_bps: int
     trigger_price_source: _orders_pb2.TriggerPriceSource
     trigger_direction: _orders_pb2.TriggerDirection
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., peak_price_ticks: _Optional[int] = ..., trough_price_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., trigger_direction: _Optional[_Union[_orders_pb2.TriggerDirection, str]] = ...) -> None: ...
+    trigger_price_ticks: int
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., peak_price_ticks: _Optional[int] = ..., trough_price_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., trigger_direction: _Optional[_Union[_orders_pb2.TriggerDirection, str]] = ..., trigger_price_ticks: _Optional[int] = ...) -> None: ...
 
 class TwapDetails(_message.Message):
     __slots__ = ("twap_duration_ms", "twap_slice_interval_ms", "slice_idx", "slice_count", "executed_qty_scaled")

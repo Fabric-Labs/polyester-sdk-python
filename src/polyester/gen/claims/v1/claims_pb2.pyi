@@ -28,6 +28,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_INTERNAL_ERROR: _ClassVar[ErrorCode]
     ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
     ERROR_CODE_FAILED_PRECONDITION: _ClassVar[ErrorCode]
+    ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED: _ClassVar[ErrorCode]
 
 class ClaimPolicy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -53,6 +54,7 @@ ERROR_CODE_SERVICE_UNAVAILABLE: ErrorCode
 ERROR_CODE_INTERNAL_ERROR: ErrorCode
 ERROR_CODE_PERMISSION_DENIED: ErrorCode
 ERROR_CODE_FAILED_PRECONDITION: ErrorCode
+ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED: ErrorCode
 POLICY_UNSPECIFIED: ClaimPolicy
 UTC_DAILY: ClaimPolicy
 CLAIM_UNSPECIFIED: DailyClaimState

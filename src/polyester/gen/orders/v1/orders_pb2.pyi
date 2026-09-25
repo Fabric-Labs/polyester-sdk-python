@@ -695,7 +695,7 @@ class BatchReplaceOrderItem(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., new_price_ticks: _Optional[int] = ..., new_qty_scaled: _Optional[int] = ..., new_attached_risk: _Optional[_Union[RiskPolicy, _Mapping]] = ..., new_client_order_id: _Optional[str] = ...) -> None: ...
 
 class BatchReplaceAdmissionItem(_message.Message):
-    __slots__ = ("item_index", "status", "old_order_id", "replacement_order_id", "client_order_id", "code", "error")
+    __slots__ = ("item_index", "status", "old_order_id", "replacement_order_id", "client_order_id", "code", "error", "action_taken")
     ITEM_INDEX_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     OLD_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -703,6 +703,7 @@ class BatchReplaceAdmissionItem(_message.Message):
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
+    ACTION_TAKEN_FIELD_NUMBER: _ClassVar[int]
     item_index: int
     status: BatchReplaceItemAdmissionStatus
     old_order_id: int
@@ -710,7 +711,8 @@ class BatchReplaceAdmissionItem(_message.Message):
     client_order_id: str
     code: str
     error: ErrorDetail
-    def __init__(self, item_index: _Optional[int] = ..., status: _Optional[_Union[BatchReplaceItemAdmissionStatus, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., error: _Optional[_Union[ErrorDetail, _Mapping]] = ...) -> None: ...
+    action_taken: ModifyActionTaken
+    def __init__(self, item_index: _Optional[int] = ..., status: _Optional[_Union[BatchReplaceItemAdmissionStatus, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., code: _Optional[str] = ..., error: _Optional[_Union[ErrorDetail, _Mapping]] = ..., action_taken: _Optional[_Union[ModifyActionTaken, str]] = ...) -> None: ...
 
 class BatchReplaceOrdersRequest(_message.Message):
     __slots__ = ("subaccount_id", "symbol_id", "request_id", "items")

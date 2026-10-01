@@ -421,7 +421,7 @@ class GetBatchReplaceStatusRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., batch_request_id: _Optional[int] = ...) -> None: ...
 
 class BatchReplaceStatusItem(_message.Message):
-    __slots__ = ("item_index", "phase", "old_order_id", "replacement_order_id", "order_status", "code", "updated_ts_ns")
+    __slots__ = ("item_index", "phase", "old_order_id", "replacement_order_id", "order_status", "code", "updated_ts_ns", "action_taken")
     ITEM_INDEX_FIELD_NUMBER: _ClassVar[int]
     PHASE_FIELD_NUMBER: _ClassVar[int]
     OLD_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -429,6 +429,7 @@ class BatchReplaceStatusItem(_message.Message):
     ORDER_STATUS_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
     UPDATED_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    ACTION_TAKEN_FIELD_NUMBER: _ClassVar[int]
     item_index: int
     phase: BatchReplacePhase
     old_order_id: int
@@ -436,7 +437,8 @@ class BatchReplaceStatusItem(_message.Message):
     order_status: OrderStatus
     code: str
     updated_ts_ns: int
-    def __init__(self, item_index: _Optional[int] = ..., phase: _Optional[_Union[BatchReplacePhase, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., order_status: _Optional[_Union[OrderStatus, str]] = ..., code: _Optional[str] = ..., updated_ts_ns: _Optional[int] = ...) -> None: ...
+    action_taken: _orders_pb2.ModifyActionTaken
+    def __init__(self, item_index: _Optional[int] = ..., phase: _Optional[_Union[BatchReplacePhase, str]] = ..., old_order_id: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., order_status: _Optional[_Union[OrderStatus, str]] = ..., code: _Optional[str] = ..., updated_ts_ns: _Optional[int] = ..., action_taken: _Optional[_Union[_orders_pb2.ModifyActionTaken, str]] = ...) -> None: ...
 
 class GetBatchReplaceStatusResponse(_message.Message):
     __slots__ = ("batch_request_id", "admission_status", "items", "accepted_count", "rejected_count", "accepted_ts_ns", "updated_ts_ns")

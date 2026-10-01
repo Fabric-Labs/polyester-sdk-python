@@ -39,7 +39,7 @@ FAILED: RewardFulfillmentState
 CANCELED: RewardFulfillmentState
 
 class RewardAward(_message.Message):
-    __slots__ = ("award_id", "campaign_id", "campaign_name", "asset_id", "amount_base_units", "fulfillment_method", "fulfillment_state", "published_at")
+    __slots__ = ("award_id", "campaign_id", "campaign_name", "asset_id", "amount_base_units", "fulfillment_method", "fulfillment_state", "published_at", "network", "fulfillment_revision", "destination_address", "transaction_id")
     AWARD_ID_FIELD_NUMBER: _ClassVar[int]
     CAMPAIGN_ID_FIELD_NUMBER: _ClassVar[int]
     CAMPAIGN_NAME_FIELD_NUMBER: _ClassVar[int]
@@ -48,6 +48,10 @@ class RewardAward(_message.Message):
     FULFILLMENT_METHOD_FIELD_NUMBER: _ClassVar[int]
     FULFILLMENT_STATE_FIELD_NUMBER: _ClassVar[int]
     PUBLISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    NETWORK_FIELD_NUMBER: _ClassVar[int]
+    FULFILLMENT_REVISION_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    TRANSACTION_ID_FIELD_NUMBER: _ClassVar[int]
     award_id: str
     campaign_id: str
     campaign_name: str
@@ -56,7 +60,29 @@ class RewardAward(_message.Message):
     fulfillment_method: RewardFulfillmentMethod
     fulfillment_state: RewardFulfillmentState
     published_at: _timestamp_pb2.Timestamp
-    def __init__(self, award_id: _Optional[str] = ..., campaign_id: _Optional[str] = ..., campaign_name: _Optional[str] = ..., asset_id: _Optional[int] = ..., amount_base_units: _Optional[str] = ..., fulfillment_method: _Optional[_Union[RewardFulfillmentMethod, str]] = ..., fulfillment_state: _Optional[_Union[RewardFulfillmentState, str]] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    network: str
+    fulfillment_revision: int
+    destination_address: str
+    transaction_id: str
+    def __init__(self, award_id: _Optional[str] = ..., campaign_id: _Optional[str] = ..., campaign_name: _Optional[str] = ..., asset_id: _Optional[int] = ..., amount_base_units: _Optional[str] = ..., fulfillment_method: _Optional[_Union[RewardFulfillmentMethod, str]] = ..., fulfillment_state: _Optional[_Union[RewardFulfillmentState, str]] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., network: _Optional[str] = ..., fulfillment_revision: _Optional[int] = ..., destination_address: _Optional[str] = ..., transaction_id: _Optional[str] = ...) -> None: ...
+
+class SetMyRewardDestinationRequest(_message.Message):
+    __slots__ = ("award_id", "destination_address", "expected_revision", "request_id")
+    AWARD_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_REVISION_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    award_id: str
+    destination_address: str
+    expected_revision: int
+    request_id: str
+    def __init__(self, award_id: _Optional[str] = ..., destination_address: _Optional[str] = ..., expected_revision: _Optional[int] = ..., request_id: _Optional[str] = ...) -> None: ...
+
+class SetMyRewardDestinationResponse(_message.Message):
+    __slots__ = ("award",)
+    AWARD_FIELD_NUMBER: _ClassVar[int]
+    award: RewardAward
+    def __init__(self, award: _Optional[_Union[RewardAward, _Mapping]] = ...) -> None: ...
 
 class ListMyRewardAwardsRequest(_message.Message):
     __slots__ = ("limit", "page_token")

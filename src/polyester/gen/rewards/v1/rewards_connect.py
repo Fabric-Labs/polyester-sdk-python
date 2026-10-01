@@ -21,6 +21,9 @@ class RewardCampaignService(Protocol):
     async def list_my_reward_awards(self, request: rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def set_my_reward_destination(self, request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class RewardCampaignServiceASGIApplication(ConnectASGIApplication[RewardCampaignService]):
     def __init__(self, service: RewardCampaignService | AsyncGenerator[RewardCampaignService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -36,6 +39,16 @@ class RewardCampaignServiceASGIApplication(ConnectASGIApplication[RewardCampaign
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_my_reward_awards,
+                ),
+                "/rewards.v1.RewardCampaignService/SetMyRewardDestination": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SetMyRewardDestination",
+                        service_name="rewards.v1.RewardCampaignService",
+                        input=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
+                        output=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.set_my_reward_destination,
                 ),
             },
             interceptors=interceptors,
@@ -71,12 +84,34 @@ class RewardCampaignServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def set_my_reward_destination(
+        self,
+        request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetMyRewardDestination",
+                service_name="rewards.v1.RewardCampaignService",
+                input=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
+                output=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
 
 class RewardCampaignServiceSync(Protocol):
     def list_my_reward_awards(self, request: rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def set_my_reward_destination(self, request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -93,6 +128,16 @@ class RewardCampaignServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_my_reward_awards,
+                ),
+                "/rewards.v1.RewardCampaignService/SetMyRewardDestination": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SetMyRewardDestination",
+                        service_name="rewards.v1.RewardCampaignService",
+                        input=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
+                        output=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.set_my_reward_destination,
                 ),
             },
             interceptors=interceptors,
@@ -122,6 +167,26 @@ class RewardCampaignServiceClientSync(ConnectClientSync):
                 service_name="rewards.v1.RewardCampaignService",
                 input=rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsRequest,
                 output=rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def set_my_reward_destination(
+        self,
+        request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetMyRewardDestination",
+                service_name="rewards.v1.RewardCampaignService",
+                input=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
+                output=rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

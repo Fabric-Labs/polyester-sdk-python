@@ -258,6 +258,12 @@ class UserTrade(_message.Message):
     lineage: OrderLineage
     def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., order_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., is_maker: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., fee_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., referral_share_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., ts_ns: _Optional[int] = ..., fee_is_rebate: _Optional[bool] = ..., lineage: _Optional[_Union[OrderLineage, _Mapping]] = ...) -> None: ...
 
+class UserTradeBatch(_message.Message):
+    __slots__ = ("events",)
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    events: _containers.RepeatedCompositeFieldContainer[UserTrade]
+    def __init__(self, events: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ...) -> None: ...
+
 class OrderTransfer(_message.Message):
     __slots__ = ("match_id", "symbol_id", "asset_id", "amount_e18", "is_debit", "transfer_code", "account_code", "ts_ns", "tx_id")
     MATCH_ID_FIELD_NUMBER: _ClassVar[int]

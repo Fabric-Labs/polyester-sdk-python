@@ -50,6 +50,7 @@ class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRIGGER_CANCEL_REASON_USER_REQUEST: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_OCO: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_INTERNAL_ERROR: _ClassVar[TriggerCancelReason]
 
@@ -127,6 +128,7 @@ TRIGGER_CANCEL_REASON_UNSPECIFIED: TriggerCancelReason
 TRIGGER_CANCEL_REASON_USER_REQUEST: TriggerCancelReason
 TRIGGER_CANCEL_REASON_OCO: TriggerCancelReason
 TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL: TriggerCancelReason
+TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION: TriggerCancelReason
 TRIGGER_CANCEL_REASON_MISSING_REASON_CODE: TriggerCancelReason
 TRIGGER_CANCEL_REASON_INTERNAL_ERROR: TriggerCancelReason
 TRIGGER_FAILURE_REASON_UNSPECIFIED: TriggerFailureReason
@@ -402,6 +404,12 @@ class TriggerEvent(_message.Message):
     cancel_reason: TriggerCancelReason
     failure_reason: TriggerFailureReason
     def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_price_ticks: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ...) -> None: ...
+
+class TriggerEventBatch(_message.Message):
+    __slots__ = ("events",)
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    events: _containers.RepeatedCompositeFieldContainer[TriggerEvent]
+    def __init__(self, events: _Optional[_Iterable[_Union[TriggerEvent, _Mapping]]] = ...) -> None: ...
 
 class ListTriggerEventsResponse(_message.Message):
     __slots__ = ("events", "next_page_token")

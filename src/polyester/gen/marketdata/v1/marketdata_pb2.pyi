@@ -95,6 +95,12 @@ class MarketTrade(_message.Message):
     ts_ns: int
     def __init__(self, symbol_id: _Optional[int] = ..., match_id: _Optional[int] = ..., is_buy: _Optional[bool] = ..., price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
+class MarketTradeBatch(_message.Message):
+    __slots__ = ("events",)
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    events: _containers.RepeatedCompositeFieldContainer[MarketTrade]
+    def __init__(self, events: _Optional[_Iterable[_Union[MarketTrade, _Mapping]]] = ...) -> None: ...
+
 class GetTradesResponse(_message.Message):
     __slots__ = ("trades", "next_page_token")
     TRADES_FIELD_NUMBER: _ClassVar[int]

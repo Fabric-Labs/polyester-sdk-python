@@ -48,6 +48,8 @@ class ZipperReasonCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     XRP_WITHDRAWAL_DESTINATION_TAG_INVALID: _ClassVar[ZipperReasonCode]
     WITHDRAWAL_LIQUIDITY_INSUFFICIENT: _ClassVar[ZipperReasonCode]
     COMPLIANCE_HIGH_RISK_ADDRESS: _ClassVar[ZipperReasonCode]
+    COMPLIANCE_ADDRESS_BLOCKED: _ClassVar[ZipperReasonCode]
+    COMPLIANCE_ADDRESS_RETURN: _ClassVar[ZipperReasonCode]
     REQUEST_VERIFICATION_REJECTED: _ClassVar[ZipperReasonCode]
     REJECTED: _ClassVar[ZipperReasonCode]
     ERROR_UNMAPPED: _ClassVar[ZipperReasonCode]
@@ -97,6 +99,8 @@ XRP_WITHDRAWAL_CLASSIC_ADDRESS_INVALID: ZipperReasonCode
 XRP_WITHDRAWAL_DESTINATION_TAG_INVALID: ZipperReasonCode
 WITHDRAWAL_LIQUIDITY_INSUFFICIENT: ZipperReasonCode
 COMPLIANCE_HIGH_RISK_ADDRESS: ZipperReasonCode
+COMPLIANCE_ADDRESS_BLOCKED: ZipperReasonCode
+COMPLIANCE_ADDRESS_RETURN: ZipperReasonCode
 REQUEST_VERIFICATION_REJECTED: ZipperReasonCode
 REJECTED: ZipperReasonCode
 ERROR_UNMAPPED: ZipperReasonCode

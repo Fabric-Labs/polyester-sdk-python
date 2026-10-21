@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+- Trigger events label standalone trailing-stop activation as `activated`,
+  and `trigger_event_type_from_label` accepts `activated` as a filter.
+
 ### Changed
 - Trading prices now use fixed 9-decimal price ticks (one tick is 1e-9 quote
   units), matching the API. This covers order, trigger, trailing-stop,

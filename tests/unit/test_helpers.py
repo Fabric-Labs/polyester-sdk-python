@@ -134,7 +134,7 @@ def test_eth_usdt_price_hints_present():
 
 def test_post_only_buy_price_from_last_ticks_uses_fraction_of_spot():
     price = far_below_price_from_last_ticks(
-        50_000_000_000,  # 50k USDT with 6 decimal ticks
+        50_000_000_000_000,  # 50k USDT at Q9 price ticks
         tick_size="0.01",
         symbol="BTC-USDT",
     )

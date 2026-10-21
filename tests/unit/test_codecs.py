@@ -25,7 +25,7 @@ from polyester.models import ClientOrderId
 
 
 def test_decimal_codecs_are_exact_integer_scaled() -> None:
-    assert parse_price_ticks("50000.123456") == 50_000_123_456
+    assert parse_price_ticks("50000.123456789") == 50_000_123_456_789
     assert parse_qty_scaled("0.10000000", 8) == 10_000_000
 
 
@@ -43,9 +43,9 @@ def test_price_rejects_trailing_dot_and_accepts_trimmed_whitespace() -> None:
     with pytest.raises(PolyesterValidationError):
         parse_price_ticks("65.")
     # Leading/trailing whitespace is trimmed (TS value.trim() parity).
-    assert parse_price_ticks(" 65000") == 65_000_000_000
-    assert parse_price_ticks("65000 ") == 65_000_000_000
-    assert parse_price_ticks("65000.0") == 65_000_000_000
+    assert parse_price_ticks(" 65000") == 65_000_000_000_000
+    assert parse_price_ticks("65000 ") == 65_000_000_000_000
+    assert parse_price_ticks("65000.0") == 65_000_000_000_000
 
 
 def test_create_order_rejects_stray_price_on_market() -> None:
@@ -62,9 +62,19 @@ def test_create_order_rejects_stray_price_on_market() -> None:
 
 
 def test_price_ticks_round_trip() -> None:
-    ticks = align_price_ticks(600_123_456, "0.01")
-    assert ticks == 600_120_000
+    ticks = align_price_ticks(600_123_456_789, "0.01")
+    assert ticks == 600_120_000_000
     assert parse_price_ticks(format_price_ticks(ticks)) == ticks
+
+
+def test_price_ticks_match_published_q9_scale() -> None:
+    # The public contract defines one price tick as 1e-9 quote units.
+    assert parse_price_ticks("0.000000001") == 1
+    assert format_price_ticks(1) == "0.000000001"
+    assert parse_price_ticks("1") == 1_000_000_000
+    assert format_price_ticks(65_000_500_000_000) == "65000.5"
+    with pytest.raises(PolyesterValidationError, match="at most 9"):
+        parse_price_ticks("0.0000000001")
 
 
 def test_ids_round_trip_as_base58() -> None:
@@ -87,7 +97,7 @@ def test_modify_order_to_proto_requires_order_key() -> None:
         new_price="100",
     )
     assert proto.client_order_id == "cid-1"
-    assert proto.new_price_ticks == 100_000_000
+    assert proto.new_price_ticks == 100_000_000_000
 
 
 def test_ledger_range_codecs() -> None:
@@ -97,7 +107,7 @@ def test_ledger_range_codecs() -> None:
 
 def test_modify_trigger_to_proto() -> None:
     proto = modify_trigger_to_proto(trigger_id="1", symbol_id=1, trigger_price="100")
-    assert proto.trigger_price_ticks == 100_000_000
+    assert proto.trigger_price_ticks == 100_000_000_000
 
 
 def test_cancel_all_orders_to_proto() -> None:
@@ -121,7 +131,7 @@ def test_create_order_encodes_limit_gtd() -> None:
     )
     proto = create_order_to_proto(req, quantity_scale=8)
     assert proto.order.WhichOneof("execution") == "limit_gtd"
-    assert proto.order.limit_gtd.price_ticks == 50_000_000_000
+    assert proto.order.limit_gtd.price_ticks == 50_000_000_000_000
     assert proto.order.limit_gtd.post_only is True
     assert proto.order.limit_gtd.expire_at.seconds == int(expire_at.timestamp())
 
@@ -186,5 +196,5 @@ def test_create_order_to_wire_maps_public_strings() -> None:
         "order_type": "LIMIT",
         "timeInForce": "GTC",
         "qty_scaled": 10_000_000,
-        "limit_price_ticks": 50_000_000_000,
+        "limit_price_ticks": 50_000_000_000_000,
     }

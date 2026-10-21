@@ -125,7 +125,7 @@ async def test_create_order_does_not_preflight_pair_constraints() -> None:
         )
     assert capture.calls == 1
     assert capture.request.order.symbol_id == 1
-    assert capture.request.order.limit_gtc.price_ticks == 1_001_000
+    assert capture.request.order.limit_gtc.price_ticks == 1_001_000_000
 
 
 @pytest.mark.parametrize("limit", [True, 1.5, "10"])

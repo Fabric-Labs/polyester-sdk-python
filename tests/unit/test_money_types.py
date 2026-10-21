@@ -28,17 +28,17 @@ from polyester.types.money import (
 
 
 def test_strict_decimal_rejects_excess_precision() -> None:
-    with pytest.raises(PolyesterValidationError, match="at most 6"):
-        resolve_price_ticks("50000.1234567")
+    with pytest.raises(PolyesterValidationError, match="at most 9"):
+        resolve_price_ticks("50000.1234567891")
     with pytest.raises(PolyesterValidationError, match="at most 8"):
         resolve_qty_scaled("0.123456789", 8)
 
 
 def test_scaled_path_pass_through() -> None:
     qty = Quantity.from_scaled(100_000, scale=8, symbol="BTC-USD")
-    price = Price.from_ticks(50_000_000_000, symbol="BTC-USD")
+    price = Price.from_ticks(50_000_000_000_000, symbol="BTC-USD")
     assert resolve_qty_scaled(qty, 8, symbol="BTC-USD") == 100_000
-    assert resolve_price_ticks(price, symbol="BTC-USD") == 50_000_000_000
+    assert resolve_price_ticks(price, symbol="BTC-USD") == 50_000_000_000_000
 
 
 def test_rejects_float_and_bare_int_and_bool() -> None:
@@ -78,7 +78,7 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
     )
     proto = create_order_to_proto(req, quantity_scale=8)
     assert proto.order.base_qty_scaled == 10_000_000
-    assert proto.order.limit_gtc.price_ticks == 50_000_000_000
+    assert proto.order.limit_gtc.price_ticks == 50_000_000_000_000
 
     req2 = normalize_create_order_request(
         symbol="BTC-USD",
@@ -86,7 +86,7 @@ def test_create_order_accepts_decimal_and_scaled() -> None:
         side="buy",
         order_type="limit",
         qty=Quantity.from_scaled(10_000_000, scale=8, symbol="BTC-USD"),
-        price=Price.from_ticks(50_000_000_000, symbol="BTC-USD"),
+        price=Price.from_ticks(50_000_000_000_000, symbol="BTC-USD"),
     )
     proto2 = create_order_to_proto(req2, quantity_scale=8)
     assert proto2.order.base_qty_scaled == proto.order.base_qty_scaled

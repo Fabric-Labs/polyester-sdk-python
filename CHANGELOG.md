@@ -3,9 +3,15 @@
 ## Unreleased
 
 ### Changed
+- Trading prices now use fixed 9-decimal price ticks (one tick is 1e-9 quote
+  units), matching the API. This covers order, trigger, trailing-stop,
+  ladder, order-book, trade, candle, and market-overview prices and
+  `Price.from_ticks`. Earlier SDK versions encode and decode prices at 6
+  decimals, which is 1,000 times off against the current API; upgrade
+  before trading. Integer `max_slippage_ticks` values are 64-bit Q9 ticks.
 - Candle and market-overview base volume now use the base asset
   `market_data_volume_scale` from `get_spot_config`. Primary candle prices
-  stay on scale 6.
+  use the 9-decimal price scale.
 - Composite reference-candle OHLC uses the pair `reference_price_scale`.
   `get_candles(..., include_reference=True)` requests that series.
   `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the

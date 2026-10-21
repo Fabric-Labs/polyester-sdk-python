@@ -46,7 +46,7 @@ def _require_scaled_int(value: int, field_name: str, *, allow_u128: bool = False
 
 @dataclass(frozen=True, slots=True)
 class Price:
-    """Resolved protocol price units (protobuf price_ticks, fixed 1e6)."""
+    """Resolved protocol price units (protobuf price_ticks, fixed 1e9)."""
 
     ticks: int
     symbol: str | None = None

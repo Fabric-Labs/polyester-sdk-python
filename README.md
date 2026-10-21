@@ -337,7 +337,7 @@ fails closed on encoding unless the request's `amount_scale` /
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
-(fixed 1e6), not market tick-size alignment (server validates tick size).
+(fixed 1e9), not market tick-size alignment (server validates tick size).
 Catalog hydration resolves `symbol` → `symbol_id` and quantity scales for
 encoding; pair admission (tick/step/min qty/notional) stays on the API.
 `orders.preview_order(...)` remains the authority for balances, reservations,
@@ -356,7 +356,7 @@ result = await client.orders.create(
     order_type="limit",
     tif="gtc",
     qty=Quantity.from_scaled(1_000_000, scale=8),  # already wire units
-    price=Price.from_ticks(100_000_000),            # 100.000000 at 1e6
+    price=Price.from_ticks(100_000_000_000),        # 100.000000000 at 1e9
     post_only=True,
 )
 # Reads expose the same types: order.price.ticks, order.orig_qty.scaled

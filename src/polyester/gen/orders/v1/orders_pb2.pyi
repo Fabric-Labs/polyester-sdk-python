@@ -120,6 +120,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_POLICY_SPOT_READ_DENY: _ClassVar[ErrorCode]
     ERROR_CODE_API_KEY_SPOT_READ_DENY: _ClassVar[ErrorCode]
     ERROR_CODE_CANCEL_REQUEST_EXPIRED: _ClassVar[ErrorCode]
+    ERROR_CODE_MAX_QTY: _ClassVar[ErrorCode]
+    ERROR_CODE_MAX_NOTIONAL: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -248,6 +250,8 @@ ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN: ErrorCode
 ERROR_CODE_POLICY_SPOT_READ_DENY: ErrorCode
 ERROR_CODE_API_KEY_SPOT_READ_DENY: ErrorCode
 ERROR_CODE_CANCEL_REQUEST_EXPIRED: ErrorCode
+ERROR_CODE_MAX_QTY: ErrorCode
+ERROR_CODE_MAX_NOTIONAL: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource

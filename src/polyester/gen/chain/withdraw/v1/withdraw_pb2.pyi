@@ -56,6 +56,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_FAILED_PRECONDITION: _ClassVar[ErrorCode]
     ERROR_CODE_NOT_FOUND: _ClassVar[ErrorCode]
     ERROR_CODE_CONFLICT: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE: _ClassVar[ErrorCode]
 
 class TradingWithdrawAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -115,6 +116,7 @@ ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE: ErrorCode
 ERROR_CODE_FAILED_PRECONDITION: ErrorCode
 ERROR_CODE_NOT_FOUND: ErrorCode
 ERROR_CODE_CONFLICT: ErrorCode
+ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE: ErrorCode
 ACTION_UNSPECIFIED: TradingWithdrawAction
 TO_FUNDING: TradingWithdrawAction
 TO_EXTERNAL_CHAIN: TradingWithdrawAction

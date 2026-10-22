@@ -13,7 +13,7 @@ UINT64_MAX = 2**64 - 1
 UINT32_MAX = 2**32 - 1
 INT64_MAX = 2**63 - 1
 INT64_MIN = -(2**63)
-PRICE_TICK_SCALE = 6
+PRICE_TICK_SCALE = 9
 # Maximum accepted quantity/ledger scale for public formatters and catalog hydration.
 # Values above this are rejected instead of allocating pathological padding (scale ≥ 65535).
 MAX_PROTOCOL_SCALE = 36

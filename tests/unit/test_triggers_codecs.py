@@ -25,10 +25,10 @@ def test_create_trigger_stop_loss_maps_core_fields() -> None:
     assert trigger.symbol_id == 1
     assert trigger.WhichOneof("strategy") == "stop_loss"
     stop = trigger.stop_loss
-    assert stop.trigger_price_ticks == 50_000_000_000
+    assert stop.trigger_price_ticks == 50_000_000_000_000
     assert stop.side == orders_pb2.SELL
     assert stop.child.WhichOneof("execution") == "limit_gtc"
-    assert stop.child.limit_gtc.price_ticks == 49_900_000_000
+    assert stop.child.limit_gtc.price_ticks == 49_900_000_000_000
     assert stop.child.limit_gtc.post_only is True
     assert trigger.client_trigger_id == "trg-1"
 
@@ -63,7 +63,7 @@ def test_create_trigger_stop_loss_market_child() -> None:
     )
     trigger = proto.trigger
     assert trigger.WhichOneof("strategy") == "take_profit"
-    assert trigger.take_profit.trigger_price_ticks == 60_000_000_000
+    assert trigger.take_profit.trigger_price_ticks == 60_000_000_000_000
     assert trigger.take_profit.child.WhichOneof("execution") == "market_ioc"
 
 
@@ -75,7 +75,7 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
         side="sell",
         qty="0.1",
         quantity_scale=8,
-        trailing_distance_ticks=500_000,
+        trailing_distance_ticks=500_000_000,
         activation_price="51000",
         max_slippage_bps=25,
         fee_asset="quote",
@@ -85,8 +85,8 @@ def test_create_trigger_trailing_stop_maps_strategy_fields() -> None:
     assert trigger.WhichOneof("strategy") == "trailing_stop"
     trailing = trigger.trailing_stop
     assert trailing.side == orders_pb2.SELL
-    assert trailing.trailing_distance_ticks == 500_000
-    assert trailing.activation_price_ticks == 51_000_000_000
+    assert trailing.trailing_distance_ticks == 500_000_000
+    assert trailing.activation_price_ticks == 51_000_000_000_000
     assert trailing.max_slippage_bps == 25
     assert trigger.fee_asset == orders_pb2.QUOTE
     assert trigger.self_trade_prevention_mode == orders_pb2.EXPIRE_MAKER
@@ -141,8 +141,8 @@ def test_create_trigger_ladder_maps_range_fields() -> None:
     trigger = proto.trigger
     assert trigger.WhichOneof("strategy") == "ladder"
     ladder = trigger.ladder
-    assert ladder.price_min_ticks == 48_000_000_000
-    assert ladder.price_max_ticks == 52_000_000_000
+    assert ladder.price_min_ticks == 48_000_000_000_000
+    assert ladder.price_max_ticks == 52_000_000_000_000
     assert ladder.levels == 5
     assert ladder.side == orders_pb2.BUY
 

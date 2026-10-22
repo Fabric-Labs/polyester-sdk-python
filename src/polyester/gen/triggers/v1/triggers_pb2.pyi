@@ -42,6 +42,7 @@ class TriggerEventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVENT_CANCELED: _ClassVar[TriggerEventType]
     EVENT_UPDATED: _ClassVar[TriggerEventType]
     EVENT_FAILED: _ClassVar[TriggerEventType]
+    EVENT_ACTIVATED: _ClassVar[TriggerEventType]
 
 class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -49,6 +50,7 @@ class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRIGGER_CANCEL_REASON_USER_REQUEST: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_OCO: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL: _ClassVar[TriggerCancelReason]
+    TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE: _ClassVar[TriggerCancelReason]
     TRIGGER_CANCEL_REASON_INTERNAL_ERROR: _ClassVar[TriggerCancelReason]
 
@@ -92,6 +94,7 @@ class TriggerFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_INTERNAL_ERROR: _ClassVar[TriggerFailureReason]
 
@@ -120,10 +123,12 @@ EVENT_FIRED: TriggerEventType
 EVENT_CANCELED: TriggerEventType
 EVENT_UPDATED: TriggerEventType
 EVENT_FAILED: TriggerEventType
+EVENT_ACTIVATED: TriggerEventType
 TRIGGER_CANCEL_REASON_UNSPECIFIED: TriggerCancelReason
 TRIGGER_CANCEL_REASON_USER_REQUEST: TriggerCancelReason
 TRIGGER_CANCEL_REASON_OCO: TriggerCancelReason
 TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL: TriggerCancelReason
+TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION: TriggerCancelReason
 TRIGGER_CANCEL_REASON_MISSING_REASON_CODE: TriggerCancelReason
 TRIGGER_CANCEL_REASON_INTERNAL_ERROR: TriggerCancelReason
 TRIGGER_FAILURE_REASON_UNSPECIFIED: TriggerFailureReason
@@ -164,6 +169,7 @@ TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY: TriggerFailureReason
 TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL: TriggerFailureReason
 TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS: TriggerFailureReason
 TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID: TriggerFailureReason
 TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_INTERNAL_ERROR: TriggerFailureReason
 LADDER_DISTRIBUTION_UNSPECIFIED: LadderDistribution
@@ -399,6 +405,12 @@ class TriggerEvent(_message.Message):
     failure_reason: TriggerFailureReason
     def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_price_ticks: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ...) -> None: ...
 
+class TriggerEventBatch(_message.Message):
+    __slots__ = ("events",)
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    events: _containers.RepeatedCompositeFieldContainer[TriggerEvent]
+    def __init__(self, events: _Optional[_Iterable[_Union[TriggerEvent, _Mapping]]] = ...) -> None: ...
+
 class ListTriggerEventsResponse(_message.Message):
     __slots__ = ("events", "next_page_token")
     EVENTS_FIELD_NUMBER: _ClassVar[int]
@@ -516,7 +528,7 @@ class StopDetails(_message.Message):
     def __init__(self, trigger_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., trigger_direction: _Optional[_Union[_orders_pb2.TriggerDirection, str]] = ...) -> None: ...
 
 class TrailingDetails(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "activation_price_ticks", "peak_price_ticks", "trough_price_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "trigger_price_source", "trigger_direction")
+    __slots__ = ("trailing_distance_ticks", "activation_price_ticks", "peak_price_ticks", "trough_price_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "trigger_price_source", "trigger_direction", "trigger_price_ticks")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     PEAK_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
@@ -526,6 +538,7 @@ class TrailingDetails(_message.Message):
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_DIRECTION_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     activation_price_ticks: int
     peak_price_ticks: int
@@ -535,7 +548,8 @@ class TrailingDetails(_message.Message):
     max_slippage_bps: int
     trigger_price_source: _orders_pb2.TriggerPriceSource
     trigger_direction: _orders_pb2.TriggerDirection
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., peak_price_ticks: _Optional[int] = ..., trough_price_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., trigger_direction: _Optional[_Union[_orders_pb2.TriggerDirection, str]] = ...) -> None: ...
+    trigger_price_ticks: int
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., peak_price_ticks: _Optional[int] = ..., trough_price_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., trigger_direction: _Optional[_Union[_orders_pb2.TriggerDirection, str]] = ..., trigger_price_ticks: _Optional[int] = ...) -> None: ...
 
 class TwapDetails(_message.Message):
     __slots__ = ("twap_duration_ms", "twap_slice_interval_ms", "slice_idx", "slice_count", "executed_qty_scaled")

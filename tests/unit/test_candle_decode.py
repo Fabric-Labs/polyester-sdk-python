@@ -12,10 +12,10 @@ from polyester.gen.marketdata.v1 import marketdata_pb2
 def test_candle_point_from_proto_converts_price_ticks_to_decimal() -> None:
     point = marketdata_pb2.CandlePoint(
         ts_sec=1_700_000_000,
-        open=1_000_000_000,
-        high=1_100_000_000,
-        low=900_000_000,
-        close=1_050_000_000,
+        open=1_000_000_000_000,
+        high=1_100_000_000_000,
+        low=900_000_000_000,
+        close=1_050_000_000_000,
         volume=250_000_000,
         is_closed=True,
     )
@@ -37,10 +37,10 @@ def test_candles_from_proto_uses_volume_scale() -> None:
         candles=[
             marketdata_pb2.CandlePoint(
                 ts_sec=1,
-                open=2_000_000,
-                high=2_000_000,
-                low=2_000_000,
-                close=2_000_000,
+                open=2_000_000_000,
+                high=2_000_000_000,
+                low=2_000_000_000,
+                close=2_000_000_000,
                 volume=10_000_000,
             )
         ],
@@ -61,10 +61,10 @@ def test_reference_candles_use_reference_price_scale() -> None:
         candles=[
             marketdata_pb2.CandlePoint(
                 ts_sec=1,
-                open=1_000_000,
-                high=1_000_000,
-                low=1_000_000,
-                close=1_000_000,
+                open=1_000_000_000,
+                high=1_000_000_000,
+                low=1_000_000_000,
+                close=1_000_000_000,
                 volume=100_000_000,
             )
         ],

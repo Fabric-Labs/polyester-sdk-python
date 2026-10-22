@@ -1,5 +1,6 @@
 import datetime
 
+from polyester.gen.auth.v1 import auth_pb2 as _auth_pb2
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
@@ -54,7 +55,7 @@ METHOD_CHANNEL: SocialVerificationMethod
 METHOD_DM: SocialVerificationMethod
 
 class SocialVerification(_message.Message):
-    __slots__ = ("id", "provider", "method", "handle", "provider_user_id", "challenge_code", "status", "requested_at", "expires_at", "verified_at", "attempts", "last_error", "updated_at")
+    __slots__ = ("id", "provider", "method", "handle", "provider_user_id", "challenge_code", "status", "requested_at", "expires_at", "verified_at", "attempts", "last_error", "error_code", "updated_at")
     ID_FIELD_NUMBER: _ClassVar[int]
     PROVIDER_FIELD_NUMBER: _ClassVar[int]
     METHOD_FIELD_NUMBER: _ClassVar[int]
@@ -67,6 +68,7 @@ class SocialVerification(_message.Message):
     VERIFIED_AT_FIELD_NUMBER: _ClassVar[int]
     ATTEMPTS_FIELD_NUMBER: _ClassVar[int]
     LAST_ERROR_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     id: int
     provider: SocialProvider
@@ -80,8 +82,9 @@ class SocialVerification(_message.Message):
     verified_at: _timestamp_pb2.Timestamp
     attempts: int
     last_error: str
+    error_code: _auth_pb2.AuthErrorCode
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ..., provider_user_id: _Optional[str] = ..., challenge_code: _Optional[str] = ..., status: _Optional[_Union[SocialVerificationStatus, str]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verified_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., attempts: _Optional[int] = ..., last_error: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ..., provider_user_id: _Optional[str] = ..., challenge_code: _Optional[str] = ..., status: _Optional[_Union[SocialVerificationStatus, str]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verified_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., attempts: _Optional[int] = ..., last_error: _Optional[str] = ..., error_code: _Optional[_Union[_auth_pb2.AuthErrorCode, str]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class StartSocialVerificationRequest(_message.Message):
     __slots__ = ("provider", "method", "handle")

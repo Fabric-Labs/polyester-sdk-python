@@ -66,7 +66,7 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     assert proto.items[0].client_order_id == "cid-1"
     assert proto.items[0].base_qty_scaled == 10_000_000
     assert proto.items[0].WhichOneof("execution") == "limit_gtc"
-    assert proto.items[0].limit_gtc.price_ticks == 50_000_000_000
+    assert proto.items[0].limit_gtc.price_ticks == 50_000_000_000_000
     assert proto.items[1].symbol_id == 2
     assert proto.items[1].side == orders_pb2.SELL
     assert proto.items[1].WhichOneof("execution") == "market_ioc"
@@ -86,7 +86,7 @@ def test_batch_create_orders_to_proto_from_create_order_request() -> None:
     assert proto.request_id, "batch create must send a non-empty request_id"
     assert proto.items[0].client_order_id == ""
     assert proto.items[0].base_qty_scaled == 50_000_000
-    assert proto.items[0].limit_gtc.price_ticks == 100_000_000
+    assert proto.items[0].limit_gtc.price_ticks == 100_000_000_000
 
 
 def test_batch_create_requires_items() -> None:
@@ -294,7 +294,7 @@ def test_batch_replace_encodes_admission_request() -> None:
     assert proto.request_id == "request-1"
     assert proto.subaccount_id == id_to_int("123")
     assert proto.items[0].order_id == 10
-    assert proto.items[0].new_price_ticks == 100_000_000
+    assert proto.items[0].new_price_ticks == 100_000_000_000
     assert proto.items[0].new_qty_scaled == 250_000
     assert proto.items[0].new_client_order_id == "replacement-cid"
 

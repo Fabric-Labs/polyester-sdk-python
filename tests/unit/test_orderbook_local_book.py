@@ -170,7 +170,7 @@ def test_bucket_aggregation_formats_decimal_levels() -> None:
 
 
 def test_parse_bucket_ticks() -> None:
-    assert parse_bucket_ticks("0.01") == 10_000
+    assert parse_bucket_ticks("0.01") == 10_000_000
     assert parse_bucket_ticks(None) is None
     assert parse_bucket_ticks("not-a-price") is None
 

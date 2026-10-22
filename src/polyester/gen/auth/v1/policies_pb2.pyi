@@ -27,6 +27,9 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     READ_INTERNAL_TRANSFERS: _ClassVar[PolicyAction]
     READ_ADDRESS_BOOK: _ClassVar[PolicyAction]
     MANAGE_ADDRESS_BOOK: _ClassVar[PolicyAction]
+    READ_AUTO_WITHDRAW: _ClassVar[PolicyAction]
+    MANAGE_AUTO_WITHDRAW: _ClassVar[PolicyAction]
+    SWAP: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -36,6 +39,9 @@ READ_SPOT: PolicyAction
 READ_INTERNAL_TRANSFERS: PolicyAction
 READ_ADDRESS_BOOK: PolicyAction
 MANAGE_ADDRESS_BOOK: PolicyAction
+READ_AUTO_WITHDRAW: PolicyAction
+MANAGE_AUTO_WITHDRAW: PolicyAction
+SWAP: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()

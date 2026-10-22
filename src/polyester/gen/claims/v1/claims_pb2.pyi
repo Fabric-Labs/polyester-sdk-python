@@ -1,5 +1,6 @@
 import datetime
 
+from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
@@ -29,6 +30,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_PERMISSION_DENIED: _ClassVar[ErrorCode]
     ERROR_CODE_FAILED_PRECONDITION: _ClassVar[ErrorCode]
     ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED: _ClassVar[ErrorCode]
+    ERROR_CODE_SUBACCOUNT_NOT_FOUND: _ClassVar[ErrorCode]
+    ERROR_CODE_SUBACCOUNT_INACTIVE: _ClassVar[ErrorCode]
 
 class ClaimPolicy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -55,6 +58,8 @@ ERROR_CODE_INTERNAL_ERROR: ErrorCode
 ERROR_CODE_PERMISSION_DENIED: ErrorCode
 ERROR_CODE_FAILED_PRECONDITION: ErrorCode
 ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED: ErrorCode
+ERROR_CODE_SUBACCOUNT_NOT_FOUND: ErrorCode
+ERROR_CODE_SUBACCOUNT_INACTIVE: ErrorCode
 POLICY_UNSPECIFIED: ClaimPolicy
 UTC_DAILY: ClaimPolicy
 CLAIM_UNSPECIFIED: DailyClaimState
@@ -96,22 +101,26 @@ class GetDailyClaimStatusRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class GetDailyClaimStatusResponse(_message.Message):
-    __slots__ = ("state", "reset_at", "rewards", "claim_id", "campaign")
+    __slots__ = ("state", "reset_at", "rewards", "claim_id", "campaign", "subaccount_id")
     STATE_FIELD_NUMBER: _ClassVar[int]
     RESET_AT_FIELD_NUMBER: _ClassVar[int]
     REWARDS_FIELD_NUMBER: _ClassVar[int]
     CLAIM_ID_FIELD_NUMBER: _ClassVar[int]
     CAMPAIGN_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     state: DailyClaimState
     reset_at: _timestamp_pb2.Timestamp
     rewards: _containers.RepeatedCompositeFieldContainer[DailyClaimReward]
     claim_id: str
     campaign: ClaimCampaign
-    def __init__(self, state: _Optional[_Union[DailyClaimState, str]] = ..., reset_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., rewards: _Optional[_Iterable[_Union[DailyClaimReward, _Mapping]]] = ..., claim_id: _Optional[str] = ..., campaign: _Optional[_Union[ClaimCampaign, _Mapping]] = ...) -> None: ...
+    subaccount_id: int
+    def __init__(self, state: _Optional[_Union[DailyClaimState, str]] = ..., reset_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., rewards: _Optional[_Iterable[_Union[DailyClaimReward, _Mapping]]] = ..., claim_id: _Optional[str] = ..., campaign: _Optional[_Union[ClaimCampaign, _Mapping]] = ..., subaccount_id: _Optional[int] = ...) -> None: ...
 
 class ClaimDailyRewardRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("subaccount_id",)
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
 
 class DailyClaimTransfer(_message.Message):
     __slots__ = ("asset_id", "transfer_id")
@@ -122,7 +131,7 @@ class DailyClaimTransfer(_message.Message):
     def __init__(self, asset_id: _Optional[int] = ..., transfer_id: _Optional[str] = ...) -> None: ...
 
 class ClaimDailyRewardResponse(_message.Message):
-    __slots__ = ("claim_id", "state", "claimed_at", "rewards", "transfers", "reset_at", "campaign")
+    __slots__ = ("claim_id", "state", "claimed_at", "rewards", "transfers", "reset_at", "campaign", "subaccount_id")
     CLAIM_ID_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     CLAIMED_AT_FIELD_NUMBER: _ClassVar[int]
@@ -130,6 +139,7 @@ class ClaimDailyRewardResponse(_message.Message):
     TRANSFERS_FIELD_NUMBER: _ClassVar[int]
     RESET_AT_FIELD_NUMBER: _ClassVar[int]
     CAMPAIGN_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     claim_id: str
     state: DailyClaimState
     claimed_at: _timestamp_pb2.Timestamp
@@ -137,4 +147,5 @@ class ClaimDailyRewardResponse(_message.Message):
     transfers: _containers.RepeatedCompositeFieldContainer[DailyClaimTransfer]
     reset_at: _timestamp_pb2.Timestamp
     campaign: ClaimCampaign
-    def __init__(self, claim_id: _Optional[str] = ..., state: _Optional[_Union[DailyClaimState, str]] = ..., claimed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., rewards: _Optional[_Iterable[_Union[DailyClaimReward, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[DailyClaimTransfer, _Mapping]]] = ..., reset_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., campaign: _Optional[_Union[ClaimCampaign, _Mapping]] = ...) -> None: ...
+    subaccount_id: int
+    def __init__(self, claim_id: _Optional[str] = ..., state: _Optional[_Union[DailyClaimState, str]] = ..., claimed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., rewards: _Optional[_Iterable[_Union[DailyClaimReward, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[DailyClaimTransfer, _Mapping]]] = ..., reset_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., campaign: _Optional[_Union[ClaimCampaign, _Mapping]] = ..., subaccount_id: _Optional[int] = ...) -> None: ...

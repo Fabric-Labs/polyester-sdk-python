@@ -20,13 +20,13 @@ def test_connection_token_url() -> None:
 
 
 def test_subscription_token_url_encodes_channel() -> None:
-    channel = "private:spot:orders:acct_test:proto"
+    channel = "private:spot:trades:acct_test:proto"
     url = subscription_token_url("https://api-devnet.polyester.ai", channel)
-    assert url.endswith("channel=private%3Aspot%3Aorders%3Aacct_test%3Aproto")
+    assert url.endswith("channel=private%3Aspot%3Atrades%3Aacct_test%3Aproto")
 
 
 def test_realtime_token_signing_uses_get_with_empty_body_hash() -> None:
-    channel = "private:spot:orders:acct-1:proto"
+    channel = "private:spot:trades:acct-1:proto"
     url = subscription_token_url("https://api-devnet.polyester.ai", channel)
     canonical = canonical_signing_string(
         timestamp_ms="1234567890",
@@ -35,7 +35,7 @@ def test_realtime_token_signing_uses_get_with_empty_body_hash() -> None:
         body=b"",
     )
     assert canonical.splitlines()[1] == "GET"
-    assert "channel=private%3Aspot%3Aorders%3Aacct-1%3Aproto" in canonical
+    assert "channel=private%3Aspot%3Atrades%3Aacct-1%3Aproto" in canonical
     empty_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     assert canonical.endswith(empty_hash)
 
@@ -47,7 +47,7 @@ def test_sign_request_headers_for_rt_subscribe() -> None:
     creds = ApiKeyCredentials(key_id="ak_test", private_key=private)
     url = subscription_token_url(
         "https://api-devnet.polyester.ai",
-        "private:spot:orders:acct-1:proto",
+        "private:spot:trades:acct-1:proto",
     )
     headers = sign_request(creds, method="GET", url=url, body=b"", timestamp_ms="1")
     assert headers["X-API-KEY-ID"] == "ak_test"

@@ -30,7 +30,7 @@ PUBLICATION = bytes([9, 34, 7, 34, 5, 34, 3, 1, 2, 3])
 
 
 def test_is_private_channel() -> None:
-    assert is_private_channel("private:spot:orders:acct:proto")
+    assert is_private_channel("private:spot:trades:acct:proto")
     assert not is_private_channel("public:spot:market:trades:1:proto")
 
 
@@ -81,7 +81,7 @@ async def test_subscribe_proto_private_requires_credentials() -> None:
     )
     with pytest.raises(PolyesterAuthError, match="without API-key credentials"):
         await client.subscribe_proto(
-            "private:spot:orders:acct:proto",
+            "private:spot:trades:acct:proto",
             decode=lambda payload: payload,
         )
 
@@ -137,7 +137,7 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
         patch("polyester.realtime.client.websockets.connect", return_value=FakeWS()),
     ):
         subscription = await client.subscribe_proto(
-            "private:spot:orders:acct_test:proto",
+            "private:spot:trades:acct_test:proto",
             decode=lambda payload: payload,
         )
         await asyncio.sleep(0.05)
@@ -146,12 +146,12 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
 
     fetch_conn.assert_awaited_once()
     fetch_sub.assert_awaited_once()
-    assert fetch_sub.await_args.kwargs["channel"] == "private:spot:orders:acct_test:proto"
+    assert fetch_sub.await_args.kwargs["channel"] == "private:spot:trades:acct_test:proto"
     assert FakeWS.sent == [
         connect_command(1, "conn-token"),
         subscribe_command(
             2,
-            "private:spot:orders:acct_test:proto",
+            "private:spot:trades:acct_test:proto",
             "sub-token",
         ),
     ]

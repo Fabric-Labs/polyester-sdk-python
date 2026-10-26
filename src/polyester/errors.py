@@ -153,7 +153,23 @@ def is_not_found(err: BaseException) -> bool:
 
 
 class PolyesterRealtimeError(PolyesterError):
-    """Raised for realtime connection, subscription, or decode failures."""
+    """Raised for realtime connection, subscription, or decode failures.
+
+    ``code`` is the private WebSocket request error code (for example
+    ``FORBIDDEN``); ``close_code`` is the WebSocket close code that ended the
+    stream (for example ``4403``). Both are ``None`` when not applicable.
+    """
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        code: str | None = None,
+        close_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.close_code = close_code
 
 
 class PolyesterRealtimeOverflowError(PolyesterRealtimeError):

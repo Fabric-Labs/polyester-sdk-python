@@ -9,14 +9,14 @@ from polyester.codecs.decode.balances import asset_balance_from_proto
 from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
 from polyester.codecs.decode.market_data import candle_point_from_proto
 from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
-from polyester.codecs.decode.orders import order_from_proto, user_trade_from_proto
+from polyester.codecs.decode.orders import user_trade_from_proto
 from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_policy_from_proto
 from polyester.codecs.decode.sub_accounts import subaccount_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto
 from polyester.codecs.decode.triggers import trigger_event_from_proto, trigger_from_proto
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterRealtimeError
-from polyester.models import ApiData, AssetBalance, LedgerTransfer, Order, UserTrade
+from polyester.models import ApiData, AssetBalance, LedgerTransfer, UserTrade
 from polyester.models.auth import AccountIdentity
 from polyester.models.market import Candle, MarketOverviewList
 from polyester.models.policies import ApiPolicy, SubaccountPolicy
@@ -71,12 +71,6 @@ def decode_trigger_event_bytes(payload: bytes) -> TriggerEvent:
     from polyester.gen.triggers.v1.triggers_pb2 import TriggerEvent as TriggerEventPb
 
     return trigger_event_from_proto(_parse_proto(payload, TriggerEventPb))
-
-
-def decode_order_bytes(payload: bytes) -> Order:
-    from polyester.gen.orders.v1.orders_read_pb2 import Order as OrderPb
-
-    return order_from_proto(_parse_proto(payload, OrderPb))
 
 
 def decode_api_key_bytes(payload: bytes) -> ApiKeySummary:

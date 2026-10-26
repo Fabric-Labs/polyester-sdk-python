@@ -6,7 +6,7 @@ from polyester.services._realtime_subscribe import subscribe_account_proto, subs
 @pytest.mark.parametrize(
     ("template", "expected"),
     [
-        ("private:spot:orders:{account_id}:proto", "private:spot:orders:acct:proto"),
+        ("private:spot:trades:{account_id}:proto", "private:spot:trades:acct:proto"),
         ("private:ledger:balances:{account_id}:proto", "private:ledger:balances:acct:proto"),
         ("private:auth:api-keys:{account_id}:proto", "private:auth:api-keys:acct:proto"),
     ],

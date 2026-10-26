@@ -9,9 +9,9 @@ from polyester.services.orders import AsyncOrdersService
 
 
 @pytest.mark.asyncio
-async def test_orders_subscribe_builds_private_channel() -> None:
+async def test_orders_subscribe_uses_the_private_order_socket() -> None:
     realtime = MagicMock()
-    realtime.subscribe_proto = AsyncMock(return_value="subscription")
+    realtime.subscribe_private_orders = AsyncMock(return_value="subscription")
     service = AsyncOrdersService(
         transport=MagicMock(),
         catalogs=MagicMock(),
@@ -23,8 +23,8 @@ async def test_orders_subscribe_builds_private_channel() -> None:
     result = await service.subscribe()
 
     assert result == "subscription"
-    channel = realtime.subscribe_proto.await_args.args[0]
-    assert channel == "private:spot:orders:acct_test:proto"
+    realtime.subscribe_private_orders.assert_awaited_once_with("acct_test")
+    realtime.subscribe_proto.assert_not_called()
 
 
 @pytest.mark.asyncio

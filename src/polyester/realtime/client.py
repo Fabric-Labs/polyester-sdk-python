@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import secrets
 from collections.abc import AsyncIterator, Callable
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import httpx
 import websockets
@@ -26,6 +26,10 @@ from polyester.realtime.protocol import (
     pong_command,
     subscribe_command,
 )
+
+if TYPE_CHECKING:
+    from polyester.models.private_orders import PrivateOrdersEvent
+    from polyester.realtime.private_orders import PrivateOrderStream
 
 T = TypeVar("T")
 
@@ -203,7 +207,7 @@ class AsyncSubscription(Generic[T]):
 
 
 class AsyncRealtimeClient:
-    """Centrifugo client for public and private protobuf channels."""
+    """Realtime client: Centrifugo protobuf channels and the private order WebSocket."""
 
     def __init__(
         self,
@@ -220,6 +224,7 @@ class AsyncRealtimeClient:
         self._http = http
         self._max_queue_size = max_queue_size
         self._active_subs: set[AsyncSubscription[Any]] = set()
+        self._private_orders: PrivateOrderStream | None = None
         self._closed = False
 
     async def aclose(self) -> None:
@@ -229,6 +234,47 @@ class AsyncRealtimeClient:
         self._active_subs.clear()
         for sub in subs:
             await sub.aclose()
+        if self._private_orders is not None:
+            await self._private_orders.aclose()
+            self._private_orders = None
+
+    async def subscribe_private_orders(
+        self, account_id: str | int
+    ) -> AsyncSubscription[PrivateOrdersEvent]:
+        """Stream an account's orders over the private WebSocket (``/v1/ws/private``).
+
+        Every subscription shares one connection, and each account one server
+        subscription. Returns once the server confirmed the subscription.
+        """
+        from polyester.realtime.private_orders import (
+            PrivateOrderStream,
+            private_orders_channel,
+            private_ws_url,
+        )
+
+        if self._closed:
+            raise PolyesterRealtimeError("realtime client is closed")
+        self._require_private_auth(private_orders_channel(account_id))
+        if self._private_orders is None:
+            http = self._require_http()
+            credentials = self._require_credentials()
+            api_url = self._require_api_url()
+
+            async def fetch_connect_token() -> str:
+                return await fetch_connection_token(http, credentials, api_url=api_url)
+
+            async def fetch_subscribe_token(channel: str) -> str:
+                return await fetch_subscription_token(
+                    http, credentials, api_url=api_url, channel=channel
+                )
+
+            self._private_orders = PrivateOrderStream(
+                url=private_ws_url(api_url),
+                fetch_connect_token=fetch_connect_token,
+                fetch_subscribe_token=fetch_subscribe_token,
+                max_queue_size=self._max_queue_size,
+            )
+        return await self._private_orders.subscribe(account_id)
 
     def _track_sub(self, sub: AsyncSubscription[Any]) -> None:
         self._active_subs.add(sub)

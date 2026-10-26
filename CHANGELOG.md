@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Breaking
+- `orders.subscribe()` now streams live orders over the private WebSocket
+  (`/v1/ws/private`) instead of the retired `private:spot:orders:<account>:proto`
+  realtime channel, which no longer issues subscribe tokens. It yields
+  `PrivateOrdersEvent` values instead of bare `Order` objects:
+  `PrivateOrdersSnapshot` (the full live view), `PrivateOrdersUnit` (changed
+  orders, removed order IDs and order events), `PrivateOrdersStale`,
+  `PrivateOrdersConnected`, `PrivateOrdersDisconnected` and
+  `PrivateOrdersError`. Orders are the same `Order` model the reads return.
+  The stream resumes from its last position after a gap, an expired token or
+  a reconnect. `orders.subscribe_sync(on_event=...)` receives the same events.
 - `market_data.get_trades()` drops `from_match_id`, which never reached the
   API (it failed before sending), and `MarketTradesResult.next_match_id` is
   now `next_page_token`. Page a listing with `page_token`.
@@ -88,6 +98,9 @@
   `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public IDs of
   the triggers created for the order's attached-risk legs. Each is set only
   for a leg the order configured and is empty otherwise.
+- `PolyesterRealtimeError.code` (private WebSocket request error code, for
+  example `FORBIDDEN`) and `PolyesterRealtimeError.close_code` (the WebSocket
+  close code that ended a stream).
 - Trigger events label standalone trailing-stop activation as `activated`,
   and `trigger_event_type_from_label` accepts `activated` as a filter.
 

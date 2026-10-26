@@ -11,6 +11,7 @@ from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
 )
+from polyester.codecs.proto_helpers import error_code_name
 from polyester.errors import (
     PolyesterApiError,
     PolyesterAuthError,
@@ -82,13 +83,13 @@ def map_connect_error(exc: ConnectError):
                 continue
             full_name = unpacked.DESCRIPTOR.full_name
             if full_name == "auth.v1.AuthErrorDetail":
-                code_name = auth_pb2.AuthErrorCode.Name(unpacked.code)
+                code_name = error_code_name(auth_pb2.AuthErrorCode, unpacked.code)
                 message = unpacked.message or error_message
                 return PolyesterApiError(message, code=code_name, raw=unpacked)
             if full_name == "polyester.ratelimit.v1.RateLimitDetail":
                 return _rate_limit_error(error_message, proto_detail=unpacked)
             if full_name == "orders.v1.ErrorDetail":
-                code_name = orders_pb2.ErrorCode.Name(unpacked.code)
+                code_name = error_code_name(orders_pb2.ErrorCode, unpacked.code)
                 rate_limit = unpacked.rate_limit if unpacked.HasField("rate_limit") else None
                 if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
                     return _rate_limit_error(error_message, proto_detail=rate_limit)
@@ -102,7 +103,7 @@ def map_connect_error(exc: ConnectError):
                     return PolyesterApiError(error_message, code=code_name)
                 return PolyesterApiError(error_message, code=code_name)
             if full_name == "chain.withdraw.v1.ErrorDetail":
-                code_name = withdraw_pb2.ErrorCode.Name(unpacked.code)
+                code_name = error_code_name(withdraw_pb2.ErrorCode, unpacked.code)
                 if (
                     "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
@@ -114,7 +115,7 @@ def map_connect_error(exc: ConnectError):
                     return _rate_limit_error(error_message)
                 return PolyesterApiError(error_message, code=code_name)
             if full_name == "transfer.v1.ErrorDetail":
-                code_name = transfer_pb2.ErrorCode.Name(unpacked.code)
+                code_name = error_code_name(transfer_pb2.ErrorCode, unpacked.code)
                 if (
                     "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name

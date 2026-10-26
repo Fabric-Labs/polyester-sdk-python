@@ -237,13 +237,19 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
         trigger_price: str | None = None,
-        limit_price: str | None = None,
         trailing_distance_ticks: int | None = None,
         trailing_distance_bps: int | None = None,
         activation_price: str | None = None,
         max_slippage_ticks: int | None = None,
         max_slippage_bps: int | None = None,
     ) -> TriggerMutationResult:
+        """Modify a live trigger.
+
+        A child limit price is fixed at create: to change it, cancel the
+        trigger and create a new one. ``max_slippage_bps`` must be 1 to 9999
+        for a trailing stop and for a sell stop-loss or take-profit, and up to
+        10000 for a buy one; ``0`` clears the cap.
+        """
         await self._ensure_catalogs()
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
@@ -252,7 +258,6 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             ),
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             trigger_price=trigger_price,
-            limit_price=limit_price,
             trailing_distance_ticks=trailing_distance_ticks,
             trailing_distance_bps=trailing_distance_bps,
             activation_price=activation_price,

@@ -412,6 +412,13 @@ when unset. `policy_class` uses full protobuf enum names
 (`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Rate-limit rules expose
 `vip_tier` (not `tier`).
 
+`VIPStatus.settled_volume_quality` and `average_aop_quality` say how complete
+each 30-day metric is: `status` is `complete`, `price_unavailable` (some
+contributions had no USD reference price, so `settled_volume_30d_usd` is a
+lower bound) or `incomplete_history`, with `incomplete_hours` out of 720. Both
+are `None` for an account without qualification evidence, such as a new
+account's default tier.
+
 ```python
 tiers = await client.vip.list_vip_tiers()
 status = await client.vip.get_vip_status()
@@ -520,9 +527,16 @@ far (`peak_price` for a sell).
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
 (`Price.from_ticks(0)` or `0`) to clear an existing activation price or
-maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
-modify still accepts `0` to clear. Trailing distance in bps uses the same
-1–10000 range; trigger modify accepts `0` to clear.
+maximum-slippage cap. `max_slippage_bps` is 1–9999 for a trailing stop (either
+side, standalone or attached) and for a sell stop-loss or take-profit market
+child, because a 100% cap would leave a sell no positive price; a buy
+stop-loss or take-profit market child and a TWAP's market slices accept up to
+10000. The SDK checks these ranges when it creates a trigger; on modify it
+cannot see the trigger's side, so it accepts 1–10000 and the server applies the
+same ranges. Modify still accepts `0` to clear. Trailing distance in bps uses
+1–10000; trigger modify accepts `0` to clear. A trigger's child limit price
+(and a buy trailing stop's maximum price) is fixed at create: to change it,
+cancel the trigger and create a new one.
 
 `orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
 return only child orders created by that trigger (TWAP/ladder slices).

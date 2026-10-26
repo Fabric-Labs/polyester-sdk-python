@@ -9,7 +9,7 @@ import msgspec
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.bps import validate_bps
+from polyester.codecs.bps import MAX_SELL_SLIPPAGE_BPS, validate_bps
 from polyester.codecs.correlation_id import (
     optional_client_id,
     optional_request_id,
@@ -688,7 +688,10 @@ def _trailing_stop_from_dict(
     if slip_ticks is not None:
         proto.max_slippage_ticks = tick_count(slip_ticks, "max_slippage_ticks")
     if slip_bps is not None:
-        proto.max_slippage_bps = validate_bps(slip_bps, "max_slippage_bps")
+        # An attached trailing stop stops at 9999 bps on either side.
+        proto.max_slippage_bps = validate_bps(
+            slip_bps, "max_slippage_bps", max_value=MAX_SELL_SLIPPAGE_BPS
+        )
 
     activation = _mapping_get(data, "activation_price", "activationPrice")
     activation_ticks = _mapping_get(data, "activation_price_ticks", "activationPriceTicks")

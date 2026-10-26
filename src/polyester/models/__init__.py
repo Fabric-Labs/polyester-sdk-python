@@ -160,6 +160,7 @@ from polyester.models.trading_rate_limits import (
 )
 from polyester.models.vip import (
     NextVIPTierThresholds,
+    VIPMetricQuality,
     VIPStatus,
     VIPTier,
     VIPTiersList,
@@ -321,6 +322,7 @@ __all__ = [
     "VIPTier",
     "VIPTiersList",
     "NextVIPTierThresholds",
+    "VIPMetricQuality",
     "UsernameHistoryEntry",
     "UsernameHistoryList",
     "WithdrawDestinationValidation",

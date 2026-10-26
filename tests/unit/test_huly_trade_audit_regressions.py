@@ -39,19 +39,21 @@ def _create_trailing(**overrides: int):
 
 
 def test_poly_4684_attached_trailing_slippage_bps_is_capped() -> None:
+    # The contract caps an attached trailing stop at 9999 bps on either side.
     risk_policy_from_dict(
-        {"trailing_stop": {"trailing_distance_bps": 100, "max_slippage_bps": 10_000}}
+        {"trailing_stop": {"trailing_distance_bps": 100, "max_slippage_bps": 9_999}}
     )
-    with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*10000"):
+    with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*9999"):
         risk_policy_from_dict(
-            {"trailing_stop": {"trailing_distance_bps": 100, "max_slippage_bps": 10_001}}
+            {"trailing_stop": {"trailing_distance_bps": 100, "max_slippage_bps": 10_000}}
         )
 
 
 def test_poly_4684_standalone_trailing_slippage_cap_is_retained() -> None:
-    _create_trailing(max_slippage_bps=10_000)
-    with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*10000"):
-        _create_trailing(max_slippage_bps=10_001)
+    # The contract caps a standalone trailing stop at 9999 bps on either side.
+    _create_trailing(max_slippage_bps=9_999)
+    with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*9999"):
+        _create_trailing(max_slippage_bps=10_000)
     with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*10000"):
         modify_trigger_to_proto(trigger_id="1", symbol_id=1, max_slippage_bps=10_001)
     assert (

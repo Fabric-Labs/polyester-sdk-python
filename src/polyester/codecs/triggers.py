@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.bps import validate_bps
+from polyester.codecs.bps import MAX_BPS, MAX_SELL_SLIPPAGE_BPS, validate_bps
 from polyester.codecs.correlation_id import optional_client_id
 from polyester.codecs.scalars import id_to_int, tick_count
 from polyester.errors import PolyesterValidationError
@@ -51,6 +51,7 @@ def _conditional_child(
     symbol: str,
     max_slippage_ticks: int | None = None,
     max_slippage_bps: int | None = None,
+    buy: bool = False,
 ) -> triggers_pb2.ConditionalChildExecution:
     """Map flat order_type/tif/post_only onto a conditional child execution.
 
@@ -72,7 +73,12 @@ def _conditional_child(
         if max_slippage_ticks is not None:
             market.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         elif max_slippage_bps is not None:
-            market.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
+            # A buy child may cap at 100%; a sell child stops at 9999.
+            market.max_slippage_bps = validate_bps(
+                max_slippage_bps,
+                "max_slippage_bps",
+                max_value=MAX_BPS if buy else MAX_SELL_SLIPPAGE_BPS,
+            )
         return child
     if max_slippage_ticks is not None or max_slippage_bps is not None:
         raise PolyesterValidationError(
@@ -194,6 +200,7 @@ def create_trigger_to_proto(
                 symbol=symbol,
                 max_slippage_ticks=max_slippage_ticks,
                 max_slippage_bps=max_slippage_bps,
+                buy=side_key == "buy",
             )
         )
         getattr(intent, type_key).CopyFrom(conditional)
@@ -231,7 +238,10 @@ def create_trigger_to_proto(
         if max_slippage_ticks is not None:
             trailing.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         if max_slippage_bps is not None:
-            trailing.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
+            # Either side stops at 9999 bps.
+            trailing.max_slippage_bps = validate_bps(
+                max_slippage_bps, "max_slippage_bps", max_value=MAX_SELL_SLIPPAGE_BPS
+            )
     elif type_key == "twap":
         twap = intent.twap
         twap.side = side_proto
@@ -323,7 +333,6 @@ def modify_trigger_to_proto(
     symbol_id: int,
     sub_account_id: str | int | None = None,
     trigger_price: Any | None = None,
-    limit_price: Any | None = None,
     trailing_distance_ticks: int | None = None,
     trailing_distance_bps: int | None = None,
     activation_price: Any | None = None,
@@ -333,7 +342,6 @@ def modify_trigger_to_proto(
     if not any(
         (
             trigger_price is not None,
-            limit_price is not None,
             trailing_distance_ticks is not None,
             trailing_distance_bps is not None,
             activation_price is not None,
@@ -342,7 +350,7 @@ def modify_trigger_to_proto(
         )
     ):
         raise PolyesterValidationError(
-            "modify requires at least one of trigger_price, limit_price, "
+            "modify requires at least one of trigger_price, "
             "trailing_distance_ticks, trailing_distance_bps, activation_price, "
             "max_slippage_ticks, or max_slippage_bps"
         )
@@ -356,8 +364,6 @@ def modify_trigger_to_proto(
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if trigger_price is not None:
         proto.trigger_price_ticks = resolve_price_ticks(trigger_price, "trigger_price")  # type: ignore[arg-type]
-    if limit_price is not None:
-        proto.limit_price_ticks = resolve_price_ticks(limit_price, "limit_price")  # type: ignore[arg-type]
     if trailing_distance_ticks is not None:
         proto.trailing_distance_ticks = tick_count(
             trailing_distance_ticks, "trailing_distance_ticks"

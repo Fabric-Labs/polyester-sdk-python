@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Breaking
+- `triggers.modify()` no longer takes `limit_price`: a trigger's child limit
+  price is fixed at create, and the API rejects any change to it. Cancel the
+  trigger and create a new one to change it.
+- `max_slippage_bps` is now checked against the API's ranges when creating:
+  1 to 9999 for a trailing stop (standalone or attached, either side) and for
+  a sell stop-loss or take-profit market child; 10000 is rejected before
+  sending. A buy stop-loss or take-profit market child and TWAP market slices
+  still accept 10000.
 - `market_data.get_trades()` drops `from_match_id`, which never reached the
   API (it failed before sending), and `MarketTradesResult.next_match_id` is
   now `next_page_token`. Page a listing with `page_token`.
@@ -27,6 +35,10 @@
   not have.
 
 ### Added
+- `VIPStatus.settled_volume_quality` and `average_aop_quality`
+  (`VIPMetricQuality` with `status` and `incomplete_hours`): how complete each
+  30-day qualification metric is. A `price_unavailable` settled volume is a
+  lower bound.
 - Standalone buy trailing stops: `triggers.create(trigger_type="trailing_stop",
   side="buy", limit_price=...)`, where `limit_price` is the required maximum
   price (decimal or `Price.from_ticks`). Trigger reads show a buy trailing

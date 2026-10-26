@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from polyester.codecs.proto_helpers import has_field
+from polyester.codecs.proto_helpers import has_field, proto_enum_name
 from polyester.gen.vip.v1 import vip_pb2
 from polyester.models.vip import (
     NextVIPTierThresholds,
+    VIPMetricQuality,
     VIPStatus,
     VIPTier,
     VIPTiersList,
@@ -56,6 +57,17 @@ def next_vip_tier_thresholds_from_proto(
     )
 
 
+def _metric_quality(msg: vip_pb2.GetVIPStatusResponse, field: str) -> VIPMetricQuality | None:
+    if not has_field(msg, field):
+        return None
+    quality = getattr(msg, field)
+    status = proto_enum_name(vip_pb2.VIPMetricStatus, quality.status)
+    return VIPMetricQuality(
+        status=status.removeprefix("metric_"),
+        incomplete_hours=int(quality.incomplete_hours),
+    )
+
+
 def vip_status_from_proto(msg: vip_pb2.GetVIPStatusResponse) -> VIPStatus:
     next_thresholds = None
     if has_field(msg, "next_tier_thresholds"):
@@ -84,4 +96,6 @@ def vip_status_from_proto(msg: vip_pb2.GetVIPStatusResponse) -> VIPStatus:
         if has_field(msg, "metrics_as_of")
         else None,
         next_tier_thresholds=next_thresholds,
+        settled_volume_quality=_metric_quality(msg, "settled_volume_quality"),
+        average_aop_quality=_metric_quality(msg, "average_aop_quality"),
     )

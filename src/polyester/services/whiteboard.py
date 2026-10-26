@@ -8,6 +8,7 @@ from google.protobuf import struct_pb2
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.enums import resolve_proto_enum
 from polyester.codecs.proto_build import repeated_messages_from_mappings
+from polyester.codecs.scalars import uint32_value
 from polyester.gen.collab.v1 import whiteboard_pb2 as wb_pb2
 from polyester.gen.collab.v1.whiteboard_connect import WhiteboardServiceClient
 from polyester.models import ApiData
@@ -80,7 +81,7 @@ class AsyncWhiteboardService(BaseService):
         return await self._call(
             wb_pb2.ListBoardsRequest(
                 include_archived=include_archived,
-                limit=limit,
+                limit=uint32_value(limit, "limit"),
                 page_token=page_token,
             ),
             WhiteboardServiceClient.list_boards,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
+from polyester.codecs.scalars import uint32_value
 from polyester.errors import PolyesterValidationError
 
 
@@ -41,4 +42,6 @@ def validate_limit(
         raise PolyesterValidationError(f"{label} must be an integer")
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise PolyesterValidationError(f"{label} must be an integer")
-    return limit
+    # Every page limit is a uint32 on the wire; the contract narrows it per endpoint,
+    # which the request range check applies before sending.
+    return uint32_value(limit, label)

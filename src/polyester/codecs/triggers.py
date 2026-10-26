@@ -5,7 +5,7 @@ from typing import Any
 from polyester.catalogs import CatalogManager
 from polyester.codecs.bps import MAX_BPS, MAX_SELL_SLIPPAGE_BPS, validate_bps
 from polyester.codecs.correlation_id import optional_client_id
-from polyester.codecs.scalars import id_to_int, tick_count
+from polyester.codecs.scalars import id_to_int, int32_value, int64_value, tick_count, uint32_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
@@ -144,8 +144,9 @@ def create_trigger_to_proto(
     ladder_distribution: str | None = None,
     quantity_scale: int,
 ) -> triggers_pb2.CreateTriggerRequest:
-    if symbol_id <= 0:
+    if not isinstance(symbol_id, int) or isinstance(symbol_id, bool) or symbol_id <= 0:
         raise PolyesterValidationError("create trigger requires a resolved symbol_id")
+    symbol_id = uint32_value(symbol_id, "symbol_id", minimum=1)
     type_key = trigger_type.lower().replace("-", "_")
     if type_key not in TRIGGER_TYPE_TO_PROTO:
         raise PolyesterValidationError(
@@ -246,9 +247,11 @@ def create_trigger_to_proto(
         twap = intent.twap
         twap.side = side_proto
         if twap_duration_ms is not None:
-            twap.duration_ms = twap_duration_ms
+            twap.duration_ms = int64_value(twap_duration_ms, "twap_duration_ms")
         if twap_slice_interval_ms is not None:
-            twap.slice_interval_ms = twap_slice_interval_ms
+            twap.slice_interval_ms = int64_value(
+                twap_slice_interval_ms, "twap_slice_interval_ms"
+            )
         # TWAP children are market-IOC or limit-GTC only.
         if order_key == "limit":
             if limit_price is not None:
@@ -301,7 +304,7 @@ def create_trigger_to_proto(
         if price_max_ticks is not None:
             ladder.price_max_ticks = price_max_ticks
         if ladder_levels is not None:
-            ladder.levels = ladder_levels
+            ladder.levels = int32_value(ladder_levels, "ladder_levels")
         if post_only:
             ladder.post_only = True
 
@@ -354,8 +357,9 @@ def modify_trigger_to_proto(
             "trailing_distance_ticks, trailing_distance_bps, activation_price, "
             "max_slippage_ticks, or max_slippage_bps"
         )
-    if symbol_id <= 0:
+    if not isinstance(symbol_id, int) or isinstance(symbol_id, bool) or symbol_id <= 0:
         raise PolyesterValidationError("modify trigger requires a resolved symbol_id")
+    symbol_id = uint32_value(symbol_id, "symbol_id", minimum=1)
     proto = triggers_pb2.ModifyTriggerRequest(
         trigger_id=id_to_int(trigger_id, "trigger_id"),
         symbol_id=int(symbol_id),

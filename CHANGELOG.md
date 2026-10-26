@@ -19,6 +19,14 @@
   `limit_price`; earlier versions ignored them.
 
 ### Fixed
+- Every caller-supplied integer bound for a request field is checked before
+  sending: an integer outside its field's type (for example `ladder_levels`,
+  `twap_duration_ms`, `cancel_all_after(timeout_sec=...)`, a page `limit`, a
+  `symbol_id`, a chain or asset ID, a revision) raises
+  `PolyesterValidationError` naming the field instead of a raw `ValueError`.
+  Requests are also checked against the API's published integer ranges (for
+  example a page `limit` of at most 1000, or 2 to 100 `ladder_levels`), so an
+  out-of-range value fails before it is sent.
 - A stop-loss or take-profit market child now carries its
   `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
   the cap silently, so the pair's default market slippage applied instead.

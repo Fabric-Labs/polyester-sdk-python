@@ -24,7 +24,7 @@ from polyester.codecs.decode.address_book import (
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_address_book_invalidation_bytes
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, uint64_value
 from polyester.gen.auth.v1.address_book_connect import AddressBookServiceClient
 from polyester.gen.auth.v1.address_book_pb2 import (
     CreateAddressBookTagRequest,
@@ -225,7 +225,9 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
         if minimum_view_revision:
-            request.minimum_view_revision = int(minimum_view_revision)
+            request.minimum_view_revision = uint64_value(
+                minimum_view_revision, "minimum_view_revision"
+            )
         return await unary_auth_decoded(
             self._transport,
             AddressBookServiceClient,

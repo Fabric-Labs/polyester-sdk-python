@@ -4,7 +4,7 @@ from typing import Any
 
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.proto_build import message_from_mapping
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, uint32_value, uint64_value
 from polyester.gen.layout.v1 import layout_pb2
 from polyester.gen.layout.v1.layout_connect import LayoutServiceClient
 from polyester.models import ApiData
@@ -15,7 +15,7 @@ from polyester.services._generated import unary_auth_decoded
 class AsyncLayoutService(BaseService):
     async def get_layouts(self, *, limit: int = 0, page_token: str = "") -> ApiData:
         return await self._call(
-            layout_pb2.GetLayoutsRequest(limit=limit, page_token=page_token),
+            layout_pb2.GetLayoutsRequest(limit=uint32_value(limit, "limit"), page_token=page_token),
             LayoutServiceClient.get_layouts,
         )
 
@@ -54,7 +54,7 @@ class AsyncLayoutService(BaseService):
         return await self._call(
             layout_pb2.CreateLayoutShareLinkRequest(
                 layout_id=id_to_int(layout_id, "layout_id"),
-                expires_at_ms=expires_at_ms,
+                expires_at_ms=uint64_value(expires_at_ms, "expires_at_ms"),
             ),
             LayoutServiceClient.create_layout_share_link,
         )
@@ -75,7 +75,7 @@ class AsyncLayoutService(BaseService):
         return await self._call(
             layout_pb2.ListOwnerPublishedLayoutsRequest(
                 owner_id=id_to_int(owner_id, "owner_id"),
-                limit=limit,
+                limit=uint32_value(limit, "limit"),
                 page_token=page_token,
             ),
             LayoutServiceClient.list_owner_published_layouts,
@@ -122,7 +122,7 @@ class AsyncLayoutService(BaseService):
             layout_pb2.ListLayoutTemplateVersionsRequest(
                 owner_id=id_to_int(owner_id, "owner_id"),
                 template_id=id_to_int(template_id, "template_id"),
-                limit=limit,
+                limit=uint32_value(limit, "limit"),
                 page_token=page_token,
             ),
             LayoutServiceClient.list_layout_template_versions,
@@ -139,7 +139,7 @@ class AsyncLayoutService(BaseService):
             layout_pb2.GetLayoutTemplateVersionRequest(
                 owner_id=id_to_int(owner_id, "owner_id"),
                 template_id=id_to_int(template_id, "template_id"),
-                version=version,
+                version=uint32_value(version, "version"),
             ),
             LayoutServiceClient.get_layout_template_version,
         )
@@ -157,7 +157,7 @@ class AsyncLayoutService(BaseService):
                 owner_id=id_to_int(owner_id, "owner_id"),
                 template_id=id_to_int(template_id, "template_id"),
                 track_latest=track_latest,
-                pinned_version=pinned_version,
+                pinned_version=uint32_value(pinned_version, "pinned_version"),
             ),
             LayoutServiceClient.set_layout_template_subscription,
         )
@@ -184,7 +184,7 @@ class AsyncLayoutService(BaseService):
     ) -> ApiData:
         return await self._call(
             layout_pb2.ListMyLayoutTemplateSubscriptionsRequest(
-                limit=limit,
+                limit=uint32_value(limit, "limit"),
                 page_token=page_token,
             ),
             LayoutServiceClient.list_my_layout_template_subscriptions,

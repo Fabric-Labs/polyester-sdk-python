@@ -10,6 +10,7 @@ from polyester.codecs.decode.withdraw import (
     withdraw_intent_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.scalars import uint64_value
 from polyester.codecs.withdraw import (
     new_trading_withdraw_nonce,
     trading_withdraw_payload_to_proto,
@@ -234,12 +235,13 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         Use for form feedback before Trading → external submission; create RPCs
         remain authoritative.
         """
-        if int(destination_chain_id) <= 0:
+        chain_id = uint64_value(destination_chain_id, "destination_chain_id")
+        if chain_id <= 0:
             raise PolyesterValidationError("destination_chain_id must be non-zero")
         if not str(destination_address or "").strip():
             raise PolyesterValidationError("destination_address is required")
         request = withdraw_pb2.ValidateWithdrawDestinationRequest(
-            destination_chain_id=int(destination_chain_id),
+            destination_chain_id=chain_id,
             destination_address=str(destination_address),
         )
         return await unary_auth_decoded(

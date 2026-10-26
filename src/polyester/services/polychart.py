@@ -4,7 +4,7 @@ from typing import Any
 
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.proto_build import message_from_mapping, repeated_messages_from_mappings
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, uint32_value, uint64_value
 from polyester.gen.polychart.v1 import polychart_pb2 as pc_pb2
 from polyester.gen.polychart.v1.polychart_connect import PolychartServiceClient
 from polyester.models import ApiData
@@ -15,7 +15,9 @@ from polyester.services._generated import unary_auth_decoded
 class AsyncPolychartService(BaseService):
     async def get_market_layers(self, *, engine_symbol_id: int) -> ApiData:
         return await self._call(
-            pc_pb2.GetMarketLayersRequest(engine_symbol_id=engine_symbol_id),
+            pc_pb2.GetMarketLayersRequest(
+                engine_symbol_id=uint32_value(engine_symbol_id, "engine_symbol_id")
+            ),
             PolychartServiceClient.get_market_layers,
         )
 
@@ -28,8 +30,8 @@ class AsyncPolychartService(BaseService):
     ) -> ApiData:
         return await self._call(
             pc_pb2.ListInboxMarketLayersRequest(
-                engine_symbol_id=engine_symbol_id,
-                limit=limit,
+                engine_symbol_id=uint32_value(engine_symbol_id, "engine_symbol_id"),
+                limit=uint32_value(limit, "limit"),
                 page_token=page_token,
             ),
             PolychartServiceClient.list_inbox_market_layers,
@@ -71,8 +73,8 @@ class AsyncPolychartService(BaseService):
         return await self._call(
             pc_pb2.CreateLayerShareLinkRequest(
                 layer=message_from_mapping(pc_pb2.LayerRef, layer),
-                perms=perms,
-                expires_at_ms=expires_at_ms,
+                perms=uint32_value(perms, "perms"),
+                expires_at_ms=uint64_value(expires_at_ms, "expires_at_ms"),
             ),
             PolychartServiceClient.create_layer_share_link,
         )
@@ -94,8 +96,8 @@ class AsyncPolychartService(BaseService):
         return await self._call(
             pc_pb2.ListOwnerPublishedLayersRequest(
                 owner_id=id_to_int(owner_id, "owner_id"),
-                engine_symbol_id=engine_symbol_id,
-                limit=limit,
+                engine_symbol_id=uint32_value(engine_symbol_id, "engine_symbol_id"),
+                limit=uint32_value(limit, "limit"),
                 page_token=page_token,
             ),
             PolychartServiceClient.list_owner_published_layers,
@@ -133,7 +135,7 @@ class AsyncPolychartService(BaseService):
         return await self._call(
             pc_pb2.UpsertLayerRequest(
                 layer=message_from_mapping(pc_pb2.Layer, layer),
-                expected_revision=expected_revision,
+                expected_revision=uint64_value(expected_revision, "expected_revision"),
             ),
             PolychartServiceClient.upsert_layer,
         )
@@ -147,7 +149,7 @@ class AsyncPolychartService(BaseService):
         return await self._call(
             pc_pb2.DeleteLayerRequest(
                 layer=message_from_mapping(pc_pb2.LayerRef, layer),
-                expected_revision=expected_revision,
+                expected_revision=uint64_value(expected_revision, "expected_revision"),
             ),
             PolychartServiceClient.delete_layer,
         )
@@ -161,7 +163,9 @@ class AsyncPolychartService(BaseService):
         return await self._call(
             pc_pb2.UpsertDrawingRequest(
                 drawing=message_from_mapping(pc_pb2.Drawing, drawing),
-                expected_layer_revision=expected_layer_revision,
+                expected_layer_revision=uint64_value(
+                    expected_layer_revision, "expected_layer_revision"
+                ),
             ),
             PolychartServiceClient.upsert_drawing,
         )
@@ -177,7 +181,9 @@ class AsyncPolychartService(BaseService):
             pc_pb2.DeleteDrawingRequest(
                 drawing=message_from_mapping(pc_pb2.DrawingRef, drawing),
                 layer=message_from_mapping(pc_pb2.LayerRef, layer),
-                expected_layer_revision=expected_layer_revision,
+                expected_layer_revision=uint64_value(
+                    expected_layer_revision, "expected_layer_revision"
+                ),
             ),
             PolychartServiceClient.delete_drawing,
         )
@@ -190,7 +196,7 @@ class AsyncPolychartService(BaseService):
     ) -> ApiData:
         return await self._call(
             pc_pb2.SetLayerSubscriptionsRequest(
-                engine_symbol_id=engine_symbol_id,
+                engine_symbol_id=uint32_value(engine_symbol_id, "engine_symbol_id"),
                 subscriptions=repeated_messages_from_mappings(
                     pc_pb2.LayerSubscription, subscriptions
                 ),

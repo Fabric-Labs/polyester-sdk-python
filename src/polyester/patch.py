@@ -4,6 +4,7 @@ from typing import Any
 
 from google.protobuf.field_mask_pb2 import FieldMask
 
+from polyester.codecs.scalars import uint64_value
 from polyester.errors import PolyesterValidationError
 
 UNSET: Any = object()
@@ -14,8 +15,9 @@ def is_set(value: object) -> bool:
 
 
 def require_positive_revision(expected_revision: int) -> None:
-    if expected_revision <= 0:
+    if isinstance(expected_revision, int) and expected_revision <= 0:
         raise PolyesterValidationError("expected_revision must be positive")
+    uint64_value(expected_revision, "expected_revision", minimum=1)
 
 
 def field_mask(paths: list[str]) -> FieldMask:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from polyester.codecs.scalars import uint32_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.guard.v1 import guard_signer_pb2
 
@@ -48,7 +49,9 @@ def protected_action_args_to_proto(
 ) -> guard_signer_pb2.ProtectedActionArgs:
     args = guard_signer_pb2.ProtectedActionArgs()
     if external_polychain_chain_id is not None and external_addresses:
-        args.external_whitelist.polychain_chain_id = external_polychain_chain_id
+        args.external_whitelist.polychain_chain_id = uint32_value(
+            external_polychain_chain_id, "external_polychain_chain_id", minimum=1
+        )
         args.external_whitelist.addresses.extend(external_addresses)
     elif internal_addresses:
         args.internal_whitelist.addresses.extend(internal_addresses)

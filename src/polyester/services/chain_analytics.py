@@ -4,6 +4,7 @@ from typing import Any
 
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.enums import resolve_proto_enum
+from polyester.codecs.scalars import uint32_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2
 from polyester.gen.chain.analytics.v1.analytics_read_connect import ChainAnalyticsServiceClient
@@ -41,11 +42,11 @@ class AsyncChainAnalyticsService(BaseService):
         end_ts_sec: int = 0,
     ) -> ApiData:
         request = analytics_read_pb2.GetZippedAssetSupplyRequest(
-            zipped_asset_id=zipped_asset_id,
+            zipped_asset_id=uint32_value(zipped_asset_id, "zipped_asset_id"),
             range=_analytics_range(range),
             bucket=bucket,
-            start_ts_sec=start_ts_sec,
-            end_ts_sec=end_ts_sec,
+            start_ts_sec=uint32_value(start_ts_sec, "start_ts_sec"),
+            end_ts_sec=uint32_value(end_ts_sec, "end_ts_sec"),
         )
         return await unary_public_decoded(
             self._transport,
@@ -68,8 +69,8 @@ class AsyncChainAnalyticsService(BaseService):
             group_id=group_id,
             range=_analytics_range(range),
             bucket=bucket,
-            start_ts_sec=start_ts_sec,
-            end_ts_sec=end_ts_sec,
+            start_ts_sec=uint32_value(start_ts_sec, "start_ts_sec"),
+            end_ts_sec=uint32_value(end_ts_sec, "end_ts_sec"),
         )
         return await unary_public_decoded(
             self._transport,
@@ -91,11 +92,11 @@ class AsyncChainAnalyticsService(BaseService):
         if asset_id <= 0:
             raise PolyesterValidationError("asset_id must be positive")
         request = analytics_read_pb2.GetUnifiedAssetBalancesRequest(
-            asset_id=asset_id,
+            asset_id=uint32_value(asset_id, "asset_id"),
             range=_analytics_range(range),
             bucket=bucket,
-            start_ts_sec=start_ts_sec,
-            end_ts_sec=end_ts_sec,
+            start_ts_sec=uint32_value(start_ts_sec, "start_ts_sec"),
+            end_ts_sec=uint32_value(end_ts_sec, "end_ts_sec"),
         )
         return await unary_public_decoded(
             self._transport,

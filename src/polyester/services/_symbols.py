@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.scalars import uint32_value
 from polyester.errors import PolyesterValidationError
 
 
@@ -12,11 +13,11 @@ def resolve_symbol_id(
     label: str = "request",
 ) -> int:
     if symbol_id is not None:
-        if int(symbol_id) == 0:
+        if isinstance(symbol_id, int) and not isinstance(symbol_id, bool) and symbol_id == 0:
             raise PolyesterValidationError(
                 f"{label} symbol_id must be non-zero when explicitly supplied"
             )
-        return int(symbol_id)
+        return uint32_value(symbol_id, f"{label} symbol_id", minimum=1)
     if symbol and catalogs is not None:
         resolved = catalogs.symbol_id_for_symbol(symbol)
         if resolved is not None:
@@ -119,7 +120,11 @@ def resolve_cancel_all_symbol_ids(
     """
     normalized_symbol = normalize_raw_symbol_filter(symbol, label=f"{label} symbol")
     normalized_symbols = normalize_raw_symbol_filters(symbols, label=f"{label} symbols")
-    raw_ids = [int(value) for value in symbol_ids] if symbol_ids else []
+    raw_ids = (
+        [uint32_value(value, f"{label} symbol_ids", minimum=1) for value in symbol_ids]
+        if symbol_ids
+        else []
+    )
     selected = sum(
         1 for group in (normalized_symbol, normalized_symbols, raw_ids) if group
     )

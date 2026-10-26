@@ -13,6 +13,8 @@ UINT64_MAX = 2**64 - 1
 UINT32_MAX = 2**32 - 1
 INT64_MAX = 2**63 - 1
 INT64_MIN = -(2**63)
+INT32_MAX = 2**31 - 1
+INT32_MIN = -(2**31)
 PRICE_TICK_SCALE = 9
 # Maximum accepted quantity/ledger scale for public formatters and catalog hydration.
 # Values above this are rejected instead of allocating pathological padding (scale ≥ 65535).
@@ -102,6 +104,47 @@ def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
             )
         raise PolyesterValidationError(f"{field_name} must be a valid decimal string")
     return scaled
+
+
+def bounded_int(value: object, field_name: str, *, minimum: int, maximum: int) -> int:
+    """Validate a caller-supplied integer for a protobuf integer field.
+
+    Accepts an ``int`` or a base-10 integer string and rejects booleans and
+    anything outside ``minimum..maximum`` (the field's protobuf type, narrowed
+    to the contract's range where it has one), so a value can never reach a
+    protobuf assignment that would raise.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise PolyesterValidationError(f"{field_name} must be an integer")
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise PolyesterValidationError(f"{field_name} must be an integer") from exc
+    if parsed < minimum or parsed > maximum:
+        raise PolyesterValidationError(
+            f"{field_name} must be between {minimum} and {maximum}"
+        )
+    return parsed
+
+
+def int32_value(value: object, field_name: str, *, minimum: int = INT32_MIN) -> int:
+    """A caller-supplied int32 field value."""
+    return bounded_int(value, field_name, minimum=minimum, maximum=INT32_MAX)
+
+
+def int64_value(value: object, field_name: str, *, minimum: int = INT64_MIN) -> int:
+    """A caller-supplied int64 field value."""
+    return bounded_int(value, field_name, minimum=minimum, maximum=INT64_MAX)
+
+
+def uint32_value(value: object, field_name: str, *, minimum: int = 0) -> int:
+    """A caller-supplied uint32 (or fixed32) field value."""
+    return bounded_int(value, field_name, minimum=minimum, maximum=UINT32_MAX)
+
+
+def uint64_value(value: object, field_name: str, *, minimum: int = 0) -> int:
+    """A caller-supplied uint64 (or fixed64) field value."""
+    return bounded_int(value, field_name, minimum=minimum, maximum=UINT64_MAX)
 
 
 def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> int:

@@ -171,7 +171,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
         if symbol_id is not None:
-            request.symbol_id.append(symbol_id)
+            request.symbol_id.append(
+                resolve_symbol_id(
+                    self._catalogs, symbol=None, symbol_id=symbol_id, label="list_history"
+                )
+            )
         elif symbol:
             resolved = resolve_symbol_id(
                 self._catalogs, symbol=symbol, symbol_id=None, label="list_history"
@@ -368,7 +372,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         request = CancelOrderRequest()
         set_order_key(request, key, op="cancel")
         if symbol_id is not None:
-            request.symbol_id = symbol_id
+            request.symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=None, symbol_id=symbol_id, label="cancel"
+            )
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

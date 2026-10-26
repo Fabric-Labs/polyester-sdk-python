@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.fees import spot_fee_rates_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.scalars import uint32_value
 from polyester.gen.fees.v1.fees_connect import FeeServiceClient
 from polyester.gen.fees.v1.fees_pb2 import GetSpotFeeRatesRequest
 from polyester.models.fees import SpotFeeRatesList
@@ -39,7 +40,7 @@ class AsyncFeeService(ScopedSubAccountMixin, BaseService):
             request.subaccount_id = parsed_sub
         if symbol_id is not None:
             ids = [symbol_id] if isinstance(symbol_id, int) else list(symbol_id)
-            request.symbol_id.extend(int(item) for item in ids)
+            request.symbol_id.extend(uint32_value(item, "symbol_ids") for item in ids)
         return await unary_auth_decoded(
             self._transport,
             FeeServiceClient,

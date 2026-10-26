@@ -12,6 +12,7 @@ from polyester.codecs.decode.balances import (
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_asset_balance_bytes
+from polyester.codecs.scalars import int32_value, uint32_value
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
@@ -81,7 +82,7 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
     ) -> BalanceHistory:
         request = GetBalanceHistoryRequest(
             range=resolve_balance_range(range),
-            ledger=ledger,
+            ledger=uint32_value(ledger, "ledger"),
         )
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -89,7 +90,9 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
         if account_codes:
-            request.account_codes.extend(account_codes)
+            request.account_codes.extend(
+                int32_value(code, "account_codes") for code in account_codes
+            )
         return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,
@@ -117,7 +120,9 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
         if account_codes:
-            request.account_codes.extend(account_codes)
+            request.account_codes.extend(
+                int32_value(code, "account_codes") for code in account_codes
+            )
         return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,

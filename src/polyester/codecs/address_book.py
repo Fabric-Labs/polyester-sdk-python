@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, uint32_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import address_book_pb2
 from polyester.models.address_book import AddressBookTagInput
@@ -117,7 +117,9 @@ def create_entry_to_proto(
         if polychain_chain_id is not None:
             if int(polychain_chain_id) <= 0:
                 raise PolyesterValidationError("polychain_chain_id must be positive")
-            external.polychain_chain_id = int(polychain_chain_id)
+            external.polychain_chain_id = uint32_value(
+                polychain_chain_id, "polychain_chain_id", minimum=1
+            )
         request.external.CopyFrom(external)
     else:
         if not isinstance(smart_account_address, str) or not smart_account_address:

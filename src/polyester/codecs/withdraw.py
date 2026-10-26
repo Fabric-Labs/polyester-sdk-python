@@ -5,6 +5,7 @@ import time
 import uuid
 from decimal import Decimal
 
+from polyester.codecs.scalars import uint32_value, uint64_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
@@ -72,14 +73,16 @@ def trading_withdraw_payload_to_proto(
     if action_enum is None:
         raise PolyesterValidationError(f"unknown trading withdraw action: {action}")
     resolved_deadline = (
-        _default_deadline_ts_sec() if deadline_ts_sec is None else int(deadline_ts_sec)
+        _default_deadline_ts_sec()
+        if deadline_ts_sec is None
+        else uint64_value(deadline_ts_sec, "deadline_ts_sec")
     )
     if resolved_deadline <= 0:
         raise PolyesterValidationError("deadline_ts_sec must be non-zero")
     return withdraw_pb2.TradingWithdrawIntentPayload(
         action=action_enum,
-        asset_id=asset_id,
-        destination_chain_id=destination_chain_id,
+        asset_id=uint32_value(asset_id, "asset_id"),
+        destination_chain_id=uint64_value(destination_chain_id, "destination_chain_id"),
         amount_e18=str_to_u128_proto(amount, scale=amount_scale, asset_id=asset_id),
         deadline_ts_sec=resolved_deadline,
         nonce=_nonce_to_u128(nonce),

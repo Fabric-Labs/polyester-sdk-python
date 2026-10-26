@@ -7,6 +7,7 @@ from connectrpc.errors import ConnectError
 from google.protobuf.message import Message
 
 from polyester._wire import map_connect_error, protobuf_to_public_dict
+from polyester.codecs.request_rules import check_request_ranges
 from polyester.transport import TransportFactory
 
 TRequest = TypeVar("TRequest", bound=Message)
@@ -20,6 +21,7 @@ async def unary_public_message(
     call: Callable[..., Any],
     request: TRequest,
 ) -> TResponse:
+    check_request_ranges(request)
     client = transport.create_public_client(client_cls)
     try:
         response: TResponse = await call(client, request)
@@ -34,6 +36,7 @@ async def unary_auth_message(
     call: Callable[..., Any],
     request: TRequest,
 ) -> TResponse:
+    check_request_ranges(request)
     client = transport.create_auth_client(client_cls)
     try:
         response: TResponse = await call(client, request)

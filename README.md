@@ -644,7 +644,10 @@ async with subscription:
 
 List and heatmap `limit` arguments must be integers (booleans and other types
 are rejected for wire safety). Optional limits omit when unset so the server
-default applies; allowed ranges are enforced by each API, not a global SDK cap.
+default applies. Every integer you pass is checked before sending, against its
+field's type and against the API's published range for that field (for
+example a page `limit` of at most 1000): a value outside it raises
+`PolyesterValidationError` naming the field, and nothing is sent.
 Response fields named `ts_ns` are treated as epoch nanoseconds per the API
 contract.
 

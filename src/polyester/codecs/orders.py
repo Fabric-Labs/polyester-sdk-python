@@ -15,7 +15,7 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
-from polyester.codecs.scalars import id_to_int, omit_none, tick_count
+from polyester.codecs.scalars import id_to_int, omit_none, tick_count, uint32_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
@@ -226,7 +226,7 @@ def order_intent_from_request(
             "orders.create requires a resolved symbol_id; pass symbol_id or wait for catalogs"
         )
     intent = orders_pb2.OrderIntent(
-        symbol_id=int(request.symbol_id),
+        symbol_id=uint32_value(request.symbol_id, "symbol_id", minimum=1),
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
     )
     if request.qty is not None:
@@ -834,7 +834,7 @@ def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelIt
     proto = orders_pb2.BatchCancelItem()
     set_order_key(proto, key, op="each batch cancel item")
     if symbol_id is not None:
-        proto.symbol_id = int(symbol_id)
+        proto.symbol_id = uint32_value(symbol_id, "symbol_id", minimum=1)
     return proto
 
 
@@ -865,12 +865,12 @@ def cancel_all_after_to_proto(
 ) -> orders_pb2.CancelAllAfterRequest:
     proto = orders_pb2.CancelAllAfterRequest(
         request_id=optional_request_id(request_id) or f"cancel-after-{uuid.uuid4().hex[:12]}",
-        timeout_sec=timeout_sec,
+        timeout_sec=uint32_value(timeout_sec, "timeout_sec"),
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if symbol_id:
-        proto.symbol_id = int(symbol_id)
+        proto.symbol_id = uint32_value(symbol_id, "symbol_id", minimum=1)
     if side:
         key = side.lower()
         if key not in ORDER_SIDE_TO_PROTO:
@@ -891,7 +891,7 @@ def batch_replace_orders_to_proto(
     if symbol_id <= 0:
         raise PolyesterValidationError("batch_replace requires a resolved symbol_id")
     proto = orders_pb2.BatchReplaceOrdersRequest(
-        symbol_id=symbol_id,
+        symbol_id=uint32_value(symbol_id, "symbol_id", minimum=1),
         request_id=optional_request_id(request_id) or f"batch-replace-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
@@ -926,7 +926,7 @@ def modify_order_to_proto(
         raise PolyesterValidationError("modify requires a resolved symbol_id")
     proto = orders_pb2.ModifyOrderRequest(
         request_id=optional_request_id(request_id) or f"mod-{uuid.uuid4().hex[:12]}",
-        symbol_id=int(symbol_id),
+        symbol_id=uint32_value(symbol_id, "symbol_id", minimum=1),
     )
     set_order_key(proto, key, op="modify")
     if sub_account_id is not None:
@@ -975,9 +975,9 @@ def cancel_all_orders_to_proto(
         )
     resolved_ids: list[int] = []
     if symbol_ids:
-        resolved_ids = [int(value) for value in symbol_ids]
+        resolved_ids = [uint32_value(value, "cancel_all symbol_ids") for value in symbol_ids]
     elif symbol_id:
-        resolved_ids = [int(symbol_id)]
+        resolved_ids = [uint32_value(symbol_id, "cancel_all symbol_ids")]
     seen: set[int] = set()
     unique_ids: list[int] = []
     for value in resolved_ids:

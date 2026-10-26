@@ -5,6 +5,7 @@ from polyester.codecs.decode.deposit import (
     deposit_addresses_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.scalars import uint32_value
 from polyester.gen.chain.deposit.v1.deposit_connect import DepositAddressServiceClient
 from polyester.gen.chain.deposit.v1.deposit_pb2 import (
     CreateDepositAddressRequest,
@@ -28,7 +29,7 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> DepositAddressesList:
-        request = ListDepositAddressesRequest(chain_id=chain_id)
+        request = ListDepositAddressesRequest(chain_id=uint32_value(chain_id, "chain_id"))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -49,7 +50,7 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> DepositAddress:
-        request = CreateDepositAddressRequest(chain_id=chain_id)
+        request = CreateDepositAddressRequest(chain_id=uint32_value(chain_id, "chain_id"))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

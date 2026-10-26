@@ -4,7 +4,7 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import user_trades_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_user_trade_bytes
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, uint32_value, uint64_value
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import GetUserTradesRequest
@@ -82,7 +82,9 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         if lineage_id is not None:
             request.lineage_id = id_to_int(lineage_id, "lineage_id")
         if through_generation is not None:
-            request.through_generation = through_generation
+            request.through_generation = uint32_value(
+                through_generation, "trades.list through_generation", minimum=1
+            )
         if include_transfers:
             request.include_transfers = True
         if after_match_id is not None:
@@ -96,7 +98,9 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
                 symbol_id=symbol_id,
                 label="trades.list",
             )
-            request.after_match_id = int(after_match_id)
+            request.after_match_id = uint64_value(
+                after_match_id, "trades.list after_match_id", minimum=1
+            )
         elif symbol is not None or symbol_id is not None:
             request.symbol_id = resolve_symbol_id(
                 self._catalogs,

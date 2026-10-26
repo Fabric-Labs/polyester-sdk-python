@@ -8,6 +8,11 @@
   not have.
 
 ### Added
+- `OrderMutationResult` (from `orders.create`), `ModifyOrderResult` and
+  accepted `BatchCreateResultItem` entries carry `take_profit_trigger_id`,
+  `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public IDs of
+  the triggers created for the order's attached-risk legs. Each is set only
+  for a leg the order configured and is empty otherwise.
 - Trigger events label standalone trailing-stop activation as `activated`,
   and `trigger_event_type_from_label` accepts `activated` as a filter.
 

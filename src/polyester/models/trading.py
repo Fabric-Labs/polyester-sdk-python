@@ -129,6 +129,11 @@ class OrderMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     resolved_base_qty_scaled: str = ""
     resolved_base_qty: Quantity | None = None
     submitted_max_quote_debit_scaled: str = ""
+    # Trigger IDs of the attached-risk legs this order configured; empty for a
+    # leg the order does not have.
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+    trailing_stop_trigger_id: str = ""
 
 
 class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -226,6 +231,11 @@ class ModifyOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     old_order_id: str = ""
     final_order_id: str = ""
     code: str = ""
+    # Trigger IDs of the attached-risk legs this order configured; empty for a
+    # leg the order does not have.
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+    trailing_stop_trigger_id: str = ""
 
 
 class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -528,6 +538,11 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_order_id: str = ""
     code: str = ""
     rate_limit: RateLimitDetail | None = None
+    # Trigger IDs of the attached-risk legs this order configured; empty for a
+    # leg the order does not have.
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+    trailing_stop_trigger_id: str = ""
 
 
 class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):

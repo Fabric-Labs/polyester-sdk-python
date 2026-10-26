@@ -15,7 +15,7 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
-from polyester.codecs.scalars import id_to_int, omit_none
+from polyester.codecs.scalars import id_to_int, omit_none, tick_count
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
@@ -453,21 +453,9 @@ def _set_market_max_slippage(
             "market_ioc allows at most one of max_slippage_ticks or max_slippage_bps"
         )
     if ticks is not None:
-        market.max_slippage_ticks = _positive_int(ticks, "max_slippage_ticks")
+        market.max_slippage_ticks = tick_count(ticks, "max_slippage_ticks")
     elif bps is not None:
         market.max_slippage_bps = validate_bps(bps, "max_slippage_bps")
-
-
-def _positive_int(value: object, field_name: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, (int, str)):
-        raise PolyesterValidationError(f"{field_name} must be an integer")
-    try:
-        parsed = int(value)
-    except ValueError as exc:
-        raise PolyesterValidationError(f"{field_name} must be an integer") from exc
-    if parsed <= 0:
-        raise PolyesterValidationError(f"{field_name} must be positive")
-    return parsed
 
 
 def _risk_leg_model_to_dict(leg: RiskLeg) -> dict[str, Any]:
@@ -589,7 +577,7 @@ def _risk_execution_from_child(
                 price, f"{field_name}.child.limit_gtc.price", symbol=symbol
             )
         elif ticks is not None:
-            execution.limit_gtc.price_ticks = _positive_int(
+            execution.limit_gtc.price_ticks = tick_count(
                 ticks, f"{field_name}.child.limit_gtc.price_ticks"
             )
         else:
@@ -632,7 +620,7 @@ def _risk_leg_from_dict(
             trigger_price, f"{field_name}.trigger_price", symbol=symbol
         )
     elif trigger_ticks is not None:
-        ticks = _positive_int(trigger_ticks, f"{field_name}.trigger_price_ticks")
+        ticks = tick_count(trigger_ticks, f"{field_name}.trigger_price_ticks")
     else:
         raise PolyesterValidationError(f"{field_name} requires trigger_price")
 
@@ -687,7 +675,7 @@ def _trailing_stop_from_dict(
 
     proto = orders_pb2.TrailingStopPolicy()
     if dist_ticks is not None:
-        proto.trailing_distance_ticks = _positive_int(dist_ticks, "trailing_distance_ticks")
+        proto.trailing_distance_ticks = tick_count(dist_ticks, "trailing_distance_ticks")
     else:
         proto.trailing_distance_bps = validate_bps(dist_bps, "trailing_distance_bps")
 
@@ -698,7 +686,7 @@ def _trailing_stop_from_dict(
             "trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps"
         )
     if slip_ticks is not None:
-        proto.max_slippage_ticks = _positive_int(slip_ticks, "max_slippage_ticks")
+        proto.max_slippage_ticks = tick_count(slip_ticks, "max_slippage_ticks")
     if slip_bps is not None:
         proto.max_slippage_bps = validate_bps(slip_bps, "max_slippage_bps")
 
@@ -713,7 +701,7 @@ def _trailing_stop_from_dict(
             activation, "attached_risk.trailing_stop.activation_price", symbol=symbol
         )
     elif activation_ticks is not None:
-        proto.activation_price_ticks = _positive_int(activation_ticks, "activation_price_ticks")
+        proto.activation_price_ticks = tick_count(activation_ticks, "activation_price_ticks")
     return proto
 
 

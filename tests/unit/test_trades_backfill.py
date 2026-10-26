@@ -70,6 +70,30 @@ async def test_backfill_from_the_first_trade_sends_zero() -> None:
 
 
 @pytest.mark.asyncio
+async def test_empty_backfill_page_keeps_watermarks_and_epoch_ends() -> None:
+    # Nothing new in the window, but the walk still moves past an ended epoch.
+    capture = CaptureUnary(
+        marketdata_pb2.GetTradesResponse(
+            complete_through_trade_id=EPOCH_2_START,
+            next_after_trade_id=EPOCH_2_START,
+            epoch_ends=[
+                marketdata_pb2.TradeEpochEnd(epoch=1, last_trade_id=977),
+                marketdata_pb2.TradeEpochEnd(epoch=2, last_trade_id=EPOCH_2_START),
+            ],
+        )
+    )
+    with patch("polyester.services.market_data.unary_public_decoded", capture):
+        result = await _service().get_trades(symbol="BTC-USDT", after_trade_id=977)
+    assert result.trades == []
+    assert result.complete_through_trade_id == EPOCH_2_START
+    assert result.next_after_trade_id == EPOCH_2_START
+    assert result.epoch_ends == [
+        TradeEpochEnd(epoch=1, last_trade_id=977),
+        TradeEpochEnd(epoch=2, last_trade_id=EPOCH_2_START),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_listing_without_after_trade_id_leaves_it_unset() -> None:
     capture = CaptureUnary(marketdata_pb2.GetTradesResponse(next_page_token="cursor-2"))
     start = datetime(2026, 10, 27, 12, 0, tzinfo=UTC)

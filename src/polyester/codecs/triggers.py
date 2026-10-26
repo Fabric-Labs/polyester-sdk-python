@@ -5,7 +5,7 @@ from typing import Any
 from polyester.catalogs import CatalogManager
 from polyester.codecs.bps import validate_bps
 from polyester.codecs.correlation_id import optional_client_id
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, tick_count
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
@@ -42,14 +42,6 @@ LADDER_DISTRIBUTION_TO_PROTO = {
 }
 
 
-def _positive_ticks(value: object, field_name: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise PolyesterValidationError(f"{field_name} must be an integer")
-    if value <= 0:
-        raise PolyesterValidationError(f"{field_name} must be positive")
-    return value
-
-
 def _conditional_child(
     *,
     order_type: str,
@@ -78,7 +70,7 @@ def _conditional_child(
                 "a market child allows at most one of max_slippage_ticks or max_slippage_bps"
             )
         if max_slippage_ticks is not None:
-            market.max_slippage_ticks = _positive_ticks(max_slippage_ticks, "max_slippage_ticks")
+            market.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         elif max_slippage_bps is not None:
             market.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
         return child
@@ -225,7 +217,9 @@ def create_trigger_to_proto(
                 "the maximum price applies to buys only"
             )
         if trailing_distance_ticks is not None:
-            trailing.trailing_distance_ticks = trailing_distance_ticks
+            trailing.trailing_distance_ticks = tick_count(
+                trailing_distance_ticks, "trailing_distance_ticks"
+            )
         if trailing_distance_bps is not None:
             trailing.trailing_distance_bps = validate_bps(
                 trailing_distance_bps, "trailing_distance_bps"
@@ -235,7 +229,7 @@ def create_trigger_to_proto(
                 activation_price, "activation_price", symbol=symbol
             )  # type: ignore[arg-type]
         if max_slippage_ticks is not None:
-            trailing.max_slippage_ticks = max_slippage_ticks
+            trailing.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         if max_slippage_bps is not None:
             trailing.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
     elif type_key == "twap":
@@ -259,7 +253,9 @@ def create_trigger_to_proto(
                     "twap market_ioc allows at most one of max_slippage_ticks or max_slippage_bps"
                 )
             if max_slippage_ticks is not None:
-                twap.market_ioc.max_slippage_ticks = max_slippage_ticks
+                twap.market_ioc.max_slippage_ticks = tick_count(
+                    max_slippage_ticks, "max_slippage_ticks"
+                )
             elif max_slippage_bps is not None:
                 twap.market_ioc.max_slippage_bps = validate_bps(
                     max_slippage_bps, "max_slippage_bps"
@@ -363,7 +359,9 @@ def modify_trigger_to_proto(
     if limit_price is not None:
         proto.limit_price_ticks = resolve_price_ticks(limit_price, "limit_price")  # type: ignore[arg-type]
     if trailing_distance_ticks is not None:
-        proto.trailing_distance_ticks = trailing_distance_ticks
+        proto.trailing_distance_ticks = tick_count(
+            trailing_distance_ticks, "trailing_distance_ticks"
+        )
     if trailing_distance_bps is not None:
         proto.trailing_distance_bps = validate_bps(
             trailing_distance_bps,
@@ -373,7 +371,10 @@ def modify_trigger_to_proto(
     if activation_price is not None:
         proto.activation_price_ticks = resolve_price_ticks(activation_price, "activation_price")  # type: ignore[arg-type]
     if max_slippage_ticks is not None:
-        proto.max_slippage_ticks = max_slippage_ticks
+        # Zero clears the cap.
+        proto.max_slippage_ticks = tick_count(
+            max_slippage_ticks, "max_slippage_ticks", allow_zero=True
+        )
     if max_slippage_bps is not None:
         proto.max_slippage_bps = validate_bps(
             max_slippage_bps,

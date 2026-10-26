@@ -321,6 +321,12 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     time_in_force: str = ""
     qty: Quantity | None = None
     limit_price: Price | None = None
+    # Slippage cap of a stop-loss or take-profit market child: ``max_slippage``
+    # in ticks (as a Price delta) or ``max_slippage_bps``; both unset means the
+    # pair's default market slippage. Trailing stops report theirs on
+    # ``details.trailing``.
+    max_slippage: Price | None = None
+    max_slippage_bps: int = 0
     fee_asset: str = ""
     self_trade_prevention_mode: str = ""
     post_only: bool = False

@@ -213,6 +213,8 @@ class _TriggerConfig:
         "post_only",
         "limit_price",
         "trigger_price",
+        "max_slippage",
+        "max_slippage_bps",
     )
 
     def __init__(self) -> None:
@@ -223,6 +225,8 @@ class _TriggerConfig:
         self.post_only = False
         self.limit_price: Price | None = None
         self.trigger_price: Price | None = None
+        self.max_slippage: Price | None = None
+        self.max_slippage_bps = 0
 
 
 def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | None) -> None:
@@ -230,6 +234,12 @@ def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | Non
     if child.HasField("market_ioc"):
         cfg.order_type = "market"
         cfg.time_in_force = "ioc"
+        market = child.market_ioc
+        cap = market.WhichOneof("max_slippage")
+        if cap == "max_slippage_ticks":
+            cfg.max_slippage = _price(int(market.max_slippage_ticks), symbol=symbol)
+        elif cap == "max_slippage_bps":
+            cfg.max_slippage_bps = int(market.max_slippage_bps)
     elif child.HasField("limit_gtc"):
         cfg.order_type = "limit"
         cfg.time_in_force = "gtc"
@@ -317,6 +327,8 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
             symbol_id=int(msg.symbol_id),
         ),
         limit_price=cfg.limit_price,
+        max_slippage=cfg.max_slippage,
+        max_slippage_bps=cfg.max_slippage_bps,
         fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
         self_trade_prevention_mode=proto_enum_name(
             orders_pb2.SelfTradePreventionMode, msg.self_trade_prevention_mode

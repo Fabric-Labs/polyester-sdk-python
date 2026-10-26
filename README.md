@@ -480,6 +480,8 @@ A stop-loss or take-profit with `order_type="market"` takes an optional
 slippage cap, `max_slippage_ticks` (Q9 ticks) or `max_slippage_bps`, at most
 one; without one the pair's default market slippage applies. A limit child
 takes no cap (its limit price bounds it). Either side may use either child.
+Trigger reads show the cap as `max_slippage` (ticks, as a price delta) or
+`max_slippage_bps`; both unset means the pair default.
 
 ```python
 await client.triggers.create(

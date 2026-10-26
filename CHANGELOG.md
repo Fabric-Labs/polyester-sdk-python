@@ -14,6 +14,14 @@
 - A stop-loss or take-profit market child now carries its
   `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
   the cap silently, so the pair's default market slippage applied instead.
+- Trigger reads (`triggers.get`, `triggers.list` and the trigger stream)
+  show a stop-loss or take-profit market child's cap as
+  `Trigger.max_slippage` (ticks, as a price delta) or
+  `Trigger.max_slippage_bps`; earlier versions decoded every market child
+  the same way, cap or not.
+- Integer tick counts (`max_slippage_ticks`, `trailing_distance_ticks`,
+  attached-risk `*_ticks` fields) above the 64-bit range raise
+  `PolyesterValidationError` before sending instead of a raw `ValueError`.
 - Order reads no longer report an attached-risk leg whose state is
   `not_configured`; the server sends that state for a leg the order does
   not have.

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
+
 ### Added
 - Trigger events label standalone trailing-stop activation as `activated`,
   and `trigger_event_type_from_label` accepts `activated` as a filter.

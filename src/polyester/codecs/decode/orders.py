@@ -103,7 +103,8 @@ def _risk_execution_order_type(child) -> tuple[str, int | None]:
 
 
 def _attached_risk_state_from_proto(msg) -> AttachedRiskLegState | None:
-    if msg is None:
+    # NOT_CONFIGURED is the server's state for a leg the parent order does not have.
+    if msg is None or msg.status == orders_read_pb2.AttachedRiskLegState.NOT_CONFIGURED:
         return None
     return AttachedRiskLegState(
         status=(

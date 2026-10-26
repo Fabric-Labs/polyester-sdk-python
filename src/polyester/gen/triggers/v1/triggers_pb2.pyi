@@ -144,6 +144,7 @@ class TriggerFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_INTERNAL_ERROR: _ClassVar[TriggerFailureReason]
@@ -269,6 +270,7 @@ TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED: TriggerFailureReason
 TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION: TriggerFailureReason
 TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION: TriggerFailureReason
 TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED: TriggerFailureReason
+TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT: TriggerFailureReason
 TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_INTERNAL_ERROR: TriggerFailureReason
@@ -278,8 +280,12 @@ GEOMETRIC: LadderDistribution
 WEIGHTED_FAVORABLE: LadderDistribution
 
 class TriggerMarketIoc(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("max_slippage_ticks", "max_slippage_bps")
+    MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
+    max_slippage_ticks: int
+    max_slippage_bps: int
+    def __init__(self, max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ...) -> None: ...
 
 class TriggerLimitGtc(_message.Message):
     __slots__ = ("price_ticks", "post_only")
@@ -324,20 +330,22 @@ class ConditionalTrigger(_message.Message):
     def __init__(self, trigger_price_ticks: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., child: _Optional[_Union[ConditionalChildExecution, _Mapping]] = ...) -> None: ...
 
 class TrailingStopTrigger(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps", "side")
+    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps", "side", "limit_price_ticks")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRAILING_DISTANCE_BPS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     trailing_distance_bps: int
     activation_price_ticks: int
     max_slippage_ticks: int
     max_slippage_bps: int
     side: _orders_pb2.Side
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ...) -> None: ...
+    limit_price_ticks: int
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., limit_price_ticks: _Optional[int] = ...) -> None: ...
 
 class TwapMarketIoc(_message.Message):
     __slots__ = ("max_slippage_ticks", "max_slippage_bps")

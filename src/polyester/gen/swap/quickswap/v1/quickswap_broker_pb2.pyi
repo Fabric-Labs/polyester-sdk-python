@@ -432,6 +432,20 @@ class QuickSwapSummary(_message.Message):
     updated_at: _timestamp_pb2.Timestamp
     def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[_quickswap_pb2.QuickSwapStatus, str]] = ..., reason: _Optional[_Union[_quickswap_pb2.QuickSwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., terms: _Optional[_Union[_quickswap_pb2.QuickSwapTerms, _Mapping]] = ..., fees: _Optional[_Union[_quickswap_pb2.RequestedFees, _Mapping]] = ..., charged_fees: _Optional[_Iterable[_Union[_quickswap_pb2.ChargedFee, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
+class QuickSwapBrokerServiceGetQuickSwapRequest(_message.Message):
+    __slots__ = ("broker", "swap_id")
+    BROKER_FIELD_NUMBER: _ClassVar[int]
+    SWAP_ID_FIELD_NUMBER: _ClassVar[int]
+    broker: str
+    swap_id: int
+    def __init__(self, broker: _Optional[str] = ..., swap_id: _Optional[int] = ...) -> None: ...
+
+class QuickSwapBrokerServiceGetQuickSwapResponse(_message.Message):
+    __slots__ = ("quick_swap",)
+    QUICK_SWAP_FIELD_NUMBER: _ClassVar[int]
+    quick_swap: _quickswap_pb2.QuickSwap
+    def __init__(self, quick_swap: _Optional[_Union[_quickswap_pb2.QuickSwap, _Mapping]] = ...) -> None: ...
+
 class ListQuickSwapsRequest(_message.Message):
     __slots__ = ("broker", "vault_account_id", "statuses", "start_time", "end_time", "limit", "page_token")
     BROKER_FIELD_NUMBER: _ClassVar[int]

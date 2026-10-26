@@ -24,6 +24,11 @@ _TIMEFRAME_LABELS: dict[int, str] = {
     marketdata_pb2.DAY_1: "1d",
     marketdata_pb2.WEEK_1: "1w",
     marketdata_pb2.MONTH_1: "1mo",
+    marketdata_pb2.MIN_3: "3m",
+    marketdata_pb2.HOUR_2: "2h",
+    marketdata_pb2.HOUR_6: "6h",
+    marketdata_pb2.HOUR_8: "8h",
+    marketdata_pb2.DAY_3: "3d",
 }
 
 

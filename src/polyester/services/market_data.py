@@ -38,6 +38,11 @@ TIMEFRAME_ALIASES: dict[str, str] = {
     "1d": "DAY_1",
     "1w": "WEEK_1",
     "1mo": "MONTH_1",
+    "3m": "MIN_3",
+    "2h": "HOUR_2",
+    "6h": "HOUR_6",
+    "8h": "HOUR_8",
+    "3d": "DAY_3",
 }
 
 # Live Centrifugo channels use human labels (`1m`), not REST enum names (`MIN_1`).

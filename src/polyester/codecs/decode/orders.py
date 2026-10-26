@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from google.protobuf.message import Message
+
 from polyester.codecs.decode.balances import u128_from_proto
 from polyester.codecs.decode.invariants import (
     ts_ns_from_response,
@@ -103,7 +105,8 @@ def _risk_execution_order_type(child) -> tuple[str, int | None]:
 
 
 def _attached_risk_state_from_proto(msg) -> AttachedRiskLegState | None:
-    if msg is None:
+    # NOT_CONFIGURED is the server's state for a leg the parent order does not have.
+    if msg is None or msg.status == orders_read_pb2.AttachedRiskLegState.NOT_CONFIGURED:
         return None
     return AttachedRiskLegState(
         status=(
@@ -373,6 +376,17 @@ def _batch_cancel_item_status(value: int) -> str:
     return name if name in {"accepted", "rejected"} else ""
 
 
+def _leg_trigger_id(msg: Message, field_name: str) -> str:
+    """Public ID of an attached-risk leg trigger a response reports.
+
+    A leg the order does not configure is absent on the wire and stays empty.
+    """
+    if field_name not in msg.DESCRIPTOR.fields_by_name or not msg.HasField(field_name):
+        return ""
+    value = int(getattr(msg, field_name))
+    return format_uint64_id(value) if value else ""
+
+
 def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> OrderMutationResult:
     client_order_id = getattr(msg, "client_order_id", "") or ""
     message_name = msg.DESCRIPTOR.name
@@ -405,6 +419,9 @@ def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> Orde
             )
             else ""
         ),
+        take_profit_trigger_id=_leg_trigger_id(msg, "take_profit_trigger_id"),
+        stop_loss_trigger_id=_leg_trigger_id(msg, "stop_loss_trigger_id"),
+        trailing_stop_trigger_id=_leg_trigger_id(msg, "trailing_stop_trigger_id"),
     )
 
 
@@ -487,6 +504,9 @@ def modify_order_from_proto(msg: orders_pb2.ModifyOrderResponse) -> ModifyOrderR
         old_order_id=format_uint64_id(msg.old_order_id) if msg.old_order_id else "",
         final_order_id=format_uint64_id(msg.final_order_id) if msg.final_order_id else "",
         code=msg.code,
+        take_profit_trigger_id=_leg_trigger_id(msg, "take_profit_trigger_id"),
+        stop_loss_trigger_id=_leg_trigger_id(msg, "stop_loss_trigger_id"),
+        trailing_stop_trigger_id=_leg_trigger_id(msg, "trailing_stop_trigger_id"),
     )
 
 
@@ -695,6 +715,9 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             status="accepted",
             order_id=(format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""),
             client_order_id=item.client_order_id,
+            take_profit_trigger_id=_leg_trigger_id(item.accepted, "take_profit_trigger_id"),
+            stop_loss_trigger_id=_leg_trigger_id(item.accepted, "stop_loss_trigger_id"),
+            trailing_stop_trigger_id=_leg_trigger_id(item.accepted, "trailing_stop_trigger_id"),
         )
     if item.HasField("rejected"):
         raw_code = int(item.rejected.error.code)

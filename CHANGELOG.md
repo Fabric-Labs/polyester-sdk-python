@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a56
+
+Git tag: `v0.1.0a56`.
+
 ### Added
 - Trigger events label standalone trailing-stop activation as `activated`,
   and `trigger_event_type_from_label` accepts `activated` as a filter.

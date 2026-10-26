@@ -644,16 +644,20 @@ from polyester.models import (
     PrivateOrdersConnected,
     PrivateOrdersDisconnected,
     PrivateOrdersError,
+    PrivateOrdersReady,
     PrivateOrdersSnapshot,
     PrivateOrdersStale,
     PrivateOrdersUnit,
 )
 
-orders: dict[str, object] = {}
+orders = {order.order_id: order for order in (await client.orders.list_open()).orders}
 subscription = await client.orders.subscribe()  # default_account_id, or account_id=...
 async with subscription:
     async for event in subscription:
-        if isinstance(event, PrivateOrdersSnapshot):
+        if isinstance(event, PrivateOrdersReady):
+            # The stream now reflects every order read made before the subscribe.
+            print("ready")
+        elif isinstance(event, PrivateOrdersSnapshot):
             # The full live view: replace local state.
             orders = {order.order_id: order for order in event.orders}
         elif isinstance(event, PrivateOrdersUnit):
@@ -675,7 +679,14 @@ async with subscription:
   `PolyesterRealtimeError` with `code == "FORBIDDEN"`).
 - Orders are the same `Order` model the order reads return. Two copies with
   the same `version` are identical, and a higher `version` is newer. To merge
-  with a read, read `list_open()`, subscribe, and keep the higher version.
+  with a read: read `list_open()`, subscribe, wait for `PrivateOrdersReady`,
+  and keep the higher version of each order.
+- `PrivateOrdersReady` means the subscription reached the account's read
+  boundary, sampled when the server received the subscribe: from then on it
+  reflects every acknowledgement given before the subscribe. Wait for it
+  before relying on the stream. It comes once per server subscription, so
+  again after a resubscribe or reconnect, and a consumer that joins an
+  account that is already ready gets it right after its catch-up snapshot.
 - A sequence gap, an expired token or a dropped connection resumes from the
   last applied position. Consumers see `PrivateOrdersDisconnected` and then
   `PrivateOrdersConnected`; a position the server can no longer resume is

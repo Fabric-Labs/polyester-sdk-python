@@ -630,7 +630,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         Returns once the server confirmed the subscription. Iterate the
         events: ``PrivateOrdersSnapshot`` (the full live view; replace local
         state), ``PrivateOrdersUnit`` (changed orders, removed order IDs and
-        order events), ``PrivateOrdersStale``, ``PrivateOrdersConnected``,
+        order events), ``PrivateOrdersReady`` (the stream reflects every order
+        read made before the subscribe; wait for it before relying on the
+        stream), ``PrivateOrdersStale``, ``PrivateOrdersConnected``,
         ``PrivateOrdersDisconnected`` and ``PrivateOrdersError``. Orders are
         the same ``Order`` model the reads return; keep the copy with the
         higher ``version``. Gaps, expired tokens and reconnects resume from

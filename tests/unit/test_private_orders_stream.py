@@ -25,6 +25,7 @@ from polyester.models import (
     PrivateOrdersConnected,
     PrivateOrdersDisconnected,
     PrivateOrdersError,
+    PrivateOrdersReady,
     PrivateOrdersSnapshot,
     PrivateOrdersStale,
     PrivateOrdersUnit,
@@ -617,6 +618,85 @@ async def test_last_consumer_leaving_unsubscribes_and_closes_the_connection(
     assert (await conn.expect("unsubscribe")).sub == "s1"
     await asyncio.sleep(0.1)
     assert conn.close_code == 1000
+
+
+async def test_ready_follows_the_snapshot_once_per_server_subscription(
+    server: FakePrivateWsServer, stream: PrivateOrderStream
+) -> None:
+    sub, conn = await open_stream(server, stream)
+    await conn.snapshot("s1", "c1", [order(1)])
+    await conn.send("s1", 4, ready=pb.Ready())
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+    assert isinstance(await next_event(sub), PrivateOrdersReady)
+
+    # A repeated ready on the same server subscription is not delivered again.
+    await conn.send("s1", 5, ready=pb.Ready())
+    await conn.send("s1", 6, unit=pb.Unit(prev_cursor="c1", next_cursor="c2"))
+    assert isinstance(await next_event(sub), PrivateOrdersUnit)
+
+    # A resubscribe on the same connection starts a new server subscription.
+    await conn.send("s1", 9, covered=pb.Covered(cursor="c3"))
+    request = await conn.expect("subscribe")
+    assert request.cursor == "c2"
+    assert isinstance(await next_event(sub), PrivateOrdersDisconnected)
+    await conn.send("s2", subscribed=pb.Subscribed(id=request.id, account=ACCOUNT))
+    assert isinstance(await next_event(sub), PrivateOrdersConnected)
+    await conn.send("s2", 1, ready=pb.Ready())
+    assert isinstance(await next_event(sub), PrivateOrdersReady)
+
+
+async def test_ready_is_delivered_again_after_a_reconnect(
+    server: FakePrivateWsServer, stream: PrivateOrderStream
+) -> None:
+    sub, first = await open_stream(server, stream)
+    await first.snapshot("s1", "c1", [order(1)])
+    await first.send("s1", 4, ready=pb.Ready())
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+    assert isinstance(await next_event(sub), PrivateOrdersReady)
+
+    await first.close(1001)
+    assert isinstance(await next_event(sub), PrivateOrdersDisconnected)
+    second = await server.next_connection()
+    await second.expect("auth")
+    assert (await second.confirm("s2")).cursor == "c1"
+    assert isinstance(await next_event(sub), PrivateOrdersConnected)
+    # A resumed subscription sends no snapshot; ready still marks its read boundary.
+    await second.send("s2", 1, ready=pb.Ready())
+    assert isinstance(await next_event(sub), PrivateOrdersReady)
+
+
+async def test_late_joiner_of_a_ready_subscription_gets_snapshot_then_ready(
+    server: FakePrivateWsServer, stream: PrivateOrderStream
+) -> None:
+    sub, conn = await open_stream(server, stream)
+    await conn.snapshot("s1", "c1", [order(1), order(2)])
+    await conn.send("s1", 4, ready=pb.Ready())
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+    assert isinstance(await next_event(sub), PrivateOrdersReady)
+
+    late = await stream.subscribe(ACCOUNT_B58)
+    assert isinstance(await next_event(late), PrivateOrdersConnected)
+    catch_up = await next_event(late)
+    assert isinstance(catch_up, PrivateOrdersSnapshot)
+    assert [o.order_id for o in catch_up.orders] == [format_id(1), format_id(2)]
+    assert isinstance(await next_event(late), PrivateOrdersReady)
+    assert late._queue.empty()
+
+
+async def test_late_joiner_before_ready_gets_it_live(
+    server: FakePrivateWsServer, stream: PrivateOrderStream
+) -> None:
+    sub, conn = await open_stream(server, stream)
+    await conn.snapshot("s1", "c1", [order(1)])
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+
+    late = await stream.subscribe(ACCOUNT_B58)
+    assert isinstance(await next_event(late), PrivateOrdersConnected)
+    assert isinstance(await next_event(late), PrivateOrdersSnapshot)
+    assert late._queue.empty()
+    await conn.send("s1", 4, ready=pb.Ready())
+    assert isinstance(await next_event(sub), PrivateOrdersReady)
+    assert isinstance(await next_event(late), PrivateOrdersReady)
 
 
 async def test_subscribe_right_after_the_last_consumer_left_opens_a_new_connection(

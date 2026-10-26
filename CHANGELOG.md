@@ -8,7 +8,9 @@
   realtime channel, which no longer issues subscribe tokens. It yields
   `PrivateOrdersEvent` values instead of bare `Order` objects:
   `PrivateOrdersSnapshot` (the full live view), `PrivateOrdersUnit` (changed
-  orders, removed order IDs and order events), `PrivateOrdersStale`,
+  orders, removed order IDs and order events), `PrivateOrdersReady` (the
+  stream reflects every order read made before the subscribe; wait for it
+  before relying on the stream), `PrivateOrdersStale`,
   `PrivateOrdersConnected`, `PrivateOrdersDisconnected` and
   `PrivateOrdersError`. Orders are the same `Order` model the reads return.
   The stream resumes from its last position after a gap, an expired token or

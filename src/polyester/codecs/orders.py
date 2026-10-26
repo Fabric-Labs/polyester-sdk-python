@@ -855,6 +855,14 @@ def batch_cancel_orders_to_proto(
     return proto
 
 
+def _cancel_all_after_timeout(timeout_sec: object) -> int:
+    """0 turns the switch off; 10 to 120 arms or refreshes it (the contract's range)."""
+    value = uint32_value(timeout_sec, "timeout_sec")
+    if value != 0 and not 10 <= value <= 120:
+        raise PolyesterValidationError("timeout_sec must be 0 or between 10 and 120")
+    return value
+
+
 def cancel_all_after_to_proto(
     *,
     sub_account_id: str | int | None = None,
@@ -865,7 +873,7 @@ def cancel_all_after_to_proto(
 ) -> orders_pb2.CancelAllAfterRequest:
     proto = orders_pb2.CancelAllAfterRequest(
         request_id=optional_request_id(request_id) or f"cancel-after-{uuid.uuid4().hex[:12]}",
-        timeout_sec=uint32_value(timeout_sec, "timeout_sec"),
+        timeout_sec=_cancel_all_after_timeout(timeout_sec),
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")

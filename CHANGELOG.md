@@ -19,6 +19,14 @@
   `limit_price`; earlier versions ignored them.
 
 ### Fixed
+- An error code this SDK version does not know yet no longer crashes error
+  handling with `ValueError`. Orders, auth, withdraw and transfer errors
+  raise the usual `PolyesterApiError` with `code` set to
+  `UNKNOWN_ERROR_CODE(<number>)`; an orders error that carries rate-limit
+  details is still a `PolyesterRateLimitError`.
+- With `wire_format="json"`, responses that contain fields or enum names
+  this SDK version does not know yet decode instead of failing. Unknown enum
+  names read as the unspecified value.
 - Every caller-supplied integer bound for a request field is checked before
   sending: an integer outside its field's type (for example `ladder_levels`,
   `twap_duration_ms`, `cancel_all_after(timeout_sec=...)`, a page `limit`, a
@@ -26,7 +34,10 @@
   `PolyesterValidationError` naming the field instead of a raw `ValueError`.
   Requests are also checked against the API's published integer ranges (for
   example a page `limit` of at most 1000, or 2 to 100 `ladder_levels`), so an
-  out-of-range value fails before it is sent.
+  out-of-range value fails before it is sent. A TWAP needs a
+  `twap_duration_ms` of at least 1000 and a `twap_slice_interval_ms` from 100
+  to that duration, and `cancel_all_after` takes a `timeout_sec` of 0 (off) or
+  10 to 120.
 - A stop-loss or take-profit market child now carries its
   `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
   the cap silently, so the pair's default market slippage applied instead.
@@ -82,16 +93,6 @@
   `get_candles(..., include_reference=True)` requests that series.
   `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the
   catalog scale is known; `volume_24h_base_scaled` stays the integer.
-
-### Fixed
-- An error code this SDK version does not know yet no longer crashes error
-  handling with `ValueError`. Orders, auth, withdraw and transfer errors
-  raise the usual `PolyesterApiError` with `code` set to
-  `UNKNOWN_ERROR_CODE(<number>)`; an orders error that carries rate-limit
-  details is still a `PolyesterRateLimitError`.
-- With `wire_format="json"`, responses that contain fields or enum names
-  this SDK version does not know yet decode instead of failing. Unknown enum
-  names read as the unspecified value.
 
 ## 0.1.0a55
 

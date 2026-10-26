@@ -5,7 +5,14 @@ from typing import Any
 from polyester.catalogs import CatalogManager
 from polyester.codecs.bps import MAX_BPS, MAX_SELL_SLIPPAGE_BPS, validate_bps
 from polyester.codecs.correlation_id import optional_client_id
-from polyester.codecs.scalars import id_to_int, int32_value, int64_value, tick_count, uint32_value
+from polyester.codecs.scalars import (
+    INT64_MAX,
+    bounded_int,
+    id_to_int,
+    int32_value,
+    tick_count,
+    uint32_value,
+)
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
@@ -246,12 +253,21 @@ def create_trigger_to_proto(
     elif type_key == "twap":
         twap = intent.twap
         twap.side = side_proto
-        if twap_duration_ms is not None:
-            twap.duration_ms = int64_value(twap_duration_ms, "twap_duration_ms")
-        if twap_slice_interval_ms is not None:
-            twap.slice_interval_ms = int64_value(
-                twap_slice_interval_ms, "twap_slice_interval_ms"
+        # The contract requires a duration of at least 1 s and a slice interval
+        # from 100 ms up to the duration.
+        if twap_duration_ms is None or twap_slice_interval_ms is None:
+            raise PolyesterValidationError(
+                "twap requires twap_duration_ms and twap_slice_interval_ms"
             )
+        twap.duration_ms = bounded_int(
+            twap_duration_ms, "twap_duration_ms", minimum=1_000, maximum=INT64_MAX
+        )
+        twap.slice_interval_ms = bounded_int(
+            twap_slice_interval_ms,
+            "twap_slice_interval_ms",
+            minimum=100,
+            maximum=twap.duration_ms,
+        )
         # TWAP children are market-IOC or limit-GTC only.
         if order_key == "limit":
             if limit_price is not None:

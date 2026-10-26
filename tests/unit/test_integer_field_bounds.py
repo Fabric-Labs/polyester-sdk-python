@@ -357,3 +357,57 @@ def test_range_check_explicit_presence_zero_is_checked() -> None:
     with pytest.raises(PolyesterValidationError, match="after_match_id must be > 0"):
         check_request_ranges(request)
     check_request_ranges(ledger_read_pb2.GetBalanceHistoryRequest(ledger=7))
+
+
+# --- message-level contract ranges (expressed as rule expressions, not field rules)
+
+
+def _twap(**overrides: object):
+    kwargs: dict[str, object] = {
+        "symbol": "BTC-USDT",
+        "symbol_id": 1,
+        "trigger_type": "twap",
+        "side": "sell",
+        "qty": "0.01",
+        "quantity_scale": 8,
+        "twap_duration_ms": 1_000,
+        "twap_slice_interval_ms": 100,
+    }
+    kwargs.update(overrides)
+    return create_trigger_to_proto(**kwargs)  # type: ignore[arg-type]
+
+
+def test_twap_duration_and_interval_follow_the_contract() -> None:
+    twap = _twap().trigger.twap
+    assert (twap.duration_ms, twap.slice_interval_ms) == (1_000, 100)
+    assert _twap(twap_slice_interval_ms=1_000).trigger.twap.slice_interval_ms == 1_000
+    with pytest.raises(PolyesterValidationError, match="twap_duration_ms must be between 1000"):
+        _twap(twap_duration_ms=999)
+    with pytest.raises(
+        PolyesterValidationError, match="twap_slice_interval_ms must be between 100"
+    ):
+        _twap(twap_slice_interval_ms=99)
+    with pytest.raises(
+        PolyesterValidationError, match="twap_slice_interval_ms must be between 100 and 1000"
+    ):
+        _twap(twap_slice_interval_ms=1_001)
+    with pytest.raises(PolyesterValidationError, match="requires twap_duration_ms and"):
+        _twap(twap_duration_ms=None)
+
+
+@pytest.mark.parametrize("timeout", [0, 10, 120])
+def test_cancel_all_after_accepts_off_or_10_to_120(timeout: int) -> None:
+    from polyester.codecs.orders import cancel_all_after_to_proto
+
+    assert cancel_all_after_to_proto(timeout_sec=timeout).timeout_sec == timeout
+
+
+@pytest.mark.parametrize("timeout", [1, 9, 121])
+@pytest.mark.asyncio
+async def test_cancel_all_after_rejects_other_timeouts_without_sending(timeout: int) -> None:
+    transport = MagicMock()
+    with pytest.raises(
+        PolyesterValidationError, match="timeout_sec must be 0 or between 10 and 120"
+    ):
+        await AsyncOrdersService(transport, _catalogs(), None).cancel_all_after(timeout_sec=timeout)
+    _assert_not_sent(transport)

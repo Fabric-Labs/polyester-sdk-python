@@ -82,6 +82,8 @@ def test_twap_market_ioc_encodes_optional_slippage() -> None:
             side="buy",
             qty="1",
             quantity_scale=8,
+            twap_duration_ms=60_000,
+            twap_slice_interval_ms=5_000,
             max_slippage_bps=10_001,
         )
 

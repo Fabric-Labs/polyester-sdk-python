@@ -10,6 +10,7 @@ from polyester.models.market import (
     CandlesResult,
     MarketTrade,
     MarketTradesResult,
+    TradeEpochEnd,
 )
 
 _TIMEFRAME_LABELS: dict[int, str] = {
@@ -67,7 +68,13 @@ def market_trades_from_proto(
         trades=[
             market_trade_from_proto(item, quantity_scale=quantity_scale) for item in msg.trades
         ],
-        next_match_id=msg.next_page_token,
+        next_page_token=msg.next_page_token,
+        complete_through_trade_id=int(msg.complete_through_trade_id),
+        next_after_trade_id=int(msg.next_after_trade_id),
+        epoch_ends=[
+            TradeEpochEnd(epoch=int(item.epoch), last_trade_id=int(item.last_trade_id))
+            for item in msg.epoch_ends
+        ],
     )
 
 

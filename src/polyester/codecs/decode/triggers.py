@@ -213,6 +213,8 @@ class _TriggerConfig:
         "post_only",
         "limit_price",
         "trigger_price",
+        "max_slippage",
+        "max_slippage_bps",
     )
 
     def __init__(self) -> None:
@@ -223,6 +225,8 @@ class _TriggerConfig:
         self.post_only = False
         self.limit_price: Price | None = None
         self.trigger_price: Price | None = None
+        self.max_slippage: Price | None = None
+        self.max_slippage_bps = 0
 
 
 def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | None) -> None:
@@ -230,6 +234,12 @@ def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | Non
     if child.HasField("market_ioc"):
         cfg.order_type = "market"
         cfg.time_in_force = "ioc"
+        market = child.market_ioc
+        cap = market.WhichOneof("max_slippage")
+        if cap == "max_slippage_ticks":
+            cfg.max_slippage = _price(int(market.max_slippage_ticks), symbol=symbol)
+        elif cap == "max_slippage_bps":
+            cfg.max_slippage_bps = int(market.max_slippage_bps)
     elif child.HasField("limit_gtc"):
         cfg.order_type = "limit"
         cfg.time_in_force = "gtc"
@@ -257,13 +267,18 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
         if conditional.HasField("child"):
             _child_execution_projection(conditional.child, cfg, symbol=symbol)
     elif has_field(msg, "trailing_stop"):
-        # Trailing stops execute as market-IOC; side is on the wire
-        # so attached trailing opposite the parent is preserved on decode.
+        # Side is on the wire so attached trailing opposite the parent is
+        # preserved on decode. A sell fires a market IOC child; a buy fires an
+        # IOC limit child capped at its maximum price (``limit_price``).
         trailing = msg.trailing_stop
         cfg.trigger_type = "trailing_stop"
         cfg.side = proto_enum_name(orders_pb2.Side, trailing.side)
-        cfg.order_type = "market"
         cfg.time_in_force = "ioc"
+        if trailing.limit_price_ticks:
+            cfg.order_type = "limit"
+            cfg.limit_price = _price(trailing.limit_price_ticks, symbol=symbol)
+        else:
+            cfg.order_type = "market"
     elif has_field(msg, "twap"):
         twap = msg.twap
         cfg.trigger_type = "twap"
@@ -312,6 +327,8 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
             symbol_id=int(msg.symbol_id),
         ),
         limit_price=cfg.limit_price,
+        max_slippage=cfg.max_slippage,
+        max_slippage_bps=cfg.max_slippage_bps,
         fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
         self_trade_prevention_mode=proto_enum_name(
             orders_pb2.SelfTradePreventionMode, msg.self_trade_prevention_mode

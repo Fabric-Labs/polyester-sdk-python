@@ -143,7 +143,9 @@ def test_market_trades_from_proto() -> None:
     assert len(result.trades) == 1
     trade = market_trade_from_proto(msg.trades[0])
     assert trade.match_id == "55"
-    assert result.next_match_id == "56"
+    assert result.next_page_token == "56"
+    assert result.complete_through_trade_id == 0
+    assert result.epoch_ends == []
 
 
 def test_market_overview_list_from_proto() -> None:

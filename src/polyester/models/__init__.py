@@ -75,6 +75,18 @@ from polyester.models.policies import (
     SubaccountPoliciesList,
     SubaccountPolicy,
 )
+from polyester.models.private_orders import (
+    PrivateOrderCommandOutcome,
+    PrivateOrderEvent,
+    PrivateOrderFill,
+    PrivateOrdersConnected,
+    PrivateOrdersDisconnected,
+    PrivateOrdersError,
+    PrivateOrdersEvent,
+    PrivateOrdersSnapshot,
+    PrivateOrdersStale,
+    PrivateOrdersUnit,
+)
 from polyester.models.ratelimit import RateLimitDetail
 from polyester.models.sub_accounts import (
     CreateSubaccountResult,
@@ -247,6 +259,16 @@ __all__ = [
     "OrderFieldViolation",
     "OrderLineage",
     "OrderTransfer",
+    "PrivateOrderCommandOutcome",
+    "PrivateOrderEvent",
+    "PrivateOrderFill",
+    "PrivateOrdersConnected",
+    "PrivateOrdersDisconnected",
+    "PrivateOrdersError",
+    "PrivateOrdersEvent",
+    "PrivateOrdersSnapshot",
+    "PrivateOrdersStale",
+    "PrivateOrdersUnit",
     "RateLimitConfig",
     "RateLimitDetail",
     "ZipperReasonDetails",

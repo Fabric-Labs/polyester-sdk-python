@@ -87,6 +87,21 @@ class PrivateOrdersStale:
 
 
 @dataclass(frozen=True, slots=True)
+class PrivateOrdersReady:
+    """The subscription reached the account's read boundary, sampled when the
+    server received the subscribe.
+
+    From here the stream reflects at least every acknowledgement given before
+    the subscribe, including every order read made before it. Wait for it
+    before relying on the stream: read, subscribe, wait for ready, then merge
+    by ``version``. Delivered once per server subscription, so again after a
+    resubscribe or reconnect.
+    """
+
+    type: Literal["ready"] = "ready"
+
+
+@dataclass(frozen=True, slots=True)
 class PrivateOrdersConnected:
     """The server confirmed the subscription; again after each reconnect or resubscribe."""
 
@@ -123,6 +138,7 @@ PrivateOrdersEvent = (
     PrivateOrdersSnapshot
     | PrivateOrdersUnit
     | PrivateOrdersStale
+    | PrivateOrdersReady
     | PrivateOrdersConnected
     | PrivateOrdersDisconnected
     | PrivateOrdersError
@@ -136,6 +152,7 @@ __all__ = [
     "PrivateOrdersDisconnected",
     "PrivateOrdersError",
     "PrivateOrdersEvent",
+    "PrivateOrdersReady",
     "PrivateOrdersSnapshot",
     "PrivateOrdersStale",
     "PrivateOrdersUnit",

@@ -38,6 +38,7 @@ from polyester.models.private_orders import (
     PrivateOrdersDisconnected,
     PrivateOrdersError,
     PrivateOrdersEvent,
+    PrivateOrdersReady,
     PrivateOrdersSnapshot,
     PrivateOrdersStale,
 )
@@ -111,6 +112,8 @@ class _Subscription:
     # The last connection state consumers were told about.
     state: Literal["pending", "connected", "disconnected"] = "pending"
     stale: bool = False
+    # The current server subscription reported Ready; reset on every new server subscription.
+    ready: bool = False
     # Subscribe attempts since the subscription last delivered data; drives retry backoff.
     retries: int = 0
     retry_handle: asyncio.TimerHandle | None = None
@@ -226,6 +229,8 @@ class PrivateOrderStream:
             self._deliver_to(s, consumer, PrivateOrdersConnected())
         if s.orders is not None:
             self._deliver_to(s, consumer, PrivateOrdersSnapshot(orders=list(s.orders.values())))
+        if s.ready:
+            self._deliver_to(s, consumer, PrivateOrdersReady())
         if s.stale:
             self._deliver_to(s, consumer, PrivateOrdersStale(stale=True))
 
@@ -445,6 +450,7 @@ class PrivateOrderStream:
             s.sub = ""
             s.seq = 0
             s.staged = None
+            s.ready = False
 
     def _shutdown(self) -> None:
         ws = self._ws
@@ -569,6 +575,7 @@ class PrivateOrderStream:
         s.sub = ""
         s.seq = 0
         s.staged = None
+        s.ready = False
         if s.retries > 0:
             self._retry_subscribe(ws, s)
         else:
@@ -659,6 +666,9 @@ class PrivateOrderStream:
         elif kind == "ready":
             # A resumed subscription on a quiet account delivers no data, only this.
             s.retries = 0
+            if not s.ready:
+                s.ready = True
+                self._deliver(s, PrivateOrdersReady())
         elif kind in ("unavailable", "available"):
             s.stale = kind == "unavailable"
             self._deliver(s, PrivateOrdersStale(stale=s.stale))
@@ -683,6 +693,7 @@ class PrivateOrderStream:
         s = request.subscription
         s.sub = msg.sub
         s.seq = 0
+        s.ready = False
         s.confirmed = True
         self._by_sub[msg.sub] = s
         if s.state != "connected":

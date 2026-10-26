@@ -11,10 +11,11 @@ Git tag: `v0.1.0a56`.
   and `trigger_event_type_from_label` accepts `activated` as a filter.
 
 ### Changed
-- Trading prices now use fixed 9-decimal price ticks (one tick is 1e-9 quote
-  units), matching the API. This covers order, trigger, trailing-stop,
-  ladder, order-book, trade, candle, and market-overview prices and
-  `Price.from_ticks`. Earlier SDK versions encode and decode prices at 6
+- **Breaking:** trading prices now use fixed 9-decimal price ticks (one tick
+  is 1e-9 quote units), matching the API. This covers order, trigger,
+  trailing-stop, ladder, order-book, trade, candle, and market-overview
+  prices and `Price.from_ticks`. Raw tick values built for the old 6-decimal
+  scale are 1,000 times too small: multiply them by 1,000 or pass decimals. Earlier SDK versions encode and decode prices at 6
   decimals, which is 1,000 times off against the current API; upgrade
   before trading. Integer `max_slippage_ticks` values are 64-bit Q9 ticks.
 - Candle and market-overview base volume now use the base asset

@@ -16,7 +16,6 @@ from polyester.models.market import (
     MarketOverviewEntry,
     MarketOverviewList,
     MarketTrade,
-    MarketTradesResult,
 )
 from polyester.models.trading import (
     ApiKeysList,
@@ -244,18 +243,6 @@ def decode_market_trade(data: dict[str, Any], *, quantity_scale: int) -> MarketT
             context="MarketTrade",
             empty_when_zero=True,
         ),
-    )
-
-
-def decode_market_trades_list(data: dict[str, Any], *, quantity_scale: int) -> MarketTradesResult:
-    trades = [
-        decode_market_trade(item, quantity_scale=quantity_scale)
-        for item in _field(data, "trades", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return MarketTradesResult(
-        trades=trades,
-        next_match_id=str(_field(data, "nextMatchId", "next_match_id", default="") or ""),
     )
 
 

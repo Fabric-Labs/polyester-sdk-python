@@ -43,6 +43,7 @@ from polyester.models import (
     BatchReplaceStatusResult,
     CancelAllAfterResult,
     CancelAllOrdersResult,
+    CancelledOrder,
     GetOrderResult,
     ModifyOrderResult,
     OrderErrorDetail,
@@ -535,6 +536,15 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
         matched_orders=int(msg.matched_orders),
         submitted_cancels=int(msg.submitted_cancels),
         failed_cancels=int(msg.failed_cancels),
+        cancelled_orders=[
+            CancelledOrder(
+                order_id=format_uint64_id(item.order_id),
+                client_order_id=item.client_order_id,
+            )
+            for item in msg.cancelled_orders
+        ],
+        total_cancelled=int(msg.total_cancelled),
+        truncated=bool(msg.truncated),
     )
 
 

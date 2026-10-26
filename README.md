@@ -373,6 +373,12 @@ and per-item phases by polling `get_batch_replace_status`. Use
 to `working`, `rejected`, or `terminal`, not as a finality signal. Retry an
 ambiguous batch request with the same `request_id`.
 
+`cancel_all(...)` requests cancellation of every matching order. The result
+lists up to 200 of them, oldest first, in `cancelled_orders` (each with
+`order_id` and `client_order_id`); `total_cancelled` counts all of them and
+`truncated` is true when the list is shorter. Each order's final state comes
+from the order stream and reads. A dry run lists none.
+
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
@@ -469,6 +475,45 @@ that runtime `AttachedRiskLegState` at `.state` with `status`, nanosecond
 armed/terminal timestamps, `trigger_id`, and `child_order_id`; absent policy
 fields remain unset. `Order` also exposes `post_only`. Create/modify accept the
 same policy shape as a dict or `AttachedRisk`.
+
+A stop-loss or take-profit with `order_type="market"` takes an optional
+slippage cap, `max_slippage_ticks` (Q9 ticks) or `max_slippage_bps`, at most
+one; without one the pair's default market slippage applies. A limit child
+takes no cap (its limit price bounds it). Either side may use either child.
+
+```python
+await client.triggers.create(
+    symbol="BTC-USDT",
+    trigger_type="stop_loss",
+    side="sell",
+    qty="0.01",
+    trigger_price="83000",
+    order_type="market",
+    max_slippage_bps=50,
+)
+```
+
+A standalone trailing stop may sell or buy. A buy trailing stop tracks the
+lowest price and fires when the price rises the trailing distance from it.
+It requires `limit_price`, its maximum price: the most its child pays per
+unit (a 9-decimal string or `Decimal`, or `Price.from_ticks` for ticks),
+fixed at create. A sell trailing stop takes no `limit_price`.
+
+```python
+await client.triggers.create(
+    symbol="BTC-USDT",
+    trigger_type="trailing_stop",
+    side="buy",
+    qty="0.01",
+    trailing_distance_bps=100,
+    limit_price="85000",
+)
+```
+
+Trigger reads show a buy trailing stop with `side="buy"`,
+`order_type="limit"`, `time_in_force="ioc"` and its maximum price as
+`limit_price`; `details.trailing.trough_price` is the lowest price tracked so
+far (`peak_price` for a sell).
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
@@ -586,6 +631,29 @@ are rejected for wire safety). Optional limits omit when unset so the server
 default applies; allowed ranges are enforced by each API, not a global SDK cap.
 Response fields named `ts_ns` are treated as epoch nanoseconds per the API
 contract.
+
+`get_trades()` lists trades newest first. Narrow it with `start_time` /
+`end_time` (inclusive), `side` (`"buy"` or `"sell"` aggressor), and page with
+`page_token=result.next_page_token`.
+
+To backfill trades a live stream missed, walk by trade ID instead: oldest
+first and gap-free. Start from `after_trade_id=0` (or the last trade ID you
+hold) and pass each result's `next_after_trade_id` to the next call. Every
+trade up to `complete_through_trade_id` is returned, across trade-ID epoch
+ends (`epoch_ends`). When `next_after_trade_id` equals the ID you sent,
+nothing newer is available yet; retry later with backoff. `after_trade_id`
+cannot be combined with the time range, side or page token.
+
+```python
+after = 0
+while True:
+    page = await client.market_data.get_trades(symbol="BTC-USDT", after_trade_id=after, limit=1000)
+    for trade in page.trades:
+        handle(trade)
+    if page.next_after_trade_id == after:
+        break  # caught up; resume later from `after`
+    after = page.next_after_trade_id
+```
 
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its

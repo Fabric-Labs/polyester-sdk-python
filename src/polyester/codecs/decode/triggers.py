@@ -257,13 +257,18 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
         if conditional.HasField("child"):
             _child_execution_projection(conditional.child, cfg, symbol=symbol)
     elif has_field(msg, "trailing_stop"):
-        # Trailing stops execute as market-IOC; side is on the wire
-        # so attached trailing opposite the parent is preserved on decode.
+        # Side is on the wire so attached trailing opposite the parent is
+        # preserved on decode. A sell fires a market IOC child; a buy fires an
+        # IOC limit child capped at its maximum price (``limit_price``).
         trailing = msg.trailing_stop
         cfg.trigger_type = "trailing_stop"
         cfg.side = proto_enum_name(orders_pb2.Side, trailing.side)
-        cfg.order_type = "market"
         cfg.time_in_force = "ioc"
+        if trailing.limit_price_ticks:
+            cfg.order_type = "limit"
+            cfg.limit_price = _price(trailing.limit_price_ticks, symbol=symbol)
+        else:
+            cfg.order_type = "market"
     elif has_field(msg, "twap"):
         twap = msg.twap
         cfg.trigger_type = "twap"

@@ -238,11 +238,29 @@ class ModifyOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     trailing_stop_trigger_id: str = ""
 
 
+class CancelledOrder(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One order whose cancellation a cancel-all requested."""
+
+    order_id: str
+    client_order_id: str = ""
+
+
 class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Cancel-all outcome.
+
+    ``cancelled_orders`` lists up to 200 orders whose cancellation was
+    requested, oldest first; ``total_cancelled`` counts all of them and
+    ``truncated`` is true when the list is shorter than that. Each order's
+    final state comes from the order stream and reads. Empty for a dry run.
+    """
+
     status: str = ""
     matched_orders: int = 0
     submitted_cancels: int = 0
     failed_cancels: int = 0
+    cancelled_orders: list[CancelledOrder] = []
+    total_cancelled: int = 0
+    truncated: bool = False
 
 
 class TriggerStopDetails(msgspec.Struct, kw_only=True, omit_defaults=True):

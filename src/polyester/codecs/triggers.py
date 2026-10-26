@@ -42,6 +42,14 @@ LADDER_DISTRIBUTION_TO_PROTO = {
 }
 
 
+def _positive_ticks(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise PolyesterValidationError(f"{field_name} must be an integer")
+    if value <= 0:
+        raise PolyesterValidationError(f"{field_name} must be positive")
+    return value
+
+
 def _conditional_child(
     *,
     order_type: str,
@@ -49,18 +57,36 @@ def _conditional_child(
     limit_price: Any | None,
     post_only: bool,
     symbol: str,
+    max_slippage_ticks: int | None = None,
+    max_slippage_bps: int | None = None,
 ) -> triggers_pb2.ConditionalChildExecution:
     """Map flat order_type/tif/post_only onto a conditional child execution.
 
     market -> market_ioc; limit+gtc -> limit_gtc; limit+ioc -> limit_ioc;
-    limit+fok -> limit_fok. ``post_only`` is only valid for limit GTC.
+    limit+fok -> limit_fok. ``post_only`` is only valid for limit GTC. A
+    market child takes at most one slippage cap (``max_slippage_ticks`` or
+    ``max_slippage_bps``); without one the pair's default applies.
     """
     child = triggers_pb2.ConditionalChildExecution()
     if order_type == "market":
         if post_only:
             raise PolyesterValidationError("post_only is only valid for limit GTC executions")
-        child.market_ioc.SetInParent()
+        market = child.market_ioc
+        market.SetInParent()
+        if max_slippage_ticks is not None and max_slippage_bps is not None:
+            raise PolyesterValidationError(
+                "a market child allows at most one of max_slippage_ticks or max_slippage_bps"
+            )
+        if max_slippage_ticks is not None:
+            market.max_slippage_ticks = _positive_ticks(max_slippage_ticks, "max_slippage_ticks")
+        elif max_slippage_bps is not None:
+            market.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
         return child
+    if max_slippage_ticks is not None or max_slippage_bps is not None:
+        raise PolyesterValidationError(
+            "max_slippage_ticks and max_slippage_bps apply to a market child only; "
+            "a limit child is capped by its limit price"
+        )
     price_ticks = (
         resolve_price_ticks(limit_price, "limit_price", symbol=symbol)  # type: ignore[arg-type]
         if limit_price is not None
@@ -174,17 +200,30 @@ def create_trigger_to_proto(
                 limit_price=limit_price,
                 post_only=post_only,
                 symbol=symbol,
+                max_slippage_ticks=max_slippage_ticks,
+                max_slippage_bps=max_slippage_bps,
             )
         )
         getattr(intent, type_key).CopyFrom(conditional)
     elif type_key == "trailing_stop":
-        # Standalone trailing create remains sell-only; the wire always
-        # populates the wire ``side`` field (attached trailing may use either).
-        if side_key != "sell":
-            raise PolyesterValidationError("trailing_stop only supports side=sell")
+        # A buy trailing stop needs its maximum price (the most its child pays
+        # per unit); a sell trailing stop must not carry one.
         trailing = intent.trailing_stop
         trailing.SetInParent()
         trailing.side = side_proto
+        if side_key == "buy":
+            if limit_price is None:
+                raise PolyesterValidationError(
+                    "trailing_stop with side=buy requires limit_price (the maximum price)"
+                )
+            trailing.limit_price_ticks = resolve_price_ticks(
+                limit_price, "limit_price", symbol=symbol
+            )  # type: ignore[arg-type]
+        elif limit_price is not None:
+            raise PolyesterValidationError(
+                "trailing_stop with side=sell does not take limit_price; "
+                "the maximum price applies to buys only"
+            )
         if trailing_distance_ticks is not None:
             trailing.trailing_distance_ticks = trailing_distance_ticks
         if trailing_distance_bps is not None:

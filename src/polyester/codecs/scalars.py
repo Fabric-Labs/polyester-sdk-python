@@ -114,7 +114,7 @@ def parse_price_ticks(raw: str | Decimal, field_name: str = "price") -> int:
 
 
 def format_price_ticks(ticks: int) -> str:
-    """Convert int6 price ticks to a decimal string (inverse of parse_price_ticks)."""
+    """Convert Q9 price ticks to a decimal string (inverse of parse_price_ticks)."""
     neg = ticks < 0
     digits = str(abs(int(ticks)))
     padded = digits.zfill(PRICE_TICK_SCALE + 1)

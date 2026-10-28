@@ -11,6 +11,11 @@
   `limit_price`; earlier versions ignored them.
 
 ### Fixed
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  the client defaults now use the documented `api.devnet.polyester.com` host.
 - A stop-loss or take-profit market child now carries its
   `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
   the cap silently, so the pair's default market slippage applied instead.

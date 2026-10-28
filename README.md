@@ -139,7 +139,7 @@ asyncio.run(main())
 
 Pass an `environment` preset so API, websocket, RPC, and contract pins stay
 together. `POLYESTER_DEVNET_ENVIRONMENT` is the constructor default.
-`POLYESTER_TESTNET_ENVIRONMENT` targets public testnet (`api-testnet.polyester.com`,
+`POLYESTER_TESTNET_ENVIRONMENT` targets public testnet (`api.testnet.polyester.com`,
 chain `888169`). Custom / VPC endpoints use `create_polyester_environment` or
 `environment.with_urls(...)`. `api_url` / `ws_url` remain as transport overrides.
 

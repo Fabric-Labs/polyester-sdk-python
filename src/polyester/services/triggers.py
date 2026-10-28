@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
+from decimal import Decimal
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.triggers import (
@@ -41,6 +42,7 @@ from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
+from polyester.types.money import Price
 
 
 class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
@@ -136,7 +138,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         qty: str,
         trigger_price: str | None = None,
         order_type: str = "market",
-        limit_price: str | None = None,
+        limit_price: str | Decimal | Price | None = None,
         trigger_price_source: str = "last",
         tif: str = "gtc",
         sub_account_id: str | None = None,
@@ -156,6 +158,14 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ladder_levels: int | None = None,
         ladder_distribution: str | None = None,
     ) -> TriggerMutationResult:
+        """Create a standalone trigger.
+
+        ``limit_price`` is the child's limit price for a limit stop-loss or
+        take-profit. For ``trigger_type="trailing_stop"`` with ``side="buy"`` it
+        is the required maximum price, the most the child pays per unit (a
+        9-decimal string or ``Decimal``, or ``Price.from_ticks`` for ticks);
+        a sell trailing stop takes none. The maximum price is fixed at create.
+        """
         await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)
         request = create_trigger_to_proto(

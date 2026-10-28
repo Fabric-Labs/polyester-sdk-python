@@ -6,7 +6,54 @@
 
 Git tag: `v0.1.0a56`.
 
+### Breaking
+- `market_data.get_trades()` drops `from_match_id`, which never reached the
+  API (it failed before sending), and `MarketTradesResult.next_match_id` is
+  now `next_page_token`. Page a listing with `page_token`.
+- A stop-loss or take-profit with a limit child now rejects
+  `max_slippage_ticks` / `max_slippage_bps`, and a sell trailing stop rejects
+  `limit_price`; earlier versions ignored them.
+
+### Fixed
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  the client defaults now use the documented `api.devnet.polyester.com` host.
+- A stop-loss or take-profit market child now carries its
+  `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
+  the cap silently, so the pair's default market slippage applied instead.
+- Trigger reads (`triggers.get`, `triggers.list` and the trigger stream)
+  show a stop-loss or take-profit market child's cap as
+  `Trigger.max_slippage` (ticks, as a price delta) or
+  `Trigger.max_slippage_bps`; earlier versions decoded every market child
+  the same way, cap or not.
+- Integer tick counts (`max_slippage_ticks`, `trailing_distance_ticks`,
+  attached-risk `*_ticks` fields) above the 64-bit range raise
+  `PolyesterValidationError` before sending instead of a raw `ValueError`.
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
+
 ### Added
+- Standalone buy trailing stops: `triggers.create(trigger_type="trailing_stop",
+  side="buy", limit_price=...)`, where `limit_price` is the required maximum
+  price (decimal or `Price.from_ticks`). Trigger reads show a buy trailing
+  stop as an IOC limit child with its maximum price as `limit_price`, and
+  `details.trailing.trough_price` as the lowest price tracked.
+- `CancelAllOrdersResult.cancelled_orders` (up to 200 `CancelledOrder`
+  entries with `order_id` and `client_order_id`, oldest first),
+  `total_cancelled` and `truncated`.
+- Gap-free public trade backfill: `market_data.get_trades(after_trade_id=...)`
+  walks a market's trades by trade ID, oldest first. Results carry
+  `complete_through_trade_id`, `next_after_trade_id` and `epoch_ends`
+  (`TradeEpochEnd`). `get_trades()` also accepts `start_time`, `end_time`,
+  `side` and `page_token`.
+- `OrderMutationResult` (from `orders.create`), `ModifyOrderResult` and
+  accepted `BatchCreateResultItem` entries carry `take_profit_trigger_id`,
+  `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public IDs of
+  the triggers created for the order's attached-risk legs. Each is set only
+  for a leg the order configured and is empty otherwise.
 - Trigger events label standalone trailing-stop activation as `activated`,
   and `trigger_event_type_from_label` accepts `activated` as a filter.
 
@@ -25,6 +72,16 @@ Git tag: `v0.1.0a56`.
   `get_candles(..., include_reference=True)` requests that series.
   `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the
   catalog scale is known; `volume_24h_base_scaled` stays the integer.
+
+### Fixed
+- An error code this SDK version does not know yet no longer crashes error
+  handling with `ValueError`. Orders, auth, withdraw and transfer errors
+  raise the usual `PolyesterApiError` with `code` set to
+  `UNKNOWN_ERROR_CODE(<number>)`; an orders error that carries rate-limit
+  details is still a `PolyesterRateLimitError`.
+- With `wire_format="json"`, responses that contain fields or enum names
+  this SDK version does not know yet decode instead of failing. Unknown enum
+  names read as the unspecified value.
 
 ## 0.1.0a55
 

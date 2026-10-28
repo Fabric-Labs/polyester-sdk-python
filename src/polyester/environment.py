@@ -299,8 +299,8 @@ def environment_from_name(name: str) -> PolyesterEnvironment:
 
 POLYESTER_DEVNET_ENVIRONMENT = create_polyester_environment(
     name="polyester-devnet",
-    api_url="https://api-devnet.polyester.ai",
-    websocket_url="wss://api-devnet.polyester.ai",
+    api_url="https://api.devnet.polyester.com",
+    websocket_url="wss://api.devnet.polyester.com",
     rpc_url="https://rpc.polyester.tech",
     chain_id=888168,
     chain_name="Polyester Chain Devnet",
@@ -332,8 +332,8 @@ POLYESTER_DEVNET_ENVIRONMENT = create_polyester_environment(
 
 POLYESTER_TESTNET_ENVIRONMENT = create_polyester_environment(
     name="polyester-testnet",
-    api_url="https://api-testnet.polyester.com",
-    websocket_url="wss://api-testnet.polyester.com",
+    api_url="https://api.testnet.polyester.com",
+    websocket_url="wss://api.testnet.polyester.com",
     rpc_url="https://rpc.polyester.live",
     chain_id=888169,
     chain_name="Polyester Chain Testnet",

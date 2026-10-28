@@ -104,6 +104,27 @@ def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
     return scaled
 
 
+def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> int:
+    """Validate a caller-supplied integer tick count for an int64 wire field.
+
+    Accepts an ``int`` or a base-10 integer string; rejects booleans, values
+    below 1 (below 0 with ``allow_zero``, where zero clears a cap) and values
+    above ``INT64_MAX``.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise PolyesterValidationError(f"{field_name} must be an integer")
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise PolyesterValidationError(f"{field_name} must be an integer") from exc
+    if parsed < 0 or (parsed == 0 and not allow_zero):
+        qualifier = "non-negative" if allow_zero else "positive"
+        raise PolyesterValidationError(f"{field_name} must be {qualifier}")
+    if parsed > INT64_MAX:
+        raise PolyesterValidationError(f"{field_name} exceeds int64 range")
+    return parsed
+
+
 def parse_price_ticks(raw: str | Decimal, field_name: str = "price") -> int:
     scaled = decimal_to_scaled(raw, PRICE_TICK_SCALE, field_name)
     if scaled < 0:
@@ -114,7 +135,7 @@ def parse_price_ticks(raw: str | Decimal, field_name: str = "price") -> int:
 
 
 def format_price_ticks(ticks: int) -> str:
-    """Convert int6 price ticks to a decimal string (inverse of parse_price_ticks)."""
+    """Convert Q9 price ticks to a decimal string (inverse of parse_price_ticks)."""
     neg = ticks < 0
     digits = str(abs(int(ticks)))
     padded = digits.zfill(PRICE_TICK_SCALE + 1)

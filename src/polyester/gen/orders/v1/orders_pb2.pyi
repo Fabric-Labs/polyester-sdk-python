@@ -210,6 +210,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER: _ClassVar[ErrorCode]
     ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_QUICKSWAP_DISABLED: _ClassVar[ErrorCode]
     ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED: _ClassVar[ErrorCode]
     ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE: _ClassVar[ErrorCode]
@@ -224,6 +225,11 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
     ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
     ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING: _ClassVar[ErrorCode]
+    ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_ORDER_REPAIRING: _ClassVar[ErrorCode]
+    ERROR_CODE_ACCOUNT_REPAIRING: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -442,6 +448,7 @@ ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH: ErrorCode
 ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER: ErrorCode
 ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE: ErrorCode
 ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE: ErrorCode
+ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN: ErrorCode
 ERROR_CODE_QUICKSWAP_DISABLED: ErrorCode
 ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED: ErrorCode
 ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE: ErrorCode
@@ -456,6 +463,11 @@ ERROR_CODE_ATTACHED_EXIT_WORKING: ErrorCode
 ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED: ErrorCode
 ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED: ErrorCode
 ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED: ErrorCode
+ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING: ErrorCode
+ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN: ErrorCode
+ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN: ErrorCode
+ERROR_CODE_ORDER_REPAIRING: ErrorCode
+ERROR_CODE_ACCOUNT_REPAIRING: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -724,8 +736,16 @@ class CancelAllOrdersRequest(_message.Message):
     request_id: str
     def __init__(self, subaccount_id: _Optional[int] = ..., symbol_ids: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ...) -> None: ...
 
+class CancelledOrder(_message.Message):
+    __slots__ = ("order_id", "client_order_id")
+    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    order_id: int
+    client_order_id: str
+    def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ...) -> None: ...
+
 class CancelAllOrdersResponse(_message.Message):
-    __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns")
+    __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns", "cancelled_orders", "total_cancelled", "truncated")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[CancelAllOrdersResponse.Status]
@@ -740,13 +760,19 @@ class CancelAllOrdersResponse(_message.Message):
     FAILED_CANCELS_FIELD_NUMBER: _ClassVar[int]
     TS_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
+    CANCELLED_ORDERS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_CANCELLED_FIELD_NUMBER: _ClassVar[int]
+    TRUNCATED_FIELD_NUMBER: _ClassVar[int]
     status: CancelAllOrdersResponse.Status
     matched_orders: int
     submitted_cancels: int
     failed_cancels: int
     ts: _timestamp_pb2.Timestamp
     ts_ns: int
-    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    cancelled_orders: _containers.RepeatedCompositeFieldContainer[CancelledOrder]
+    total_cancelled: int
+    truncated: bool
+    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., cancelled_orders: _Optional[_Iterable[_Union[CancelledOrder, _Mapping]]] = ..., total_cancelled: _Optional[int] = ..., truncated: _Optional[bool] = ...) -> None: ...
 
 class CancelAllAfterRequest(_message.Message):
     __slots__ = ("subaccount_id", "timeout_sec", "symbol_id", "side", "request_id")

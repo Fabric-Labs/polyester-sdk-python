@@ -11,7 +11,9 @@ from polyester.codecs.decode.market_data import (
     market_trades_from_proto,
 )
 from polyester.codecs.realtime_decode import decode_candle_point_bytes
+from polyester.codecs.scalars import UINT64_MAX
 from polyester.errors import PolyesterValidationError
+from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import (
     GetCandlesRequest,
@@ -38,8 +40,17 @@ TIMEFRAME_ALIASES: dict[str, str] = {
     "1d": "DAY_1",
     "1w": "WEEK_1",
     "1mo": "MONTH_1",
+    "3m": "MIN_3",
+    "2h": "HOUR_2",
+    "6h": "HOUR_6",
+    "8h": "HOUR_8",
+    "3d": "DAY_3",
 }
 
+_TRADE_SIDE_FILTERS: dict[str, marketdata_pb2.SideFilter] = {
+    "buy": marketdata_pb2.BUY,
+    "sell": marketdata_pb2.SELL,
+}
 # Live Centrifugo channels use human labels (`1m`), not REST enum names (`MIN_1`).
 _CHANNEL_TIMEFRAME_ALIASES: dict[str, str] = {}
 for _label, _enum_name in TIMEFRAME_ALIASES.items():
@@ -76,9 +87,39 @@ class AsyncMarketDataService(BaseService):
         symbol: str | None = None,
         symbol_id: int | None = None,
         limit: int = 100,
-        from_match_id: int | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        side: str | None = None,
+        page_token: str | None = None,
+        after_trade_id: int | None = None,
     ) -> MarketTradesResult:
+        """List public trades for one market.
+
+        By default trades come newest first; ``start_time`` / ``end_time``
+        (inclusive), ``side`` (``"buy"`` or ``"sell"`` aggressor) and
+        ``page_token`` (the previous result's ``next_page_token``) narrow and
+        page them.
+
+        With ``after_trade_id`` the call instead walks the market's trades by
+        trade ID, oldest first and gap-free, to backfill trades a live stream
+        missed: pass ``0`` to start from the first trade, then the result's
+        ``next_after_trade_id``. Every trade up to ``complete_through_trade_id``
+        is returned; when ``next_after_trade_id`` equals the ``after_trade_id``
+        you sent, nothing newer is available yet, so retry later with backoff.
+        ``after_trade_id`` cannot be combined with the time range, side or
+        page token.
+        """
         validated_limit = validate_limit(limit)
+        if after_trade_id is not None:
+            if isinstance(after_trade_id, bool) or not isinstance(after_trade_id, int):
+                raise PolyesterValidationError("get_trades after_trade_id must be an integer")
+            if after_trade_id < 0 or after_trade_id > UINT64_MAX:
+                raise PolyesterValidationError("get_trades after_trade_id exceeds uint64 range")
+            if start_time is not None or end_time is not None or side or page_token:
+                raise PolyesterValidationError(
+                    "get_trades after_trade_id cannot be combined with "
+                    "start_time, end_time, side or page_token"
+                )
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,
@@ -89,8 +130,19 @@ class AsyncMarketDataService(BaseService):
             self._catalogs, resolved_symbol_id, label="get_trades"
         )
         request = GetTradesRequest(symbol_id=resolved_symbol_id, limit=validated_limit)
-        if from_match_id is not None:
-            request.from_match_id = from_match_id
+        if start_time is not None:
+            request.start_time.CopyFrom(_datetime_to_timestamp(start_time))
+        if end_time is not None:
+            request.end_time.CopyFrom(_datetime_to_timestamp(end_time))
+        if side:
+            side_key = side.lower()
+            if side_key not in _TRADE_SIDE_FILTERS:
+                raise PolyesterValidationError("get_trades side must be 'buy' or 'sell'")
+            request.side = _TRADE_SIDE_FILTERS[side_key]
+        if page_token:
+            request.page_token = page_token
+        if after_trade_id is not None:
+            request.after_trade_id = after_trade_id
         return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,

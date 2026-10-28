@@ -129,6 +129,11 @@ class OrderMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     resolved_base_qty_scaled: str = ""
     resolved_base_qty: Quantity | None = None
     submitted_max_quote_debit_scaled: str = ""
+    # Trigger IDs of the attached-risk legs this order configured; empty for a
+    # leg the order does not have.
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+    trailing_stop_trigger_id: str = ""
 
 
 class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -226,13 +231,36 @@ class ModifyOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     old_order_id: str = ""
     final_order_id: str = ""
     code: str = ""
+    # Trigger IDs of the attached-risk legs this order configured; empty for a
+    # leg the order does not have.
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+    trailing_stop_trigger_id: str = ""
+
+
+class CancelledOrder(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One order whose cancellation a cancel-all requested."""
+
+    order_id: str
+    client_order_id: str = ""
 
 
 class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Cancel-all outcome.
+
+    ``cancelled_orders`` lists up to 200 orders whose cancellation was
+    requested, oldest first; ``total_cancelled`` counts all of them and
+    ``truncated`` is true when the list is shorter than that. Each order's
+    final state comes from the order stream and reads. Empty for a dry run.
+    """
+
     status: str = ""
     matched_orders: int = 0
     submitted_cancels: int = 0
     failed_cancels: int = 0
+    cancelled_orders: list[CancelledOrder] = []
+    total_cancelled: int = 0
+    truncated: bool = False
 
 
 class TriggerStopDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -293,6 +321,12 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     time_in_force: str = ""
     qty: Quantity | None = None
     limit_price: Price | None = None
+    # Slippage cap of a stop-loss or take-profit market child: ``max_slippage``
+    # in ticks (as a Price delta) or ``max_slippage_bps``; both unset means the
+    # pair's default market slippage. Trailing stops report theirs on
+    # ``details.trailing``.
+    max_slippage: Price | None = None
+    max_slippage_bps: int = 0
     fee_asset: str = ""
     self_trade_prevention_mode: str = ""
     post_only: bool = False
@@ -528,6 +562,11 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_order_id: str = ""
     code: str = ""
     rate_limit: RateLimitDetail | None = None
+    # Trigger IDs of the attached-risk legs this order configured; empty for a
+    # leg the order does not have.
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+    trailing_stop_trigger_id: str = ""
 
 
 class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):

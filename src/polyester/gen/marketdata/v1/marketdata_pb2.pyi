@@ -23,13 +23,18 @@ class Timeframe(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TIMEFRAME_UNSPECIFIED: _ClassVar[Timeframe]
     SEC_1: _ClassVar[Timeframe]
     MIN_1: _ClassVar[Timeframe]
+    MIN_3: _ClassVar[Timeframe]
     MIN_5: _ClassVar[Timeframe]
     MIN_15: _ClassVar[Timeframe]
     MIN_30: _ClassVar[Timeframe]
     HOUR_1: _ClassVar[Timeframe]
+    HOUR_2: _ClassVar[Timeframe]
     HOUR_4: _ClassVar[Timeframe]
-    DAY_1: _ClassVar[Timeframe]
+    HOUR_6: _ClassVar[Timeframe]
+    HOUR_8: _ClassVar[Timeframe]
     HOUR_12: _ClassVar[Timeframe]
+    DAY_1: _ClassVar[Timeframe]
+    DAY_3: _ClassVar[Timeframe]
     WEEK_1: _ClassVar[Timeframe]
     MONTH_1: _ClassVar[Timeframe]
 
@@ -47,13 +52,18 @@ SELL: SideFilter
 TIMEFRAME_UNSPECIFIED: Timeframe
 SEC_1: Timeframe
 MIN_1: Timeframe
+MIN_3: Timeframe
 MIN_5: Timeframe
 MIN_15: Timeframe
 MIN_30: Timeframe
 HOUR_1: Timeframe
+HOUR_2: Timeframe
 HOUR_4: Timeframe
-DAY_1: Timeframe
+HOUR_6: Timeframe
+HOUR_8: Timeframe
 HOUR_12: Timeframe
+DAY_1: Timeframe
+DAY_3: Timeframe
 WEEK_1: Timeframe
 MONTH_1: Timeframe
 PAIR_STATUS_UNSPECIFIED: PairStatus
@@ -64,20 +74,22 @@ PAIR_STATUS_POST_ONLY: PairStatus
 PAIR_STATUS_REDUCE_ONLY: PairStatus
 
 class GetTradesRequest(_message.Message):
-    __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "page_token")
+    __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "page_token", "after_trade_id")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     START_TIME_FIELD_NUMBER: _ClassVar[int]
     END_TIME_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    AFTER_TRADE_ID_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     limit: int
     start_time: _timestamp_pb2.Timestamp
     end_time: _timestamp_pb2.Timestamp
     side: SideFilter
     page_token: str
-    def __init__(self, symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., side: _Optional[_Union[SideFilter, str]] = ..., page_token: _Optional[str] = ...) -> None: ...
+    after_trade_id: int
+    def __init__(self, symbol_id: _Optional[int] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., side: _Optional[_Union[SideFilter, str]] = ..., page_token: _Optional[str] = ..., after_trade_id: _Optional[int] = ...) -> None: ...
 
 class MarketTrade(_message.Message):
     __slots__ = ("symbol_id", "match_id", "is_buy", "price_ticks", "qty_scaled", "ts_ns")
@@ -101,13 +113,27 @@ class MarketTradeBatch(_message.Message):
     events: _containers.RepeatedCompositeFieldContainer[MarketTrade]
     def __init__(self, events: _Optional[_Iterable[_Union[MarketTrade, _Mapping]]] = ...) -> None: ...
 
+class TradeEpochEnd(_message.Message):
+    __slots__ = ("epoch", "last_trade_id")
+    EPOCH_FIELD_NUMBER: _ClassVar[int]
+    LAST_TRADE_ID_FIELD_NUMBER: _ClassVar[int]
+    epoch: int
+    last_trade_id: int
+    def __init__(self, epoch: _Optional[int] = ..., last_trade_id: _Optional[int] = ...) -> None: ...
+
 class GetTradesResponse(_message.Message):
-    __slots__ = ("trades", "next_page_token")
+    __slots__ = ("trades", "next_page_token", "complete_through_trade_id", "next_after_trade_id", "epoch_ends")
     TRADES_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    COMPLETE_THROUGH_TRADE_ID_FIELD_NUMBER: _ClassVar[int]
+    NEXT_AFTER_TRADE_ID_FIELD_NUMBER: _ClassVar[int]
+    EPOCH_ENDS_FIELD_NUMBER: _ClassVar[int]
     trades: _containers.RepeatedCompositeFieldContainer[MarketTrade]
     next_page_token: str
-    def __init__(self, trades: _Optional[_Iterable[_Union[MarketTrade, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    complete_through_trade_id: int
+    next_after_trade_id: int
+    epoch_ends: _containers.RepeatedCompositeFieldContainer[TradeEpochEnd]
+    def __init__(self, trades: _Optional[_Iterable[_Union[MarketTrade, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., complete_through_trade_id: _Optional[int] = ..., next_after_trade_id: _Optional[int] = ..., epoch_ends: _Optional[_Iterable[_Union[TradeEpochEnd, _Mapping]]] = ...) -> None: ...
 
 class GetCandlesRequest(_message.Message):
     __slots__ = ("symbol_id", "timeframe", "limit", "start_time", "end_time", "include_incomplete", "include_reference", "page_token")

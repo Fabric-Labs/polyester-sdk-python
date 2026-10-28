@@ -398,3 +398,49 @@ def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:
     assert result.status == "accepted"
     assert result.order_id == format_id(42)
     assert result.client_order_id == ""
+
+
+def test_order_from_proto_omits_not_configured_attached_risk_legs() -> None:
+    from polyester.gen.orders.v1.orders_read_pb2 import (
+        AttachedRisk as ProtoAttachedRisk,
+    )
+    from polyester.gen.orders.v1.orders_read_pb2 import (
+        AttachedRiskLegState,
+        AttachedRiskStopLoss,
+        AttachedRiskTakeProfit,
+        AttachedRiskTrailingStop,
+    )
+
+    not_configured = AttachedRiskLegState(status=AttachedRiskLegState.NOT_CONFIGURED)
+    msg = Order(
+        order_id=4,
+        symbol_id=1,
+        attached_risk=ProtoAttachedRisk(
+            take_profit=AttachedRiskTakeProfit(
+                policy=orders_pb2.TakeProfitPolicy(
+                    trigger_price_ticks=2000000000000,
+                    child=orders_pb2.RiskExecution(market_ioc=orders_pb2.RiskMarketIoc()),
+                ),
+                state=AttachedRiskLegState(
+                    status=AttachedRiskLegState.CREATED, trigger_id=5584097434927106
+                ),
+            ),
+            stop_loss=AttachedRiskStopLoss(state=not_configured),
+            trailing_stop=AttachedRiskTrailingStop(state=not_configured),
+            oco=True,
+        ),
+    )
+    risk = order_from_proto(msg).attached_risk
+    assert risk is not None
+    assert risk.take_profit is not None
+    assert risk.stop_loss is None
+    assert risk.trailing_stop is None
+
+    only_unconfigured = Order(
+        order_id=5,
+        symbol_id=1,
+        attached_risk=ProtoAttachedRisk(
+            trailing_stop=AttachedRiskTrailingStop(state=not_configured)
+        ),
+    )
+    assert order_from_proto(only_unconfigured).attached_risk is None

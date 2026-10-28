@@ -60,6 +60,15 @@ def proto_enum_name(enum_type: EnumTypeWrapper, value: int) -> str:
     return str(value)
 
 
+def error_code_name(enum_type: EnumTypeWrapper, value: int) -> str:
+    """Name of a server error code, or ``UNKNOWN_ERROR_CODE(n)`` for a number
+    this SDK's generated enum does not define yet."""
+    try:
+        return enum_type.Name(value)
+    except (ValueError, TypeError):
+        return f"UNKNOWN_ERROR_CODE({value})"
+
+
 def has_field(message: Message, field_name: str) -> bool:
     try:
         return message.HasField(field_name)

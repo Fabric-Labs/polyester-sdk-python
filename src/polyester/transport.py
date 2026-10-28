@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 import httpx
-from connectrpc.codec import proto_binary_codec, proto_json_codec
+from connectrpc.codec import proto_binary_codec
 from connectrpc.interceptor import UnaryInterceptor
+from google.protobuf.json_format import MessageToJson, Parse
+from google.protobuf.message import Message
 
 from polyester.auth import ApiKeyCredentials
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
@@ -16,9 +18,28 @@ WireFormat = Literal["binary", "json"]
 MAX_CONNECT_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
+class _ProtoJSONCodec:
+    """Protobuf JSON codec that ignores fields and enum names this SDK does not
+    know yet (the server adds them ahead of SDK releases); unknown enum names
+    read as the unspecified value, unknown enum numbers stay numbers."""
+
+    def name(self) -> str:
+        return "json"
+
+    def encode(self, message: Message) -> bytes:
+        return MessageToJson(message).encode()
+
+    def decode(self, data: bytes | bytearray, message: Message) -> Message:
+        Parse(bytes(data), message, ignore_unknown_fields=True)
+        return message
+
+
+_PROTO_JSON_CODEC = _ProtoJSONCodec()
+
+
 def codec_for_config(config: TransportConfig):
     if config.wire_format == "json":
-        return proto_json_codec()
+        return _PROTO_JSON_CODEC
     return proto_binary_codec()
 
 

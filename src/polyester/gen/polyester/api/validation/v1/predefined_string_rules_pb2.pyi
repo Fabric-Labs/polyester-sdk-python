@@ -9,3 +9,5 @@ EVM_ADDRESS_FIELD_NUMBER: _ClassVar[int]
 evm_address: _descriptor.FieldDescriptor
 CHAIN_TX_IDENTIFIER_FIELD_NUMBER: _ClassVar[int]
 chain_tx_identifier: _descriptor.FieldDescriptor
+DISPLAY_LABEL_FIELD_NUMBER: _ClassVar[int]
+display_label: _descriptor.FieldDescriptor

@@ -14,9 +14,32 @@ class MarketTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
     ts_ns: str = ""
 
 
+class TradeEpochEnd(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Where one epoch of a market's trade IDs ended.
+
+    Trade IDs of epoch ``e`` lie between ``(e-1) * 2**40`` and ``e * 2**40``;
+    ``last_trade_id`` is ``(epoch-1) * 2**40`` for an epoch without trades.
+    """
+
+    epoch: int
+    last_trade_id: int
+
+
 class MarketTradesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Public trades. ``next_page_token`` pages a newest-first listing.
+
+    The backfill fields are set only for a call with ``after_trade_id``:
+    every trade up to ``complete_through_trade_id`` exists and is returned;
+    ``next_after_trade_id`` is the next call's ``after_trade_id`` (equal to the
+    one sent when nothing newer is available yet); ``epoch_ends`` lists the
+    epochs that ended in the walked range.
+    """
+
     trades: list[MarketTrade]
-    next_match_id: str = ""
+    next_page_token: str = ""
+    complete_through_trade_id: int = 0
+    next_after_trade_id: int = 0
+    epoch_ends: list[TradeEpochEnd] = []
 
 
 class Candle(msgspec.Struct, kw_only=True, omit_defaults=True):

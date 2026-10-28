@@ -60,6 +60,11 @@ class QuickSwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     OUTCOME_RECONCILING: _ClassVar[QuickSwapReason]
     SOURCE_SCREENING_BLOCKED: _ClassVar[QuickSwapReason]
     REFUND_BELOW_MINIMUM: _ClassVar[QuickSwapReason]
+    DEPOSIT_ADDRESS_CONFLICT: _ClassVar[QuickSwapReason]
+    DEPOSIT_ADDRESS_ALREADY_USED: _ClassVar[QuickSwapReason]
+    DEPOSIT_ADDRESS_RETIRED: _ClassVar[QuickSwapReason]
+    DEPOSIT_ADDRESS_NOT_ISSUED: _ClassVar[QuickSwapReason]
+    INTERMEDIATE_BELOW_MINIMUM: _ClassVar[QuickSwapReason]
 
 class WithdrawalRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -162,6 +167,11 @@ WITHDRAWAL_FAILED: QuickSwapReason
 OUTCOME_RECONCILING: QuickSwapReason
 SOURCE_SCREENING_BLOCKED: QuickSwapReason
 REFUND_BELOW_MINIMUM: QuickSwapReason
+DEPOSIT_ADDRESS_CONFLICT: QuickSwapReason
+DEPOSIT_ADDRESS_ALREADY_USED: QuickSwapReason
+DEPOSIT_ADDRESS_RETIRED: QuickSwapReason
+DEPOSIT_ADDRESS_NOT_ISSUED: QuickSwapReason
+INTERMEDIATE_BELOW_MINIMUM: QuickSwapReason
 ROLE_UNSPECIFIED: WithdrawalRole
 DESTINATION: WithdrawalRole
 REFUND: WithdrawalRole

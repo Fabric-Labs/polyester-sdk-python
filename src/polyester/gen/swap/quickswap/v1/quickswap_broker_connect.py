@@ -69,6 +69,9 @@ class QuickSwapBrokerService(Protocol):
     async def list_quick_swaps(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListQuickSwapsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListQuickSwapsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_quick_swap(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_fee_totals(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -250,6 +253,16 @@ class QuickSwapBrokerServiceASGIApplication(ConnectASGIApplication[QuickSwapBrok
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_quick_swaps,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/GetQuickSwap": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetQuickSwap",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_quick_swap,
                 ),
                 "/swap.quickswap.v1.QuickSwapBrokerService/GetFeeTotals": Endpoint.unary(
                     method=MethodInfo(
@@ -625,6 +638,26 @@ class QuickSwapBrokerServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_quick_swap(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetQuickSwap",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def get_fee_totals(
         self,
         request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsRequest,
@@ -703,6 +736,8 @@ class QuickSwapBrokerServiceSync(Protocol):
     def set_vault_status(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.SetVaultStatusRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.SetVaultStatusResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_quick_swaps(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListQuickSwapsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListQuickSwapsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_quick_swap(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_fee_totals(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -883,6 +918,16 @@ class QuickSwapBrokerServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_quick_swaps,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/GetQuickSwap": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetQuickSwap",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_quick_swap,
                 ),
                 "/swap.quickswap.v1.QuickSwapBrokerService/GetFeeTotals": EndpointSync.unary(
                     method=MethodInfo(
@@ -1252,6 +1297,26 @@ class QuickSwapBrokerServiceClientSync(ConnectClientSync):
                 service_name="swap.quickswap.v1.QuickSwapBrokerService",
                 input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListQuickSwapsRequest,
                 output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListQuickSwapsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_quick_swap(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetQuickSwap",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.QuickSwapBrokerServiceGetQuickSwapResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

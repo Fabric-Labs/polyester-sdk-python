@@ -14,27 +14,6 @@ Git tag: `v0.1.0a56`.
   `max_slippage_ticks` / `max_slippage_bps`, and a sell trailing stop rejects
   `limit_price`; earlier versions ignored them.
 
-### Fixed
-- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
-  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
-  Earlier versions pointed at `api-testnet.polyester.com`, which does not
-  exist, so every testnet call failed with a DNS error. The devnet preset and
-  the client defaults now use the documented `api.devnet.polyester.com` host.
-- A stop-loss or take-profit market child now carries its
-  `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
-  the cap silently, so the pair's default market slippage applied instead.
-- Trigger reads (`triggers.get`, `triggers.list` and the trigger stream)
-  show a stop-loss or take-profit market child's cap as
-  `Trigger.max_slippage` (ticks, as a price delta) or
-  `Trigger.max_slippage_bps`; earlier versions decoded every market child
-  the same way, cap or not.
-- Integer tick counts (`max_slippage_ticks`, `trailing_distance_ticks`,
-  attached-risk `*_ticks` fields) above the 64-bit range raise
-  `PolyesterValidationError` before sending instead of a raw `ValueError`.
-- Order reads no longer report an attached-risk leg whose state is
-  `not_configured`; the server sends that state for a leg the order does
-  not have.
-
 ### Added
 - Standalone buy trailing stops: `triggers.create(trigger_type="trailing_stop",
   side="buy", limit_price=...)`, where `limit_price` is the required maximum
@@ -74,6 +53,25 @@ Git tag: `v0.1.0a56`.
   catalog scale is known; `volume_24h_base_scaled` stays the integer.
 
 ### Fixed
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  the client defaults now use the documented `api.devnet.polyester.com` host.
+- A stop-loss or take-profit market child now carries its
+  `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
+  the cap silently, so the pair's default market slippage applied instead.
+- Trigger reads (`triggers.get`, `triggers.list` and the trigger stream)
+  show a stop-loss or take-profit market child's cap as
+  `Trigger.max_slippage` (ticks, as a price delta) or
+  `Trigger.max_slippage_bps`; earlier versions decoded every market child
+  the same way, cap or not.
+- Integer tick counts (`max_slippage_ticks`, `trailing_distance_ticks`,
+  attached-risk `*_ticks` fields) above the 64-bit range raise
+  `PolyesterValidationError` before sending instead of a raw `ValueError`.
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
 - An error code this SDK version does not know yet no longer crashes error
   handling with `ValueError`. Orders, auth, withdraw and transfer errors
   raise the usual `PolyesterApiError` with `code` set to

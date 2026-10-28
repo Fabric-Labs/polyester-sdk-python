@@ -17,8 +17,8 @@ from polyester.errors import PolyesterValidationError
 def test_devnet_preset_matches_typescript_and_zipper_extras() -> None:
     env = POLYESTER_DEVNET_ENVIRONMENT
     assert env.name == "polyester-devnet"
-    assert env.api_url == "https://api-devnet.polyester.ai"
-    assert env.websocket_url == "wss://api-devnet.polyester.ai"
+    assert env.api_url == "https://api.devnet.polyester.com"
+    assert env.websocket_url == "wss://api.devnet.polyester.com"
     assert env.rpc_url == "https://rpc.polyester.tech"
     assert env.chain_id == 888168
     assert env.account_abstraction.entry_point.version == "0.7"
@@ -35,8 +35,8 @@ def test_devnet_preset_matches_typescript_and_zipper_extras() -> None:
 def test_testnet_preset_matches_typescript_and_zipper_extras() -> None:
     env = POLYESTER_TESTNET_ENVIRONMENT
     assert env.name == "polyester-testnet"
-    assert env.api_url == "https://api-testnet.polyester.com"
-    assert env.websocket_url == "wss://api-testnet.polyester.com"
+    assert env.api_url == "https://api.testnet.polyester.com"
+    assert env.websocket_url == "wss://api.testnet.polyester.com"
     assert env.rpc_url == "https://rpc.polyester.live"
     assert env.chain_id == 888169
     assert env.account_abstraction.bundler_url == "https://bundler.polyester.live"

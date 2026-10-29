@@ -36,7 +36,7 @@ class RateLimitServiceASGIApplication(ConnectASGIApplication[RateLimitService]):
                         service_name="ratelimit.v1.RateLimitService",
                         input=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigRequest,
                         output=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.get_rate_limit_config,
                 ),
@@ -70,6 +70,7 @@ class RateLimitServiceClient(ConnectClient):
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
+        use_get: bool = False,
     ) -> ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigResponse:
         return await self.execute_unary(
             request=request,
@@ -78,10 +79,11 @@ class RateLimitServiceClient(ConnectClient):
                 service_name="ratelimit.v1.RateLimitService",
                 input=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigRequest,
                 output=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
             timeout_ms=timeout_ms,
+            use_get=use_get,
         )
 
     async def get_trading_rate_limits(
@@ -125,7 +127,7 @@ class RateLimitServiceWSGIApplication(ConnectWSGIApplication):
                         service_name="ratelimit.v1.RateLimitService",
                         input=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigRequest,
                         output=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.get_rate_limit_config,
                 ),
@@ -159,6 +161,7 @@ class RateLimitServiceClientSync(ConnectClientSync):
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
+        use_get: bool = False,
     ) -> ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigResponse:
         return self.execute_unary(
             request=request,
@@ -167,10 +170,11 @@ class RateLimitServiceClientSync(ConnectClientSync):
                 service_name="ratelimit.v1.RateLimitService",
                 input=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigRequest,
                 output=ratelimit_dot_v1_dot_ratelimit__pb2.GetRateLimitConfigResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
             timeout_ms=timeout_ms,
+            use_get=use_get,
         )
 
     def get_trading_rate_limits(

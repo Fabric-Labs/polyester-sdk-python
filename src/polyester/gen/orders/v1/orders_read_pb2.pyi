@@ -407,16 +407,18 @@ class GetOrderRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., include_attached_risk: _Optional[bool] = ..., include_attached_risk_state: _Optional[bool] = ..., include_execution_history: _Optional[bool] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class GetOrderResponse(_message.Message):
-    __slots__ = ("order", "trades", "transfers", "next_page_token")
+    __slots__ = ("order", "trades", "transfers", "next_page_token", "executions_complete")
     ORDER_FIELD_NUMBER: _ClassVar[int]
     TRADES_FIELD_NUMBER: _ClassVar[int]
     TRANSFERS_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    EXECUTIONS_COMPLETE_FIELD_NUMBER: _ClassVar[int]
     order: Order
     trades: _containers.RepeatedCompositeFieldContainer[UserTrade]
     transfers: _containers.RepeatedCompositeFieldContainer[OrderTransfer]
     next_page_token: str
-    def __init__(self, order: _Optional[_Union[Order, _Mapping]] = ..., trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[OrderTransfer, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    executions_complete: bool
+    def __init__(self, order: _Optional[_Union[Order, _Mapping]] = ..., trades: _Optional[_Iterable[_Union[UserTrade, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[OrderTransfer, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., executions_complete: _Optional[bool] = ...) -> None: ...
 
 class GetBatchReplaceStatusRequest(_message.Message):
     __slots__ = ("subaccount_id", "batch_request_id")

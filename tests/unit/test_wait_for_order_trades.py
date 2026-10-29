@@ -36,6 +36,7 @@ async def test_wait_for_order_trades_complete_resolves_when_sum_matches() -> Non
                 UserTrade(symbol_id=1, qty=_qty(40)),
                 UserTrade(symbol_id=1, qty=_qty(60)),
             ],
+            executions_complete=True,
         )
 
     orders = AsyncMock()
@@ -48,6 +49,7 @@ async def test_wait_for_order_trades_complete_resolves_when_sum_matches() -> Non
     )
     assert calls["n"] == 2
     assert sum(t.qty.scaled for t in result.trades if t.qty) == 100
+    assert result.executions_complete is True
 
 
 @pytest.mark.asyncio

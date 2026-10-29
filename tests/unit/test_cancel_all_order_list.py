@@ -59,3 +59,40 @@ def test_cancel_all_dry_run_lists_nothing() -> None:
     assert result.matched_orders == 4
     assert result.cancelled_orders == []
     assert result.total_cancelled == 0
+
+
+def test_cancel_all_reports_listing_status() -> None:
+    included = cancel_all_from_proto(
+        orders_pb2.CancelAllOrdersResponse(
+            status=Status.SUBMITTED,
+            matched_orders=1,
+            submitted_cancels=1,
+            cancelled_orders=[orders_pb2.CancelledOrder(order_id=101)],
+            total_cancelled=1,
+            listing_status=Status.INCLUDED,
+        )
+    )
+    assert included.listing_status == "included"
+
+    # A retry with the same request_id keeps the original counts but not the list.
+    retried = cancel_all_from_proto(
+        orders_pb2.CancelAllOrdersResponse(
+            status=Status.SUBMITTED,
+            matched_orders=3,
+            submitted_cancels=3,
+            total_cancelled=3,
+            listing_status=Status.NOT_RETAINED_READ_OPEN_ORDERS,
+        )
+    )
+    assert retried.listing_status == "not_retained_read_open_orders"
+    assert retried.cancelled_orders == []
+    assert retried.total_cancelled == 3
+
+    unset = cancel_all_from_proto(
+        orders_pb2.CancelAllOrdersResponse(status=Status.DRY_RUN, matched_orders=1)
+    )
+    assert unset.listing_status == ""
+    unknown = cancel_all_from_proto(
+        orders_pb2.CancelAllOrdersResponse(status=Status.DRY_RUN, listing_status=99)
+    )
+    assert unknown.listing_status == "99"

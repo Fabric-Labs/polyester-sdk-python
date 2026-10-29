@@ -139,7 +139,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_price: str | None = None,
         order_type: str = "market",
         limit_price: str | Decimal | Price | None = None,
-        trigger_price_source: str = "last",
+        trigger_price_source: str | None = None,
         tif: str = "gtc",
         sub_account_id: str | None = None,
         client_trigger_id: str | None = None,
@@ -165,6 +165,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         is the required maximum price, the most the child pays per unit (a
         9-decimal string or ``Decimal``, or ``Price.from_ticks`` for ticks);
         a sell trailing stop takes none. The maximum price is fixed at create.
+
+        ``trigger_price_source`` (``last``, ``index`` or ``mark``) sets the
+        price a stop-loss, take-profit or trailing stop watches; unset means
+        the last trade price.
         """
         await self._ensure_catalogs()
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)

@@ -183,6 +183,14 @@ def test_get_order_from_proto_includes_trades() -> None:
     assert result.trades[0].fee_asset == "base"
     assert result.trades[0].referral_share_amount_e18 == "2"
     assert result.trades[0].fee_is_rebate is True
+    assert result.executions_complete is False
+
+
+def test_get_order_from_proto_reports_executions_complete() -> None:
+    result = get_order_from_proto(
+        GetOrderResponse(order=Order(order_id=7, symbol_id=2), executions_complete=True)
+    )
+    assert result.executions_complete is True
 
 
 def test_order_from_proto_maps_lineage() -> None:

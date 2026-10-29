@@ -25,6 +25,7 @@ from polyester.models import (
     BatchReplaceStatusResult,
     ClientOrderId,
     CreateOrderRequest,
+    DeadManSwitchScope,
     OrderId,
 )
 from polyester.services.orders import is_batch_replace_settled
@@ -397,6 +398,36 @@ def test_cancel_all_after_from_proto() -> None:
     assert result.status == "armed"
     assert result.effective_timeout_sec == 120
     assert result.expires_at_ts_ns == "1700000000000000000"
+    assert result.effective_scope is None
+
+
+def test_cancel_all_after_reports_effective_scope() -> None:
+    armed = cancel_all_after_from_proto(
+        orders_pb2.CancelAllAfterResponse(
+            status=orders_pb2.CancelAllAfterResponse.ARMED,
+            effective_timeout_sec=30,
+            effective_scope=orders_pb2.DeadManSwitchScope(
+                account_id=77, symbol_id=2, side=orders_pb2.SELL
+            ),
+        )
+    )
+    assert armed.effective_scope == DeadManSwitchScope(
+        account_id=format_id(77), symbol_id=2, side="sell"
+    )
+
+    every_symbol = cancel_all_after_from_proto(
+        orders_pb2.CancelAllAfterResponse(
+            status=orders_pb2.CancelAllAfterResponse.ARMED,
+            effective_timeout_sec=30,
+            effective_scope=orders_pb2.DeadManSwitchScope(account_id=77),
+        )
+    )
+    assert every_symbol.effective_scope == DeadManSwitchScope(account_id=format_id(77))
+
+    disabled = cancel_all_after_from_proto(
+        orders_pb2.CancelAllAfterResponse(status=orders_pb2.CancelAllAfterResponse.DISABLED)
+    )
+    assert disabled.effective_scope is None
 
 
 def test_cancel_all_requires_known_status() -> None:

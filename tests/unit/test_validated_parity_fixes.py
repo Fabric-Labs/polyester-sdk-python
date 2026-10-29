@@ -205,12 +205,14 @@ async def test_cancel_requires_typed_order_key() -> None:
         await service.cancel(key=OrderId(""))
 
 
-def test_attached_risk_rejects_dead_trigger_price_source() -> None:
-    with pytest.raises(PolyesterValidationError, match="always uses last trade"):
+def test_attached_risk_rejects_unknown_trigger_price_source() -> None:
+    with pytest.raises(
+        PolyesterValidationError, match="take_profit.trigger_price_source must be last"
+    ):
         risk_policy_from_dict(
             {
                 "take_profit": {
-                    "trigger_price_source": "mark",
+                    "trigger_price_source": "oracle",
                     "trigger_price_ticks": 10,
                 }
             }

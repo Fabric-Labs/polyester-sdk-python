@@ -100,8 +100,8 @@ def test_json_wire_format_tolerates_unknown_enum_names_and_fields() -> None:
     # An enum name this SDK does not know reads as the unspecified value.
     assert trigger.failure_reason == 0
     # Unknown enum numbers are kept as numbers.
-    numeric = codec.decode(b'{"failureReason": 241}', triggers_pb2.Trigger())
-    assert numeric.failure_reason == 241
+    numeric = codec.decode(b'{"failureReason": 999}', triggers_pb2.Trigger())
+    assert numeric.failure_reason == UNKNOWN
 
 
 def test_json_wire_format_round_trips_requests() -> None:

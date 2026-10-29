@@ -230,6 +230,9 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_ORDER_REPAIRING: _ClassVar[ErrorCode]
     ERROR_CODE_ACCOUNT_REPAIRING: _ClassVar[ErrorCode]
+    ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: _ClassVar[ErrorCode]
+    ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -468,6 +471,9 @@ ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN: ErrorCode
 ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN: ErrorCode
 ERROR_CODE_ORDER_REPAIRING: ErrorCode
 ERROR_CODE_ACCOUNT_REPAIRING: ErrorCode
+ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: ErrorCode
+ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: ErrorCode
+ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -681,34 +687,40 @@ class RiskExecution(_message.Message):
     def __init__(self, market_ioc: _Optional[_Union[RiskMarketIoc, _Mapping]] = ..., limit_gtc: _Optional[_Union[RiskLimitGtc, _Mapping]] = ...) -> None: ...
 
 class TakeProfitPolicy(_message.Message):
-    __slots__ = ("trigger_price_ticks", "child")
+    __slots__ = ("trigger_price_ticks", "child", "trigger_price_source")
     TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     CHILD_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     trigger_price_ticks: int
     child: RiskExecution
-    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ...) -> None: ...
+    trigger_price_source: TriggerPriceSource
+    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ...) -> None: ...
 
 class StopLossPolicy(_message.Message):
-    __slots__ = ("trigger_price_ticks", "child")
+    __slots__ = ("trigger_price_ticks", "child", "trigger_price_source")
     TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     CHILD_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     trigger_price_ticks: int
     child: RiskExecution
-    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ...) -> None: ...
+    trigger_price_source: TriggerPriceSource
+    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ...) -> None: ...
 
 class TrailingStopPolicy(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "activation_price_ticks")
+    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "activation_price_ticks", "trigger_price_source")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRAILING_DISTANCE_BPS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     trailing_distance_bps: int
     max_slippage_ticks: int
     max_slippage_bps: int
     activation_price_ticks: int
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ...) -> None: ...
+    trigger_price_source: TriggerPriceSource
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ...) -> None: ...
 
 class RiskPolicy(_message.Message):
     __slots__ = ("take_profit", "stop_loss", "trailing_stop", "oco")
@@ -745,7 +757,7 @@ class CancelledOrder(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ...) -> None: ...
 
 class CancelAllOrdersResponse(_message.Message):
-    __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns", "cancelled_orders", "total_cancelled", "truncated")
+    __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns", "cancelled_orders", "total_cancelled", "truncated", "listing_status")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[CancelAllOrdersResponse.Status]
@@ -754,6 +766,14 @@ class CancelAllOrdersResponse(_message.Message):
     STATUS_UNSPECIFIED: CancelAllOrdersResponse.Status
     SUBMITTED: CancelAllOrdersResponse.Status
     DRY_RUN: CancelAllOrdersResponse.Status
+    class ListingStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        LISTING_UNSPECIFIED: _ClassVar[CancelAllOrdersResponse.ListingStatus]
+        INCLUDED: _ClassVar[CancelAllOrdersResponse.ListingStatus]
+        NOT_RETAINED_READ_OPEN_ORDERS: _ClassVar[CancelAllOrdersResponse.ListingStatus]
+    LISTING_UNSPECIFIED: CancelAllOrdersResponse.ListingStatus
+    INCLUDED: CancelAllOrdersResponse.ListingStatus
+    NOT_RETAINED_READ_OPEN_ORDERS: CancelAllOrdersResponse.ListingStatus
     STATUS_FIELD_NUMBER: _ClassVar[int]
     MATCHED_ORDERS_FIELD_NUMBER: _ClassVar[int]
     SUBMITTED_CANCELS_FIELD_NUMBER: _ClassVar[int]
@@ -763,6 +783,7 @@ class CancelAllOrdersResponse(_message.Message):
     CANCELLED_ORDERS_FIELD_NUMBER: _ClassVar[int]
     TOTAL_CANCELLED_FIELD_NUMBER: _ClassVar[int]
     TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    LISTING_STATUS_FIELD_NUMBER: _ClassVar[int]
     status: CancelAllOrdersResponse.Status
     matched_orders: int
     submitted_cancels: int
@@ -772,7 +793,8 @@ class CancelAllOrdersResponse(_message.Message):
     cancelled_orders: _containers.RepeatedCompositeFieldContainer[CancelledOrder]
     total_cancelled: int
     truncated: bool
-    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., cancelled_orders: _Optional[_Iterable[_Union[CancelledOrder, _Mapping]]] = ..., total_cancelled: _Optional[int] = ..., truncated: _Optional[bool] = ...) -> None: ...
+    listing_status: CancelAllOrdersResponse.ListingStatus
+    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., cancelled_orders: _Optional[_Iterable[_Union[CancelledOrder, _Mapping]]] = ..., total_cancelled: _Optional[int] = ..., truncated: _Optional[bool] = ..., listing_status: _Optional[_Union[CancelAllOrdersResponse.ListingStatus, str]] = ...) -> None: ...
 
 class CancelAllAfterRequest(_message.Message):
     __slots__ = ("subaccount_id", "timeout_sec", "symbol_id", "side", "request_id")
@@ -788,8 +810,18 @@ class CancelAllAfterRequest(_message.Message):
     request_id: str
     def __init__(self, subaccount_id: _Optional[int] = ..., timeout_sec: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., request_id: _Optional[str] = ...) -> None: ...
 
+class DeadManSwitchScope(_message.Message):
+    __slots__ = ("account_id", "symbol_id", "side")
+    ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    account_id: int
+    symbol_id: int
+    side: Side
+    def __init__(self, account_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ...) -> None: ...
+
 class CancelAllAfterResponse(_message.Message):
-    __slots__ = ("status", "effective_timeout_sec", "expires_at_ts_ns", "ts", "ts_ns")
+    __slots__ = ("status", "effective_timeout_sec", "expires_at_ts_ns", "ts", "ts_ns", "effective_scope")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[CancelAllAfterResponse.Status]
@@ -803,12 +835,14 @@ class CancelAllAfterResponse(_message.Message):
     EXPIRES_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
     TS_FIELD_NUMBER: _ClassVar[int]
     TS_NS_FIELD_NUMBER: _ClassVar[int]
+    EFFECTIVE_SCOPE_FIELD_NUMBER: _ClassVar[int]
     status: CancelAllAfterResponse.Status
     effective_timeout_sec: int
     expires_at_ts_ns: int
     ts: _timestamp_pb2.Timestamp
     ts_ns: int
-    def __init__(self, status: _Optional[_Union[CancelAllAfterResponse.Status, str]] = ..., effective_timeout_sec: _Optional[int] = ..., expires_at_ts_ns: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+    effective_scope: DeadManSwitchScope
+    def __init__(self, status: _Optional[_Union[CancelAllAfterResponse.Status, str]] = ..., effective_timeout_sec: _Optional[int] = ..., expires_at_ts_ns: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., effective_scope: _Optional[_Union[DeadManSwitchScope, _Mapping]] = ...) -> None: ...
 
 class BatchCreateAccepted(_message.Message):
     __slots__ = ("order_id", "take_profit_trigger_id", "stop_loss_trigger_id", "trailing_stop_trigger_id", "resolved_base_qty_scaled", "submitted_max_quote_debit_scaled")

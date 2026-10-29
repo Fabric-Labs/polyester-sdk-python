@@ -7,6 +7,19 @@ AUTH_STEP_UP_REQUIRED = "AUTH_STEP_UP_REQUIRED"
 AUTH_MFA_ELEVATION_REQUIRED = "AUTH_MFA_ELEVATION_REQUIRED"
 AUTH_MFA_LAST_FACTOR_REQUIRED = "AUTH_MFA_LAST_FACTOR_REQUIRED"
 AUTH_INTERNAL_ERROR = "AUTH_INTERNAL_ERROR"
+# The account request changed nothing; retry the same request.
+AUTH_TEMPORARILY_UNAVAILABLE = "AUTH_TEMPORARILY_UNAVAILABLE"
+
+# orders.v1.ErrorDetail codes for a mutation that was sent but not confirmed in
+# time. The server may still have applied it: read back before retrying.
+_ORDER_OUTCOME_UNKNOWN_CODES = frozenset(
+    {
+        "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN",
+        "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN",
+        "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN",
+        "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN",
+    }
+)
 
 
 class PolyesterError(Exception):
@@ -156,22 +169,44 @@ class PolyesterRealtimeOverflowError(PolyesterRealtimeError):
     """
 
 
+def _is_outcome_unknown_api_error(err: BaseException) -> bool:
+    return isinstance(err, PolyesterApiError) and err.code in _ORDER_OUTCOME_UNKNOWN_CODES
+
+
 def is_retryable_error(err: BaseException) -> bool:
     """Return whether retrying may succeed after backoff.
+
+    True for transport, rate-limit and server errors, for
+    ``AUTH_TEMPORARILY_UNAVAILABLE`` (the request changed nothing), and for an
+    order or trigger create, cancel or modify whose outcome is unknown
+    (``ERROR_CODE_*_OUTCOME_UNKNOWN``).
 
     This does not guarantee that a mutation was not applied. Preserve the
     original idempotency key and reconcile first when
     :func:`mutation_outcome_unknown` returns true.
     """
-    return isinstance(
+    if isinstance(err, PolyesterApiError) and err.code == AUTH_TEMPORARILY_UNAVAILABLE:
+        return True
+    return _is_outcome_unknown_api_error(err) or isinstance(
         err,
         (PolyesterTransportError, PolyesterRateLimitError, PolyesterServerError),
     )
 
 
 def mutation_outcome_unknown(err: BaseException) -> bool:
-    """Return whether the server may have applied a failed mutation."""
-    return isinstance(err, PolyesterResponseContractError) or (
-        isinstance(err, (PolyesterTransportError, PolyesterServerError))
-        and not isinstance(err, PolyesterRateLimitError)
+    """Return whether the server may have applied a failed mutation.
+
+    True for transport and server errors (except rate limits), for a
+    malformed success response, and for an order or trigger create, cancel or
+    modify that was sent but not confirmed in time
+    (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or trigger back before
+    retrying.
+    """
+    return (
+        isinstance(err, PolyesterResponseContractError)
+        or _is_outcome_unknown_api_error(err)
+        or (
+            isinstance(err, (PolyesterTransportError, PolyesterServerError))
+            and not isinstance(err, PolyesterRateLimitError)
+        )
     )

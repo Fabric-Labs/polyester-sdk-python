@@ -37,6 +37,7 @@ _LIFECYCLE_REASON_BY_CODE: dict[int, str] = {
     int(types_pb2.TRADING_WITHDRAW_EXECUTION_FAILED): (
         "trading_withdraw_execution_failed"
     ),
+    int(types_pb2.DEPOSIT_SOURCE_NOT_CONFIRMED): "deposit_source_not_confirmed",
 }
 
 
@@ -84,6 +85,7 @@ def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> Lifecycl
         smart_account_address=account_fields.get("smart_account_address", ""),
         lifecycle_reason=lifecycle_reason_from_code(int(msg.lifecycle_reason)),
         zipper_reason=_zipper_reason_if_present(msg),
+        is_delayed=bool(msg.is_delayed),
     )
 
 

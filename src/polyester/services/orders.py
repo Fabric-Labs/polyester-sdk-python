@@ -717,6 +717,7 @@ async def _get_order_execution_pages(
                 trades=trades,
                 transfers=transfers,
                 next_page_token="",
+                executions_complete=page.executions_complete,
             )
         page_token = page.next_page_token
 

@@ -213,6 +213,7 @@ class _TriggerConfig:
         "post_only",
         "limit_price",
         "trigger_price",
+        "trigger_price_source",
         "max_slippage",
         "max_slippage_bps",
     )
@@ -225,6 +226,7 @@ class _TriggerConfig:
         self.post_only = False
         self.limit_price: Price | None = None
         self.trigger_price: Price | None = None
+        self.trigger_price_source = ""
         self.max_slippage: Price | None = None
         self.max_slippage_bps = 0
 
@@ -264,6 +266,7 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
         cfg.trigger_type = "stop_loss" if has_field(msg, "stop_loss") else "take_profit"
         cfg.side = proto_enum_name(orders_pb2.Side, conditional.side)
         cfg.trigger_price = _price(conditional.trigger_price_ticks, symbol=symbol)
+        cfg.trigger_price_source = _trigger_price_source_label(conditional.trigger_price_source)
         if conditional.HasField("child"):
             _child_execution_projection(conditional.child, cfg, symbol=symbol)
     elif has_field(msg, "trailing_stop"):
@@ -273,6 +276,7 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
         trailing = msg.trailing_stop
         cfg.trigger_type = "trailing_stop"
         cfg.side = proto_enum_name(orders_pb2.Side, trailing.side)
+        cfg.trigger_price_source = _trigger_price_source_label(trailing.trigger_price_source)
         cfg.time_in_force = "ioc"
         if trailing.limit_price_ticks:
             cfg.order_type = "limit"
@@ -335,6 +339,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         ),
         post_only=cfg.post_only,
         trigger_price=trigger_price,
+        trigger_price_source=cfg.trigger_price_source,
         client_trigger_id=msg.client_trigger_id,
         created_at=_timestamp(msg.created_at) if has_field(msg, "created_at") else None,
         updated_at=_timestamp(msg.updated_at) if has_field(msg, "updated_at") else None,

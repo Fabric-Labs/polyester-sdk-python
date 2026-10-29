@@ -33,6 +33,20 @@ def test_flow_summary_from_proto() -> None:
     assert flow.smart_account_address == "0xabc"
     assert flow.lifecycle_reason == "unspecified"
     assert flow.zipper_reason is None
+    assert flow.is_delayed is False
+
+
+def test_flow_summary_reports_delayed_open_flow() -> None:
+    flow = flow_summary_from_proto(
+        lifecycle_read_pb2.FlowSummaryView(
+            flow_id="flow-slow",
+            flow_kind=types_pb2.KIND_DEPOSIT,
+            current_step=lifecycle_read_pb2.FLOW_STEP_SETTLEMENT,
+            is_open=True,
+            is_delayed=True,
+        )
+    )
+    assert flow.is_delayed is True
 
 
 def test_flow_summary_zipper_reason_and_lifecycle_reason() -> None:

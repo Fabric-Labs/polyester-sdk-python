@@ -9,8 +9,21 @@
 - A stop-loss or take-profit with a limit child now rejects
   `max_slippage_ticks` / `max_slippage_bps`, and a sell trailing stop rejects
   `limit_price`; earlier versions ignored them.
+- `triggers.create()` no longer defaults `trigger_price_source` to `"last"`;
+  unset means the last trade price. A TWAP or ladder trigger now rejects
+  `trigger_price_source`, which earlier versions ignored.
 
 ### Fixed
+- `is_retryable_error()` and `mutation_outcome_unknown()` now return true for
+  an order or trigger create, cancel or modify that was sent but not
+  confirmed in time (`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`). The change may have been
+  applied: read the order or trigger back before retrying. Earlier versions
+  treated these as definite failures.
+- `is_retryable_error()` returns true for `AUTH_TEMPORARILY_UNAVAILABLE`
+  (exported as a constant): the request changed nothing, so retry it as is.
 - `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
   use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
   Earlier versions pointed at `api-testnet.polyester.com`, which does not
@@ -32,6 +45,31 @@
   not have.
 
 ### Added
+- Index-price triggers: stop-loss, take-profit and trailing-stop triggers,
+  standalone (`triggers.create(trigger_price_source=...)`) or attached to an
+  order (`trigger_price_source` on each attached leg, in create and modify),
+  accept `"last"`, `"index"` or `"mark"`; unset means the last trade price.
+  Reads report the same label on `Trigger.trigger_price_source`,
+  `RiskLeg.trigger_price_source` and `TrailingStop.trigger_price_source`, so
+  a leg read from an order can be passed back unchanged. Earlier versions
+  rejected the field on attached legs and dropped it on standalone triggers.
+- `CancelAllOrdersResult.listing_status`: `included`, or
+  `not_retained_read_open_orders` for a retry with the same `request_id`
+  within 120 seconds. Such a retry returns the original counts with an empty
+  `cancelled_orders`; the empty list does not mean nothing was cancelled.
+- `CancelAllAfterResult.effective_scope` (`DeadManSwitchScope` with
+  `account_id`, `symbol_id` and `side`): the orders an armed switch cancels
+  on expiry. `None` when the switch is disabled.
+- `GetOrderResult.executions_complete`: true when the order's trades across
+  every page add up to its filled quantity.
+- `LifecycleFlowSummary.is_delayed`: true when an open flow has made no
+  progress for well beyond its expected step time.
+- New named values: lifecycle reason `deposit_source_not_confirmed`; trigger
+  cancel reasons `account_repair`, `pair_drain_trigger`, `pair_drain_twap`,
+  `pair_drain_ladder` and `pair_drain_attached_leg`; trigger failure reasons
+  `index_price_unavailable` and `trigger_would_trigger_immediately`; order
+  error code `ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY`; pair status
+  `PAIR_STATUS_HALTED` (only cancellations are accepted).
 - Standalone buy trailing stops: `triggers.create(trigger_type="trailing_stop",
   side="buy", limit_price=...)`, where `limit_price` is the required maximum
   price (decimal or `Price.from_ticks`). Trigger reads show a buy trailing

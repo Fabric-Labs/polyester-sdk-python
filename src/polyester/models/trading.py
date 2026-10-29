@@ -96,8 +96,9 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
 
     Create/modify dicts must supply a positive ``trailing_distance_ticks`` or
     ``trailing_distance_bps`` (and positive slippage when set).
-    ``trigger_price_source`` / ``order_type`` are not on the trailing wire and
-    are rejected if supplied under ``attached_risk.trailing_stop``.
+    ``trigger_price_source`` is ``last``, ``index`` or ``mark``; unset on a
+    write means the last trade price. ``order_type`` is rejected if supplied
+    under ``attached_risk.trailing_stop``.
     """
 
     distance_ticks: int = 0
@@ -163,6 +164,9 @@ class GetOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     trades: list[UserTrade] = []
     transfers: list[OrderTransfer] = []
     next_page_token: str = ""
+    # True when the order's trades across every page add up to its filled
+    # quantity; false while a recent execution is still being recorded.
+    executions_complete: bool = False
 
 
 class UserTrade(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -219,6 +223,9 @@ class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     smart_account_address: str = ""
     lifecycle_reason: str = "unspecified"
     zipper_reason: ZipperReasonDetails | None = None
+    # True when an open flow has made no progress for well beyond its expected
+    # step time. Always false for terminal flows and transaction lookups.
+    is_delayed: bool = False
 
 
 class LifecycleFlowsList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -252,6 +259,13 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     requested, oldest first; ``total_cancelled`` counts all of them and
     ``truncated`` is true when the list is shorter than that. Each order's
     final state comes from the order stream and reads. Empty for a dry run.
+
+    ``listing_status`` is ``included`` when ``cancelled_orders`` is the list
+    for this request. A retry with the same ``request_id`` within 120 seconds
+    returns the original counts with an empty ``cancelled_orders`` and
+    ``not_retained_read_open_orders``: the empty list does not mean nothing
+    was cancelled, so read open orders instead. An unknown value keeps its
+    number.
     """
 
     status: str = ""
@@ -261,6 +275,7 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     cancelled_orders: list[CancelledOrder] = []
     total_cancelled: int = 0
     truncated: bool = False
+    listing_status: str = ""
 
 
 class TriggerStopDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -331,6 +346,9 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     self_trade_prevention_mode: str = ""
     post_only: bool = False
     trigger_price: Price | None = None
+    # Price a stop-loss, take-profit or trailing stop watches: ``last``,
+    # ``index`` or ``mark``. Pass it to ``triggers.create`` unchanged.
+    trigger_price_source: str = ""
     client_trigger_id: str = ""
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -589,10 +607,24 @@ class BatchCancelOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     rejected_count: int = 0
 
 
+class DeadManSwitchScope(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Orders an armed cancel-all-after switch cancels on expiry.
+
+    ``symbol_id`` 0 covers every symbol; an empty ``side`` covers both sides.
+    Waiting triggers stay active when the switch expires.
+    """
+
+    account_id: str = ""
+    symbol_id: int = 0
+    side: str = ""
+
+
 class CancelAllAfterResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     status: str = ""
     effective_timeout_sec: int = 0
     expires_at_ts_ns: str = "0"
+    # Scope the armed switch covers; None when the switch is disabled.
+    effective_scope: DeadManSwitchScope | None = None
 
 
 class WithdrawIntentResult(msgspec.Struct, kw_only=True, omit_defaults=True):

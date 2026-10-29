@@ -22,6 +22,7 @@ class UnavailableReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     NOT_READY: _ClassVar[UnavailableReason]
     FAILOVER: _ClassVar[UnavailableReason]
     BOUNDARY_UNAVAILABLE: _ClassVar[UnavailableReason]
+    ORDER_UNAVAILABLE: _ClassVar[UnavailableReason]
 CHANNEL_UNSPECIFIED: Channel
 ORDERS: Channel
 UNAVAILABLE_REASON_UNSPECIFIED: UnavailableReason
@@ -29,6 +30,7 @@ VIEW_BEHIND: UnavailableReason
 NOT_READY: UnavailableReason
 FAILOVER: UnavailableReason
 BOUNDARY_UNAVAILABLE: UnavailableReason
+ORDER_UNAVAILABLE: UnavailableReason
 
 class ClientMessage(_message.Message):
     __slots__ = ("auth", "subscribe", "subscribe_refresh", "unsubscribe", "sync", "ping")
@@ -265,10 +267,12 @@ class ResyncRequired(_message.Message):
     def __init__(self, reason: _Optional[_Union[ResyncRequired.Reason, str]] = ...) -> None: ...
 
 class Unavailable(_message.Message):
-    __slots__ = ("reason",)
+    __slots__ = ("reason", "order_ids")
     REASON_FIELD_NUMBER: _ClassVar[int]
+    ORDER_IDS_FIELD_NUMBER: _ClassVar[int]
     reason: UnavailableReason
-    def __init__(self, reason: _Optional[_Union[UnavailableReason, str]] = ...) -> None: ...
+    order_ids: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, reason: _Optional[_Union[UnavailableReason, str]] = ..., order_ids: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class Available(_message.Message):
     __slots__ = ()

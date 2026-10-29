@@ -36,7 +36,7 @@ class VIPServiceASGIApplication(ConnectASGIApplication[VIPService]):
                         service_name="vip.v1.VIPService",
                         input=vip_dot_v1_dot_vip__pb2.ListVIPTiersRequest,
                         output=vip_dot_v1_dot_vip__pb2.ListVIPTiersResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.list_v_i_p_tiers,
                 ),
@@ -70,6 +70,7 @@ class VIPServiceClient(ConnectClient):
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
+        use_get: bool = False,
     ) -> vip_dot_v1_dot_vip__pb2.ListVIPTiersResponse:
         return await self.execute_unary(
             request=request,
@@ -78,10 +79,11 @@ class VIPServiceClient(ConnectClient):
                 service_name="vip.v1.VIPService",
                 input=vip_dot_v1_dot_vip__pb2.ListVIPTiersRequest,
                 output=vip_dot_v1_dot_vip__pb2.ListVIPTiersResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
             timeout_ms=timeout_ms,
+            use_get=use_get,
         )
 
     async def get_v_i_p_status(
@@ -125,7 +127,7 @@ class VIPServiceWSGIApplication(ConnectWSGIApplication):
                         service_name="vip.v1.VIPService",
                         input=vip_dot_v1_dot_vip__pb2.ListVIPTiersRequest,
                         output=vip_dot_v1_dot_vip__pb2.ListVIPTiersResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.list_v_i_p_tiers,
                 ),
@@ -159,6 +161,7 @@ class VIPServiceClientSync(ConnectClientSync):
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
+        use_get: bool = False,
     ) -> vip_dot_v1_dot_vip__pb2.ListVIPTiersResponse:
         return self.execute_unary(
             request=request,
@@ -167,10 +170,11 @@ class VIPServiceClientSync(ConnectClientSync):
                 service_name="vip.v1.VIPService",
                 input=vip_dot_v1_dot_vip__pb2.ListVIPTiersRequest,
                 output=vip_dot_v1_dot_vip__pb2.ListVIPTiersResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
             timeout_ms=timeout_ms,
+            use_get=use_get,
         )
 
     def get_v_i_p_status(

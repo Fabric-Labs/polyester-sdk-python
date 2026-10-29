@@ -46,6 +46,7 @@ class PairStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PAIR_STATUS_CANCEL_ONLY: _ClassVar[PairStatus]
     PAIR_STATUS_POST_ONLY: _ClassVar[PairStatus]
     PAIR_STATUS_REDUCE_ONLY: _ClassVar[PairStatus]
+    PAIR_STATUS_HALTED: _ClassVar[PairStatus]
 SIDE_UNSPECIFIED: SideFilter
 BUY: SideFilter
 SELL: SideFilter
@@ -72,6 +73,7 @@ PAIR_STATUS_DISABLED: PairStatus
 PAIR_STATUS_CANCEL_ONLY: PairStatus
 PAIR_STATUS_POST_ONLY: PairStatus
 PAIR_STATUS_REDUCE_ONLY: PairStatus
+PAIR_STATUS_HALTED: PairStatus
 
 class GetTradesRequest(_message.Message):
     __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "page_token", "after_trade_id")

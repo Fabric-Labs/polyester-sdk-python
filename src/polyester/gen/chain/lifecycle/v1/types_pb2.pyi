@@ -28,6 +28,7 @@ class LifecycleReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRADING_WITHDRAW_POLICY_DENIED: _ClassVar[LifecycleReason]
     TRADING_WITHDRAW_CONTRACT_REVERTED: _ClassVar[LifecycleReason]
     TRADING_WITHDRAW_EXECUTION_FAILED: _ClassVar[LifecycleReason]
+    DEPOSIT_SOURCE_NOT_CONFIRMED: _ClassVar[LifecycleReason]
 
 class FlowKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -52,6 +53,7 @@ class LifecycleSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SOURCE_POLYESTER_CHAIN: _ClassVar[LifecycleSource]
     SOURCE_EXECUTOR: _ClassVar[LifecycleSource]
     SOURCE_LEDGER: _ClassVar[LifecycleSource]
+    SOURCE_LIFECYCLE: _ClassVar[LifecycleSource]
 
 class FlowState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -79,6 +81,7 @@ LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED: LifecycleReason
 TRADING_WITHDRAW_POLICY_DENIED: LifecycleReason
 TRADING_WITHDRAW_CONTRACT_REVERTED: LifecycleReason
 TRADING_WITHDRAW_EXECUTION_FAILED: LifecycleReason
+DEPOSIT_SOURCE_NOT_CONFIRMED: LifecycleReason
 KIND_UNSPECIFIED: FlowKind
 KIND_DEPOSIT: FlowKind
 KIND_WITHDRAW: FlowKind
@@ -94,6 +97,7 @@ SOURCE_RELAYER: LifecycleSource
 SOURCE_POLYESTER_CHAIN: LifecycleSource
 SOURCE_EXECUTOR: LifecycleSource
 SOURCE_LEDGER: LifecycleSource
+SOURCE_LIFECYCLE: LifecycleSource
 STATE_UNSPECIFIED: FlowState
 STATE_PENDING_SOURCE: FlowState
 STATE_PENDING_POLYESTER_CHAIN: FlowState

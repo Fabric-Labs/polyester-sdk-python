@@ -26,6 +26,24 @@ TRIGGER_PRICE_SOURCE_TO_PROTO = {
     "mark": "MARK_PRICE",
     "mark_price": "MARK_PRICE",
 }
+
+
+def trigger_price_source_to_proto(
+    value: object, field_name: str = "trigger_price_source"
+) -> orders_pb2.TriggerPriceSource:
+    """Map ``last``, ``index`` or ``mark`` (as trigger reads report it) to the wire enum.
+
+    ``None`` or an empty string leaves the source unset; the server then uses
+    the last trade price.
+    """
+    if value is None or value == "":
+        return orders_pb2.TRIGGER_PRICE_SOURCE_UNSPECIFIED
+    key = value.strip().lower() if isinstance(value, str) else ""
+    if key not in TRIGGER_PRICE_SOURCE_TO_PROTO:
+        raise PolyesterValidationError(f"{field_name} must be last, index, or mark")
+    return getattr(orders_pb2, TRIGGER_PRICE_SOURCE_TO_PROTO[key])
+
+
 FEE_ASSET_TO_PROTO = {
     "quote": "QUOTE",
     "base": "BASE",
@@ -118,7 +136,7 @@ def create_trigger_to_proto(
     trigger_price: Any | None = None,
     order_type: str = "market",
     limit_price: Any | None = None,
-    trigger_price_source: str = "last",
+    trigger_price_source: str | None = None,
     tif: str = "gtc",
     sub_account_id: str | int | None = None,
     client_trigger_id: str | None = None,
@@ -175,12 +193,16 @@ def create_trigger_to_proto(
             orders_pb2, SELF_TRADE_PREVENTION_MODE_TO_PROTO[stp_key]
         )
 
-    # trigger_price_source is no longer part of the conditional/trailing wire
-    # shape in POLY-3701; the argument is accepted but ignored.
-    _ = trigger_price_source
+    price_source = trigger_price_source_to_proto(trigger_price_source)
+    if price_source and type_key in ("twap", "ladder"):
+        raise PolyesterValidationError(
+            "trigger_price_source applies to stop_loss, take_profit and trailing_stop only"
+        )
 
     if type_key in ("stop_loss", "take_profit"):
-        conditional = triggers_pb2.ConditionalTrigger(side=side_proto)
+        conditional = triggers_pb2.ConditionalTrigger(
+            side=side_proto, trigger_price_source=price_source
+        )
         if trigger_price is not None:
             conditional.trigger_price_ticks = resolve_price_ticks(
                 trigger_price, "trigger_price", symbol=symbol
@@ -203,6 +225,7 @@ def create_trigger_to_proto(
         trailing = intent.trailing_stop
         trailing.SetInParent()
         trailing.side = side_proto
+        trailing.trigger_price_source = price_source
         if side_key == "buy":
             if limit_price is None:
                 raise PolyesterValidationError(

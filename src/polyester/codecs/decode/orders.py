@@ -44,6 +44,7 @@ from polyester.models import (
     CancelAllAfterResult,
     CancelAllOrdersResult,
     CancelledOrder,
+    DeadManSwitchScope,
     GetOrderResult,
     ModifyOrderResult,
     OrderErrorDetail,
@@ -146,6 +147,7 @@ def _risk_leg_from_policy(
     )
     return RiskLeg(
         trigger_price=_price(policy.trigger_price_ticks),
+        trigger_price_source=_trigger_price_source_label(policy.trigger_price_source),
         order_type=order_type,
         limit_price=_price(limit_ticks) if limit_ticks else None,
         state=state,
@@ -175,6 +177,7 @@ def _trailing_stop_from_policy(
         activation_price=(
             _price(policy.activation_price_ticks) if policy.activation_price_ticks else None
         ),
+        trigger_price_source=_trigger_price_source_label(policy.trigger_price_source),
         state=state,
     )
 
@@ -354,6 +357,7 @@ def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
         trades=trades,
         transfers=transfers,
         next_page_token=next_page_token,
+        executions_complete=bool(msg.executions_complete),
     )
 
 
@@ -365,6 +369,10 @@ def _cancel_order_status(value: int) -> str:
 def _cancel_all_status(value: int) -> str:
     name = proto_enum_name(orders_pb2.CancelAllOrdersResponse.Status, value)
     return name if name in {"submitted", "dry_run"} else ""
+
+
+def _cancel_all_listing_status(value: int) -> str:
+    return proto_enum_name(orders_pb2.CancelAllOrdersResponse.ListingStatus, value)
 
 
 def _cancel_all_after_status(value: int) -> str:
@@ -545,6 +553,7 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
         ],
         total_cancelled=int(msg.total_cancelled),
         truncated=bool(msg.truncated),
+        listing_status=_cancel_all_listing_status(msg.listing_status),
     )
 
 
@@ -843,4 +852,17 @@ def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> Cance
             field_name="expires_at_ts_ns",
             empty_when_zero=True,
         ),
+        effective_scope=(
+            _dead_man_switch_scope_from_proto(msg.effective_scope)
+            if msg.HasField("effective_scope")
+            else None
+        ),
+    )
+
+
+def _dead_man_switch_scope_from_proto(msg: orders_pb2.DeadManSwitchScope) -> DeadManSwitchScope:
+    return DeadManSwitchScope(
+        account_id=format_uint64_id(msg.account_id) if msg.account_id else "",
+        symbol_id=int(msg.symbol_id),
+        side=proto_enum_name(orders_pb2.Side, msg.side),
     )

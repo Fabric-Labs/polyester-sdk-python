@@ -258,7 +258,7 @@ response as an admission acknowledgement and reconcile with `list_open` before
 releasing local state.
 
 Attached take-profit / stop-loss use the same friendly keys as the read
-model (`trigger_price`, `order_type`, `limit_price`). Child execution is
+model (`trigger_price`, `trigger_price_source`, `order_type`, `limit_price`). Child execution is
 `market` (default) or `limit`, not `limit_ioc` / `limit_fok`, and not a
 nested `child.execution` wrapper.
 
@@ -377,7 +377,10 @@ ambiguous batch request with the same `request_id`.
 lists up to 200 of them, oldest first, in `cancelled_orders` (each with
 `order_id` and `client_order_id`); `total_cancelled` counts all of them and
 `truncated` is true when the list is shorter. Each order's final state comes
-from the order stream and reads. A dry run lists none.
+from the order stream and reads. A dry run lists none. Retrying with the same
+`request_id` within 120 seconds returns the original counts with an empty
+`cancelled_orders` and `listing_status="not_retained_read_open_orders"`; the
+empty list does not mean nothing was cancelled, so read open orders instead.
 
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
@@ -516,6 +519,25 @@ Trigger reads show a buy trailing stop with `side="buy"`,
 `order_type="limit"`, `time_in_force="ioc"` and its maximum price as
 `limit_price`; `details.trailing.trough_price` is the lowest price tracked so
 far (`peak_price` for a sell).
+
+Stop-loss, take-profit and trailing-stop triggers, standalone or attached to
+an order, watch the last trade price unless `trigger_price_source` names
+another: `"last"`, `"index"` or `"mark"`. Reads report the same label
+(`Trigger.trigger_price_source`, `RiskLeg.trigger_price_source`,
+`TrailingStop.trigger_price_source`), so a leg read from an order can be
+passed back to create or modify unchanged. The API rejects a source the pair
+does not support.
+
+```python
+await client.triggers.create(
+    symbol="BTC-USDT",
+    trigger_type="stop_loss",
+    side="sell",
+    qty="0.01",
+    trigger_price="83000",
+    trigger_price_source="index",
+)
+```
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero

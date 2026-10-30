@@ -233,6 +233,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: _ClassVar[ErrorCode]
     ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -474,6 +475,7 @@ ERROR_CODE_ACCOUNT_REPAIRING: ErrorCode
 ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: ErrorCode
 ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: ErrorCode
 ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: ErrorCode
+ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -659,14 +661,16 @@ class FieldViolation(_message.Message):
     def __init__(self, field_path: _Optional[str] = ..., rule_id: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code", "violations", "rate_limit")
+    __slots__ = ("code", "violations", "rate_limit", "existing_order_id")
     CODE_FIELD_NUMBER: _ClassVar[int]
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
     RATE_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    EXISTING_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     violations: _containers.RepeatedCompositeFieldContainer[FieldViolation]
     rate_limit: _types_pb2.RateLimitDetail
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ...) -> None: ...
+    existing_order_id: int
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ..., existing_order_id: _Optional[int] = ...) -> None: ...
 
 class RiskMarketIoc(_message.Message):
     __slots__ = ()

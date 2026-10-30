@@ -176,14 +176,16 @@ class EarnedBadge(_message.Message):
     def __init__(self, badge: _Optional[_Union[CheckpointBadge, str]] = ..., earned_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class AssetAmount(_message.Message):
-    __slots__ = ("asset", "amount", "usd")
+    __slots__ = ("asset", "amount", "usd", "excluded_from_value")
     ASSET_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
     USD_FIELD_NUMBER: _ClassVar[int]
+    EXCLUDED_FROM_VALUE_FIELD_NUMBER: _ClassVar[int]
     asset: str
     amount: str
     usd: str
-    def __init__(self, asset: _Optional[str] = ..., amount: _Optional[str] = ..., usd: _Optional[str] = ...) -> None: ...
+    excluded_from_value: bool
+    def __init__(self, asset: _Optional[str] = ..., amount: _Optional[str] = ..., usd: _Optional[str] = ..., excluded_from_value: _Optional[bool] = ...) -> None: ...
 
 class FlowTotal(_message.Message):
     __slots__ = ("count", "usd")

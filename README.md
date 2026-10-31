@@ -249,7 +249,10 @@ first attempt admitted the order. After an unknown outcome, look up that id
 (`get` / `list_open`) before creating again. A second create with the same id
 is rejected (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`) even when the payload
 matches. Only create again with that id if reconciliation shows the first
-attempt did not admit.
+attempt did not admit. When the server knows the order that already holds the
+id, the rejection carries it: `PolyesterApiError.existing_order_id` on a
+single create, `BatchCreateResultItem.existing_order_id` on a batch create
+item (empty otherwise).
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create, cancel, and replace accept at most 20 items. `batch_create`
 always sends `request_id` (caller value or a generated `batch-create-*` key);
@@ -317,9 +320,10 @@ prerequisite for order submission.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
-before overriding pair defaults. Set at most one of `max_slippage_bps`
-(1–10000) or `max_slippage_ticks`. Omit both to keep the pair default. The
-fields are rejected on limit orders and if both are supplied.
+before overriding pair defaults. Set at most one of `max_slippage_bps` or
+`max_slippage_ticks`. `max_slippage_bps` is 1–10000 for a buy and 1–9999 for a
+sell. Omit both to keep the pair default. The fields are rejected on limit
+orders and if both are supplied.
 
 ```python
 result = await client.orders.create(
@@ -341,6 +345,21 @@ Do **not** pass floats. `ticks` on `Price` means Polyester protocol price units
 (fixed 1e9), not market tick-size alignment (server validates tick size).
 Catalog hydration resolves `symbol` → `symbol_id` and quantity scales for
 encoding; pair admission (tick/step/min qty/notional) stays on the API.
+
+Order limits are read from the spot config. `client.catalogs.order_limits_for_symbol("BTC-USDT")`
+(or `get_spot_config().pair_order_limits`) returns `PairOrderLimits` with
+decimal strings `max_limit_qty_base`, `max_market_qty_base` and
+`max_order_notional_quote` (`None` when the pair has no maximum), and
+`max_open_orders_per_pair`. `client.catalogs.max_open_orders_total` (or
+`SpotConfig.max_open_orders_total`) is the cross-pair resting-order limit.
+The open-order counts are the venue defaults for a typical account, `0` when
+unpublished; an account may have a lower limit of its own.
+
+```python
+limits = client.catalogs.order_limits_for_symbol("BTC-USDT")
+if limits is not None and limits.max_limit_qty_base is not None:
+    print("largest limit order:", limits.max_limit_qty_base, "BTC")
+```
 `orders.preview_order(...)` remains the authority for balances, reservations,
 liquidity, and other stateful rules.
 
@@ -372,7 +391,14 @@ The predecessor ID can be stale after admission; reconcile the successor IDs
 and per-item phases by polling `get_batch_replace_status`. Use
 `is_batch_replace_settled(status)` only to determine that all items have moved
 to `working`, `rejected`, or `terminal`, not as a finality signal. Retry an
-ambiguous batch request with the same `request_id`.
+ambiguous batch request with the same `request_id`. Each admission and status
+item carries `action_taken`: `"replaced"` when a successor order was admitted,
+`"amended"` for a cancel-only outcome with no successor (keep tracking
+`old_order_id` until it is terminal).
+
+A replacement order's `cum_qty` includes the quantity filled by its
+predecessors; `Order.inherited_cum_qty` is that carried-over part (zero for an
+order never replaced).
 
 `cancel_all(...)` requests cancellation of every matching order. The result
 lists up to 200 of them, oldest first, in `cancelled_orders` (each with
@@ -412,7 +438,10 @@ Public catalog reads need no credentials. Authenticated VIP status, effective sp
 account trading limits require an API key. `GetVIPStatus` has no subaccount selector: JWT and
 API-key callers receive the owning root group only. USD amounts and fee percents are decimal
 strings. Optional qualification metrics, timestamps, and next-tier thresholds stay omitted
-when unset. `policy_class` uses full protobuf enum names
+when unset. `VIPStatus.settled_volume_quality` and `average_aop_quality` say how complete
+each 30-day metric is: `status` is `complete`, `price_unavailable` (the metric is a lower
+bound) or `incomplete_history`, with `incomplete_hours` out of 720. Both are `None` when the
+assignment carries no qualification evidence. `policy_class` uses full protobuf enum names
 (`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Rate-limit rules expose
 `vip_tier` (not `tier`).
 
@@ -481,8 +510,9 @@ fields remain unset. `Order` also exposes `post_only`. Create/modify accept the
 same policy shape as a dict or `AttachedRisk`.
 
 A stop-loss or take-profit with `order_type="market"` takes an optional
-slippage cap, `max_slippage_ticks` (Q9 ticks) or `max_slippage_bps`, at most
-one; without one the pair's default market slippage applies. A limit child
+slippage cap, `max_slippage_ticks` (Q9 ticks) or `max_slippage_bps` (1–10000
+for a buy, 1–9999 for a sell), at most one; without one the pair's default
+market slippage applies. A limit child
 takes no cap (its limit price bounds it). Either side may use either child.
 Trigger reads show the cap as `max_slippage` (ticks, as a price delta) or
 `max_slippage_bps`; both unset means the pair default.
@@ -503,7 +533,9 @@ A standalone trailing stop may sell or buy. A buy trailing stop tracks the
 lowest price and fires when the price rises the trailing distance from it.
 It requires `limit_price`, its maximum price: the most its child pays per
 unit (a 9-decimal string or `Decimal`, or `Price.from_ticks` for ticks),
-fixed at create. A sell trailing stop takes no `limit_price`.
+fixed at create, and at least `activation_price` when that is set. A sell
+trailing stop takes no `limit_price`. Every trailing stop, standalone or
+attached to an order, takes `max_slippage_bps` from 1 to 9999.
 
 ```python
 await client.triggers.create(
@@ -519,15 +551,16 @@ await client.triggers.create(
 Trigger reads show a buy trailing stop with `side="buy"`,
 `order_type="limit"`, `time_in_force="ioc"` and its maximum price as
 `limit_price`; `details.trailing.trough_price` is the lowest price tracked so
-far (`peak_price` for a sell).
+far (`peak_price` for a sell), and `details.trailing.trigger_price` is the
+current threshold.
 
 Stop-loss, take-profit and trailing-stop triggers, standalone or attached to
 an order, watch the last trade price unless `trigger_price_source` names
-another: `"last"`, `"index"` or `"mark"`. Reads report the same label
+another: `"last"` or `"index"`. Spot markets have no mark price, so `"mark"`
+raises `PolyesterValidationError`. Reads report the same label
 (`Trigger.trigger_price_source`, `RiskLeg.trigger_price_source`,
 `TrailingStop.trigger_price_source`), so a leg read from an order can be
-passed back to create or modify unchanged. The API rejects a source the pair
-does not support.
+passed back to create unchanged.
 
 ```python
 await client.triggers.create(
@@ -543,9 +576,20 @@ await client.triggers.create(
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
 (`Price.from_ticks(0)` or `0`) to clear an existing activation price or
-maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
-modify still accepts `0` to clear. Trailing distance in bps uses the same
-1–10000 range; trigger modify accepts `0` to clear.
+maximum-slippage cap. Modify `max_slippage_bps` is 1–9999 (the patch does not
+say what it modifies, so it takes the cap shared by trailing stops and
+sells); `0` clears it. Trailing distance in bps is 1–10000; trigger modify
+accepts `0` to clear. A child's limit price is fixed at create, so `modify`
+takes no `limit_price`: cancel the trigger and create a new one instead.
+
+`triggers.modify(...)` and `triggers.resume(...)` do not need a symbol: without
+`symbol` / `symbol_id` they target the trigger's own market. When given, it
+must be that market, and an API key limited to specific markets must give it.
+
+```python
+await client.triggers.modify(trigger_id=trigger_id, trigger_price="82500")
+await client.triggers.resume(trigger_id=trigger_id)
+```
 
 `orders.list_open(trigger_id=...)` / `orders.list_history(trigger_id=...)`
 return only child orders created by that trigger (TWAP/ladder slices).
@@ -686,7 +730,8 @@ column response oldest-first. Sort explicitly by `ts_sec` before feeding a
 chronological indicator.
 
 Merged market overview stream (snapshot + live updates). The create call waits
-for the WebSocket handshake and initial snapshot:
+for the WebSocket handshake and initial snapshot. With `symbols=[...]`, the
+snapshot and every live or buffered update keep only those markets:
 
 ```python
 sub = await client.market_overview.create_subscription(
@@ -705,6 +750,15 @@ async with sub:
   channels; live orders use the private WebSocket (see Live orders below).
   ConnectRPC's optional JSON wire mode does not apply to realtime.
   Inbound WebSocket messages are capped at 4 MiB.
+- Market trade, user fill (`trades.subscribe`), ledger transfer
+  (`transfers.subscribe`) and trigger event (`triggers.subscribe_events`)
+  channels publish batches. Each event of a batch is yielded on its own, in
+  order. An event that fails to decode is reported through `set_on_error(...)`
+  without dropping the rest of its batch. Both legs of a ledger transfer share
+  `LedgerTransfer.transfer_id`; with `account_code` it identifies a leg, and
+  a repeated leg replaces the earlier copy. A trigger event is identified by
+  `(trigger_id, event_type, child_seq, ts_ns)`. For your own batched channel,
+  use `realtime.subscribe_proto_batch(channel, decode_batch=...)`.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
   `PolyesterRealtimeOverflowError` and faults the subscription; it does **not**
   silently drop updates.
@@ -926,4 +980,18 @@ Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
 defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
 
 Some RPCs may return HTTP 404 on devnet. The SDK raises `PolyesterRouteNotFoundError`
-with a clearer message than `[unimplemented]: Not Found`.
+with a clearer message than `[unimplemented]: Not Found`. HTTP 501 and Connect
+`unimplemented` raise `PolyesterNotImplementedError`, the parent class of
+`PolyesterRouteNotFoundError`; neither is retryable.
+
+API-key rejections from the gateway carry a code. A request whose signed
+timestamp falls outside the server's skew window raises
+`PolyesterTimestampSkewError` (`code == "TIMESTAMP_SKEW"`). It is
+retryable, and the gateway rejected it before any service saw it: a retry
+signs again with a fresh timestamp. If it persists, fix the local clock. For
+large bursts, bound concurrency so requests do not wait locally past the skew
+window. Other gateway codes (`SIGNATURE_INVALID`, `KEY_DISABLED`,
+`IP_NOT_ALLOWED`, ...) raise a non-retryable `PolyesterAuthError` whose
+message is the code. A request whose deadline expires raises `PolyesterTimeoutError`, a
+`PolyesterTransportError`: retryable, but a mutation may still have been
+applied, so reconcile first (`mutation_outcome_unknown(error)` is true).

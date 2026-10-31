@@ -7,7 +7,13 @@ from urllib.parse import quote
 import httpx
 
 from polyester.auth import ApiKeyCredentials, sign_request_async
-from polyester.errors import PolyesterAuthError, PolyesterRealtimeError, PolyesterTransportError
+from polyester.errors import (
+    TIMESTAMP_SKEW,
+    PolyesterAuthError,
+    PolyesterRealtimeError,
+    PolyesterTimestampSkewError,
+    PolyesterTransportError,
+)
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 MAX_TOKEN_RESPONSE_BYTES = 64 * 1024
@@ -74,7 +80,7 @@ def _auth_http_error(
     label: str,
     endpoint: str,
     body: bytes,
-) -> PolyesterAuthError:
+) -> PolyesterAuthError | PolyesterTimestampSkewError:
     truncated = _truncate_body(body)
     code: str | None = None
     server_message: str | None = None
@@ -89,6 +95,8 @@ def _auth_http_error(
                 server_message = raw_message.strip()
     except (json.JSONDecodeError, UnicodeDecodeError):
         pass
+    if code == TIMESTAMP_SKEW:
+        return PolyesterTimestampSkewError(f"{label}: {TIMESTAMP_SKEW}", status_code=status_code)
     code = code or ("permission_denied" if status_code == 403 else "unauthenticated")
     kind = "permission denied" if status_code == 403 else "authentication failed"
     detail = server_message or truncated

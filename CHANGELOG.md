@@ -1,5 +1,80 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+- `triggers.modify()` no longer takes `limit_price`: the API rejects any
+  change to a child's limit price. Cancel the trigger and create a new one.
+- Slippage caps match the API: `max_slippage_bps` is 1–9999 for a market
+  order that sells, a sell stop-loss or take-profit market child, every
+  trailing stop (standalone or attached, either side) and `triggers.modify()`.
+  Buy market orders, buy stop-loss or take-profit market children and TWAP
+  slices still accept 10000.
+- `trigger_price_source="mark"` raises `PolyesterValidationError`: spot
+  markets have no mark price. Use `"last"` or `"index"`.
+- A buy trailing stop's `limit_price` must be at least its `activation_price`.
+- API-key rejections from the API gateway are classified by their code.
+  `TIMESTAMP_SKEW` raises the new retryable `PolyesterTimestampSkewError`;
+  retrying signs the request again with a fresh timestamp, and the request
+  never reached a service, so `mutation_outcome_unknown()` is false. Other
+  codes such as `SIGNATURE_INVALID`, `KEY_DISABLED` or `IP_NOT_ALLOWED`
+  raise a non-retryable `PolyesterAuthError` carrying the code. Earlier
+  versions reported all of them as a retryable `PolyesterServerError`
+  without details.
+
+### Added
+- Spot config order limits: `SpotConfig.pair_order_limits` and
+  `client.catalogs.order_limits_for_symbol(...)` / `order_limits_for_symbol_id(...)`
+  return `PairOrderLimits` with `max_limit_qty_base`, `max_market_qty_base`
+  and `max_order_notional_quote` (decimal strings, `None` when the pair has
+  no maximum) and `max_open_orders_per_pair`. `SpotConfig.max_open_orders_total`
+  and `client.catalogs.max_open_orders_total` give the cross-pair limit. The
+  open-order counts are venue defaults; an account may have a lower limit.
+- `Order.inherited_cum_qty`: the filled quantity a replacement order carries
+  over from its predecessors.
+- `action_taken` on batch replace admission and status items: `"replaced"`
+  when a successor was admitted, `"amended"` for a cancel-only outcome.
+- `existing_order_id` on a `CONFLICT_DUPLICATE_CLIENT_ORDER_ID` rejection,
+  when the server knows the order: `PolyesterApiError.existing_order_id` on a
+  single create and `BatchCreateResultItem.existing_order_id` on a batch
+  create item.
+- `triggers.modify()` and `triggers.resume()` no longer need `symbol` or
+  `symbol_id`; without one they target the trigger's own market. An API key
+  limited to specific markets must still pass it.
+- `LedgerTransfer.transfer_id`, the unsigned 128-bit decimal shared by both
+  legs of a transfer.
+- `VIPStatus.settled_volume_quality` and `average_aop_quality`
+  (`VIPMetricQuality`: `status` of `complete`, `price_unavailable` or
+  `incomplete_history`, plus `incomplete_hours`).
+- `TriggerTrailingDetails.trigger_price`, the current trailing threshold.
+- `AsyncRealtimeClient.subscribe_proto_batch(...)` for channels whose
+  publications batch several events.
+- A Connect `deadline_exceeded` raises `PolyesterTimeoutError`, a subclass of
+  `PolyesterTransportError`, so existing handlers still catch it.
+- HTTP 501 and Connect `unimplemented` raise `PolyesterNotImplementedError`,
+  a `PolyesterApiError` subclass that `PolyesterRouteNotFoundError` now
+  extends.
+
+### Fixed
+- `trades.subscribe()`, `transfers.subscribe()`, `triggers.subscribe_events()`
+  and `market_data.subscribe_trades()` decode the batched publications these
+  channels now send and yield each event on its own, in order. Earlier
+  versions decoded a batch as one event, which dropped or garbled the rest of
+  it. An event that fails to decode is reported through `set_on_error(...)`
+  without dropping the rest of its batch.
+- `market_overview.create_subscription(symbols=[...])` keeps only the
+  requested markets in live and buffered updates; earlier versions filtered
+  the initial snapshot only.
+- `trades.list(after_match_id=...)` rejects a value beyond the uint64 range
+  before sending.
+
+### Changed
+- The package description now reads "Python SDK for the Polyester API with
+  generated protobuf types and ConnectRPC clients."
+
+### Internal
+- `sdk-capabilities.json` no longer carries `publicDescriptorSha256` or `generatedAt`, so a proto publication that only changes `src/polyester/gen/` and `manifest.json` no longer makes it stale; `manifest.json` stays the single source of the descriptor hash.
+
 ## 0.2.0
 
 Git tag: `v0.2.0`.

@@ -18,6 +18,9 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     values across the lineage through the returned generation, not values
     limited to one physical order. ``leaves_qty`` is remaining working
     quantity. Retain the first submitted quantity separately if you need it.
+    ``inherited_cum_qty`` is the part of ``cum_qty`` carried over from
+    predecessors when a replacement was accepted; zero for an order never
+    replaced.
     """
 
     order_id: str
@@ -29,6 +32,7 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     tif: str = ""
     orig_qty: Quantity | None = None
     cum_qty: Quantity | None = None
+    inherited_cum_qty: Quantity | None = None
     leaves_qty: Quantity | None = None
     price: Price | None = None
     avg_px: Price | None = None
@@ -285,6 +289,10 @@ class TriggerStopDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class TriggerTrailingDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Runtime state of a trailing stop; ``trigger_price`` is the current
+    threshold, which moves with the peak (sell) or trough (buy)."""
+
+    trigger_price: Price | None = None
     trailing_distance: Price | None = None
     trailing_distance_bps: int = 0
     activation_price: Price | None = None
@@ -396,6 +404,9 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     is_debit: bool = False
     source: TransferSide | None = None
     destination: TransferSide | None = None
+    # Unsigned 128-bit decimal shared by both legs of one transfer; with
+    # ``account_code`` it identifies a leg, so a repeated leg replaces the earlier copy.
+    transfer_id: str = ""
 
 
 class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -536,6 +547,13 @@ class BatchReplaceItem(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One item of a batch replace receipt.
+
+    ``action_taken`` is ``"replaced"`` when a successor order was admitted and
+    ``"amended"`` for a cancel-only outcome with no successor: keep tracking
+    ``old_order_id`` until its terminal state is confirmed. Empty when unset.
+    """
+
     item_index: int
     status: str = ""
     client_order_id: str = ""
@@ -543,6 +561,7 @@ class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True
     replacement_order_id: str = ""
     code: str = ""
     rate_limit: RateLimitDetail | None = None
+    action_taken: str = ""
 
 
 class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -555,6 +574,8 @@ class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True)
 
 
 class BatchReplaceStatusItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One item of a batch replace status read; ``action_taken`` as on admission."""
+
     item_index: int
     phase: str
     old_order_id: str = ""
@@ -562,6 +583,7 @@ class BatchReplaceStatusItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_status: str = ""
     code: str = ""
     updated_ts_ns: int = 0
+    action_taken: str = ""
 
 
 class BatchReplaceStatusResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -580,6 +602,9 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_order_id: str = ""
     code: str = ""
     rate_limit: RateLimitDetail | None = None
+    # On a duplicate-client-order-ID rejection: the order that already holds the
+    # client order ID, when known; empty otherwise.
+    existing_order_id: str = ""
     # Trigger IDs of the attached-risk legs this order configured; empty for a
     # leg the order does not have.
     take_profit_trigger_id: str = ""

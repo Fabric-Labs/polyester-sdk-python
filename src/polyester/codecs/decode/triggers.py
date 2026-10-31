@@ -140,6 +140,7 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
         return TriggerDetails(
             case="trailing",
             trailing=TriggerTrailingDetails(
+                trigger_price=_price(trailing.trigger_price_ticks, symbol=symbol),
                 trailing_distance=_price(trailing.trailing_distance_ticks, symbol=symbol),
                 trailing_distance_bps=int(trailing.trailing_distance_bps),
                 activation_price=_price(trailing.activation_price_ticks, symbol=symbol),

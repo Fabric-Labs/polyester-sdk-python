@@ -45,6 +45,7 @@ def ledger_transfer_from_proto(msg: ledger_read_pb2.TransferRow) -> LedgerTransf
         destination=transfer_side_from_proto(
             msg.destination if msg.HasField("destination") else None
         ),
+        transfer_id=msg.transfer_id,
     )
 
 

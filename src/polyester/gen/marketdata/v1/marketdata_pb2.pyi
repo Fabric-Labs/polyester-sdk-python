@@ -292,7 +292,7 @@ class PairMarketdataConfig(_message.Message):
     def __init__(self, orderbook_price_buckets: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class PairConfig(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "tick_size", "step_size", "min_notional_quote", "min_qty_base", "allow_buy_fee_from_base", "base_quantity_scale", "quote_quantity_scale", "marketdata", "listing_at", "delisting_at", "status", "default_market_slippage_bps_buy", "default_market_slippage_bps_sell", "max_client_ref_drift_bps", "reference_price_scale", "max_limit_qty_base", "max_market_qty_base", "max_order_notional_quote", "max_open_orders_per_pair")
+    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "tick_size", "step_size", "min_notional_quote", "min_qty_base", "allow_buy_fee_from_base", "base_quantity_scale", "quote_quantity_scale", "marketdata", "listing_at", "delisting_at", "status", "default_market_slippage_bps_buy", "default_market_slippage_bps_sell", "max_client_ref_drift_bps", "reference_price_scale", "max_limit_qty_base", "max_market_qty_base", "max_order_notional_quote", "max_open_orders_per_pair", "max_market_notional_quote")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     BASE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -316,6 +316,7 @@ class PairConfig(_message.Message):
     MAX_MARKET_QTY_BASE_FIELD_NUMBER: _ClassVar[int]
     MAX_ORDER_NOTIONAL_QUOTE_FIELD_NUMBER: _ClassVar[int]
     MAX_OPEN_ORDERS_PER_PAIR_FIELD_NUMBER: _ClassVar[int]
+    MAX_MARKET_NOTIONAL_QUOTE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     symbol: str
     base_asset: str
@@ -339,7 +340,8 @@ class PairConfig(_message.Message):
     max_market_qty_base: str
     max_order_notional_quote: str
     max_open_orders_per_pair: int
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_base: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ..., reference_price_scale: _Optional[int] = ..., max_limit_qty_base: _Optional[str] = ..., max_market_qty_base: _Optional[str] = ..., max_order_notional_quote: _Optional[str] = ..., max_open_orders_per_pair: _Optional[int] = ...) -> None: ...
+    max_market_notional_quote: str
+    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., tick_size: _Optional[str] = ..., step_size: _Optional[str] = ..., min_notional_quote: _Optional[str] = ..., min_qty_base: _Optional[str] = ..., allow_buy_fee_from_base: _Optional[bool] = ..., base_quantity_scale: _Optional[int] = ..., quote_quantity_scale: _Optional[int] = ..., marketdata: _Optional[_Union[PairMarketdataConfig, _Mapping]] = ..., listing_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delisting_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[PairStatus, str]] = ..., default_market_slippage_bps_buy: _Optional[int] = ..., default_market_slippage_bps_sell: _Optional[int] = ..., max_client_ref_drift_bps: _Optional[int] = ..., reference_price_scale: _Optional[int] = ..., max_limit_qty_base: _Optional[str] = ..., max_market_qty_base: _Optional[str] = ..., max_order_notional_quote: _Optional[str] = ..., max_open_orders_per_pair: _Optional[int] = ..., max_market_notional_quote: _Optional[str] = ...) -> None: ...
 
 class GetSpotConfigRequest(_message.Message):
     __slots__ = ()

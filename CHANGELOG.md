@@ -30,6 +30,11 @@
   no maximum) and `max_open_orders_per_pair`. `SpotConfig.max_open_orders_total`
   and `client.catalogs.max_open_orders_total` give the cross-pair limit. The
   open-order counts are venue defaults; an account may have a lower limit.
+- `PairOrderLimits.max_market_notional_quote`: the largest notional of one
+  market order in quote units, valued at a buy's protection price or a sell's
+  reference price. A larger market order is rejected with `MAX_NOTIONAL`.
+  `None` means the pair has no cap. Available on `SpotConfig.pair_order_limits`
+  and `client.catalogs.order_limits_for_symbol(...)`.
 - `Order.inherited_cum_qty`: the filled quantity a replacement order carries
   over from its predecessors.
 - `action_taken` on batch replace admission and status items: `"replaced"`
@@ -69,6 +74,8 @@
   before sending.
 
 ### Changed
+- `connectrpc` minimum raised from 0.9.0 to 0.10.0. 0.9.0 has no
+  `connectrpc.codec`, so the SDK failed to import with it.
 - The package description now reads "Python SDK for the Polyester API with
   generated protobuf types and ConnectRPC clients."
 

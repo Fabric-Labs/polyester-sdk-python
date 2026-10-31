@@ -55,6 +55,9 @@ class PairOrderLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
     # Largest notional of one order in quote units: quantity times limit price,
     # or times protection price for a market order.
     max_order_notional_quote: str | None = None
+    # Largest notional of one market order in quote units, valued at the top
+    # of its band: a buy at its protection price, a sell at its reference price.
+    max_market_notional_quote: str | None = None
     # Default resting-order (GTC and GTD) limit on this pair.
     max_open_orders_per_pair: int = 0
 

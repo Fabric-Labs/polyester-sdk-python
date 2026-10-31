@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import secrets
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import httpx
@@ -287,10 +287,13 @@ class AsyncRealtimeClient:
     async def subscribe_market_trades(
         self, symbol_id: int, *, quantity_scale: int
     ) -> AsyncSubscription[Any]:
+        """Stream public trades; each batched publication is emitted trade by trade."""
+        from polyester.codecs.realtime_decode import decode_market_trade_batch_bytes
+
         channel = f"public:spot:market:trades:{symbol_id}:proto"
-        return await self.subscribe_proto(
+        return await self.subscribe_proto_batch(
             channel,
-            decode=lambda payload: self._decode_market_trade(
+            decode_batch=lambda payload: decode_market_trade_batch_bytes(
                 payload, quantity_scale=quantity_scale
             ),
         )
@@ -308,6 +311,37 @@ class AsyncRealtimeClient:
         to succeed before returning. Initial auth/handshake failures raise and do
         not reconnect in the background.
         """
+        return await self._subscribe(
+            channel,
+            decode_batch=lambda payload: [decode(payload)],
+            auto_reconnect=auto_reconnect,
+        )
+
+    async def subscribe_proto_batch(
+        self,
+        channel: str,
+        *,
+        decode_batch: Callable[[bytes], Sequence[T | BaseException]],
+        auto_reconnect: bool = True,
+    ) -> AsyncSubscription[T]:
+        """Subscribe to a channel whose publications batch several events.
+
+        ``decode_batch`` returns the events of one publication in order; each is
+        yielded on its own. A member returned as an exception is reported through
+        the subscription's ``set_on_error`` callback without dropping the rest of
+        its batch. Handshake semantics match :meth:`subscribe_proto`.
+        """
+        return await self._subscribe(
+            channel, decode_batch=decode_batch, auto_reconnect=auto_reconnect
+        )
+
+    async def _subscribe(
+        self,
+        channel: str,
+        *,
+        decode_batch: Callable[[bytes], Sequence[T | BaseException]],
+        auto_reconnect: bool,
+    ) -> AsyncSubscription[T]:
         if self._closed:
             raise PolyesterRealtimeError("realtime client is closed")
         if is_private_channel(channel):
@@ -342,10 +376,11 @@ class AsyncRealtimeClient:
                     try:
                         await self._run_subscription_once(
                             channel=channel,
-                            decode=decode,
+                            decode_batch=decode_batch,
                             queue=queue,
                             close=close,
                             on_ready=on_ready,
+                            on_member_error=sub._notify_error,
                         )
                     except asyncio.CancelledError:
                         if not ready.done():
@@ -422,10 +457,11 @@ class AsyncRealtimeClient:
         self,
         *,
         channel: str,
-        decode: Callable[[bytes], T],
+        decode_batch: Callable[[bytes], Sequence[T | BaseException]],
         queue: asyncio.Queue[Any],
         close: asyncio.Event,
         on_ready: Callable[[], None] | None = None,
+        on_member_error: Callable[[BaseException], None] | None = None,
     ) -> None:
         async with websockets.connect(
             self._ws_url,
@@ -488,10 +524,15 @@ class AsyncRealtimeClient:
                     if isinstance(incoming, Ping):
                         await ws.send(pong_command())
                     elif isinstance(incoming, Publication):
-                        item = decode(incoming.data)
+                        members = decode_batch(incoming.data)
                         if close.is_set():
                             return
-                        enqueue_or_overflow(queue, item, close=close)
+                        for member in members:
+                            if isinstance(member, BaseException):
+                                if on_member_error is not None:
+                                    on_member_error(member)
+                                continue
+                            enqueue_or_overflow(queue, member, close=close)
                     elif isinstance(incoming, Reply) and incoming.error is not None:
                         raise self._protocol_error(incoming)
 
@@ -517,12 +558,6 @@ class AsyncRealtimeClient:
         if self._http is None:
             raise PolyesterRealtimeError("Realtime private channels require an HTTP client")
         return self._http
-
-    @staticmethod
-    def _decode_market_trade(payload: bytes, *, quantity_scale: int):
-        from polyester.codecs.wire_decode import decode_market_trade_bytes
-
-        return decode_market_trade_bytes(payload, quantity_scale=quantity_scale)
 
     async def _centrifugo_connect(
         self,

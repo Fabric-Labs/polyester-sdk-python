@@ -10,6 +10,10 @@ AUTH_INTERNAL_ERROR = "AUTH_INTERNAL_ERROR"
 # The account request changed nothing; retry the same request.
 AUTH_TEMPORARILY_UNAVAILABLE = "AUTH_TEMPORARILY_UNAVAILABLE"
 
+# Gateway code for an API-key request whose signed timestamp is outside the
+# allowed skew window.
+TIMESTAMP_SKEW = "TIMESTAMP_SKEW"
+
 # Suffix of orders.v1.ErrorDetail codes for a mutation that was sent but not
 # confirmed in time (e.g. ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN). The server
 # may still have applied it: read back before retrying. Matching the suffix
@@ -84,8 +88,42 @@ class PolyesterServerError(PolyesterTransportError):
     """Raised for server-side 5xx failures."""
 
 
+class PolyesterTimeoutError(PolyesterTransportError):
+    """Raised when a request deadline expires before a response arrives.
+
+    Retryable, but the outcome is unknown: a mutation may still have been
+    applied, so reconcile before retrying it (see :func:`mutation_outcome_unknown`).
+    """
+
+
+class PolyesterTimestampSkewError(PolyesterTransportError):
+    """Raised when the API-key request timestamp is outside the allowed skew window.
+
+    Retryable: the gateway rejected the request before any service saw it,
+    and a retry signs it again with a fresh timestamp. If it persists, the
+    local clock is wrong. For large bursts, bound concurrency so requests do
+    not wait locally past the skew window.
+    """
+
+    code = TIMESTAMP_SKEW
+
+    def __init__(
+        self,
+        message: str = "API key timestamp is outside the allowed skew window.",
+        *,
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class PolyesterApiError(PolyesterError):
-    """Raised for structured Connect/API errors."""
+    """Raised for structured Connect/API errors.
+
+    ``existing_order_id`` is set on an ``ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID``
+    order rejection: the public ID of the order that already holds the client
+    order ID, when the server knows it.
+    """
 
     def __init__(
         self,
@@ -94,11 +132,13 @@ class PolyesterApiError(PolyesterError):
         code: str | None = None,
         metadata: dict[str, str] | None = None,
         raw: object | None = None,
+        existing_order_id: str | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.metadata = metadata or {}
         self.raw = raw
+        self.existing_order_id = existing_order_id
 
 
 def auth_error_code(err: BaseException) -> str | None:
@@ -128,7 +168,15 @@ def is_mfa_last_factor_required(err: BaseException) -> bool:
     return auth_error_code(err) == AUTH_MFA_LAST_FACTOR_REQUIRED
 
 
-class PolyesterRouteNotFoundError(PolyesterApiError):
+class PolyesterNotImplementedError(PolyesterApiError):
+    """Raised for HTTP 501 or Connect ``unimplemented``: the server does not
+    offer this RPC or feature. Not retryable."""
+
+    def __init__(self, message: str, *, code: str | None = "unimplemented") -> None:
+        super().__init__(message, code=code)
+
+
+class PolyesterRouteNotFoundError(PolyesterNotImplementedError):
     """Raised when the gateway has no route for a Connect RPC (plain HTTP 404)."""
 
     def __init__(self, procedure: str | None = None) -> None:
@@ -191,7 +239,7 @@ def _is_outcome_unknown_api_error(err: BaseException) -> bool:
 def is_retryable_error(err: BaseException) -> bool:
     """Return whether retrying may succeed after backoff.
 
-    True for transport, rate-limit and server errors, and for
+    True for transport, rate-limit, timestamp-skew and server errors, and for
     ``AUTH_TEMPORARILY_UNAVAILABLE`` (the request changed nothing).
 
     False for an order or trigger create, cancel, modify or control whose
@@ -218,8 +266,9 @@ def is_retryable_error(err: BaseException) -> bool:
 def mutation_outcome_unknown(err: BaseException) -> bool:
     """Return whether the server may have applied a failed mutation.
 
-    True for transport and server errors (except rate limits), for a
-    malformed success response, and for an order or trigger create, cancel,
+    True for transport and server errors (except rate limits and timestamp
+    skew, which the gateway rejects before any service sees the request), for
+    a malformed success response, and for an order or trigger create, cancel,
     modify or control that was sent but not confirmed in time
     (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or trigger back before
     retrying.
@@ -229,6 +278,6 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
         or _is_outcome_unknown_api_error(err)
         or (
             isinstance(err, (PolyesterTransportError, PolyesterServerError))
-            and not isinstance(err, PolyesterRateLimitError)
+            and not isinstance(err, (PolyesterRateLimitError, PolyesterTimestampSkewError))
         )
     )

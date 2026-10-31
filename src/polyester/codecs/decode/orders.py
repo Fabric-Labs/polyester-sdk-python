@@ -265,6 +265,9 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force),
         orig_qty=_qty(msg.orig_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         cum_qty=_qty(msg.cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        inherited_cum_qty=_qty(
+            msg.inherited_cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale
+        ),
         leaves_qty=_qty(msg.leaves_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
@@ -626,6 +629,7 @@ def batch_replace_from_proto(
                 if item.HasField("error") and item.error.HasField("rate_limit")
                 else None
             ),
+            action_taken=proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken),
         )
         for item in msg.results
     ]
@@ -689,6 +693,7 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
                     context="GetBatchReplaceStatus",
                     field_name="updated_ts_ns",
                 ),
+                action_taken=proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken),
             )
         )
         if phase in {"admitted", "working", "terminal"}:
@@ -754,11 +759,13 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             if item.rejected.HasField("error") and item.rejected.error.HasField("rate_limit")
             else None
         )
+        existing_order_id = item.rejected.error.existing_order_id
         return BatchCreateResultItem(
             status="rejected",
             client_order_id=item.client_order_id,
             code=code,
             rate_limit=rate_limit,
+            existing_order_id=format_uint64_id(existing_order_id) if existing_order_id else "",
         )
     raise PolyesterResponseContractError(
         "BatchCreateOrders", "batch create response item has neither accepted nor rejected outcome"

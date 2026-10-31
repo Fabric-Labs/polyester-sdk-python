@@ -36,10 +36,37 @@ class ApiData(msgspec.Struct, kw_only=True, omit_defaults=True):
     raw: dict[str, Any]
 
 
+class PairOrderLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Per-order and open-order limits of one spot pair.
+
+    The decimal maxima are ``None`` when the pair has no maximum.
+    ``max_open_orders_per_pair`` is the venue default for a typical account
+    (``0`` when unpublished); an account may have a lower limit of its own.
+    """
+
+    symbol: str
+    symbol_id: int
+    # Largest quantity of one limit order in base units; a replacement counts
+    # its new total less the filled quantity.
+    max_limit_qty_base: str | None = None
+    # Largest quantity of one market order in base units, after converting a
+    # quote-sized order to base.
+    max_market_qty_base: str | None = None
+    # Largest notional of one order in quote units: quantity times limit price,
+    # or times protection price for a market order.
+    max_order_notional_quote: str | None = None
+    # Default resting-order (GTC and GTD) limit on this pair.
+    max_open_orders_per_pair: int = 0
+
+
 class SpotConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Spot pair catalog payload. Prefer resolving symbols via ``client.catalogs``."""
 
     raw: dict[str, Any]
+    pair_order_limits: list[PairOrderLimits] = []
+    # Default resting-order limit for a typical account across all pairs
+    # (``0`` when unpublished); an account may have a lower limit of its own.
+    max_open_orders_total: int = 0
 
 
 class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -82,5 +109,6 @@ __all__ = [
     "Order",
     "OrderbookData",
     "OrderbookLevel",
+    "PairOrderLimits",
     "SpotConfig",
 ]

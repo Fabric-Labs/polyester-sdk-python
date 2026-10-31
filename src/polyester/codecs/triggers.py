@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.bps import validate_bps
+from polyester.codecs.bps import (
+    MAX_SELL_SLIPPAGE_BPS,
+    max_slippage_bps_for_side,
+    validate_bps,
+)
 from polyester.codecs.correlation_id import optional_client_id
 from polyester.codecs.scalars import id_to_int, tick_count
 from polyester.errors import PolyesterValidationError
@@ -23,24 +27,28 @@ TRIGGER_PRICE_SOURCE_TO_PROTO = {
     "last_price": "LAST_PRICE",
     "index": "INDEX_PRICE",
     "index_price": "INDEX_PRICE",
-    "mark": "MARK_PRICE",
-    "mark_price": "MARK_PRICE",
 }
+# Spot markets have no mark price; the backend rejects it.
+_UNSUPPORTED_SPOT_PRICE_SOURCES = frozenset({"mark", "mark_price"})
 
 
 def trigger_price_source_to_proto(
     value: object, field_name: str = "trigger_price_source"
 ) -> orders_pb2.TriggerPriceSource:
-    """Map ``last``, ``index`` or ``mark`` (as trigger reads report it) to the wire enum.
+    """Map ``last`` or ``index`` (as trigger reads report it) to the wire enum.
 
     ``None`` or an empty string leaves the source unset; the server then uses
-    the last trade price.
+    the last trade price. Spot markets do not support ``mark``.
     """
     if value is None or value == "":
         return orders_pb2.TRIGGER_PRICE_SOURCE_UNSPECIFIED
     key = value.strip().lower() if isinstance(value, str) else ""
+    if key in _UNSUPPORTED_SPOT_PRICE_SOURCES:
+        raise PolyesterValidationError(
+            f"{field_name} mark is not supported on spot markets; use last or index"
+        )
     if key not in TRIGGER_PRICE_SOURCE_TO_PROTO:
-        raise PolyesterValidationError(f"{field_name} must be last, index, or mark")
+        raise PolyesterValidationError(f"{field_name} must be last or index")
     return getattr(orders_pb2, TRIGGER_PRICE_SOURCE_TO_PROTO[key])
 
 
@@ -62,6 +70,7 @@ LADDER_DISTRIBUTION_TO_PROTO = {
 
 def _conditional_child(
     *,
+    side: str,
     order_type: str,
     tif: str,
     limit_price: Any | None,
@@ -75,7 +84,8 @@ def _conditional_child(
     market -> market_ioc; limit+gtc -> limit_gtc; limit+ioc -> limit_ioc;
     limit+fok -> limit_fok. ``post_only`` is only valid for limit GTC. A
     market child takes at most one slippage cap (``max_slippage_ticks`` or
-    ``max_slippage_bps``); without one the pair's default applies.
+    ``max_slippage_bps``: 1 to 10000 to buy, 1 to 9999 to sell); without one
+    the pair's default applies.
     """
     child = triggers_pb2.ConditionalChildExecution()
     if order_type == "market":
@@ -90,7 +100,9 @@ def _conditional_child(
         if max_slippage_ticks is not None:
             market.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         elif max_slippage_bps is not None:
-            market.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
+            market.max_slippage_bps = validate_bps(
+                max_slippage_bps, "max_slippage_bps", max_value=max_slippage_bps_for_side(side)
+            )
         return child
     if max_slippage_ticks is not None or max_slippage_bps is not None:
         raise PolyesterValidationError(
@@ -209,6 +221,7 @@ def create_trigger_to_proto(
             )  # type: ignore[arg-type]
         conditional.child.CopyFrom(
             _conditional_child(
+                side=side_key,
                 order_type=order_key,
                 tif=tif,
                 limit_price=limit_price,
@@ -251,10 +264,17 @@ def create_trigger_to_proto(
             trailing.activation_price_ticks = resolve_price_ticks(
                 activation_price, "activation_price", symbol=symbol
             )  # type: ignore[arg-type]
+            if side_key == "buy" and trailing.limit_price_ticks < trailing.activation_price_ticks:
+                raise PolyesterValidationError(
+                    "trailing_stop with side=buy requires limit_price at least activation_price"
+                )
         if max_slippage_ticks is not None:
             trailing.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         if max_slippage_bps is not None:
-            trailing.max_slippage_bps = validate_bps(max_slippage_bps, "max_slippage_bps")
+            # Every trailing stop takes at most 9999 bps.
+            trailing.max_slippage_bps = validate_bps(
+                max_slippage_bps, "max_slippage_bps", max_value=MAX_SELL_SLIPPAGE_BPS
+            )
     elif type_key == "twap":
         twap = intent.twap
         twap.side = side_proto
@@ -343,20 +363,27 @@ def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | Non
 def modify_trigger_to_proto(
     *,
     trigger_id: str | int,
-    symbol_id: int,
+    symbol_id: int = 0,
     sub_account_id: str | int | None = None,
     trigger_price: Any | None = None,
-    limit_price: Any | None = None,
     trailing_distance_ticks: int | None = None,
     trailing_distance_bps: int | None = None,
     activation_price: Any | None = None,
     max_slippage_ticks: int | None = None,
     max_slippage_bps: int | None = None,
 ) -> triggers_pb2.ModifyTriggerRequest:
+    """Encode a trigger patch.
+
+    ``symbol_id`` ``0`` targets the trigger's own market; when set, it must be
+    that market (an API key limited to specific markets must set it). A child's
+    limit price is fixed at creation: cancel the trigger and create a new one
+    to change it. The patch does not say what it modifies, so
+    ``max_slippage_bps`` takes the cap shared by trailing stops and sells,
+    1 to 9999; ``0`` clears it.
+    """
     if not any(
         (
             trigger_price is not None,
-            limit_price is not None,
             trailing_distance_ticks is not None,
             trailing_distance_bps is not None,
             activation_price is not None,
@@ -365,12 +392,12 @@ def modify_trigger_to_proto(
         )
     ):
         raise PolyesterValidationError(
-            "modify requires at least one of trigger_price, limit_price, "
+            "modify requires at least one of trigger_price, "
             "trailing_distance_ticks, trailing_distance_bps, activation_price, "
             "max_slippage_ticks, or max_slippage_bps"
         )
-    if symbol_id <= 0:
-        raise PolyesterValidationError("modify trigger requires a resolved symbol_id")
+    if symbol_id < 0:
+        raise PolyesterValidationError("modify trigger symbol_id must not be negative")
     proto = triggers_pb2.ModifyTriggerRequest(
         trigger_id=id_to_int(trigger_id, "trigger_id"),
         symbol_id=int(symbol_id),
@@ -379,8 +406,6 @@ def modify_trigger_to_proto(
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if trigger_price is not None:
         proto.trigger_price_ticks = resolve_price_ticks(trigger_price, "trigger_price")  # type: ignore[arg-type]
-    if limit_price is not None:
-        proto.limit_price_ticks = resolve_price_ticks(limit_price, "limit_price")  # type: ignore[arg-type]
     if trailing_distance_ticks is not None:
         proto.trailing_distance_ticks = tick_count(
             trailing_distance_ticks, "trailing_distance_ticks"
@@ -403,5 +428,6 @@ def modify_trigger_to_proto(
             max_slippage_bps,
             "max_slippage_bps",
             allow_clear=True,
+            max_value=MAX_SELL_SLIPPAGE_BPS,
         )
     return proto

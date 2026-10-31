@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "polyester-sdk"
 version = "0.2.0"
-description = "Official Python SDK for Polyester APIs."
+description = "Python SDK for the Polyester API with generated protobuf types and ConnectRPC clients."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
@@ -31,6 +31,7 @@ dependencies = [
   "httpx>=0.27",
   "msgspec>=0.18",
   "protobuf>=7.35.0",
+  "pyqwest>=0.5.1",
   "websockets>=15",
 ]
 

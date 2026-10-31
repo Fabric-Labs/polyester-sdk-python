@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from polyester.codecs.decode.transfers import transfers_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.realtime_decode import decode_ledger_transfer_bytes
+from polyester.codecs.realtime_decode import decode_ledger_transfer_batch_bytes
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import ListTransfersRequest
 from polyester.models import LedgerTransfer, TransfersList
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._realtime_subscribe import subscribe_account_proto
+from polyester.services._realtime_subscribe import subscribe_account_proto_batch
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._validation import validate_limit
 
@@ -58,10 +58,10 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[LedgerTransfer]:
-        return await subscribe_account_proto(
+        return await subscribe_account_proto_batch(
             self._realtime,
             channel_template="private:ledger:transfers:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode=decode_ledger_transfer_bytes,
+            decode_batch=decode_ledger_transfer_batch_bytes,
         )

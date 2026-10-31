@@ -12,6 +12,7 @@ from polyester.codecs.decode.market_data import (
 )
 from polyester.codecs.realtime_decode import decode_candle_point_bytes
 from polyester.codecs.scalars import UINT64_MAX
+from polyester.codecs.spot_config import spot_config_from_dict
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
@@ -79,7 +80,7 @@ class AsyncMarketDataService(BaseService):
             lambda client, request: client.get_spot_config(request),
             GetSpotConfigRequest(),
         )
-        return SpotConfig(raw=data)
+        return spot_config_from_dict(data)
 
     async def get_trades(
         self,

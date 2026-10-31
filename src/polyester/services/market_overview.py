@@ -184,9 +184,18 @@ class AsyncMarketOverviewService(BaseService):
         on_close: Callable[[], None] | None = None,
         on_error: Callable[[Exception], None] | None = None,
     ) -> MarketOverviewSubscription:
-        """Snapshot-then-stream merged overview rows (TS parity)."""
+        """Snapshot-then-stream merged overview rows (TS parity).
+
+        With ``symbols``, the snapshot and every live or buffered update keep
+        only those markets; the channel itself publishes all markets.
+        """
         realtime = require_realtime(self._realtime)
         channel = "public:spot:market_overview:updates:proto"
+        if symbols:
+            await self._ensure_catalogs()
+        wanted_ids = set(
+            resolve_symbol_ids(self._catalogs, symbols, label="market_overview.subscribe symbols")
+        )
         by_symbol_id: dict[int, MarketOverviewEntry] = {}
         queue: asyncio.Queue[list[MarketOverviewEntry] | None] = asyncio.Queue(maxsize=50)
         close = asyncio.Event()
@@ -213,9 +222,13 @@ class AsyncMarketOverviewService(BaseService):
                 with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(None)
 
+        def matches_symbol(row: MarketOverviewEntry) -> bool:
+            return not wanted_ids or row.symbol_id in wanted_ids
+
         def apply_rows(rows: list[MarketOverviewEntry]) -> None:
             for row in rows:
-                by_symbol_id[row.symbol_id] = row
+                if matches_symbol(row):
+                    by_symbol_id[row.symbol_id] = row
 
         async def fetch_snapshot() -> MarketOverviewList:
             return await self.list(
@@ -242,7 +255,7 @@ class AsyncMarketOverviewService(BaseService):
             channel=channel,
             decode=lambda payload: decode_market_overview_batch_bytes(payload, self._catalogs),
             fetch_snapshot=fetch_snapshot,
-            read_publication=lambda batch: batch.markets,
+            read_publication=lambda batch: [row for row in batch.markets if matches_symbol(row)],
             apply_snapshot=apply_snapshot,
             apply_live_publications=apply_live,
             max_buffered_publications=2000,

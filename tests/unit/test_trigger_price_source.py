@@ -127,7 +127,7 @@ def test_attached_legs_without_a_source_send_none() -> None:
 def test_attached_trailing_stop_rejects_unknown_source() -> None:
     with pytest.raises(
         PolyesterValidationError,
-        match="attached_risk.trailing_stop.trigger_price_source must be last, index, or mark",
+        match="attached_risk.trailing_stop.trigger_price_source must be last or index",
     ):
         risk_policy_from_dict(
             {"trailing_stop": {"trailing_distance_bps": 25, "triggerPriceSource": "oracle"}}
@@ -210,7 +210,7 @@ def test_trigger_without_a_source_sends_none() -> None:
 @pytest.mark.parametrize(
     ("trigger_type", "source", "match"),
     [
-        ("stop_loss", "oracle", "trigger_price_source must be last, index, or mark"),
+        ("stop_loss", "oracle", "trigger_price_source must be last or index"),
         ("twap", "index", "applies to stop_loss, take_profit and trailing_stop only"),
     ],
 )

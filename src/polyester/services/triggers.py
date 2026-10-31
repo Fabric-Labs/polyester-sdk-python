@@ -12,7 +12,7 @@ from polyester.codecs.decode.triggers import (
     triggers_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id, resolve_quantity_scale
-from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_bytes
+from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
     create_trigger_to_proto,
@@ -38,7 +38,10 @@ from polyester.models import (
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._realtime_subscribe import subscribe_account_proto
+from polyester.services._realtime_subscribe import (
+    subscribe_account_proto,
+    subscribe_account_proto_batch,
+)
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
@@ -62,6 +65,19 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         self._default_account_id = default_account_id
         self._realtime = realtime
         self._wait_for_catalogs = wait_for_catalogs
+
+    async def _optional_control_symbol_id(
+        self, *, symbol: str | None, symbol_id: int | None, label: str
+    ) -> int:
+        """Symbol ID for modify/resume; ``0`` targets the trigger's own market."""
+        if symbol is not None:
+            await self._ensure_catalogs()
+        return (
+            resolve_optional_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=symbol_id, label=label
+            )
+            or 0
+        )
 
     async def _ensure_catalogs(self) -> None:
         if self._wait_for_catalogs is not None:
@@ -241,22 +257,28 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
         trigger_price: str | None = None,
-        limit_price: str | None = None,
         trailing_distance_ticks: int | None = None,
         trailing_distance_bps: int | None = None,
         activation_price: str | None = None,
         max_slippage_ticks: int | None = None,
         max_slippage_bps: int | None = None,
     ) -> TriggerMutationResult:
-        await self._ensure_catalogs()
+        """Patch a live trigger; omitted fields stay unchanged.
+
+        Without ``symbol``/``symbol_id`` the trigger's own market is used; when
+        given, it must be that market, and an API key limited to specific
+        markets must give it. A child's limit price is fixed at creation:
+        cancel the trigger and create a new one to change it.
+        ``max_slippage_bps`` is 1 to 9999; ``0`` clears a cap (ticks or bps)
+        and a market child falls back to the pair's default slippage.
+        """
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
-            symbol_id=resolve_symbol_id(
-                self._catalogs, symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
+            symbol_id=await self._optional_control_symbol_id(
+                symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
             ),
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             trigger_price=trigger_price,
-            limit_price=limit_price,
             trailing_distance_ticks=trailing_distance_ticks,
             trailing_distance_bps=trailing_distance_bps,
             activation_price=activation_price,
@@ -301,11 +323,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
     ) -> TriggerMutationResult:
-        await self._ensure_catalogs()
+        """Resume a paused trigger; ``symbol`` is optional as for :meth:`modify`."""
         request = ResumeTriggerRequest(
             trigger_id=id_to_int(trigger_id, "trigger_id"),
-            symbol_id=resolve_symbol_id(
-                self._catalogs, symbol=symbol, symbol_id=symbol_id, label="triggers.resume"
+            symbol_id=await self._optional_control_symbol_id(
+                symbol=symbol, symbol_id=symbol_id, label="triggers.resume"
             ),
         )
         parsed_sub = parse_optional_subaccount_id(
@@ -375,10 +397,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[TriggerEvent]:
-        return await subscribe_account_proto(
+        return await subscribe_account_proto_batch(
             self._realtime,
             channel_template="private:spot:triggers:events:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode=decode_trigger_event_bytes,
+            decode_batch=decode_trigger_event_batch_bytes,
         )

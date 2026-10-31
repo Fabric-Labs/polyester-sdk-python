@@ -7,7 +7,12 @@ from typing import Any
 from polyester.catalogs.zipper import build_zipper_catalog_data
 from polyester.catalogs.zipper_supply import patch_zipper_catalog_supply
 from polyester.codecs.scalars import MAX_PROTOCOL_SCALE, UINT32_MAX, validate_protocol_scale
+from polyester.codecs.spot_config import (
+    max_open_orders_total_from_dict,
+    pair_order_limits_from_dict,
+)
 from polyester.errors import PolyesterValidationError
+from polyester.models.common import PairOrderLimits
 from polyester.models.zipper import (
     DepositWithdrawConfig,
     ZippedAssetSupplyUpdate,
@@ -186,6 +191,8 @@ class CatalogManager:
                     raise PolyesterValidationError(
                         f"catalog contains duplicate symbol_id {symbol_id}"
                     )
+                # Fail closed on malformed limits, like the other constraints.
+                pair_order_limits_from_dict(row)
                 symbols_seen.add(symbol)
                 symbol_ids_seen.add(symbol_id)
                 row["symbol_id"] = symbol_id
@@ -193,6 +200,7 @@ class CatalogManager:
                 if quote_scale is not None:
                     row["quote_quantity_scale"] = quote_scale
                 cleaned_pairs.append(row)
+            max_open_orders_total_from_dict(config)
         except PolyesterValidationError as exc:
             self._reject_refresh(str(exc))
             raise
@@ -398,6 +406,26 @@ class CatalogManager:
                 asset, "market_data_volume_scale", "marketDataVolumeScale"
             )
         return None
+
+    def order_limits_for_symbol(self, symbol: str) -> PairOrderLimits | None:
+        """Return the pair's order-size and open-order limits, or None when unknown."""
+        if self._unusable:
+            return None
+        pair = self._pair_for_symbol(symbol)
+        return pair_order_limits_from_dict(pair) if pair is not None else None
+
+    def order_limits_for_symbol_id(self, symbol_id: int) -> PairOrderLimits | None:
+        if self._unusable:
+            return None
+        pair = self._pair_for_symbol_id(symbol_id)
+        return pair_order_limits_from_dict(pair) if pair is not None else None
+
+    @property
+    def max_open_orders_total(self) -> int:
+        """Venue default resting-order limit across all pairs; ``0`` when unpublished."""
+        if self._unusable or not self.spot_config:
+            return 0
+        return max_open_orders_total_from_dict(self.spot_config)
 
     def reference_price_scale_for_symbol_id(self, symbol_id: int) -> int | None:
         """Return the pair reference-candle price scale, or None when missing."""

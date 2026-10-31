@@ -9,7 +9,11 @@ import msgspec
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.bps import validate_bps
+from polyester.codecs.bps import (
+    MAX_SELL_SLIPPAGE_BPS,
+    max_slippage_bps_for_side,
+    validate_bps,
+)
 from polyester.codecs.correlation_id import (
     optional_client_id,
     optional_request_id,
@@ -291,6 +295,7 @@ def order_intent_from_request(
             market,
             ticks=request.max_slippage_ticks,
             bps=request.max_slippage_bps,
+            side=request.side,
         )
     else:
         if request.max_slippage_ticks is not None or request.max_slippage_bps is not None:
@@ -450,6 +455,7 @@ def _set_market_max_slippage(
     *,
     ticks: int | None,
     bps: int | None,
+    side: str,
 ) -> None:
     if ticks is not None and bps is not None:
         raise PolyesterValidationError(
@@ -458,7 +464,10 @@ def _set_market_max_slippage(
     if ticks is not None:
         market.max_slippage_ticks = tick_count(ticks, "max_slippage_ticks")
     elif bps is not None:
-        market.max_slippage_bps = validate_bps(bps, "max_slippage_bps")
+        # The backend rejects 10000 bps on a market order that sells.
+        market.max_slippage_bps = validate_bps(
+            bps, "max_slippage_bps", max_value=max_slippage_bps_for_side(side)
+        )
 
 
 def _risk_leg_model_to_dict(leg: RiskLeg) -> dict[str, Any]:
@@ -696,7 +705,10 @@ def _trailing_stop_from_dict(
     if slip_ticks is not None:
         proto.max_slippage_ticks = tick_count(slip_ticks, "max_slippage_ticks")
     if slip_bps is not None:
-        proto.max_slippage_bps = validate_bps(slip_bps, "max_slippage_bps")
+        # An attached trailing stop takes at most 9999 bps on either side.
+        proto.max_slippage_bps = validate_bps(
+            slip_bps, "max_slippage_bps", max_value=MAX_SELL_SLIPPAGE_BPS
+        )
 
     activation = _mapping_get(data, "activation_price", "activationPrice")
     activation_ticks = _mapping_get(data, "activation_price_ticks", "activationPriceTicks")

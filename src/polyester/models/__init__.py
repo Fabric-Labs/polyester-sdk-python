@@ -40,6 +40,7 @@ from polyester.models.common import (
     Order,
     OrderbookData,
     OrderbookLevel,
+    PairOrderLimits,
     SpotConfig,
 )
 from polyester.models.fees import SpotFeeRate, SpotFeeRatesList
@@ -174,6 +175,7 @@ from polyester.models.trading_rate_limits import (
 )
 from polyester.models.vip import (
     NextVIPTierThresholds,
+    VIPMetricQuality,
     VIPStatus,
     VIPTier,
     VIPTiersList,
@@ -305,6 +307,7 @@ __all__ = [
     "ResolvedAccountsList",
     "RiskLeg",
     "RotateGuardSignerWalletResult",
+    "PairOrderLimits",
     "SpotConfig",
     "SpotFeeRate",
     "SpotFeeRatesList",
@@ -347,6 +350,7 @@ __all__ = [
     "VIPTier",
     "VIPTiersList",
     "NextVIPTierThresholds",
+    "VIPMetricQuality",
     "UsernameHistoryEntry",
     "UsernameHistoryList",
     "WithdrawDestinationValidation",

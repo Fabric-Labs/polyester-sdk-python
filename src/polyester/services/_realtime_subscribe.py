@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TypeVar
 
 from polyester.errors import PolyesterRealtimeError
@@ -28,6 +28,20 @@ async def subscribe_account_proto(
     resolved = resolve_account_id(account_id, default_account_id)
     channel = channel_template.format(account_id=resolved)
     return await client.subscribe_proto(channel, decode=decode)
+
+
+async def subscribe_account_proto_batch(
+    realtime: AsyncRealtimeClient | None,
+    *,
+    channel_template: str,
+    account_id: str | int | None,
+    default_account_id: str | int | None,
+    decode_batch: Callable[[bytes], Sequence[T | BaseException]],
+) -> AsyncSubscription[T]:
+    client = require_realtime(realtime)
+    resolved = resolve_account_id(account_id, default_account_id)
+    channel = channel_template.format(account_id=resolved)
+    return await client.subscribe_proto_batch(channel, decode_batch=decode_batch)
 
 
 async def subscribe_public_proto(

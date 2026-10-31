@@ -11,13 +11,17 @@ from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
 )
-from polyester.codecs.proto_helpers import error_code_name
+from polyester.codecs.proto_helpers import error_code_name, format_uint64_id
 from polyester.errors import (
+    TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
+    PolyesterNotImplementedError,
     PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
+    PolyesterTimeoutError,
+    PolyesterTimestampSkewError,
     PolyesterTransportError,
 )
 from polyester.gen.auth.v1 import auth_pb2
@@ -29,6 +33,9 @@ from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_
 
 _ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
 _EMPTY_ERROR_MESSAGE = "request failed without server error details"
+# connectrpc reports a bare (non-Connect) HTTP error by its status phrase; a
+# bare 501 arrives as code ``unknown`` with this message.
+_HTTP_501_PHRASE = "Not Implemented"
 
 
 def protobuf_to_public_dict(message: Message) -> dict[str, Any]:
@@ -75,6 +82,10 @@ def _rate_limit_error(message: str, *, proto_detail=None) -> PolyesterRateLimitE
 
 
 def map_connect_error(exc: ConnectError):
+    if (exc.message or "").strip() == TIMESTAMP_SKEW:
+        return PolyesterTimestampSkewError(
+            status_code=401 if exc.code.value == "unauthenticated" else None
+        )
     error_message = exc.message or _EMPTY_ERROR_MESSAGE
     if exc.details:
         for detail in exc.details:
@@ -99,9 +110,16 @@ def map_connect_error(exc: ConnectError):
                     or "PERMISSION" in code_name
                 ):
                     return PolyesterAuthError(error_message)
-                if code_name.startswith("ERROR_CODE_"):
-                    return PolyesterApiError(error_message, code=code_name)
-                return PolyesterApiError(error_message, code=code_name)
+                return PolyesterApiError(
+                    error_message,
+                    code=code_name,
+                    raw=unpacked,
+                    existing_order_id=(
+                        format_uint64_id(unpacked.existing_order_id)
+                        if unpacked.existing_order_id
+                        else None
+                    ),
+                )
             if full_name == "chain.withdraw.v1.ErrorDetail":
                 code_name = error_code_name(withdraw_pb2.ErrorCode, unpacked.code)
                 if (
@@ -138,8 +156,10 @@ def map_connect_error(exc: ConnectError):
         # Structured RateLimitDetail above populates retry_after when attached.
         return PolyesterRateLimitError(error_message)
     if code == "deadline_exceeded":
-        return PolyesterTransportError(error_message)
+        return PolyesterTimeoutError(error_message)
     message = (exc.message or "").strip().lower()
     if code == "unimplemented" and message in _ROUTE_NOT_FOUND_MESSAGES:
         return PolyesterRouteNotFoundError()
+    if code == "unimplemented" or (code == "unknown" and exc.message == _HTTP_501_PHRASE):
+        return PolyesterNotImplementedError(error_message)
     return PolyesterApiError(error_message, code=code)

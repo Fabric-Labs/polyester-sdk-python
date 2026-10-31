@@ -3,8 +3,8 @@ from __future__ import annotations
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import user_trades_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.realtime_decode import decode_user_trade_bytes
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.realtime_decode import decode_user_trade_batch_bytes
+from polyester.codecs.scalars import UINT64_MAX, id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import GetUserTradesRequest
@@ -12,7 +12,7 @@ from polyester.models import UserTrade, UserTradesList
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._realtime_subscribe import subscribe_account_proto
+from polyester.services._realtime_subscribe import subscribe_account_proto_batch
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
@@ -86,9 +86,9 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         if include_transfers:
             request.include_transfers = True
         if after_match_id is not None:
-            if int(after_match_id) <= 0:
+            if not 0 < int(after_match_id) <= UINT64_MAX:
                 raise PolyesterValidationError(
-                    "trades.list after_match_id must be a positive match id"
+                    "trades.list after_match_id must be a positive uint64 match id"
                 )
             request.symbol_id = resolve_symbol_id(
                 self._catalogs,
@@ -124,10 +124,10 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[UserTrade]:
-        return await subscribe_account_proto(
+        return await subscribe_account_proto_batch(
             self._realtime,
             channel_template="private:spot:trades:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode=decode_user_trade_bytes,
+            decode_batch=decode_user_trade_batch_bytes,
         )

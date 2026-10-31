@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.api_keys import api_key_from_proto
@@ -18,7 +18,7 @@ from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterRealtimeError
 from polyester.models import ApiData, AssetBalance, LedgerTransfer, UserTrade
 from polyester.models.auth import AccountIdentity
-from polyester.models.market import Candle, MarketOverviewList
+from polyester.models.market import Candle, MarketOverviewList, MarketTrade
 from polyester.models.policies import ApiPolicy, SubaccountPolicy
 from polyester.models.realtime import AddressBookViewInvalidation, OrderBookDeltaUpdate
 from polyester.models.sub_accounts import SubAccount
@@ -43,6 +43,25 @@ def _parse_proto(payload: bytes, message_cls):
     return message
 
 
+def _decode_batch_members(
+    events: Iterable[Any], decode: Callable[[Any], T]
+) -> list[T | PolyesterRealtimeError]:
+    """Decode every event of a batch publication in order.
+
+    A member that fails to decode becomes a ``PolyesterRealtimeError`` in its
+    slot, so one malformed event never drops the rest of its batch.
+    """
+    members: list[T | PolyesterRealtimeError] = []
+    for index, event in enumerate(events):
+        try:
+            members.append(decode(event))
+        except Exception as exc:
+            error = PolyesterRealtimeError(f"batch event {index}: {exc}")
+            error.__cause__ = exc
+            members.append(error)
+    return members
+
+
 def decode_asset_balance_bytes(payload: bytes) -> AssetBalance:
     from polyester.gen.ledger.read.v1.ledger_read_pb2 import AssetBalance as AssetBalancePb
 
@@ -55,10 +74,26 @@ def decode_user_trade_bytes(payload: bytes) -> UserTrade:
     return user_trade_from_proto(_parse_proto(payload, UserTradePb))
 
 
+def decode_user_trade_batch_bytes(payload: bytes) -> list[UserTrade | PolyesterRealtimeError]:
+    from polyester.gen.orders.v1.orders_read_pb2 import UserTradeBatch
+
+    batch = _parse_proto(payload, UserTradeBatch)
+    return _decode_batch_members(batch.events, user_trade_from_proto)
+
+
 def decode_ledger_transfer_bytes(payload: bytes) -> LedgerTransfer:
     from polyester.gen.ledger.read.v1.ledger_read_pb2 import TransferRow
 
     return ledger_transfer_from_proto(_parse_proto(payload, TransferRow))
+
+
+def decode_ledger_transfer_batch_bytes(
+    payload: bytes,
+) -> list[LedgerTransfer | PolyesterRealtimeError]:
+    from polyester.gen.ledger.read.v1.ledger_read_pb2 import TransferRowBatch
+
+    batch = _parse_proto(payload, TransferRowBatch)
+    return _decode_batch_members(batch.events, ledger_transfer_from_proto)
 
 
 def decode_trigger_bytes(payload: bytes) -> Trigger:
@@ -71,6 +106,31 @@ def decode_trigger_event_bytes(payload: bytes) -> TriggerEvent:
     from polyester.gen.triggers.v1.triggers_pb2 import TriggerEvent as TriggerEventPb
 
     return trigger_event_from_proto(_parse_proto(payload, TriggerEventPb))
+
+
+def decode_trigger_event_batch_bytes(
+    payload: bytes,
+) -> list[TriggerEvent | PolyesterRealtimeError]:
+    from polyester.gen.triggers.v1.triggers_pb2 import TriggerEventBatch
+
+    batch = _parse_proto(payload, TriggerEventBatch)
+    return _decode_batch_members(batch.events, trigger_event_from_proto)
+
+
+def decode_market_trade_batch_bytes(
+    payload: bytes, *, quantity_scale: int
+) -> list[MarketTrade | PolyesterRealtimeError]:
+    from polyester._wire import protobuf_to_public_dict
+    from polyester.codecs.wire_decode import decode_market_trade
+    from polyester.gen.marketdata.v1.marketdata_pb2 import MarketTradeBatch
+
+    batch = _parse_proto(payload, MarketTradeBatch)
+    return _decode_batch_members(
+        batch.events,
+        lambda event: decode_market_trade(
+            protobuf_to_public_dict(event), quantity_scale=quantity_scale
+        ),
+    )
 
 
 def decode_api_key_bytes(payload: bytes) -> ApiKeySummary:

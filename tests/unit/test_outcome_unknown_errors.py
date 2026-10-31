@@ -17,16 +17,28 @@ from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.orders.v1 import orders_pb2
 
 
-@pytest.mark.parametrize(
-    "code",
-    [
-        orders_pb2.ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN,
-        orders_pb2.ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN,
-        orders_pb2.ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
-        orders_pb2.ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
-    ],
+_OUTCOME_UNKNOWN_CODES = sorted(
+    value
+    for name, value in orders_pb2.ErrorCode.items()
+    if name.endswith("_OUTCOME_UNKNOWN")
 )
-def test_outcome_unknown_order_codes_are_retryable_and_ambiguous(code: int) -> None:
+
+
+def test_outcome_unknown_codes_include_known_mutations() -> None:
+    names = {orders_pb2.ErrorCode.Name(code) for code in _OUTCOME_UNKNOWN_CODES}
+    assert {
+        "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN",
+        "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN",
+        "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN",
+        "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN",
+        "ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN",
+    } <= names
+
+
+@pytest.mark.parametrize("code", _OUTCOME_UNKNOWN_CODES, ids=orders_pb2.ErrorCode.Name)
+def test_outcome_unknown_order_codes_are_ambiguous_and_not_retryable(code: int) -> None:
+    # A blind retry could apply the mutation twice (for example, place an order
+    # twice). Callers must read back first, so these are never retryable.
     mapped = map_connect_error(
         ConnectError(
             Code.DEADLINE_EXCEEDED,
@@ -36,8 +48,14 @@ def test_outcome_unknown_order_codes_are_retryable_and_ambiguous(code: int) -> N
     )
     assert type(mapped) is PolyesterApiError
     assert mapped.code == orders_pb2.ErrorCode.Name(code)
-    assert is_retryable_error(mapped)
+    assert not is_retryable_error(mapped)
     assert mutation_outcome_unknown(mapped)
+
+
+def test_future_outcome_unknown_code_is_classified_by_suffix() -> None:
+    err = PolyesterApiError("not confirmed", code="ERROR_CODE_ORDER_FUTURE_OUTCOME_UNKNOWN")
+    assert not is_retryable_error(err)
+    assert mutation_outcome_unknown(err)
 
 
 def test_auth_temporarily_unavailable_is_retryable_and_changed_nothing() -> None:

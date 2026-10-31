@@ -30,7 +30,7 @@ PUBLICATION = bytes([9, 34, 7, 34, 5, 34, 3, 1, 2, 3])
 
 
 def test_is_private_channel() -> None:
-    assert is_private_channel("private:spot:orders:acct:proto")
+    assert is_private_channel("private:spot:trades:acct:proto")
     assert not is_private_channel("public:spot:market:trades:1:proto")
 
 
@@ -75,13 +75,13 @@ def test_reconnect_backoff_is_bounded_exponential_and_jittered() -> None:
 @pytest.mark.asyncio
 async def test_subscribe_proto_private_requires_credentials() -> None:
     client = AsyncRealtimeClient(
-        "wss://api-devnet.polyester.ai",
-        api_url="https://api-devnet.polyester.ai",
+        "wss://api.devnet.polyester.com",
+        api_url="https://api.devnet.polyester.com",
         http=MagicMock(),
     )
     with pytest.raises(PolyesterAuthError, match="without API-key credentials"):
         await client.subscribe_proto(
-            "private:spot:orders:acct:proto",
+            "private:spot:trades:acct:proto",
             decode=lambda payload: payload,
         )
 
@@ -91,8 +91,8 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
     credentials = ApiKeyCredentials(key_id="ak_test", private_key=b"\x01" * 32)
     http = MagicMock()
     client = AsyncRealtimeClient(
-        "wss://api-devnet.polyester.ai",
-        api_url="https://api-devnet.polyester.ai",
+        "wss://api.devnet.polyester.com",
+        api_url="https://api.devnet.polyester.com",
         credentials=credentials,
         http=http,
     )
@@ -137,7 +137,7 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
         patch("polyester.realtime.client.websockets.connect", return_value=FakeWS()),
     ):
         subscription = await client.subscribe_proto(
-            "private:spot:orders:acct_test:proto",
+            "private:spot:trades:acct_test:proto",
             decode=lambda payload: payload,
         )
         await asyncio.sleep(0.05)
@@ -146,12 +146,12 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
 
     fetch_conn.assert_awaited_once()
     fetch_sub.assert_awaited_once()
-    assert fetch_sub.await_args.kwargs["channel"] == "private:spot:orders:acct_test:proto"
+    assert fetch_sub.await_args.kwargs["channel"] == "private:spot:trades:acct_test:proto"
     assert FakeWS.sent == [
         connect_command(1, "conn-token"),
         subscribe_command(
             2,
-            "private:spot:orders:acct_test:proto",
+            "private:spot:trades:acct_test:proto",
             "sub-token",
         ),
     ]
@@ -170,7 +170,7 @@ def test_binary_protocol_commands_and_replies() -> None:
 
 @pytest.mark.asyncio
 async def test_subscribe_proto_reconnects_after_disconnect() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    client = AsyncRealtimeClient("wss://api.devnet.polyester.com")
     connect_calls = 0
 
     class FakeWS:
@@ -215,7 +215,7 @@ async def test_subscribe_proto_reconnects_after_disconnect() -> None:
 
 @pytest.mark.asyncio
 async def test_subscribe_proto_replies_to_centrifugo_ping() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    client = AsyncRealtimeClient("wss://api.devnet.polyester.com")
 
     class FakeWS:
         sent: list[bytes] = []
@@ -259,7 +259,7 @@ async def test_subscribe_proto_replies_to_centrifugo_ping() -> None:
 @pytest.mark.asyncio
 async def test_subscribe_proto_read_timeout_is_connection_death_no_reconnect() -> None:
     """Read timeout must not hang in a continue loop; with auto_reconnect=False, surface error."""
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    client = AsyncRealtimeClient("wss://api.devnet.polyester.com")
 
     class SilentWS:
         subprotocol = "centrifuge-protobuf"
@@ -296,7 +296,7 @@ async def test_subscribe_proto_read_timeout_is_connection_death_no_reconnect() -
 
 @pytest.mark.asyncio
 async def test_subscribe_proto_read_timeout_reconnects_when_enabled() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    client = AsyncRealtimeClient("wss://api.devnet.polyester.com")
     connect_calls = 0
 
     class SilentThenAliveWS:
@@ -344,7 +344,7 @@ async def test_subscribe_proto_read_timeout_reconnects_when_enabled() -> None:
 
 @pytest.mark.asyncio
 async def test_subscribe_proto_resubscribed_increments_after_forced_reconnect() -> None:
-    client = AsyncRealtimeClient("wss://api-devnet.polyester.ai")
+    client = AsyncRealtimeClient("wss://api.devnet.polyester.com")
     connect_calls = 0
 
     class FakeWS:

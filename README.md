@@ -3,7 +3,8 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** Alpha (`0.1.0a55`). Proprietary license (not open source).
+**Status:** `0.2.0`, pre-1.0: a minor release may include breaking changes (see
+[CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
 Requires **Python 3.11+**.
@@ -53,7 +54,7 @@ Rows marked **No** are intentional for API-key SDKs (use the TypeScript
 browser client for wallet login and session MFA).
 
 Full cross-language comparison:
-[SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
+[SDK capability matrix](https://polyester.com/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
@@ -69,7 +70,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.1.0a55"
+pip install "polyester-sdk==0.2.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -315,7 +316,7 @@ host, so handle an unimplemented/not-found response and do not make Preview a
 prerequisite for order submission.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
-[Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
+[Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
 before overriding pair defaults. Set at most one of `max_slippage_bps`
 (1–10000) or `max_slippage_ticks`. Omit both to keep the pair default. The
 fields are rejected on limit orders and if both are supplied.
@@ -701,7 +702,8 @@ async with sub:
 
 - Realtime is binary-only. The client negotiates the `centrifuge-protobuf`
   WebSocket subprotocol and consumes protobuf publications from `:proto`
-  channels. ConnectRPC's optional JSON wire mode does not apply to realtime.
+  channels; live orders use the private WebSocket (see Live orders below).
+  ConnectRPC's optional JSON wire mode does not apply to realtime.
   Inbound WebSocket messages are capped at 4 MiB.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
   `PolyesterRealtimeOverflowError` and faults the subscription; it does **not**
@@ -721,6 +723,78 @@ async with sub:
   `Quantity.scale` may be `None`; resolve the hydrated catalog scale with
   `client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)` (or by
   symbol), then call `quantity.format(scale)`. Never guess or inject scale 8.
+
+### Live orders
+
+`client.orders.subscribe()` streams an account's orders over the private
+WebSocket (`/v1/ws/private`, binary protobuf, subprotocol
+`polyester.v1.proto`). It authenticates with the same realtime tokens as the
+other private streams. One connection carries every account, and each account
+has one server subscription shared by all of its consumers.
+
+```python
+from polyester.models import (
+    PrivateOrdersConnected,
+    PrivateOrdersDisconnected,
+    PrivateOrdersError,
+    PrivateOrdersReady,
+    PrivateOrdersSnapshot,
+    PrivateOrdersStale,
+    PrivateOrdersUnit,
+)
+
+orders = {order.order_id: order for order in (await client.orders.list_open()).orders}
+subscription = await client.orders.subscribe()  # default_account_id, or account_id=...
+async with subscription:
+    async for event in subscription:
+        if isinstance(event, PrivateOrdersReady):
+            # The stream now reflects every order read made before the subscribe.
+            print("ready")
+        elif isinstance(event, PrivateOrdersSnapshot):
+            # The full live view: replace local state.
+            orders = {order.order_id: order for order in event.orders}
+        elif isinstance(event, PrivateOrdersUnit):
+            for order in event.orders:
+                orders[order.order_id] = order  # keep the higher version
+            for order_id in event.removed_order_ids:
+                orders.pop(order_id, None)  # left the live view; not a cancel
+            for change in event.events:
+                print(change)  # PrivateOrderEvent or PrivateOrderCommandOutcome
+        elif isinstance(event, PrivateOrdersStale):
+            print("stale" if event.stale else "caught up")
+        elif isinstance(event, PrivateOrdersError):
+            print(f"recovering from {event.kind}: {event.error}")
+```
+
+- `subscribe()` returns once the server confirmed the subscription; the first
+  event is `PrivateOrdersConnected`. A failure before that raises (for
+  example `PolyesterAuthError` for a refused token, or
+  `PolyesterRealtimeError` with `code == "FORBIDDEN"`).
+- Orders are the same `Order` model the order reads return. Two copies with
+  the same `version` are identical, and a higher `version` is newer. To merge
+  with a read: read `list_open()`, subscribe, wait for `PrivateOrdersReady`,
+  and keep the higher version of each order.
+- `PrivateOrdersReady` means the subscription reached the account's read
+  boundary, sampled when the server received the subscribe: from then on it
+  reflects every acknowledgement given before the subscribe. Wait for it
+  before relying on the stream. It comes once per server subscription, so
+  again after a resubscribe or reconnect, and a consumer that joins an
+  account that is already ready gets it right after its catch-up snapshot.
+- A sequence gap, an expired token or a dropped connection resumes from the
+  last applied position. Consumers see `PrivateOrdersDisconnected` and then
+  `PrivateOrdersConnected`; a position the server can no longer resume is
+  answered with a fresh `PrivateOrdersSnapshot` that replaces local state.
+  Outcomes between the two states are not replayed; fills stay readable from
+  trade history.
+- `PrivateOrdersStale(stale=True)` means the account's live view is
+  temporarily behind; it recovers by itself.
+- Recoverable failures arrive as `PrivateOrdersError` events and through
+  `set_on_error(...)`. A failure that ends the stream (a refused token, a
+  revoked permission, close code 4400 or 4403) is raised from iteration, with
+  `PolyesterRealtimeError.code` or `.close_code` set.
+- Batch-replace progress has no stream: poll
+  `client.orders.get_batch_replace_status(...)` and watch each order's
+  revisions on this stream.
 
 ## Sync client
 

@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from polyester import AsyncPolyester
+from polyester.models import PrivateOrdersConnected, PrivateOrdersSnapshot
 from tests.helpers import live_client_kwargs_from_env, pick_trade_symbol
 from tests.integration.support import call_optional
 
@@ -61,7 +62,7 @@ async def test_public_trades_subscription_survives_centrifugo_ping(live_credenti
 @pytest.mark.realtime
 @pytest.mark.optional
 async def test_orders_subscribe_receives_connection(live_credentials) -> None:
-    """Validate private orders RT wiring with a function-scoped client (clean WS teardown)."""
+    """Validate the private order socket with a function-scoped client (clean WS teardown)."""
     kwargs = live_client_kwargs_from_env(hydrate_catalogs=False)
     assert kwargs is not None
     client = AsyncPolyester(**kwargs)
@@ -74,12 +75,11 @@ async def test_orders_subscribe_receives_connection(live_credentials) -> None:
             label="orders.subscribe",
         )
         try:
-            try:
-                await asyncio.wait_for(subscription.__anext__(), timeout=5)
-            except StopAsyncIteration:
-                pytest.skip("orders.subscribe closed without publications (no order activity)")
-            except TimeoutError:
-                pass
+            first = await asyncio.wait_for(subscription.__anext__(), timeout=5)
+            assert isinstance(first, PrivateOrdersConnected)
+            # A subscribe without a cursor always starts with the full live view.
+            snapshot = await asyncio.wait_for(subscription.__anext__(), timeout=10)
+            assert isinstance(snapshot, PrivateOrdersSnapshot)
         finally:
             await subscription.aclose()
             await asyncio.sleep(0.1)

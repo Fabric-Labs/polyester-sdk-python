@@ -10,16 +10,11 @@ AUTH_INTERNAL_ERROR = "AUTH_INTERNAL_ERROR"
 # The account request changed nothing; retry the same request.
 AUTH_TEMPORARILY_UNAVAILABLE = "AUTH_TEMPORARILY_UNAVAILABLE"
 
-# orders.v1.ErrorDetail codes for a mutation that was sent but not confirmed in
-# time. The server may still have applied it: read back before retrying.
-_ORDER_OUTCOME_UNKNOWN_CODES = frozenset(
-    {
-        "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN",
-        "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN",
-        "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN",
-        "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN",
-    }
-)
+# Suffix of orders.v1.ErrorDetail codes for a mutation that was sent but not
+# confirmed in time (e.g. ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN). The server
+# may still have applied it: read back before retrying. Matching the suffix
+# covers codes added to the enum later.
+_OUTCOME_UNKNOWN_SUFFIX = "_OUTCOME_UNKNOWN"
 
 
 class PolyesterError(Exception):
@@ -158,7 +153,23 @@ def is_not_found(err: BaseException) -> bool:
 
 
 class PolyesterRealtimeError(PolyesterError):
-    """Raised for realtime connection, subscription, or decode failures."""
+    """Raised for realtime connection, subscription, or decode failures.
+
+    ``code`` is the private WebSocket request error code (for example
+    ``FORBIDDEN``); ``close_code`` is the WebSocket close code that ended the
+    stream (for example ``4403``). Both are ``None`` when not applicable.
+    """
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        code: str | None = None,
+        close_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.close_code = close_code
 
 
 class PolyesterRealtimeOverflowError(PolyesterRealtimeError):
@@ -170,24 +181,35 @@ class PolyesterRealtimeOverflowError(PolyesterRealtimeError):
 
 
 def _is_outcome_unknown_api_error(err: BaseException) -> bool:
-    return isinstance(err, PolyesterApiError) and err.code in _ORDER_OUTCOME_UNKNOWN_CODES
+    return (
+        isinstance(err, PolyesterApiError)
+        and err.code is not None
+        and err.code.endswith(_OUTCOME_UNKNOWN_SUFFIX)
+    )
 
 
 def is_retryable_error(err: BaseException) -> bool:
     """Return whether retrying may succeed after backoff.
 
-    True for transport, rate-limit and server errors, for
-    ``AUTH_TEMPORARILY_UNAVAILABLE`` (the request changed nothing), and for an
-    order or trigger create, cancel or modify whose outcome is unknown
-    (``ERROR_CODE_*_OUTCOME_UNKNOWN``).
+    True for transport, rate-limit and server errors, and for
+    ``AUTH_TEMPORARILY_UNAVAILABLE`` (the request changed nothing).
 
-    This does not guarantee that a mutation was not applied. Preserve the
-    original idempotency key and reconcile first when
-    :func:`mutation_outcome_unknown` returns true.
+    False for an order or trigger create, cancel, modify or control whose
+    outcome is unknown (``ERROR_CODE_*_OUTCOME_UNKNOWN``): the server may
+    have applied it, so a blind retry could, for example, place an order
+    twice. Read the order or trigger back first; see
+    :func:`mutation_outcome_unknown`.
+
+    A true result does not guarantee that a mutation was not applied: a
+    timeout is retryable but may still have applied. Preserve the original
+    idempotency key and reconcile first when :func:`mutation_outcome_unknown`
+    returns true.
     """
+    if _is_outcome_unknown_api_error(err):
+        return False
     if isinstance(err, PolyesterApiError) and err.code == AUTH_TEMPORARILY_UNAVAILABLE:
         return True
-    return _is_outcome_unknown_api_error(err) or isinstance(
+    return isinstance(
         err,
         (PolyesterTransportError, PolyesterRateLimitError, PolyesterServerError),
     )
@@ -197,8 +219,8 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
     """Return whether the server may have applied a failed mutation.
 
     True for transport and server errors (except rate limits), for a
-    malformed success response, and for an order or trigger create, cancel or
-    modify that was sent but not confirmed in time
+    malformed success response, and for an order or trigger create, cancel,
+    modify or control that was sent but not confirmed in time
     (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or trigger back before
     retrying.
     """

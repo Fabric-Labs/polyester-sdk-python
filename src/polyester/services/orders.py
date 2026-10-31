@@ -36,7 +36,6 @@ from polyester.codecs.orders import (
     resolve_quote_quantity_scale,
     set_order_key,
 )
-from polyester.codecs.realtime_decode import decode_order_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import PolyesterTransportError, PolyesterValidationError
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
@@ -60,17 +59,17 @@ from polyester.models import (
     CreateOrderRequest,
     GetOrderResult,
     ModifyOrderResult,
-    Order,
     OrderKey,
     OrderMutationResult,
     OrdersList,
     PreviewOrderResult,
 )
+from polyester.models.private_orders import PrivateOrdersEvent
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._realtime_subscribe import subscribe_account_proto
-from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+from polyester.services._realtime_subscribe import require_realtime
+from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resolve_account_id
 from polyester.services._symbols import (
     resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
@@ -625,15 +624,24 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account_id: str | int | None = None,
-    ) -> AsyncSubscription[Order]:
-        """Subscribe to private order updates for an account."""
-        return await subscribe_account_proto(
-            self._realtime,
-            channel_template="private:spot:orders:{account_id}:proto",
-            account_id=account_id,
-            default_account_id=self._default_account_id,
-            decode=decode_order_bytes,
-        )
+    ) -> AsyncSubscription[PrivateOrdersEvent]:
+        """Stream an account's live orders over the private WebSocket.
+
+        Returns once the server confirmed the subscription. Iterate the
+        events: ``PrivateOrdersSnapshot`` (the full live view; replace local
+        state), ``PrivateOrdersUnit`` (changed orders, removed order IDs and
+        order events), ``PrivateOrdersReady`` (the stream reflects every order
+        read made before the subscribe; wait for it before relying on the
+        stream), ``PrivateOrdersStale``, ``PrivateOrdersConnected``,
+        ``PrivateOrdersDisconnected`` and ``PrivateOrdersError``. Orders are
+        the same ``Order`` model the reads return; keep the copy with the
+        higher ``version``. Gaps, expired tokens and reconnects resume from
+        the last applied position automatically. A failure that ends the
+        stream (for example a refused token) is raised from iteration.
+        """
+        client = require_realtime(self._realtime)
+        resolved = resolve_account_id(account_id, self._default_account_id)
+        return await client.subscribe_private_orders(resolved)
 
     async def wait_for_order_trades_complete(
         self,

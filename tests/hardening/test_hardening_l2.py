@@ -55,7 +55,7 @@ from tests.hardening_support import (
     wait_until,
 )
 
-PRIVATE_CHANNEL = "private:spot:orders:acct:proto"
+PRIVATE_CHANNEL = "private:spot:trades:acct:proto"
 PUBLIC_CHANNEL = "public:spot:market:trades:1:proto"
 
 

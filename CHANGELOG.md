@@ -1,8 +1,42 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+Git tag: `v0.2.0`.
+
+**Upgrade before trading.** 0.1.0a55 and earlier encode and decode prices at
+6 decimals while the API uses 9, so every price is 1,000 times off. Their
+testnet preset points at a host that does not exist, and their devnet preset
+at an undocumented host. This release uses 9-decimal prices and the
+documented hosts (`api.devnet.polyester.com`, `api.testnet.polyester.com`),
+and streams live orders over the private WebSocket.
+
+**New version scheme.** The Go, Python and Rust SDKs now share one version
+line and release together. Versions are plain SemVer (`0.2.0`, `0.2.1`,
+`0.3.0`) instead of PEP 440 pre-releases (`0.1.0aN`), and Git tags are
+`vX.Y.Z`. Before 1.0, a minor release (`0.3.0`) may include breaking changes;
+a patch release (`0.2.1`) does not. Pin the exact version
+(`polyester-sdk==0.2.0`). This release covers every change since 0.1.0a55.
 
 ### Breaking
+- Trading prices now use fixed 9-decimal price ticks (one tick is 1e-9 quote
+  units), matching the API. This covers order, trigger, trailing-stop,
+  ladder, order-book, trade, candle, and market-overview prices and
+  `Price.from_ticks`. Earlier SDK versions encode and decode prices at 6
+  decimals, which is 1,000 times off against the current API; upgrade
+  before trading. Integer `max_slippage_ticks` values are 64-bit Q9 ticks.
+- `orders.subscribe()` now streams live orders over the private WebSocket
+  (`/v1/ws/private`) instead of the retired `private:spot:orders:<account>:proto`
+  realtime channel, which no longer issues subscribe tokens. It yields
+  `PrivateOrdersEvent` values instead of bare `Order` objects:
+  `PrivateOrdersSnapshot` (the full live view), `PrivateOrdersUnit` (changed
+  orders, removed order IDs and order events), `PrivateOrdersReady` (the
+  stream reflects every order read made before the subscribe; wait for it
+  before relying on the stream), `PrivateOrdersStale`,
+  `PrivateOrdersConnected`, `PrivateOrdersDisconnected` and
+  `PrivateOrdersError`. Orders are the same `Order` model the reads return.
+  The stream resumes from its last position after a gap, an expired token or
+  a reconnect. `orders.subscribe_sync(on_event=...)` receives the same events.
 - `market_data.get_trades()` drops `from_match_id`, which never reached the
   API (it failed before sending), and `MarketTradesResult.next_match_id` is
   now `next_page_token`. Page a listing with `page_token`.
@@ -13,36 +47,18 @@
   unset means the last trade price. A TWAP or ladder trigger now rejects
   `trigger_price_source`, which earlier versions ignored.
 
-### Fixed
-- `is_retryable_error()` and `mutation_outcome_unknown()` now return true for
-  an order or trigger create, cancel or modify that was sent but not
-  confirmed in time (`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`,
-  `ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`,
-  `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`,
-  `ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`). The change may have been
-  applied: read the order or trigger back before retrying. Earlier versions
-  treated these as definite failures.
-- `is_retryable_error()` returns true for `AUTH_TEMPORARILY_UNAVAILABLE`
-  (exported as a constant): the request changed nothing, so retry it as is.
-- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
-  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
-  Earlier versions pointed at `api-testnet.polyester.com`, which does not
-  exist, so every testnet call failed with a DNS error. The devnet preset and
-  the client defaults now use the documented `api.devnet.polyester.com` host.
-- A stop-loss or take-profit market child now carries its
-  `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
-  the cap silently, so the pair's default market slippage applied instead.
-- Trigger reads (`triggers.get`, `triggers.list` and the trigger stream)
-  show a stop-loss or take-profit market child's cap as
-  `Trigger.max_slippage` (ticks, as a price delta) or
-  `Trigger.max_slippage_bps`; earlier versions decoded every market child
-  the same way, cap or not.
-- Integer tick counts (`max_slippage_ticks`, `trailing_distance_ticks`,
-  attached-risk `*_ticks` fields) above the 64-bit range raise
-  `PolyesterValidationError` before sending instead of a raw `ValueError`.
-- Order reads no longer report an attached-risk leg whose state is
-  `not_configured`; the server sends that state for a leg the order does
-  not have.
+### Changed
+- Documentation links (the PyPI "Documentation" URL, the README capability
+  matrix and Market Order Price Protection links) now point at the public
+  docs on `https://polyester.com/docs`. The price-protection link was
+  broken in earlier versions.
+- Candle and market-overview base volume now use the base asset
+  `market_data_volume_scale` from `get_spot_config`. Primary candle prices
+  use the 9-decimal price scale.
+- Composite reference-candle OHLC uses the pair `reference_price_scale`.
+  `get_candles(..., include_reference=True)` requests that series.
+  `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the
+  catalog scale is known; `volume_24h_base_scaled` stays the integer.
 
 ### Added
 - Index-price triggers: stop-loss, take-profit and trailing-stop triggers,
@@ -88,25 +104,46 @@
   `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public IDs of
   the triggers created for the order's attached-risk legs. Each is set only
   for a leg the order configured and is empty otherwise.
+- `PolyesterRealtimeError.code` (private WebSocket request error code, for
+  example `FORBIDDEN`) and `PolyesterRealtimeError.close_code` (the WebSocket
+  close code that ended a stream).
 - Trigger events label standalone trailing-stop activation as `activated`,
   and `trigger_event_type_from_label` accepts `activated` as a filter.
 
-### Changed
-- Trading prices now use fixed 9-decimal price ticks (one tick is 1e-9 quote
-  units), matching the API. This covers order, trigger, trailing-stop,
-  ladder, order-book, trade, candle, and market-overview prices and
-  `Price.from_ticks`. Earlier SDK versions encode and decode prices at 6
-  decimals, which is 1,000 times off against the current API; upgrade
-  before trading. Integer `max_slippage_ticks` values are 64-bit Q9 ticks.
-- Candle and market-overview base volume now use the base asset
-  `market_data_volume_scale` from `get_spot_config`. Primary candle prices
-  use the 9-decimal price scale.
-- Composite reference-candle OHLC uses the pair `reference_price_scale`.
-  `get_candles(..., include_reference=True)` requests that series.
-  `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the
-  catalog scale is known; `volume_24h_base_scaled` stays the integer.
-
 ### Fixed
+- `mutation_outcome_unknown()` now returns true for an order or trigger
+  create, cancel, modify or control that was sent but not confirmed in time:
+  every orders error code ending in `_OUTCOME_UNKNOWN`
+  (`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN`, and codes added later).
+  `is_retryable_error()` returns false for them: the change may have been
+  applied, so a retry loop that resends it could, for example, place an
+  order twice. Read the order or trigger back before sending it again.
+  Earlier versions treated these as definite failures.
+- `is_retryable_error()` returns true for `AUTH_TEMPORARILY_UNAVAILABLE`
+  (exported as a constant): the request changed nothing, so retry it as is.
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  the client defaults now use the documented `api.devnet.polyester.com` host.
+- A stop-loss or take-profit market child now carries its
+  `max_slippage_ticks` or `max_slippage_bps` cap. Earlier versions dropped
+  the cap silently, so the pair's default market slippage applied instead.
+- Trigger reads (`triggers.get`, `triggers.list` and the trigger stream)
+  show a stop-loss or take-profit market child's cap as
+  `Trigger.max_slippage` (ticks, as a price delta) or
+  `Trigger.max_slippage_bps`; earlier versions decoded every market child
+  the same way, cap or not.
+- Integer tick counts (`max_slippage_ticks`, `trailing_distance_ticks`,
+  attached-risk `*_ticks` fields) above the 64-bit range raise
+  `PolyesterValidationError` before sending instead of a raw `ValueError`.
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
 - An error code this SDK version does not know yet no longer crashes error
   handling with `ValueError`. Orders, auth, withdraw and transfer errors
   raise the usual `PolyesterApiError` with `code` set to

@@ -1,6 +1,35 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
+
+Git tag: `v0.3.0`. Released 2026-10-31.
+
+**What a trading bot gains.** `trades.subscribe()`, `transfers.subscribe()`,
+`triggers.subscribe_events()` and `market_data.subscribe_trades()` now yield
+every event; before, the rest of each batch was dropped or garbled. Spot
+config and the catalog expose each pair's order limits, including the new cap
+on one market order's notional, so a bot can size orders before it sends
+them. Rejections are easier to act on: a duplicate client order ID names the
+order that already holds it, a clock-skew rejection is the retryable
+`PolyesterTimestampSkewError`, and a bad key or signature is a non-retryable
+`PolyesterAuthError` instead of a retryable server error. Replacement orders
+report the quantity they inherited, and slippage caps and trigger inputs are
+checked before sending the way the API checks them. The SDK now requires
+`connectrpc` 0.10.
+
+This release works on devnet today, and on testnet after testnet's next
+upgrade, which brings the new private order stream.
+
+**Breaking changes**
+- `triggers.modify()` no longer takes `limit_price`.
+- `max_slippage_bps` is at most 9999 for a market order that sells, a sell
+  stop-loss or take-profit market child, every trailing stop and
+  `triggers.modify()`.
+- `trigger_price_source="mark"` raises `PolyesterValidationError`.
+- A buy trailing stop's `limit_price` must be at least its `activation_price`.
+- API-key rejections from the API gateway raise the retryable
+  `PolyesterTimestampSkewError` or the non-retryable `PolyesterAuthError`
+  instead of a retryable `PolyesterServerError`.
 
 ### Breaking
 - `triggers.modify()` no longer takes `limit_price`: the API rejects any

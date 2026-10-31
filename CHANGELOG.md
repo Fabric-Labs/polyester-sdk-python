@@ -48,6 +48,10 @@ a patch release (`0.2.1`) does not. Pin the exact version
   `trigger_price_source`, which earlier versions ignored.
 
 ### Changed
+- Documentation links (the PyPI "Documentation" URL, the README capability
+  matrix and Market Order Price Protection links) now point at the public
+  docs on `https://polyester.com/docs`. The price-protection link was
+  broken in earlier versions.
 - Candle and market-overview base volume now use the base asset
   `market_data_volume_scale` from `get_spot_config`. Primary candle prices
   use the 9-decimal price scale.

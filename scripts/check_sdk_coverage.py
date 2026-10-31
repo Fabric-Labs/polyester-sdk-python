@@ -46,9 +46,7 @@ CAPABILITIES_PATH = "sdk-capabilities.json"
 README_PATH = "README.md"
 README_CAP_START = "<!-- sdk-capabilities:start -->"
 README_CAP_END = "<!-- sdk-capabilities:end -->"
-MATRIX_URL = (
-    "https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix"
-)
+MATRIX_URL = "https://polyester.com/docs/developer-docs/getting-started/sdk-capability-matrix"
 
 
 def _parse_toml_subset(text: str) -> dict[str, Any]:

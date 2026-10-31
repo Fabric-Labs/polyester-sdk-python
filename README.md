@@ -54,7 +54,7 @@ Rows marked **No** are intentional for API-key SDKs (use the TypeScript
 browser client for wallet login and session MFA).
 
 Full cross-language comparison:
-[SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
+[SDK capability matrix](https://polyester.com/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
@@ -316,7 +316,7 @@ host, so handle an unimplemented/not-found response and do not make Preview a
 prerequisite for order submission.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
-[Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
+[Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
 before overriding pair defaults. Set at most one of `max_slippage_bps`
 (1–10000) or `max_slippage_ticks`. Omit both to keep the pair default. The
 fields are rejected on limit orders and if both are supplied.

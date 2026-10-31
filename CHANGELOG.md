@@ -72,6 +72,9 @@
 - The package description now reads "Python SDK for the Polyester API with
   generated protobuf types and ConnectRPC clients."
 
+### Internal
+- `sdk-capabilities.json` no longer carries `publicDescriptorSha256` or `generatedAt`, so a proto publication that only changes `src/polyester/gen/` and `manifest.json` no longer makes it stale; `manifest.json` stays the single source of the descriptor hash.
+
 ## 0.2.0
 
 Git tag: `v0.2.0`.

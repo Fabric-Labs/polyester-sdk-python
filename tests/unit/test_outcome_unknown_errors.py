@@ -16,7 +16,6 @@ from polyester.errors import (
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.orders.v1 import orders_pb2
 
-
 _OUTCOME_UNKNOWN_CODES = sorted(
     value
     for name, value in orders_pb2.ErrorCode.items()

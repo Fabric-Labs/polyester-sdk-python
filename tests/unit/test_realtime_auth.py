@@ -14,20 +14,20 @@ from polyester.realtime.auth import (
 
 def test_connection_token_url() -> None:
     assert (
-        connection_token_url("https://api-devnet.polyester.ai")
-        == "https://api-devnet.polyester.ai/v1/rt/token"
+        connection_token_url("https://api.devnet.polyester.com")
+        == "https://api.devnet.polyester.com/v1/rt/token"
     )
 
 
 def test_subscription_token_url_encodes_channel() -> None:
     channel = "private:spot:trades:acct_test:proto"
-    url = subscription_token_url("https://api-devnet.polyester.ai", channel)
+    url = subscription_token_url("https://api.devnet.polyester.com", channel)
     assert url.endswith("channel=private%3Aspot%3Atrades%3Aacct_test%3Aproto")
 
 
 def test_realtime_token_signing_uses_get_with_empty_body_hash() -> None:
     channel = "private:spot:trades:acct-1:proto"
-    url = subscription_token_url("https://api-devnet.polyester.ai", channel)
+    url = subscription_token_url("https://api.devnet.polyester.com", channel)
     canonical = canonical_signing_string(
         timestamp_ms="1234567890",
         method="GET",
@@ -46,7 +46,7 @@ def test_sign_request_headers_for_rt_subscribe() -> None:
     private = Ed25519PrivateKey.generate().private_bytes_raw()
     creds = ApiKeyCredentials(key_id="ak_test", private_key=private)
     url = subscription_token_url(
-        "https://api-devnet.polyester.ai",
+        "https://api.devnet.polyester.com",
         "private:spot:trades:acct-1:proto",
     )
     headers = sign_request(creds, method="GET", url=url, body=b"", timestamp_ms="1")

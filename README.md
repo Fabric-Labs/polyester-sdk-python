@@ -350,7 +350,9 @@ Order limits are read from the spot config. `client.catalogs.order_limits_for_sy
 (or `get_spot_config().pair_order_limits`) returns `PairOrderLimits` with
 decimal strings `max_limit_qty_base`, `max_market_qty_base` and
 `max_order_notional_quote` (`None` when the pair has no maximum), and
-`max_open_orders_per_pair`. `client.catalogs.max_open_orders_total` (or
+`max_open_orders_per_pair`. `max_market_notional_quote` caps the notional of
+one market order, valued at a buy's protection price or a sell's reference
+price (`None` means no cap). `client.catalogs.max_open_orders_total` (or
 `SpotConfig.max_open_orders_total`) is the cross-pair resting-order limit.
 The open-order counts are the venue defaults for a typical account, `0` when
 unpublished; an account may have a lower limit of its own.
@@ -928,8 +930,9 @@ account; those tests may cancel every open order in their selected symbol.
 
 CI requires every public Connect RPC in gen to be wrapped or listed in
 `sdk-coverage.toml`. Contributors: `python scripts/check_sdk_coverage.py`.
-CI refreshes `sdk-capabilities.json` and the README capability table on the
-same branch when they drift (same-repo PRs / pushes to `main`).
+CI fails when `sdk-capabilities.json` or the README capability table is stale;
+refresh both with `python scripts/check_sdk_coverage.py --write-capabilities`
+and commit the result.
 
 **Pre-release checklist (realtime changes):**
 

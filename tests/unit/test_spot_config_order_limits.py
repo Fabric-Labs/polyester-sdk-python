@@ -37,6 +37,7 @@ def _wire_config(**top: Any) -> dict[str, Any]:
                 max_limit_qty_base="100",
                 max_market_qty_base="25.5",
                 max_order_notional_quote="1000000",
+                max_market_notional_quote="250000.5",
                 max_open_orders_per_pair=200,
             ),
             marketdata_pb2.PairConfig(
@@ -59,6 +60,7 @@ def test_spot_config_decodes_limits_and_omits_unlimited_maxima() -> None:
             max_limit_qty_base="100",
             max_market_qty_base="25.5",
             max_order_notional_quote="1000000",
+            max_market_notional_quote="250000.5",
             max_open_orders_per_pair=200,
         ),
         PairOrderLimits(symbol="ETH-USDT", symbol_id=102),
@@ -67,8 +69,25 @@ def test_spot_config_decodes_limits_and_omits_unlimited_maxima() -> None:
     assert unlimited.max_limit_qty_base is None
     assert unlimited.max_market_qty_base is None
     assert unlimited.max_order_notional_quote is None
+    assert unlimited.max_market_notional_quote is None
     assert unlimited.max_open_orders_per_pair == 0
     assert config.raw["pairs"][0]["maxLimitQtyBase"] == "100"
+    assert config.raw["pairs"][0]["maxMarketNotionalQuote"] == "250000.5"
+    assert "maxMarketNotionalQuote" not in config.raw["pairs"][1]
+
+
+def test_market_notional_cap_decodes_from_snake_case_and_empty_means_no_cap() -> None:
+    config = spot_config_from_dict(
+        {
+            "pairs": [
+                {**PAIR, "max_market_notional_quote": "5000000"},
+                {**PAIR, "symbolId": 102, "symbol": "ETH-USDT", "maxMarketNotionalQuote": ""},
+            ]
+        }
+    )
+
+    assert config.pair_order_limits[0].max_market_notional_quote == "5000000"
+    assert config.pair_order_limits[1].max_market_notional_quote is None
 
 
 def test_older_spot_config_without_limits_still_decodes() -> None:
@@ -85,6 +104,11 @@ def test_older_spot_config_without_limits_still_decodes() -> None:
         ({"maxOrderNotionalQuote": "1e6"}, {}),
         ({"maxMarketQtyBase": "1."}, {}),
         ({"maxMarketQtyBase": 5}, {}),
+        ({"maxMarketNotionalQuote": "-1"}, {}),
+        ({"maxMarketNotionalQuote": "1e6"}, {}),
+        ({"maxMarketNotionalQuote": "0.5."}, {}),
+        ({"maxMarketNotionalQuote": 250000}, {}),
+        ({"max_market_notional_quote": " 1"}, {}),
         ({"maxOpenOrdersPerPair": -1}, {}),
         ({"maxOpenOrdersPerPair": 2**32}, {}),
         ({}, {"maxOpenOrdersTotal": 1.5}),
@@ -107,6 +131,7 @@ def test_catalog_exposes_limits_per_symbol_and_total() -> None:
     by_symbol = catalogs.order_limits_for_symbol("BTC-USDT")
     assert by_symbol is not None
     assert by_symbol.max_limit_qty_base == "100"
+    assert by_symbol.max_market_notional_quote == "250000.5"
     assert by_symbol.max_open_orders_per_pair == 200
     assert catalogs.order_limits_for_symbol_id(102) == PairOrderLimits(
         symbol="ETH-USDT", symbol_id=102
@@ -138,3 +163,5 @@ async def test_get_spot_config_returns_typed_limits(monkeypatch: pytest.MonkeyPa
 
     assert config.max_open_orders_total == 7
     assert config.pair_order_limits[0].max_market_qty_base == "25.5"
+    assert config.pair_order_limits[0].max_market_notional_quote == "250000.5"
+    assert config.pair_order_limits[1].max_market_notional_quote is None

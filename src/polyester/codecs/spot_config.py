@@ -54,6 +54,9 @@ def pair_order_limits_from_dict(pair: dict[str, Any]) -> PairOrderLimits:
         max_order_notional_quote=_decimal_limit(
             pair, "max_order_notional_quote", "maxOrderNotionalQuote"
         ),
+        max_market_notional_quote=_decimal_limit(
+            pair, "max_market_notional_quote", "maxMarketNotionalQuote"
+        ),
         max_open_orders_per_pair=_open_orders_limit(
             pair, "max_open_orders_per_pair", "maxOpenOrdersPerPair"
         ),

@@ -401,6 +401,23 @@ A replacement order's `cum_qty` includes the quantity filled by its
 predecessors; `Order.inherited_cum_qty` is that carried-over part (zero for an
 order never replaced).
 
+An order says why it ended. A `rejected` order's `reject_reason` is the error
+code the Orders API returns for the same refusal, without the `ERROR_CODE_`
+prefix (for example `POST_ONLY_CROSS` or `INSUFFICIENT_FUNDS`). A `canceled`
+order's `cancel_reason` is one of `USER_REQUEST`, `IOC_REMAINDER`,
+`MARKET_REMAINDER`, `STP_EXPIRE_MAKER`, `STP_EXPIRE_TAKER`, `STP_EXPIRE_BOTH`,
+`REPLACED`, `GTD_EXPIRED`, `QTY_AT_OR_BELOW_FILLED`, `PAIR_DRAIN`,
+`ATTACHED_RISK_REFUSED`, `CANCEL_ALL_AFTER`, `ACCOUNT_REPAIR`,
+`TWAP_ROLLOVER`, `STRATEGY_CANCEL` or `SYSTEM`. Both are `None` for every other
+status. A number this SDK does not know yet reads `UNKNOWN_ERROR_CODE(n)` or
+`UNKNOWN_CANCEL_REASON(n)`; treat it as a generic refusal or end.
+
+```python
+order = (await client.orders.get(key=ClientOrderId(client_order_id))).order
+if order is not None and order.reject_reason == "POST_ONLY_CROSS":
+    ...  # reprice and resend
+```
+
 `cancel_all(...)` requests cancellation of every matching order. The result
 lists up to 200 of them, oldest first, in `cancelled_orders` (each with
 `order_id` and `client_order_id`); `total_cancelled` counts all of them and
@@ -598,6 +615,12 @@ Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 (`fire_price_ticks` is optional on the wire). Canceled and failed triggers
 expose typed `cancel_reason` / `failure_reason` labels (empty when unset).
 
+`Trigger.version` is 1 for a trigger's first state and higher for every later
+state change. Reads and realtime trigger updates carry the same version for
+the same state; list results can lag realtime updates, and an update can
+repeat after a reconnect. Keep the copy of each trigger with the highest
+version and ignore any copy whose version is not higher than the one you hold.
+
 ## Balances: funding vs trading
 
 Ledger balances have separate **funding** and **trading** buckets per asset.
@@ -725,6 +748,19 @@ while True:
     after = page.next_after_trade_id
 ```
 
+`orderbook.get(symbol=...)` returns a depth snapshot. When its `available` is
+`False`, the server is building the book or invalidated it: its levels are
+unknown, not empty, so do not read the empty sides as no liquidity; request
+the snapshot again later. Books from `orderbook.create_subscription(...)` keep
+the `available` of the snapshot they started from until a reset delta replaces
+the whole book.
+
+```python
+book = await client.orderbook.get(symbol="BTC-USDT", depth=10)
+if not book.available:
+    ...  # unknown book: retry later instead of quoting into an empty side
+```
+
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its
 column response oldest-first. Sort explicitly by `ts_sec` before feeding a
@@ -829,6 +865,11 @@ async with subscription:
   the same `version` are identical, and a higher `version` is newer. To merge
   with a read: read `list_open()`, subscribe, wait for `PrivateOrdersReady`,
   and keep the higher version of each order.
+- A `PrivateOrderEvent` says why an order ended, as the order's own fields
+  do: `reject_reason` on `rejected`, and `cancel_reason` on `canceled` and on
+  the `replaced` event of the order a replace ended (`REPLACED`). Both are
+  `None` otherwise, including on the `replaced` event that installs the
+  successor.
 - `PrivateOrdersReady` means the subscription reached the account's read
   boundary, sampled when the server received the subscribe: from then on it
   reflects every acknowledgement given before the subscribe. Wait for it

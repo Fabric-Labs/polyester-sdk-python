@@ -30,4 +30,5 @@ def orderbook_from_proto(
         book_seq=str(msg.book_seq),
         bids=[orderbook_level_from_proto(item, quantity_scale=quantity_scale) for item in msg.bids],
         asks=[orderbook_level_from_proto(item, quantity_scale=quantity_scale) for item in msg.asks],
+        available=bool(msg.available),
     )

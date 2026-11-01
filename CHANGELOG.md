@@ -5,14 +5,42 @@
 **Breaking changes**
 - The `whiteboard`, `polychart` and `layout` services are removed from the
   client, because those APIs are no longer part of the public API.
+- An order's terminal reason code and name are removed: the generated
+  `orders.v1.Order` no longer has `terminal_reason_code` or `terminal_reason`,
+  and the generated `privatews.v1.OrderEvent` no longer has `reason_code`.
+  Their numbers did not match the Orders API's error codes. Read the typed
+  `Order.reject_reason` and `Order.cancel_reason` instead (see Added).
 - `PrivateOrderEvent.reason_code` is replaced by `reject_reason` and
   `cancel_reason`. A rejected order's event names its refusal as the order
   write API does (for example `POST_ONLY_CROSS`). A canceled order's event
   names why it ended (for example `USER_REQUEST`), and so does the replaced
-  event of the order a replace ended (`REPLACED`). Both are empty otherwise.
+  event of the order a replace ended (`REPLACED`). Both are `None` otherwise.
 - `sub_accounts.get()` no longer takes `include_balances`: a sub-account read
   no longer returns balances. Read them with `balances.list()` for the
   sub-account.
+
+**Added**
+- `Order.reject_reason` and `Order.cancel_reason`, on order reads and on the
+  orders of the private order stream's snapshots and units. A rejected order
+  carries the error code the Orders API returns for the same refusal (for
+  example `INSUFFICIENT_FUNDS`); a canceled order carries why it ended (for
+  example `USER_REQUEST`, `IOC_REMAINDER`, `STP_EXPIRE_MAKER`, `REPLACED` or
+  `GTD_EXPIRED`). Both are `None` for every other status, and on servers that
+  do not send them yet. An unknown number reads `UNKNOWN_ERROR_CODE(n)` or
+  `UNKNOWN_CANCEL_REASON(n)` instead of raising.
+- `OrderbookData.available`. When `False`, the book is being built or was
+  invalidated: its levels are unknown, not empty, so request the snapshot
+  again later. A subscription's book keeps the value of the snapshot it
+  started from until a reset delta replaces it.
+- `Trigger.version`: 1 for a trigger's first state, higher for every later
+  state change. Keep the copy with the highest version across reads and
+  realtime updates. It is `0` from a server that does not send it.
+- Order error codes `ATTACHED_LEGS_EXCEEDED`, `FEE_ASSET_INVALID`,
+  `FEE_CEILING_INVALID`, `UNSUPPORTED_FIELD_SET`,
+  `TRIGGER_FIRE_LIMIT_REACHED`, `CONDITION_FLAGS_INVALID`,
+  `CONDITION_PARAMETER_SET`, `TWAP_CAPACITY_REACHED` and
+  `CHILD_ORDER_INCONSISTENT`. Each raises a non-retryable `PolyesterApiError`
+  and is a definite refusal: the request did not apply.
 
 ## 0.3.0
 

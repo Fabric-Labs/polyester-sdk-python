@@ -353,6 +353,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         failure_reason=_terminal_reason_label(
             triggers_pb2.TriggerFailureReason, msg, "failure_reason"
         ),
+        version=int(msg.version),
     )
 
 

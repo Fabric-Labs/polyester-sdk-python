@@ -325,7 +325,7 @@ class UnitEvent(_message.Message):
     def __init__(self, order: _Optional[_Union[OrderEvent, _Mapping]] = ..., outcome: _Optional[_Union[CommandOutcome, _Mapping]] = ...) -> None: ...
 
 class OrderEvent(_message.Message):
-    __slots__ = ("order_id", "version", "kind", "reason_code", "replacement_order_id", "fill")
+    __slots__ = ("order_id", "version", "kind", "reject_reason", "cancel_reason", "replacement_order_id", "fill")
     class Kind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         KIND_UNSPECIFIED: _ClassVar[OrderEvent.Kind]
@@ -345,16 +345,18 @@ class OrderEvent(_message.Message):
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
-    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    REJECT_REASON_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_REASON_FIELD_NUMBER: _ClassVar[int]
     REPLACEMENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     FILL_FIELD_NUMBER: _ClassVar[int]
     order_id: int
     version: int
     kind: OrderEvent.Kind
-    reason_code: int
+    reject_reason: _orders_pb2.ErrorCode
+    cancel_reason: _orders_read_pb2.CancelReason
     replacement_order_id: int
     fill: Fill
-    def __init__(self, order_id: _Optional[int] = ..., version: _Optional[int] = ..., kind: _Optional[_Union[OrderEvent.Kind, str]] = ..., reason_code: _Optional[int] = ..., replacement_order_id: _Optional[int] = ..., fill: _Optional[_Union[Fill, _Mapping]] = ...) -> None: ...
+    def __init__(self, order_id: _Optional[int] = ..., version: _Optional[int] = ..., kind: _Optional[_Union[OrderEvent.Kind, str]] = ..., reject_reason: _Optional[_Union[_orders_pb2.ErrorCode, str]] = ..., cancel_reason: _Optional[_Union[_orders_read_pb2.CancelReason, str]] = ..., replacement_order_id: _Optional[int] = ..., fill: _Optional[_Union[Fill, _Mapping]] = ...) -> None: ...
 
 class Fill(_message.Message):
     __slots__ = ("match_id", "ordinal", "role", "qty_scaled", "price_ticks")

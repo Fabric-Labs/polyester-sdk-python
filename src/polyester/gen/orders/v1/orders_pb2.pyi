@@ -4,6 +4,7 @@ from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
+from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as _types_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -234,6 +235,15 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR: _ClassVar[ErrorCode]
+    ERROR_CODE_ATTACHED_LEGS_EXCEEDED: _ClassVar[ErrorCode]
+    ERROR_CODE_FEE_ASSET_INVALID: _ClassVar[ErrorCode]
+    ERROR_CODE_FEE_CEILING_INVALID: _ClassVar[ErrorCode]
+    ERROR_CODE_UNSUPPORTED_FIELD_SET: _ClassVar[ErrorCode]
+    ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED: _ClassVar[ErrorCode]
+    ERROR_CODE_CONDITION_FLAGS_INVALID: _ClassVar[ErrorCode]
+    ERROR_CODE_CONDITION_PARAMETER_SET: _ClassVar[ErrorCode]
+    ERROR_CODE_TWAP_CAPACITY_REACHED: _ClassVar[ErrorCode]
+    ERROR_CODE_CHILD_ORDER_INCONSISTENT: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -476,6 +486,15 @@ ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: ErrorCode
 ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: ErrorCode
 ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: ErrorCode
 ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR: ErrorCode
+ERROR_CODE_ATTACHED_LEGS_EXCEEDED: ErrorCode
+ERROR_CODE_FEE_ASSET_INVALID: ErrorCode
+ERROR_CODE_FEE_CEILING_INVALID: ErrorCode
+ERROR_CODE_UNSUPPORTED_FIELD_SET: ErrorCode
+ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED: ErrorCode
+ERROR_CODE_CONDITION_FLAGS_INVALID: ErrorCode
+ERROR_CODE_CONDITION_PARAMETER_SET: ErrorCode
+ERROR_CODE_TWAP_CAPACITY_REACHED: ErrorCode
+ERROR_CODE_CHILD_ORDER_INCONSISTENT: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource

@@ -29,9 +29,6 @@ class OrderbookData(msgspec.Struct, kw_only=True, omit_defaults=True):
     it invalidated it: its levels are then unknown, not empty, so do not read
     empty sides as no liquidity; request the snapshot again later. A
     subscription's book stays unavailable until a reset delta replaces it.
-    A snapshot with levels is always available, including from a server that
-    does not send ``available`` yet; an empty book from such a server reads
-    ``False``.
     """
 
     symbol: str

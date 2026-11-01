@@ -46,16 +46,15 @@ def test_unavailable_snapshot_read_is_unknown_not_empty() -> None:
     assert book.bids == [] and book.asks == []
 
 
-def test_snapshot_with_levels_from_a_server_without_available_reads_available() -> None:
-    # A server before this contract never sends ``available`` (it decodes as
-    # false), but an unavailable book carries no levels, so levels mean known.
+def test_snapshot_read_reports_the_wire_available_even_with_levels() -> None:
+    # ``available`` is the server's value; levels do not imply it.
     book = orderbook_from_proto(
         orderbook_pb2.GetOrderBookResponse(book_seq=5, asks=[_level(101, 2)]),
         symbol="BTC-USDT",
         depth=10,
         quantity_scale=8,
     )
-    assert book.available is True
+    assert book.available is False
 
 
 class _Harness:
@@ -114,11 +113,11 @@ async def test_subscription_book_follows_snapshot_availability(monkeypatch) -> N
 
 
 @pytest.mark.asyncio
-async def test_subscription_book_with_levels_from_a_server_without_available(monkeypatch) -> None:
+async def test_subscription_book_reports_the_snapshot_wire_available(monkeypatch) -> None:
     emitted = await _subscription_emits(
         monkeypatch, orderbook_pb2.GetOrderBookResponse(book_seq=5, bids=[_level(100, 1)]), []
     )
-    assert [book.available for book in emitted] == [True]
+    assert [book.available for book in emitted] == [False]
 
 
 @pytest.mark.asyncio

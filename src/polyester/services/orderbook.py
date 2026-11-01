@@ -5,7 +5,7 @@ import contextlib
 from collections.abc import Callable
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.decode.orderbook import orderbook_from_proto, orderbook_snapshot_available
+from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.orderbook import depth_to_connect_enum
 from polyester.codecs.realtime_decode import decode_orderbook_delta_bytes
 from polyester.errors import PolyesterValidationError
@@ -181,7 +181,7 @@ class AsyncOrderbookService(BaseService):
             bids_map = levels_from_proto_levels(snapshot.bids)
             asks_map = levels_from_proto_levels(snapshot.asks)
             current_book_seq = int(snapshot.book_seq or 0)
-            book_available = orderbook_snapshot_available(snapshot)
+            book_available = bool(snapshot.available)
             emit()
             for delta in buffered_deltas:
                 if close.is_set():

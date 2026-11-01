@@ -75,7 +75,10 @@ class _Harness:
 
 
 async def _subscription_emits(
-    monkeypatch, snapshot: orderbook_pb2.GetOrderBookResponse, deltas: list[OrderBookDeltaUpdate]
+    monkeypatch,
+    snapshot: orderbook_pb2.GetOrderBookResponse,
+    deltas: list[OrderBookDeltaUpdate],
+    refresh: orderbook_pb2.GetOrderBookResponse | None = None,
 ) -> list[OrderbookData]:
     catalogs = CatalogManager()
     catalogs.hydrate_spot_config(
@@ -98,6 +101,8 @@ async def _subscription_emits(
     )
     hooks["apply_snapshot"](snapshot, [])
     hooks["apply_live_publications"](deltas)
+    if refresh is not None:
+        hooks["apply_snapshot"](refresh, [])
     await subscription.aclose()
     return emitted
 
@@ -120,21 +125,38 @@ async def test_subscription_book_reports_the_snapshot_wire_available(monkeypatch
     assert [book.available for book in emitted] == [False]
 
 
+@pytest.mark.parametrize("snapshot_available", [True, False])
+@pytest.mark.parametrize("reset", [True, False], ids=["reset_delta", "incremental_delta"])
 @pytest.mark.asyncio
-async def test_subscription_book_from_unavailable_snapshot_stays_unknown_until_reset(
-    monkeypatch,
+async def test_subscription_book_keeps_the_snapshot_available_through_deltas(
+    monkeypatch, snapshot_available: bool, reset: bool
 ) -> None:
+    # Only a snapshot carries ``available``; deltas, resets included, do not change it.
+    emitted = await _subscription_emits(
+        monkeypatch,
+        orderbook_pb2.GetOrderBookResponse(
+            book_seq=5, available=snapshot_available, bids=[_level(100, 1)]
+        ),
+        [
+            OrderBookDeltaUpdate(book_seq_start=6, book_seq_end=6, reset=reset, asks=[[101, 1]]),
+            OrderBookDeltaUpdate(book_seq_start=7, book_seq_end=7, asks=[[102, 1]]),
+            OrderBookDeltaUpdate(book_seq_start=8, book_seq_end=8, reset=True, bids=[[99, 2]]),
+        ],
+    )
+    assert [book.available for book in emitted] == [snapshot_available] * 4
+
+
+@pytest.mark.asyncio
+async def test_subscription_book_takes_available_from_a_refreshed_snapshot(monkeypatch) -> None:
     emitted = await _subscription_emits(
         monkeypatch,
         orderbook_pb2.GetOrderBookResponse(book_seq=5, available=False),
-        [
-            OrderBookDeltaUpdate(book_seq_start=6, book_seq_end=6, bids=[[99, 3]]),
-            # A reset replaces the whole book: from here it is known.
-            OrderBookDeltaUpdate(book_seq_start=7, book_seq_end=7, reset=True, asks=[[101, 1]]),
-            OrderBookDeltaUpdate(book_seq_start=8, book_seq_end=8, asks=[[102, 1]]),
-        ],
+        [OrderBookDeltaUpdate(book_seq_start=6, book_seq_end=6, reset=True, asks=[[101, 1]])],
+        refresh=orderbook_pb2.GetOrderBookResponse(
+            book_seq=9, available=True, asks=[_level(101, 1)]
+        ),
     )
-    assert [book.available for book in emitted] == [False, False, True, True]
+    assert [book.available for book in emitted] == [False, False, True]
 
 
 def test_trigger_version_from_reads_and_realtime_updates() -> None:

@@ -116,7 +116,7 @@ class AsyncOrderbookService(BaseService):
         bids_map: dict[int, int] = {}
         asks_map: dict[int, int] = {}
         current_book_seq = 0
-        # The snapshot's availability; a reset delta replaces the whole book.
+        # The last snapshot's wire ``available``; deltas, resets included, never change it.
         book_available = True
         bucket_ticks: int | None = parse_bucket_ticks(bucket)
         queue: asyncio.Queue[OrderbookData | None] = asyncio.Queue(maxsize=200)
@@ -195,8 +195,7 @@ class AsyncOrderbookService(BaseService):
                 handle_delta(delta)
 
         def handle_delta(delta: OrderBookDeltaUpdate) -> None:
-            nonlocal current_book_seq, book_available
-            previous_book_seq = current_book_seq
+            nonlocal current_book_seq
             current_book_seq, needs_refresh = apply_delta(
                 bids=bids_map,
                 asks=asks_map,
@@ -210,8 +209,6 @@ class AsyncOrderbookService(BaseService):
                 if stream is not None and not stream.is_disposed():
                     stream.request_refresh()
                 return
-            if delta.reset and current_book_seq > previous_book_seq:
-                book_available = True
             emit()
 
         stream = AsyncSnapshotThenStreamSubscription(

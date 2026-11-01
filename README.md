@@ -751,9 +751,9 @@ while True:
 `orderbook.get(symbol=...)` returns a depth snapshot. When its `available` is
 `False`, the server is building the book or invalidated it: its levels are
 unknown, not empty, so do not read the empty sides as no liquidity; request
-the snapshot again later. Books from `orderbook.create_subscription(...)` keep
-the `available` of the snapshot they started from until a reset delta replaces
-the whole book.
+the snapshot again later. Only a snapshot carries `available`: books from
+`orderbook.create_subscription(...)` report the value of the last snapshot the
+subscription applied, and deltas, resets included, do not change it.
 
 ```python
 book = await client.orderbook.get(symbol="BTC-USDT", depth=10)

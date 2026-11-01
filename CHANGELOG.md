@@ -30,8 +30,8 @@
   `UNKNOWN_CANCEL_REASON(n)` instead of raising.
 - `OrderbookData.available`. When `False`, the book is being built or was
   invalidated: its levels are unknown, not empty, so request the snapshot
-  again later. A subscription's book keeps the value of the snapshot it
-  started from until a reset delta replaces it.
+  again later. A subscription's book reports the value of the last snapshot
+  it applied; deltas, resets included, do not change it.
 - `Trigger.version`: 1 for a trigger's first state, higher for every later
   state change. Keep the copy with the highest version across reads and
   realtime updates. It is `0` from a server that does not send it.

@@ -34,14 +34,12 @@ from polyester.services import (
     AsyncGuardSignerService,
     AsyncHeatmapService,
     AsyncInternalTransfersService,
-    AsyncLayoutService,
     AsyncLifecycleService,
     AsyncMarketDataService,
     AsyncMarketOverviewService,
     AsyncOrderbookService,
     AsyncOrdersService,
     AsyncPoliciesService,
-    AsyncPolychartService,
     AsyncRateLimitService,
     AsyncSocialVerificationService,
     AsyncSubAccountsService,
@@ -49,7 +47,6 @@ from polyester.services import (
     AsyncTransfersService,
     AsyncTriggersService,
     AsyncVIPService,
-    AsyncWhiteboardService,
     AsyncWithdrawService,
     AsyncZipperService,
 )
@@ -234,9 +231,6 @@ class AsyncPolyester:
             realtime=self.realtime,
         )
         self.social_verification = AsyncSocialVerificationService(self._transport)
-        self.whiteboard = AsyncWhiteboardService(self._transport)
-        self.polychart = AsyncPolychartService(self._transport)
-        self.layout = AsyncLayoutService(self._transport)
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
         self.rate_limits = AsyncRateLimitService(self._transport, default_sub_account_id)
         self.vip = AsyncVIPService(self._transport)
@@ -440,9 +434,6 @@ class Polyester:
             subscribe_methods={"subscribe_sync": "subscribe_view_invalidations"},
         )
         self.social_verification = _SyncService(self._loop, self._client.social_verification)
-        self.whiteboard = _SyncService(self._loop, self._client.whiteboard)
-        self.polychart = _SyncService(self._loop, self._client.polychart)
-        self.layout = _SyncService(self._loop, self._client.layout)
         self.guard_signer = _SyncService(self._loop, self._client.guard_signer)
         self.rate_limits = _SyncService(self._loop, self._client.rate_limits)
         self.vip = _SyncService(self._loop, self._client.vip)

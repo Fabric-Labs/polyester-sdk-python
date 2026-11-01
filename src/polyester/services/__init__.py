@@ -8,14 +8,12 @@ from polyester.services.fees import AsyncFeeService
 from polyester.services.guard_signer import AsyncGuardSignerService
 from polyester.services.heatmap import AsyncHeatmapService
 from polyester.services.internal_transfers import AsyncInternalTransfersService
-from polyester.services.layout import AsyncLayoutService
 from polyester.services.lifecycle import AsyncLifecycleService
 from polyester.services.market_data import AsyncMarketDataService
 from polyester.services.market_overview import AsyncMarketOverviewService
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.policies import AsyncPoliciesService
-from polyester.services.polychart import AsyncPolychartService
 from polyester.services.profile import AsyncProfileService
 from polyester.services.rate_limits import AsyncRateLimitService
 from polyester.services.social_verification import AsyncSocialVerificationService
@@ -24,7 +22,6 @@ from polyester.services.trades import AsyncTradesService
 from polyester.services.transfers import AsyncTransfersService
 from polyester.services.triggers import AsyncTriggersService
 from polyester.services.vip import AsyncVIPService
-from polyester.services.whiteboard import AsyncWhiteboardService
 from polyester.services.withdraw import AsyncWithdrawService
 from polyester.services.zipper import AsyncZipperService
 
@@ -39,14 +36,12 @@ __all__ = [
     "AsyncGuardSignerService",
     "AsyncHeatmapService",
     "AsyncInternalTransfersService",
-    "AsyncLayoutService",
     "AsyncLifecycleService",
     "AsyncMarketDataService",
     "AsyncMarketOverviewService",
     "AsyncOrderbookService",
     "AsyncOrdersService",
     "AsyncPoliciesService",
-    "AsyncPolychartService",
     "AsyncProfileService",
     "AsyncRateLimitService",
     "AsyncSocialVerificationService",
@@ -55,7 +50,6 @@ __all__ = [
     "AsyncTransfersService",
     "AsyncTriggersService",
     "AsyncVIPService",
-    "AsyncWhiteboardService",
     "AsyncWithdrawService",
     "AsyncZipperService",
 ]

@@ -126,11 +126,13 @@ def build_orderbook_data(
     asks: BookSide,
     quantity_scale: int,
     bucket_ticks: int | None = None,
+    available: bool = True,
 ) -> OrderbookData:
     return OrderbookData(
         symbol=symbol,
         depth=depth,
         book_seq=str(book_seq),
+        available=available,
         bids=side_to_levels(
             bids,
             side="bids",

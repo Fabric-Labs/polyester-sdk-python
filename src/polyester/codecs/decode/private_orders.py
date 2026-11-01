@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from polyester.codecs.decode.orders import _error_code_label, order_from_proto
+from polyester.codecs.decode.orders import (
+    _error_code_label,
+    cancel_reason_label,
+    order_from_proto,
+)
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
-from polyester.gen.orders.v1 import orders_read_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import Order as OrderPb
 from polyester.gen.privatews.v1 import private_ws_pb2
 from polyester.models.private_orders import (
@@ -34,21 +37,13 @@ def _fill_from_proto(msg: private_ws_pb2.Fill) -> PrivateOrderFill:
     )
 
 
-def _cancel_reason_label(raw: int) -> str:
-    try:
-        name = orders_read_pb2.CancelReason.Name(raw)
-    except ValueError:
-        return f"UNKNOWN_CANCEL_REASON({raw})"
-    return name.removeprefix("CANCEL_REASON_")
-
-
 def _order_event_from_proto(msg: private_ws_pb2.OrderEvent) -> PrivateOrderEvent:
     return PrivateOrderEvent(
         order_id=format_uint64_id(msg.order_id),
         version=int(msg.version),
         kind=proto_enum_name(private_ws_pb2.OrderEvent.Kind, msg.kind),
-        reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else "",
-        cancel_reason=_cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else "",
+        reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else None,
+        cancel_reason=cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else None,
         replacement_order_id=(
             format_uint64_id(msg.replacement_order_id) if msg.replacement_order_id else ""
         ),

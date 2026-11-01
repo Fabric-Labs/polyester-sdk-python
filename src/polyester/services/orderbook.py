@@ -5,7 +5,7 @@ import contextlib
 from collections.abc import Callable
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.decode.orderbook import orderbook_from_proto
+from polyester.codecs.decode.orderbook import orderbook_from_proto, orderbook_snapshot_available
 from polyester.codecs.orderbook import depth_to_connect_enum
 from polyester.codecs.realtime_decode import decode_orderbook_delta_bytes
 from polyester.errors import PolyesterValidationError
@@ -116,6 +116,8 @@ class AsyncOrderbookService(BaseService):
         bids_map: dict[int, int] = {}
         asks_map: dict[int, int] = {}
         current_book_seq = 0
+        # The snapshot's availability; a reset delta replaces the whole book.
+        book_available = True
         bucket_ticks: int | None = parse_bucket_ticks(bucket)
         queue: asyncio.Queue[OrderbookData | None] = asyncio.Queue(maxsize=200)
         close = asyncio.Event()
@@ -132,6 +134,7 @@ class AsyncOrderbookService(BaseService):
                 asks=asks_map,
                 bucket_ticks=bucket_ticks,
                 quantity_scale=self._require_quantity_scale(symbol),
+                available=book_available,
             )
             if on_event is not None:
                 on_event(data)
@@ -174,10 +177,11 @@ class AsyncOrderbookService(BaseService):
             )
 
         def apply_snapshot(snapshot, buffered_deltas: list[OrderBookDeltaUpdate]) -> None:
-            nonlocal bids_map, asks_map, current_book_seq
+            nonlocal bids_map, asks_map, current_book_seq, book_available
             bids_map = levels_from_proto_levels(snapshot.bids)
             asks_map = levels_from_proto_levels(snapshot.asks)
             current_book_seq = int(snapshot.book_seq or 0)
+            book_available = orderbook_snapshot_available(snapshot)
             emit()
             for delta in buffered_deltas:
                 if close.is_set():
@@ -191,7 +195,8 @@ class AsyncOrderbookService(BaseService):
                 handle_delta(delta)
 
         def handle_delta(delta: OrderBookDeltaUpdate) -> None:
-            nonlocal current_book_seq
+            nonlocal current_book_seq, book_available
+            previous_book_seq = current_book_seq
             current_book_seq, needs_refresh = apply_delta(
                 bids=bids_map,
                 asks=asks_map,
@@ -205,6 +210,8 @@ class AsyncOrderbookService(BaseService):
                 if stream is not None and not stream.is_disposed():
                     stream.request_refresh()
                 return
+            if delta.reset and current_book_seq > previous_book_seq:
+                book_available = True
             emit()
 
         stream = AsyncSnapshotThenStreamSubscription(

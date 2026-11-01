@@ -299,6 +299,8 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
             if "expire_at" in msg.DESCRIPTOR.fields_by_name and msg.HasField("expire_at")
             else None
         ),
+        reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else None,
+        cancel_reason=cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else None,
     )
 
 
@@ -447,6 +449,14 @@ def _error_code_label(raw_code: int) -> str:
     if not code or code == str(raw_code):
         return f"UNKNOWN_ERROR_CODE({raw_code})"
     return code.removeprefix("ERROR_CODE_")
+
+
+def cancel_reason_label(raw: int) -> str:
+    try:
+        name = orders_read_pb2.CancelReason.Name(raw)
+    except ValueError:
+        return f"UNKNOWN_CANCEL_REASON({raw})"
+    return name.removeprefix("CANCEL_REASON_")
 
 
 def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDetail:

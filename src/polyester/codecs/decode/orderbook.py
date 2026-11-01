@@ -17,6 +17,16 @@ def orderbook_level_from_proto(
     )
 
 
+def orderbook_snapshot_available(msg: orderbook_pb2.GetOrderBookResponse) -> bool:
+    """Whether a snapshot's levels are the book.
+
+    An unavailable book carries no levels, so a snapshot with levels is
+    available even from a server that does not send ``available`` yet (it
+    decodes as false there).
+    """
+    return bool(msg.available) or len(msg.bids) > 0 or len(msg.asks) > 0
+
+
 def orderbook_from_proto(
     msg: orderbook_pb2.GetOrderBookResponse,
     *,
@@ -30,4 +40,5 @@ def orderbook_from_proto(
         book_seq=str(msg.book_seq),
         bids=[orderbook_level_from_proto(item, quantity_scale=quantity_scale) for item in msg.bids],
         asks=[orderbook_level_from_proto(item, quantity_scale=quantity_scale) for item in msg.asks],
+        available=orderbook_snapshot_available(msg),
     )

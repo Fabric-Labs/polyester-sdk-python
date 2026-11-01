@@ -45,6 +45,14 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     lineage: OrderLineage | None = None
     # RFC3339 UTC expiry for GTD orders; omitted for every other TIF.
     expire_at: str | None = None
+    # Why a ``rejected`` order was refused: the Orders API error code for the
+    # same refusal, without its ``ERROR_CODE_`` prefix (for example
+    # ``POST_ONLY_CROSS``). ``None`` for every other status.
+    reject_reason: str | None = None
+    # Why a ``canceled`` order ended, without the ``CANCEL_REASON_`` prefix
+    # (for example ``USER_REQUEST`` or ``REPLACED``). ``None`` for every other
+    # status. A number this SDK does not know reads ``UNKNOWN_CANCEL_REASON(n)``.
+    cancel_reason: str | None = None
 
 
 class OrderLineage(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -365,6 +373,11 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     details: TriggerDetails | None = None
     cancel_reason: str = ""
     failure_reason: str = ""
+    # 1 for the first state, higher for every later state change. Reads and
+    # realtime updates carry the same version for the same state: keep the
+    # copy with the highest version and ignore any copy that is not higher.
+    # 0 from a server that does not send it.
+    version: int = 0
 
 
 class TriggersList(msgspec.Struct, kw_only=True, omit_defaults=True):

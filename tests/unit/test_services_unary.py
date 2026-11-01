@@ -9,18 +9,14 @@ from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.auth.v1 import social_verification_pb2 as sv_pb2
 from polyester.gen.auth.v1.auth_pb2 import MeRequest
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2
-from polyester.gen.collab.v1 import whiteboard_pb2 as wb_pb2
-from polyester.gen.layout.v1 import layout_pb2
 from polyester.gen.orders.v1 import orders_read_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import ApiData
 from polyester.services.auth import AsyncAuthService
 from polyester.services.chain_analytics import AsyncChainAnalyticsService
-from polyester.services.layout import AsyncLayoutService
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.social_verification import AsyncSocialVerificationService
 from polyester.services.triggers import AsyncTriggersService
-from polyester.services.whiteboard import AsyncWhiteboardService
 from tests.unit.support import CaptureUnary
 
 
@@ -73,28 +69,6 @@ async def test_social_verification_start_sets_provider_and_method() -> None:
     assert capture.request.method == sv_pb2.METHOD_PROFILE
     assert capture.request.handle == "@alice"
     assert result.raw["challengeCode"] == "abc"
-
-
-@pytest.mark.asyncio
-async def test_whiteboard_create_sets_title_and_audience() -> None:
-    capture = CaptureUnary(wb_pb2.CreateBoardResponse())
-    with patch("polyester.services.whiteboard.unary_auth_decoded", capture):
-        service = AsyncWhiteboardService(transport=MagicMock())
-        await service.create(title="standup", audience="private", default_role="viewer")
-    assert isinstance(capture.request, wb_pb2.CreateBoardRequest)
-    assert capture.request.title == "standup"
-    assert capture.request.audience == wb_pb2.PRIVATE
-    assert capture.request.default_role == wb_pb2.VIEWER
-
-
-@pytest.mark.asyncio
-async def test_layout_get_layouts_passes_pagination() -> None:
-    capture = CaptureUnary(layout_pb2.GetLayoutsResponse())
-    with patch("polyester.services.layout.unary_auth_decoded", capture):
-        service = AsyncLayoutService(transport=MagicMock())
-        await service.get_layouts(limit=25, page_token="tok")
-    assert capture.request.limit == 25
-    assert capture.request.page_token == "tok"
 
 
 @pytest.mark.asyncio

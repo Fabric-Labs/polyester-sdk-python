@@ -53,18 +53,20 @@ class PriceLevel(_message.Message):
     def __init__(self, price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ...) -> None: ...
 
 class GetOrderBookResponse(_message.Message):
-    __slots__ = ("symbol_id", "book_seq", "bids", "asks", "ts")
+    __slots__ = ("symbol_id", "book_seq", "bids", "asks", "ts", "available")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     BOOK_SEQ_FIELD_NUMBER: _ClassVar[int]
     BIDS_FIELD_NUMBER: _ClassVar[int]
     ASKS_FIELD_NUMBER: _ClassVar[int]
     TS_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     book_seq: int
     bids: _containers.RepeatedCompositeFieldContainer[PriceLevel]
     asks: _containers.RepeatedCompositeFieldContainer[PriceLevel]
     ts: _timestamp_pb2.Timestamp
-    def __init__(self, symbol_id: _Optional[int] = ..., book_seq: _Optional[int] = ..., bids: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., asks: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    available: bool
+    def __init__(self, symbol_id: _Optional[int] = ..., book_seq: _Optional[int] = ..., bids: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., asks: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., available: _Optional[bool] = ...) -> None: ...
 
 class OrderBookDelta(_message.Message):
     __slots__ = ("symbol_id", "book_seq_start", "book_seq_end", "bids", "asks", "reset", "ts")

@@ -5,6 +5,14 @@
 **Breaking changes**
 - The `whiteboard`, `polychart` and `layout` services are removed from the
   client, because those APIs are no longer part of the public API.
+- `PrivateOrderEvent.reason_code` is replaced by `reject_reason` and
+  `cancel_reason`. A rejected order's event names its refusal as the order
+  write API does (for example `POST_ONLY_CROSS`). A canceled order's event
+  names why it ended (for example `USER_REQUEST`), and so does the replaced
+  event of the order a replace ended (`REPLACED`). Both are empty otherwise.
+- `sub_accounts.get()` no longer takes `include_balances`: a sub-account read
+  no longer returns balances. Read them with `balances.list()` for the
+  sub-account.
 
 ## 0.3.0
 

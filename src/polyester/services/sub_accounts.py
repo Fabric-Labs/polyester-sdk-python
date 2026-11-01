@@ -71,7 +71,6 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         include_members: bool = False,
         include_invites: bool = False,
         include_policy: bool = False,
-        include_balances: bool = False,
         invites_direction: str = "",
     ) -> GetSubaccountResult:
         parsed_sub = parse_optional_subaccount_id(
@@ -85,7 +84,6 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             include_members=include_members,
             include_invites=include_invites,
             include_policy=include_policy,
-            include_balances=include_balances,
             invites_direction=invite_direction_from_label(invites_direction),
         )
         return await unary_auth_decoded(

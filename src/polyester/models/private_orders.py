@@ -26,14 +26,18 @@ class PrivateOrderEvent:
     """A change to one order: ``accepted``, ``filled``, ``canceled``, ``rejected``,
     ``replaced`` or ``attached_risk``.
 
-    ``reason_code`` is set for ``canceled``, ``rejected`` and ``replaced``;
-    ``replacement_order_id`` for ``replaced``; ``fill`` for ``filled``.
+    ``reject_reason`` names a ``rejected`` order's refusal as the order write API
+    does (for example ``POST_ONLY_CROSS``). ``cancel_reason`` names why a
+    ``canceled`` order ended (for example ``USER_REQUEST``), and is ``REPLACED`` on
+    the ``replaced`` event of the order a replace ended. Both are empty otherwise.
+    ``replacement_order_id`` is set for ``replaced``; ``fill`` for ``filled``.
     """
 
     order_id: str
     version: int
     kind: str
-    reason_code: int = 0
+    reject_reason: str = ""
+    cancel_reason: str = ""
     replacement_order_id: str = ""
     fill: PrivateOrderFill | None = None
 

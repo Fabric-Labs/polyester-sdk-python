@@ -27,10 +27,11 @@ server's brief `unavailable`.
 - `orders.wait_batch_replace(batch_request_id=...)` polls
   `get_batch_replace_status` with a short backoff until no item is
   `admitted`, and returns that status. It polls through the `not_found` the
-  status read answers for a few seconds after admission. It stops at the
-  server's 60-second status window, or at `timeout=`, with the new
-  `PolyesterBatchReplaceTimeoutError` (a `PolyesterTimeoutError`): reconcile
-  the orders themselves after it.
+  status read answers for a few seconds after admission, and through server
+  and network errors. It stops at the server's 60-second status window, or at
+  `timeout=`, even during a read, with the new
+  `PolyesterBatchReplaceTimeoutError` (a `PolyesterTimeoutError`) carrying the
+  last status read: reconcile the orders themselves after it.
 - `BatchReplaceStatusItem.error_code` names an item's refusal as
   `PolyesterApiError.code` names it: the raw `code` (`POST_ONLY_CROSS`) with
   the `ERROR_CODE_` prefix, or `code` unchanged when this SDK does not know it.

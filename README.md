@@ -415,12 +415,14 @@ receipt's `replacement_order_id` is a planned ID, not proof of an order.
 `orders.wait_batch_replace(batch_request_id=...)` polls
 `get_batch_replace_status` with a short backoff until no item is `admitted`,
 and returns that status. The status appears a few seconds after admission, so
-the wait polls through `not_found` (and `unavailable`). A `rejected` item's `error_code` names the refusal as a
+the wait polls through `not_found`, `unavailable` and other server or network
+errors; a rate limit or any other error is raised. A `rejected` item's `error_code` names the refusal as a
 single modify raises it (`ERROR_CODE_POST_ONLY_CROSS`; `code` is the raw
 `POST_ONLY_CROSS`), and its `replacement_order_id` is empty. The server keeps
 a batch's status for 60 seconds from acceptance, so the wait stops there (or
-at `timeout=`) with `PolyesterBatchReplaceTimeoutError`: a `not_found` proves
-nothing, so reconcile the orders themselves with order reads. `working` means the order is live, not that it is final. Retry an
+at `timeout=`), even during a read, with `PolyesterBatchReplaceTimeoutError`,
+whose `last_status` is the last status read: a `not_found` proves nothing, so
+reconcile the orders themselves with order reads. `working` means the order is live, not that it is final. Retry an
 ambiguous batch request with the same `request_id`.
 
 ```python

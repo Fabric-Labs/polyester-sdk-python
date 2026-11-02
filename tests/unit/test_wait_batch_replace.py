@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pytest_httpserver import HTTPServer
+from werkzeug import Request, Response
 
 from polyester import PolyesterAuthError, PolyesterBatchReplaceTimeoutError
 from polyester.auth import ApiKeyCredentials
@@ -260,3 +262,77 @@ async def test_wait_batch_replace_raises_other_errors(httpserver: HTTPServer) ->
         await transport.aclose()
 
     assert len(httpserver.log) == 1
+
+
+def _delayed(seconds: float, message: orders_read_pb2.GetBatchReplaceStatusResponse):
+    def handler(_request: Request) -> Response:
+        time.sleep(seconds)
+        return Response(message.SerializeToString(), content_type="application/proto")
+
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_wait_batch_replace_deadline_bounds_an_in_flight_read(
+    httpserver: HTTPServer,
+) -> None:
+    _respond(httpserver, _status(_admitted(), accepted=1))
+    # The next read answers only after the caller's timeout has passed.
+    httpserver.expect_oneshot_request(STATUS_PATH, method="POST").respond_with_handler(
+        _delayed(1.0, _status(_working(), accepted=1))
+    )
+    orders, transport = _orders_service(httpserver)
+    started = time.monotonic()
+    try:
+        with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
+            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=0.4)
+    finally:
+        await transport.aclose()
+
+    assert time.monotonic() - started < 0.8
+    assert caught.value.last_status is not None
+    assert caught.value.last_status.items[0].phase == "admitted"
+
+
+@pytest.mark.asyncio
+async def test_wait_batch_replace_persistent_unavailable_ends_in_the_timeout_error(
+    httpserver: HTTPServer,
+) -> None:
+    # Accepted 59.7 s ago, then every read answers unavailable until the window ends.
+    accepted_ts_ns = time.time_ns() - 59_700_000_000
+    _respond(httpserver, _status(_admitted(), accepted=1, accepted_ts_ns=accepted_ts_ns))
+    httpserver.expect_request(STATUS_PATH, method="POST").respond_with_json(
+        {"code": "unavailable", "message": "catching up"}, status=503
+    )
+    orders, transport = _orders_service(httpserver)
+    started = time.monotonic()
+    try:
+        with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
+            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID))
+    finally:
+        await transport.aclose()
+
+    assert time.monotonic() - started < 2.0
+    assert len(httpserver.log) >= 2
+    assert caught.value.last_status is not None
+    assert caught.value.last_status.items[0].phase == "admitted"
+
+
+@pytest.mark.asyncio
+async def test_wait_batch_replace_caller_cancellation_still_cancels(
+    httpserver: HTTPServer,
+) -> None:
+    httpserver.expect_request(STATUS_PATH, method="POST").respond_with_handler(
+        _delayed(1.0, _status(_working(), accepted=1))
+    )
+    orders, transport = _orders_service(httpserver)
+    try:
+        task = asyncio.create_task(
+            orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=5.0)
+        )
+        await asyncio.sleep(0.2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        await transport.aclose()

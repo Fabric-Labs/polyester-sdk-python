@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
+from collections.abc import Callable
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -264,12 +266,31 @@ async def test_wait_batch_replace_raises_other_errors(httpserver: HTTPServer) ->
     assert len(httpserver.log) == 1
 
 
-def _delayed(seconds: float, message: orders_read_pb2.GetBatchReplaceStatusResponse):
-    def handler(_request: Request) -> Response:
-        time.sleep(seconds)
-        return Response(message.SerializeToString(), content_type="application/proto")
+def _delayed(
+    seconds: float, message: orders_read_pb2.GetBatchReplaceStatusResponse
+) -> tuple[Callable[[Request], Response], threading.Event]:
+    """A handler that answers after ``seconds``, and an event set once it has.
 
-    return handler
+    The server is shared across tests: wait for the event before a test ends,
+    so the late answer is not logged in the next test."""
+    done = threading.Event()
+
+    def handler(_request: Request) -> Response:
+        try:
+            time.sleep(seconds)
+            return Response(message.SerializeToString(), content_type="application/proto")
+        finally:
+            done.set()
+
+    return handler, done
+
+
+async def _wait_handled(done: threading.Event, httpserver: HTTPServer, requests: int) -> None:
+    """Wait for the delayed handler, then for the server to log its answer."""
+    assert await asyncio.to_thread(done.wait, 5.0), "delayed handler never finished"
+    deadline = time.monotonic() + 2.0
+    while len(httpserver.log) < requests and time.monotonic() < deadline:
+        await asyncio.sleep(0.01)
 
 
 @pytest.mark.asyncio
@@ -278,18 +299,20 @@ async def test_wait_batch_replace_deadline_bounds_an_in_flight_read(
 ) -> None:
     _respond(httpserver, _status(_admitted(), accepted=1))
     # The next read answers only after the caller's timeout has passed.
-    httpserver.expect_oneshot_request(STATUS_PATH, method="POST").respond_with_handler(
-        _delayed(1.0, _status(_working(), accepted=1))
-    )
+    slow, handled = _delayed(1.0, _status(_working(), accepted=1))
+    httpserver.expect_oneshot_request(STATUS_PATH, method="POST").respond_with_handler(slow)
     orders, transport = _orders_service(httpserver)
     started = time.monotonic()
     try:
         with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
             await orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=0.4)
+        elapsed = time.monotonic() - started
     finally:
         await transport.aclose()
+        await _wait_handled(handled, httpserver, requests=2)
 
-    assert time.monotonic() - started < 0.8
+    assert elapsed < 0.8
+    assert len(httpserver.log) == 2
     assert caught.value.last_status is not None
     assert caught.value.last_status.items[0].phase == "admitted"
 
@@ -322,10 +345,10 @@ async def test_wait_batch_replace_persistent_unavailable_ends_in_the_timeout_err
 async def test_wait_batch_replace_caller_cancellation_still_cancels(
     httpserver: HTTPServer,
 ) -> None:
-    httpserver.expect_request(STATUS_PATH, method="POST").respond_with_handler(
-        _delayed(1.0, _status(_working(), accepted=1))
-    )
+    slow, handled = _delayed(1.0, _status(_working(), accepted=1))
+    httpserver.expect_request(STATUS_PATH, method="POST").respond_with_handler(slow)
     orders, transport = _orders_service(httpserver)
+    started = time.monotonic()
     try:
         task = asyncio.create_task(
             orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=5.0)
@@ -334,5 +357,10 @@ async def test_wait_batch_replace_caller_cancellation_still_cancels(
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+        elapsed = time.monotonic() - started
     finally:
         await transport.aclose()
+        await _wait_handled(handled, httpserver, requests=1)
+
+    assert elapsed < 0.8
+    assert len(httpserver.log) == 1

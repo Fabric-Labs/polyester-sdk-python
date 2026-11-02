@@ -331,7 +331,7 @@ def order_intent_from_request(
                 if price_ticks is not None:
                     intent.limit_fok.price_ticks = price_ticks
 
-    risk = risk_policy_from_dict(request.attached_risk, symbol=request.symbol)
+    risk = risk_policy_from_dict(request.attached_risk, symbol=request.symbol, side=request.side)
     if risk is not None:
         intent.attached_risk.CopyFrom(risk)
     return intent
@@ -414,6 +414,10 @@ _TRAILING_STOP_KEYS = frozenset(
         "activationPrice",
         "activation_price_ticks",
         "activationPriceTicks",
+        "limit_price",
+        "limitPrice",
+        "limit_price_ticks",
+        "limitPriceTicks",
         "order_type",
         "orderType",
         "trigger_price_source",
@@ -495,6 +499,8 @@ def _trailing_stop_model_to_dict(stop: TrailingStop) -> dict[str, Any]:
         out["max_slippage_bps"] = stop.max_slippage_bps
     if stop.activation_price is not None:
         out["activation_price"] = stop.activation_price
+    if stop.limit_price is not None:
+        out["limit_price"] = stop.limit_price
     if stop.trigger_price_source:
         out["trigger_price_source"] = stop.trigger_price_source
     if stop.order_type:
@@ -722,6 +728,29 @@ def _trailing_stop_from_dict(
         )
     elif activation_ticks is not None:
         proto.activation_price_ticks = tick_count(activation_ticks, "activation_price_ticks")
+
+    # The most a buy-back exit pays per unit; the parent order's side decides
+    # whether it is required (see risk_policy_from_dict).
+    limit = _mapping_get(data, "limit_price", "limitPrice")
+    limit_ticks = _mapping_get(data, "limit_price_ticks", "limitPriceTicks")
+    if limit is not None and limit_ticks is not None:
+        raise PolyesterValidationError(
+            "trailing_stop accepts limit_price or limit_price_ticks, not both"
+        )
+    if limit is not None:
+        proto.limit_price_ticks = _resolve_optional_price_ticks(
+            limit, "attached_risk.trailing_stop.limit_price", symbol=symbol
+        )
+        if proto.limit_price_ticks <= 0:
+            raise PolyesterValidationError(
+                "attached_risk.trailing_stop.limit_price must be positive"
+            )
+    elif limit_ticks is not None:
+        proto.limit_price_ticks = tick_count(limit_ticks, "limit_price_ticks")
+    if proto.limit_price_ticks and proto.activation_price_ticks > proto.limit_price_ticks:
+        raise PolyesterValidationError(
+            "attached_risk.trailing_stop.limit_price must be at least activation_price"
+        )
     return proto
 
 
@@ -729,6 +758,7 @@ def risk_policy_from_dict(
     data: dict[str, Any] | AttachedRisk | None,
     *,
     symbol: str | None = None,
+    side: str | None = None,
 ) -> orders_pb2.RiskPolicy | None:
     """Encode public attached-risk input onto the write ``RiskPolicy`` wire.
 
@@ -736,6 +766,10 @@ def risk_policy_from_dict(
     (``trigger_price``, ``order_type``, ``limit_price``), and proto-JSON
     (``trigger_price_ticks``, ``child.market_ioc`` / ``child.limit_gtc``).
     Unknown fields and the extra ``child.execution`` wrapper are rejected.
+
+    ``side`` is the parent order's side when known. A selling order's trailing
+    stop buys back, so it requires ``limit_price``; a buying order's must not
+    set one. Without a side (modify), the server applies that rule.
     """
     if data is None:
         return None
@@ -778,7 +812,17 @@ def risk_policy_from_dict(
             )
         )
     if trailing_stop is not None:
-        risk.trailing_stop.CopyFrom(_trailing_stop_from_dict(trailing_stop, symbol=symbol))
+        trailing = _trailing_stop_from_dict(trailing_stop, symbol=symbol)
+        if side == "sell" and not trailing.limit_price_ticks:
+            raise PolyesterValidationError(
+                "attached_risk.trailing_stop.limit_price is required when the order sells: "
+                "the trailing stop buys back and pays at most this price"
+            )
+        if side == "buy" and trailing.limit_price_ticks:
+            raise PolyesterValidationError(
+                "attached_risk.trailing_stop.limit_price must be unset when the order buys"
+            )
+        risk.trailing_stop.CopyFrom(trailing)
     return risk
 
 

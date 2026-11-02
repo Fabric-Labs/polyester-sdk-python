@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.1
+
+Git tag: `v0.5.1`. Released 2026-11-02.
+
+**What a trading bot gains.** A selling order can carry an attached trailing
+stop again. That trailing stop buys back, and the server requires the most its
+exit pays per unit; 0.5.0 could not send it, so such an order was always
+rejected.
+
+**Breaking changes**
+- None in the SDK API.
+
+### Fixed
+- `TrailingStop.limit_price` (and `limit_price` / `limit_price_ticks` in an
+  `attached_risk.trailing_stop` dict) sends the buy-back limit price of a
+  trailing stop attached to an order: a 9-decimal string, `Decimal` or
+  `Price.from_ticks`. `orders.create` and `orders.batch_create` require it
+  when the order sells and reject it when the order buys, and it must be
+  positive and at least `activation_price` when both are set; each case raises
+  `PolyesterValidationError`. `orders.modify` sends it as given and the server
+  applies the side rule. Order reads do not return it yet.
+
 ## 0.5.0
 
 Git tag: `v0.5.0`. Released 2026-11-02.

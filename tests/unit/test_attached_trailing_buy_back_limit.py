@@ -20,6 +20,11 @@ from polyester.models.trading import TrailingStop
 
 
 def _intent(side: str, trailing_stop: Any) -> Any:
+    risk = (
+        AttachedRisk(trailing_stop=trailing_stop)
+        if isinstance(trailing_stop, TrailingStop)
+        else {"trailing_stop": trailing_stop}
+    )
     return order_intent_from_request(
         CreateOrderRequest(
             symbol="BTC-USDT",
@@ -29,7 +34,7 @@ def _intent(side: str, trailing_stop: Any) -> Any:
             tif="gtc",
             qty="0.002",
             price="100",
-            attached_risk={"trailing_stop": trailing_stop},
+            attached_risk=risk,
         ),
         quantity_scale=8,
     )

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+**What a trading bot gains.** A bot can read the product changelog of the
+environment it trades on, with no API key, and find the breaking or
+action-required changes published since it last looked.
+
+**Breaking changes**
+- None in the SDK API.
+
+### Added
+- `client.changelog` wraps the public `changelog.v1.ChangelogService`.
+  `list_posts`, `get_post` and `list_changes` return typed
+  `ChangelogPostSummary`, `ChangelogPost`, `ChangelogSection`,
+  `ChangelogChange` and `ChangelogChangeEntry` models. `iter_posts` and
+  `iter_changes` yield every page, and `breaking_changes_since` and
+  `action_required_since` collect the matching changes published since a
+  time. Categories, audiences and surfaces are lowercase labels, and a value
+  newer than the SDK reads as its number. Change IDs are base58. An unknown
+  slug raises `PolyesterApiError` code `not_found`.
+- The sync `Polyester` client turns async iterator methods into plain
+  iterators, so `client.changelog.iter_posts()` works there too.
+
 ## 0.5.1
 
 Git tag: `v0.5.1`. Released 2026-11-02.

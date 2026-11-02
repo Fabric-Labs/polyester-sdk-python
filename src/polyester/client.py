@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import os
 import threading
 from typing import Any, Literal, cast
@@ -29,6 +30,7 @@ from polyester.services import (
     AsyncAuthService,
     AsyncBalancesService,
     AsyncChainAnalyticsService,
+    AsyncChangelogService,
     AsyncDepositService,
     AsyncFeeService,
     AsyncGuardSignerService,
@@ -234,6 +236,7 @@ class AsyncPolyester:
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
         self.rate_limits = AsyncRateLimitService(self._transport, default_sub_account_id)
         self.vip = AsyncVIPService(self._transport)
+        self.changelog = AsyncChangelogService(self._transport)
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
         self._catalog_last_error: BaseException | None = None
@@ -437,6 +440,7 @@ class Polyester:
         self.guard_signer = _SyncService(self._loop, self._client.guard_signer)
         self.rate_limits = _SyncService(self._loop, self._client.rate_limits)
         self.vip = _SyncService(self._loop, self._client.vip)
+        self.changelog = _SyncService(self._loop, self._client.changelog)
         self.withdraw = _SyncService(self._loop, self._client.withdraw)
         self.trading_withdraws = self.withdraw
 
@@ -477,6 +481,8 @@ class _SyncService:
             return attr
         if not callable(attr) and type(attr).__name__.endswith("Service"):
             return _SyncService(self._loop, attr)
+        if inspect.isasyncgenfunction(attr):
+            return self._sync_iterator(attr)
         if asyncio.iscoroutinefunction(attr):
 
             def async_call(*args, **kwargs):
@@ -496,6 +502,32 @@ class _SyncService:
 
             return call
         return attr
+
+
+    def _sync_iterator(self, attr):
+        """Drive an async generator method on the client loop, one item per
+        step, as a plain iterator. Leaving the loop early closes it."""
+
+        async def step(agen):
+            try:
+                return True, await agen.__anext__()
+            except StopAsyncIteration:
+                return False, None
+
+        def iterate(*args, **kwargs):
+            agen = attr(*args, **kwargs)
+            try:
+                while True:
+                    has_item, item = asyncio.run_coroutine_threadsafe(
+                        step(agen), self._loop
+                    ).result(timeout=60)
+                    if not has_item:
+                        return
+                    yield item
+            finally:
+                asyncio.run_coroutine_threadsafe(agen.aclose(), self._loop).result(timeout=10)
+
+        return iterate
 
 
 class _SyncSubscribeService(_SyncService):

@@ -32,6 +32,15 @@ from polyester.models.auth import (
     UsernameHistoryList,
     UserProfile,
 )
+from polyester.models.changelog import (
+    ChangelogChange,
+    ChangelogChangeEntry,
+    ChangelogChangesPage,
+    ChangelogPost,
+    ChangelogPostsPage,
+    ChangelogPostSummary,
+    ChangelogSection,
+)
 from polyester.models.common import (
     ApiData,
     CreateOrderRequest,
@@ -346,6 +355,13 @@ __all__ = [
     "UserTrade",
     "UserTradesList",
     "UserProfile",
+    "ChangelogChange",
+    "ChangelogChangeEntry",
+    "ChangelogChangesPage",
+    "ChangelogPost",
+    "ChangelogPostSummary",
+    "ChangelogPostsPage",
+    "ChangelogSection",
     "VIPStatus",
     "VIPTier",
     "VIPTiersList",

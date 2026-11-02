@@ -42,6 +42,9 @@ class FakeChangelog:
 
     post_count: int
     repeat_token: bool = False
+    # When set, replaces every ListPosts next_page_token in order: a server
+    # whose tokens cycle back to an earlier page.
+    cycle_tokens: list[str] | None = None
     posts: list[pb.Post] = field(default_factory=list)
     entries: list[pb.ChangeEntry] = field(default_factory=list)
     posts_calls: list[pb.ListPostsRequest] = field(default_factory=list)
@@ -103,6 +106,13 @@ class FakeChangelog:
 
     def _list_posts(self, req: pb.ListPostsRequest) -> Response:
         self.posts_calls.append(req)
+        if self.cycle_tokens is not None:
+            index = (len(self.posts_calls) - 1) % len(self.cycle_tokens)
+            return _ok(
+                pb.ListPostsResponse(
+                    posts=[self.posts[0].summary], next_page_token=self.cycle_tokens[index]
+                )
+            )
         items, next_token = _page([p.summary for p in self.posts], req.page_token, req.limit, 20)
         if self.repeat_token and req.page_token:
             next_token = req.page_token
@@ -235,6 +245,38 @@ async def test_iter_posts_rejects_a_repeated_page_token(public_client) -> None:
             seen.append(post.slug)
 
     assert len(seen) == 4
+
+
+@pytest.mark.parametrize(
+    ("start", "cycle", "calls"),
+    [
+        # "" -> A -> B -> A: A recurs after two pages.
+        (None, ["A", "B", "A"], ["", "A", "B"]),
+        # "" -> A -> B -> C -> B.
+        (None, ["A", "B", "C", "B"], ["", "A", "B", "C"]),
+        # The caller's starting token counts: S -> A -> S.
+        ("S", ["A", "S"], ["S", "A"]),
+    ],
+)
+async def test_iter_posts_rejects_a_page_token_cycle(public_client, start, cycle, calls) -> None:
+    fake, client = public_client(5, cycle_tokens=cycle)
+    seen = 0
+
+    with pytest.raises(PolyesterResponseContractError, match="ListPosts"):
+        async for _ in client.changelog.iter_posts(page_token=start):
+            seen += 1
+
+    assert [req.page_token for req in fake.posts_calls] == calls
+    assert seen == len(calls)
+
+
+def test_sync_iter_posts_rejects_a_page_token_cycle(sync_client) -> None:
+    fake, client = sync_client(5, cycle_tokens=["A", "B", "A"])
+
+    with pytest.raises(PolyesterResponseContractError, match="ListPosts"):
+        list(client.changelog.iter_posts())
+
+    assert [req.page_token for req in fake.posts_calls] == ["", "A", "B"]
 
 
 async def test_get_post_decodes_sections_and_base58_ids(public_client) -> None:

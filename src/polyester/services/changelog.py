@@ -209,16 +209,20 @@ async def _paginate(
     fetch: Callable[[str | None], Awaitable[tuple[list[T], str]]],
 ) -> AsyncIterator[T]:
     """Yield every item of ``fetch``'s pages until a page has no next token.
-    A next token equal to the one just sent would loop forever."""
+    A next token already requested by this iterator, including the caller's
+    starting token, would cycle forever."""
+    requested: set[str] = set()
     while True:
+        if token:
+            requested.add(token)
         items, next_token = await fetch(token)
         for item in items:
             yield item
         if not next_token:
             return
-        if next_token == (token or ""):
+        if next_token in requested:
             raise PolyesterResponseContractError(
-                operation, "next_page_token repeats the request's page_token"
+                operation, "next_page_token repeats an earlier page_token"
             )
         token = next_token
 

@@ -32,6 +32,7 @@ Requires **Python 3.11+**.
 | VIP tiers + status | Yes |
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
+| Product changelog (posts + changes) | Yes |
 | Balances, holds, equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -499,6 +500,52 @@ entry = await client.address_book.update_entry(
 
 `social_verification.start(..., handle="@alice")` accepts an optional leading
 `@` on Twitter handles. The SDK forwards the handle as supplied.
+
+## Product changelog API
+
+`client.changelog` reads the product changelog published for the environment
+the client points at (devnet, testnet, ...). It is public and read-only: it
+needs no API key, and the server rate-limits it per client address.
+
+- `list_posts(limit=, page_token=)` returns one page of post summaries, newest
+  first, with change counts by kind. `iter_posts(...)` yields every post
+  across pages.
+- `get_post(slug)` returns one full post with its sections and changes. A slug
+  is the post's coverage cutoff date, `YYYY-MM-DD`; a second or third post on
+  the same day gets `-2` or `-3`. An unknown slug raises `PolyesterApiError`
+  with code `not_found` (`is_not_found(err)` is true).
+- `list_changes(...)` returns one page of changes across posts, each with its
+  post slug, publication time and section heading. It filters by
+  `categories`, `action_required`, `surfaces`, `audiences`, `start_time`
+  (inclusive), `end_time` (exclusive), `post_slug` and `sort` (`"desc"`, the
+  default, or `"asc"`). Filters on different fields combine with AND; values
+  within one field combine with OR. `iter_changes(...)` yields every match
+  across pages. An `end_time` not after `start_time` raises `PolyesterApiError`
+  with code `invalid_argument`.
+- `breaking_changes_since(t)` and `action_required_since(t)` return every
+  breaking or action-required change published at or after `t`, newest post
+  first.
+
+Categories (`breaking_change`, `new_feature`, `improvement`, `bug_fix`),
+audiences (`all_users`, `traders`, `market_makers`, `developers`) and surfaces
+(`trading`, `funding`, `accounts`, `api`, `explorer`, `documentation`,
+`platform`) are lowercase labels. A value newer than this SDK reads as its
+number instead of failing. `change.id` is the change's base58 public ID.
+Datetimes must be timezone-aware. The service raises `PolyesterServerError`
+(`Unavailable`) while it is starting.
+
+```python
+from datetime import UTC, datetime
+
+async for post in client.changelog.iter_posts():
+    print(post.slug, post.title, post.breaking_change_count)
+post = await client.changelog.get_post("2026-09-24")
+for entry in await client.changelog.breaking_changes_since(datetime(2026, 9, 1, tzinfo=UTC)):
+    print(entry.post_slug, entry.change.id, entry.change.title, entry.change.migration_guidance)
+```
+
+The sync `Polyester` client returns plain iterators:
+`for post in client.changelog.iter_posts(): ...`.
 
 ## Triggers
 

@@ -11,6 +11,13 @@ from polyester.codecs.decode.balances import (
     equity_history_from_proto,
     holds_list_from_proto,
 )
+from polyester.codecs.decode.changelog import (
+    changelog_change_from_proto,
+    changelog_changes_page_from_proto,
+    changelog_post_from_proto,
+    changelog_post_summary_from_proto,
+    changelog_posts_page_from_proto,
+)
 from polyester.codecs.decode.common import api_data_from_proto
 from polyester.codecs.decode.deposit import (
     create_deposit_address_from_proto,
@@ -64,6 +71,11 @@ from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
 from polyester.codecs.decode.zipper import deposit_withdraw_config_from_proto
 
 __all__ = [
+    "changelog_change_from_proto",
+    "changelog_changes_page_from_proto",
+    "changelog_post_from_proto",
+    "changelog_post_summary_from_proto",
+    "changelog_posts_page_from_proto",
     "api_data_from_proto",
     "api_key_from_proto",
     "api_keys_list_from_proto",

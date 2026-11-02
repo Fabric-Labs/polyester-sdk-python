@@ -34,3 +34,5 @@ MFA_REQUIREMENT_FIELD_NUMBER: _ClassVar[int]
 mfa_requirement: _descriptor.FieldDescriptor
 AUTHENTICATION_METHODS_FIELD_NUMBER: _ClassVar[int]
 authentication_methods: _descriptor.FieldDescriptor
+DOCS_GROUP_FIELD_NUMBER: _ClassVar[int]
+docs_group: _descriptor.FieldDescriptor

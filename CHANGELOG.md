@@ -1,8 +1,38 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+Git tag: `v0.4.0`. Released 2026-11-02.
+
+**What a trading bot gains.** An order now says why it ended, in the same
+words everywhere. A rejected order's `reject_reason` is the error code the
+Orders API returns for the same refusal, and a canceled order's
+`cancel_reason` says why it was canceled, on order reads and on the private
+order stream alike. Before, the numeric reason used the matching engine's own
+numbering, which clashed with the API's error codes. `OrderbookData.available`
+tells a bot when a book's levels are unknown rather than empty, so it does not
+quote into a book that is being rebuilt. `Trigger.version` picks out the
+newest copy of a trigger, and nine new error codes are definite refusals: the
+request did not apply, so do not resend it unchanged.
+
+This release works on devnet now, and on testnet after testnet's next upgrade.
+
+**Reason labels in this SDK.** `reject_reason` is the `orders.v1.ErrorCode`
+name without its `ERROR_CODE_` prefix, for example `POST_ONLY_CROSS`.
+`cancel_reason` is the `orders.v1.CancelReason` name without its
+`CANCEL_REASON_` prefix, for example `USER_REQUEST`. The Go and Rust SDKs
+format these labels differently.
 
 **Breaking changes**
+- The `whiteboard`, `polychart` and `layout` services are removed.
+- The generated `orders.v1.Order` loses `terminal_reason_code` and
+  `terminal_reason`, and the generated `privatews.v1.OrderEvent` loses
+  `reason_code`. Read `Order.reject_reason` and `Order.cancel_reason` instead.
+- `PrivateOrderEvent.reason_code` is replaced by `reject_reason` and
+  `cancel_reason`.
+- `sub_accounts.get()` no longer takes `include_balances`.
+
+### Breaking
 - The `whiteboard`, `polychart` and `layout` services are removed from the
   client, because those APIs are no longer part of the public API.
 - An order's terminal reason code and name are removed: the generated
@@ -19,7 +49,7 @@
   no longer returns balances. Read them with `balances.list()` for the
   sub-account.
 
-**Added**
+### Added
 - `Order.reject_reason` and `Order.cancel_reason`, on order reads and on the
   orders of the private order stream's snapshots and units. A rejected order
   carries the error code the Orders API returns for the same refusal (for

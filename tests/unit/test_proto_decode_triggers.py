@@ -224,6 +224,7 @@ def test_trigger_event_type_from_label() -> None:
     assert trigger_event_type_from_label("fired") == triggers_pb2.EVENT_FIRED
     assert trigger_event_type_from_label("canceled") == triggers_pb2.EVENT_CANCELED
     assert trigger_event_type_from_label("activated") == triggers_pb2.EVENT_ACTIVATED
+    assert trigger_event_type_from_label("armed") == triggers_pb2.EVENT_ARMED
     with pytest.raises(PolyesterValidationError):
         trigger_event_type_from_label("nope")
 
@@ -240,3 +241,17 @@ def test_trailing_activation_event_label() -> None:
     )
     result = trigger_events_list_from_proto(msg)
     assert result.events[0].event_type == "activated"
+
+
+def test_attached_leg_armed_event_label() -> None:
+    msg = triggers_pb2.ListTriggerEventsResponse(
+        events=[
+            triggers_pb2.TriggerEvent(
+                trigger_id=5,
+                trigger_type=triggers_pb2.TAKE_PROFIT,
+                event_type=triggers_pb2.EVENT_ARMED,
+            )
+        ],
+    )
+    result = trigger_events_list_from_proto(msg)
+    assert result.events[0].event_type == "armed"

@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** `0.5.0`, pre-1.0: a minor release may include breaking changes (see
+**Status:** `0.5.1`, pre-1.0: a minor release may include breaking changes (see
 [CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
@@ -69,7 +69,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.5.0"
+pip install "polyester-sdk==0.5.1"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -563,6 +563,25 @@ await client.triggers.create(
     qty="0.01",
     trailing_distance_bps=100,
     limit_price="85000",
+)
+```
+
+A trailing stop attached to an order that sells buys back, so it requires
+`limit_price` too: the most its exit pays per unit, at least
+`activation_price` when that is set. A trailing stop attached to an order that
+buys takes none. Order reads do not return it yet; keep the value you sent.
+
+```python
+await client.orders.create(
+    symbol="BTC-USDT",
+    side="sell",
+    order_type="limit",
+    tif="gtc",
+    qty="0.01",
+    price="84000",
+    attached_risk={
+        "trailing_stop": {"trailing_distance_bps": 100, "limit_price": "86000"},
+    },
 )
 ```
 

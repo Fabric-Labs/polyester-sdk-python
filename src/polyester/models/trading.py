@@ -111,6 +111,10 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``trigger_price_source`` is ``last``, ``index`` or ``mark``; unset on a
     write means the last trade price. ``order_type`` is rejected if supplied
     under ``attached_risk.trailing_stop``.
+
+    ``limit_price`` is the most the exit pays per unit when the trailing stop
+    buys back: required when the order sells, unset when it buys, and at least
+    ``activation_price`` when both are set. Order reads do not return it yet.
     """
 
     distance_ticks: int = 0
@@ -118,6 +122,7 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
     max_slippage_ticks: int = 0
     max_slippage_bps: int = 0
     activation_price: Price | None = None
+    limit_price: Price | None = None
     trigger_price_source: str = ""
     order_type: str = ""
     state: AttachedRiskLegState | None = None

@@ -50,6 +50,7 @@ _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
     triggers_pb2.EVENT_UPDATED: "updated",
     triggers_pb2.EVENT_FAILED: "failed",
     triggers_pb2.EVENT_ACTIVATED: "activated",
+    triggers_pb2.EVENT_ARMED: "armed",
 }
 _TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
     "fired": triggers_pb2.EVENT_FIRED,
@@ -58,6 +59,7 @@ _TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
     "updated": triggers_pb2.EVENT_UPDATED,
     "failed": triggers_pb2.EVENT_FAILED,
     "activated": triggers_pb2.EVENT_ACTIVATED,
+    "armed": triggers_pb2.EVENT_ARMED,
 }
 
 
@@ -90,7 +92,7 @@ def trigger_event_type_from_label(label: str) -> int:
     if key not in _TRIGGER_EVENT_TYPE_FROM_LABEL:
         raise PolyesterValidationError(
             f"invalid trigger event type {label!r}; "
-            "expected one of: fired, canceled, updated, failed, activated"
+            "expected one of: fired, canceled, updated, failed, activated, armed"
         )
     return _TRIGGER_EVENT_TYPE_FROM_LABEL[key]
 

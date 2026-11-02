@@ -51,6 +51,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_WALLET_NOT_FOUND: _ClassVar[ErrorCode]
     ERROR_CODE_UPSTREAM_ERROR: _ClassVar[ErrorCode]
+    ERROR_CODE_INVALID_SUBACCOUNT_ID: _ClassVar[ErrorCode]
 RANGE_UNSPECIFIED: BalanceRange
 DAY_1: BalanceRange
 DAY_7: BalanceRange
@@ -79,6 +80,7 @@ ERROR_CODE_MISSING_WALLET: ErrorCode
 ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE: ErrorCode
 ERROR_CODE_WALLET_NOT_FOUND: ErrorCode
 ERROR_CODE_UPSTREAM_ERROR: ErrorCode
+ERROR_CODE_INVALID_SUBACCOUNT_ID: ErrorCode
 
 class GetBalancesRequest(_message.Message):
     __slots__ = ("subaccount_id",)

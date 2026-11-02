@@ -567,9 +567,15 @@ class BatchReplaceItem(msgspec.Struct, kw_only=True, omit_defaults=True):
 class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     """One item of a batch replace receipt.
 
-    ``action_taken`` is ``"replaced"`` when a successor order was admitted and
-    ``"amended"`` for a cancel-only outcome with no successor: keep tracking
-    ``old_order_id`` until its terminal state is confirmed. Empty when unset.
+    ``action_taken`` is ``"replaced"`` when the order is replaced by the
+    successor ``replacement_order_id``, and ``"amended"`` when the order keeps
+    ``old_order_id``: amended in place, or ended at its filled quantity. Empty
+    when unset.
+
+    ``replacement_order_id`` is the planned successor ID, not proof of an
+    order: the item can still be refused after admission, and then that ID
+    never becomes an order. Confirm it with ``wait_batch_replace``,
+    ``get_batch_replace_status`` or order reads.
     """
 
     item_index: int
@@ -592,7 +598,19 @@ class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True)
 
 
 class BatchReplaceStatusItem(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """One item of a batch replace status read; ``action_taken`` as on admission."""
+    """One item of a batch replace status read; ``action_taken`` as on admission.
+
+    ``phase`` is ``admitted``, ``working``, ``rejected`` or ``terminal``. An
+    item refused after admission (for example a post-only price that would
+    cross) reads ``rejected``: the order kept its previous price and quantity
+    and keeps ``old_order_id``, and ``replacement_order_id`` is empty.
+
+    ``code`` is the refusal as the server sends it, without the
+    ``ERROR_CODE_`` prefix (``POST_ONLY_CROSS``). ``error_code`` is the same
+    refusal as ``PolyesterApiError.code`` names it
+    (``ERROR_CODE_POST_ONLY_CROSS``), or ``code`` unchanged when this SDK does
+    not know it.
+    """
 
     item_index: int
     phase: str
@@ -600,6 +618,7 @@ class BatchReplaceStatusItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     replacement_order_id: str = ""
     order_status: str = ""
     code: str = ""
+    error_code: str = ""
     updated_ts_ns: int = 0
     action_taken: str = ""
 

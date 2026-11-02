@@ -670,6 +670,17 @@ def batch_replace_from_proto(
     )
 
 
+def batch_replace_item_error_code(code: str) -> str:
+    """Name a batch replace status item's refusal as ``PolyesterApiError.code``
+    names it: ``POST_ONLY_CROSS`` becomes ``ERROR_CODE_POST_ONLY_CROSS``, the
+    code a single modify raises. A code this SDK does not know stays as sent;
+    empty stays empty."""
+    if not code:
+        return ""
+    prefixed = code if code.startswith("ERROR_CODE_") else f"ERROR_CODE_{code}"
+    return prefixed if prefixed in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else code
+
+
 def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
     if not msg.batch_request_id:
         raise PolyesterResponseContractError("GetBatchReplaceStatus", "missing batch_request_id")
@@ -680,7 +691,6 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
             f"unknown admission status: {msg.admission_status}",
         )
     items: list[BatchReplaceStatusItem] = []
-    decoded_accepted = 0
     decoded_rejected = 0
     for item in msg.items:
         phase = _batch_replace_phase(item.phase)
@@ -693,11 +703,15 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
                 item_index=int(item.item_index),
                 phase=phase,
                 old_order_id=format_uint64_id(item.old_order_id) if item.old_order_id else "",
+                # A refused item has no replacement order: never expose an ID.
                 replacement_order_id=(
-                    format_uint64_id(item.replacement_order_id) if item.replacement_order_id else ""
+                    format_uint64_id(item.replacement_order_id)
+                    if item.replacement_order_id and phase != "rejected"
+                    else ""
                 ),
                 order_status=proto_enum_name(OrderStatus, item.order_status),
                 code=item.code,
+                error_code=batch_replace_item_error_code(item.code),
                 updated_ts_ns=ts_ns_from_response(
                     item.updated_ts_ns,
                     context="GetBatchReplaceStatus",
@@ -706,22 +720,19 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
                 action_taken=proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken),
             )
         )
-        if phase in {"admitted", "working", "terminal"}:
-            decoded_accepted += 1
-        else:
+        if phase == "rejected":
             decoded_rejected += 1
     accepted_count = int(msg.accepted_count)
     rejected_count = int(msg.rejected_count)
-    if (
-        accepted_count != decoded_accepted
-        or rejected_count != decoded_rejected
-        or accepted_count + rejected_count != len(items)
-    ):
+    # The counts describe admission. An item refused after admission reads
+    # ``rejected`` but still counts as accepted, so only the items refused at
+    # admission bound the rejected phases from below.
+    if accepted_count + rejected_count != len(items) or decoded_rejected < rejected_count:
         raise PolyesterResponseContractError(
             "GetBatchReplaceStatus",
             "batch replace status counts do not match decoded phases: "
-            f"accepted={accepted_count}/{decoded_accepted} "
-            f"rejected={rejected_count}/{decoded_rejected} items={len(items)}",
+            f"accepted={accepted_count} rejected={rejected_count} "
+            f"rejected_phases={decoded_rejected} items={len(items)}",
         )
     return BatchReplaceStatusResult(
         batch_request_id=format_uint64_id(msg.batch_request_id),

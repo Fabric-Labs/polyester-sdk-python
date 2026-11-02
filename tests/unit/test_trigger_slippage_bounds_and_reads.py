@@ -224,11 +224,15 @@ def test_stream_decode_keeps_the_market_cap() -> None:
     assert trigger.max_slippage_bps == 50
 
 
+# Trigger reads retry ``unavailable``; see test_trigger_read_retry.py.
+_TRIGGER_READ = "polyester.services.triggers.unary_auth_decoded_retry_unavailable"
+
+
 @pytest.mark.asyncio
 async def test_triggers_get_and_list_keep_the_market_cap() -> None:
     service = AsyncTriggersService(MagicMock(), _catalogs(), None)
     get_capture = CaptureUnary(triggers_pb2.GetTriggerResponse(trigger=_stop_with(CAPS["bps_10"])))
-    with patch("polyester.services.triggers.unary_auth_decoded", get_capture):
+    with patch(_TRIGGER_READ, get_capture):
         got = await service.get(trigger_id="5")
     assert got is not None and got.max_slippage_bps == 10
 
@@ -237,7 +241,7 @@ async def test_triggers_get_and_list_keep_the_market_cap() -> None:
             triggers=[_stop_with(CAPS["ticks"]), _stop_with(CAPS["bps_50"])]
         )
     )
-    with patch("polyester.services.triggers.unary_auth_decoded", list_capture):
+    with patch(_TRIGGER_READ, list_capture):
         listed = await service.list()
     first, second = listed.triggers
     assert first.max_slippage is not None and first.max_slippage.ticks == 2_500_000_000

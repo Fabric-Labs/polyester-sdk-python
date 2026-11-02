@@ -356,17 +356,18 @@ def test_batch_replace_status_decodes_phases() -> None:
 
 
 def test_batch_replace_status_reconciles_phase_counts() -> None:
+    # Admission rejected the item, yet the status read shows it working.
     msg = orders_read_pb2.GetBatchReplaceStatusResponse(
         batch_request_id=77,
-        admission_status=orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
+        admission_status=orders_pb2.BATCH_REPLACE_ADMISSION_STATUS_REJECTED,
         items=[
             orders_read_pb2.BatchReplaceStatusItem(
                 item_index=0,
-                phase=orders_read_pb2.BATCH_REPLACE_PHASE_REJECTED,
+                phase=orders_read_pb2.BATCH_REPLACE_PHASE_WORKING,
             )
         ],
-        accepted_count=1,
-        rejected_count=0,
+        accepted_count=0,
+        rejected_count=1,
     )
     with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
         batch_replace_status_from_proto(msg)

@@ -74,7 +74,7 @@ async def test_social_verification_start_sets_provider_and_method() -> None:
 @pytest.mark.asyncio
 async def test_triggers_list_and_list_events_pass_page_token() -> None:
     list_capture = CaptureUnary(triggers_pb2.ListTriggersResponse(next_page_token="trig-page-2"))
-    with patch("polyester.services.triggers.unary_auth_decoded", list_capture):
+    with patch("polyester.services.triggers.unary_auth_decoded_retry_unavailable", list_capture):
         service = AsyncTriggersService(MagicMock(), MagicMock(), None)
         listed = await service.list(limit=10, page_token="trig-page-1")
     assert list_capture.request.page_token == "trig-page-1"

@@ -13,6 +13,7 @@ from polyester.codecs.decode.ratelimit import (
 )
 from polyester.codecs.proto_helpers import error_code_name, format_uint64_id
 from polyester.errors import (
+    AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
@@ -20,6 +21,7 @@ from polyester.errors import (
     PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
+    PolyesterSubaccountOwnerRoleLockedError,
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
@@ -86,6 +88,12 @@ def map_connect_error(exc: ConnectError):
         return PolyesterTimestampSkewError(
             status_code=401 if exc.code.value == "unauthenticated" else None
         )
+    if (exc.message or "").strip() == AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED:
+        # A REST problem body (HTTP 412) the gateway answered instead of a
+        # Connect error; see transport._raise_for_gateway_rejection.
+        return PolyesterSubaccountOwnerRoleLockedError(
+            status_code=412 if exc.code.value == "failed_precondition" else None
+        )
     error_message = exc.message or _EMPTY_ERROR_MESSAGE
     if exc.details:
         for detail in exc.details:
@@ -96,6 +104,12 @@ def map_connect_error(exc: ConnectError):
             if full_name == "auth.v1.AuthErrorDetail":
                 code_name = error_code_name(auth_pb2.AuthErrorCode, unpacked.code)
                 message = unpacked.message or error_message
+                if code_name == AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED:
+                    return PolyesterSubaccountOwnerRoleLockedError(
+                        message,
+                        status_code=412 if exc.code.value == "failed_precondition" else None,
+                        raw=unpacked,
+                    )
                 return PolyesterApiError(message, code=code_name, raw=unpacked)
             if full_name == "polyester.ratelimit.v1.RateLimitDetail":
                 return _rate_limit_error(error_message, proto_detail=unpacked)

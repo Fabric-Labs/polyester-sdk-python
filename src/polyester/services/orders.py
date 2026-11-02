@@ -37,7 +37,13 @@ from polyester.codecs.orders import (
     set_order_key,
 )
 from polyester.codecs.scalars import id_to_int
-from polyester.errors import PolyesterTransportError, PolyesterValidationError
+from polyester.errors import (
+    PolyesterApiError,
+    PolyesterBatchReplaceTimeoutError,
+    PolyesterTransportError,
+    PolyesterValidationError,
+    is_not_found,
+)
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
@@ -69,6 +75,7 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import require_realtime
+from polyester.services._retry import UnavailableRetry, unary_auth_decoded_retry_unavailable
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resolve_account_id
 from polyester.services._symbols import (
     resolve_cancel_all_symbol_ids,
@@ -76,6 +83,11 @@ from polyester.services._symbols import (
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
+
+# GetBatchReplaceStatus keeps a batch's status this long from acceptance.
+BATCH_REPLACE_STATUS_WINDOW_SECONDS = 60.0
+_BATCH_REPLACE_POLL_INITIAL = 0.05
+_BATCH_REPLACE_POLL_MAX = 0.5
 
 
 class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
@@ -513,6 +525,87 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request,
             batch_replace_status_from_proto,
         )
+
+    async def wait_batch_replace(
+        self,
+        *,
+        batch_request_id: str,
+        account: AccountScope | None = None,
+        sub_account_id: str | None = None,
+        timeout: float | None = None,
+    ) -> BatchReplaceStatusResult:
+        """Poll :meth:`get_batch_replace_status` until no item is ``admitted``.
+
+        Returns the first status whose items are all ``working``, ``rejected``
+        or ``terminal``. A ``rejected`` item changed nothing: its order keeps
+        ``old_order_id`` and its previous price and quantity, and
+        ``error_code`` names the refusal as a single modify would raise it
+        (for example ``ERROR_CODE_POST_ONLY_CROSS``).
+
+        Polls start 50 ms apart and back off to 500 ms. The status appears a
+        few seconds after admission, so ``not_found`` keeps polling, and a
+        read that answers ``unavailable`` is retried. The server keeps a
+        batch's status for 60 seconds from acceptance, so polling stops there,
+        or after ``timeout`` seconds when that comes first, with
+        :class:`~polyester.errors.PolyesterBatchReplaceTimeoutError`: a
+        ``not_found`` proves nothing, so reconcile the orders themselves.
+        Other errors are raised as they come.
+        """
+        request = GetBatchReplaceStatusRequest(
+            batch_request_id=id_to_int(batch_request_id, "batch_request_id")
+        )
+        parsed_sub = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(sub_account_id, account=account)
+        )
+        if parsed_sub is not None:
+            request.subaccount_id = parsed_sub
+        started = time.monotonic()
+        deadline = started + BATCH_REPLACE_STATUS_WINDOW_SECONDS
+        if timeout is not None:
+            deadline = min(deadline, started + max(timeout, 0.0))
+        window_known = False
+        delay = _BATCH_REPLACE_POLL_INITIAL
+        last: BatchReplaceStatusResult | None = None
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                try:
+                    last = await unary_auth_decoded_retry_unavailable(
+                        self._transport,
+                        OrdersReadServiceClient,
+                        lambda client, req: client.get_batch_replace_status(req),
+                        request,
+                        batch_replace_status_from_proto,
+                        policy=UnavailableRetry(budget=remaining),
+                    )
+                except PolyesterApiError as exc:
+                    # The status appears a few seconds after admission; until
+                    # then the read answers not_found.
+                    if not is_not_found(exc):
+                        raise
+                else:
+                    if is_batch_replace_settled(last):
+                        return last
+                    if not window_known and last.accepted_ts_ns:
+                        # The window runs from acceptance; never extend it
+                        # past 60 s from the first read when clocks disagree.
+                        window_known = True
+                        left = (
+                            last.accepted_ts_ns / 1e9
+                            + BATCH_REPLACE_STATUS_WINDOW_SECONDS
+                            - time.time()
+                        )
+                        deadline = min(deadline, time.monotonic() + max(left, 0.0))
+            now = time.monotonic()
+            if now + delay > deadline:
+                raise PolyesterBatchReplaceTimeoutError(
+                    f"batch replace {batch_request_id} has no settled status by the end "
+                    "of its status window; reconcile the orders with order reads",
+                    batch_request_id=batch_request_id,
+                    last_status=last,
+                )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, _BATCH_REPLACE_POLL_MAX)
 
     async def batch_create(
         self,

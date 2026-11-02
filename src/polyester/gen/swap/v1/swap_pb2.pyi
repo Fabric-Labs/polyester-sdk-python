@@ -40,6 +40,7 @@ class SwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ORDER_REJECTED: _ClassVar[SwapReason]
     EXPIRED: _ClassVar[SwapReason]
     MINIMUM_NOT_MET: _ClassVar[SwapReason]
+    MAX_ORDER_QUANTITY: _ClassVar[SwapReason]
 
 class SwapOrderStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -84,6 +85,7 @@ RATE_LIMITED: SwapReason
 ORDER_REJECTED: SwapReason
 EXPIRED: SwapReason
 MINIMUM_NOT_MET: SwapReason
+MAX_ORDER_QUANTITY: SwapReason
 ORDER_STATUS_UNSPECIFIED: SwapOrderStatus
 PLACING: SwapOrderStatus
 PLACED: SwapOrderStatus

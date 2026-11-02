@@ -68,6 +68,7 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_SUBACCOUNT_CHALLENGE_INVALID: _ClassVar[AuthErrorCode]
     AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED: _ClassVar[AuthErrorCode]
     AUTH_TEMPORARILY_UNAVAILABLE: _ClassVar[AuthErrorCode]
+    AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -116,6 +117,7 @@ AUTH_SOCIAL_VERIFICATION_INVALID_STATE: AuthErrorCode
 AUTH_SUBACCOUNT_CHALLENGE_INVALID: AuthErrorCode
 AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED: AuthErrorCode
 AUTH_TEMPORARILY_UNAVAILABLE: AuthErrorCode
+AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

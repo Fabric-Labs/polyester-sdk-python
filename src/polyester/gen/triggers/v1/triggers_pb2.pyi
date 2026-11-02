@@ -44,6 +44,7 @@ class TriggerEventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVENT_UPDATED: _ClassVar[TriggerEventType]
     EVENT_FAILED: _ClassVar[TriggerEventType]
     EVENT_ACTIVATED: _ClassVar[TriggerEventType]
+    EVENT_ARMED: _ClassVar[TriggerEventType]
 
 class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -184,6 +185,7 @@ EVENT_CANCELED: TriggerEventType
 EVENT_UPDATED: TriggerEventType
 EVENT_FAILED: TriggerEventType
 EVENT_ACTIVATED: TriggerEventType
+EVENT_ARMED: TriggerEventType
 TRIGGER_CANCEL_REASON_UNSPECIFIED: TriggerCancelReason
 TRIGGER_CANCEL_REASON_USER_REQUEST: TriggerCancelReason
 TRIGGER_CANCEL_REASON_OCO: TriggerCancelReason

@@ -234,6 +234,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: _ClassVar[ErrorCode]
     ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
     ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_TRIGGER_SYMBOL_MISMATCH: _ClassVar[ErrorCode]
     ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR: _ClassVar[ErrorCode]
     ERROR_CODE_ATTACHED_LEGS_EXCEEDED: _ClassVar[ErrorCode]
     ERROR_CODE_FEE_ASSET_INVALID: _ClassVar[ErrorCode]
@@ -485,6 +486,7 @@ ERROR_CODE_ACCOUNT_REPAIRING: ErrorCode
 ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: ErrorCode
 ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN: ErrorCode
 ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN: ErrorCode
+ERROR_CODE_TRIGGER_SYMBOL_MISMATCH: ErrorCode
 ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR: ErrorCode
 ERROR_CODE_ATTACHED_LEGS_EXCEEDED: ErrorCode
 ERROR_CODE_FEE_ASSET_INVALID: ErrorCode
@@ -730,20 +732,22 @@ class StopLossPolicy(_message.Message):
     def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[RiskExecution, _Mapping]] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ...) -> None: ...
 
 class TrailingStopPolicy(_message.Message):
-    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "activation_price_ticks", "trigger_price_source")
+    __slots__ = ("trailing_distance_ticks", "trailing_distance_bps", "max_slippage_ticks", "max_slippage_bps", "activation_price_ticks", "trigger_price_source", "limit_price_ticks")
     TRAILING_DISTANCE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRAILING_DISTANCE_BPS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_TICKS_FIELD_NUMBER: _ClassVar[int]
     MAX_SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
     ACTIVATION_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     trailing_distance_ticks: int
     trailing_distance_bps: int
     max_slippage_ticks: int
     max_slippage_bps: int
     activation_price_ticks: int
     trigger_price_source: TriggerPriceSource
-    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ...) -> None: ...
+    limit_price_ticks: int
+    def __init__(self, trailing_distance_ticks: _Optional[int] = ..., trailing_distance_bps: _Optional[int] = ..., max_slippage_ticks: _Optional[int] = ..., max_slippage_bps: _Optional[int] = ..., activation_price_ticks: _Optional[int] = ..., trigger_price_source: _Optional[_Union[TriggerPriceSource, str]] = ..., limit_price_ticks: _Optional[int] = ...) -> None: ...
 
 class RiskPolicy(_message.Message):
     __slots__ = ("take_profit", "stop_loss", "trailing_stop", "oco")

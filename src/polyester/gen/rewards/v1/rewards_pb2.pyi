@@ -93,9 +93,11 @@ class ListMyRewardAwardsRequest(_message.Message):
     def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListMyRewardAwardsResponse(_message.Message):
-    __slots__ = ("awards", "next_page_token")
+    __slots__ = ("awards", "next_page_token", "awards_may_change")
     AWARDS_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    AWARDS_MAY_CHANGE_FIELD_NUMBER: _ClassVar[int]
     awards: _containers.RepeatedCompositeFieldContainer[RewardAward]
     next_page_token: str
-    def __init__(self, awards: _Optional[_Iterable[_Union[RewardAward, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    awards_may_change: bool
+    def __init__(self, awards: _Optional[_Iterable[_Union[RewardAward, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., awards_may_change: _Optional[bool] = ...) -> None: ...

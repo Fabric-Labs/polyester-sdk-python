@@ -13,7 +13,8 @@ CHANGELOG_CATEGORY_BUG_FIX = "bug_fix"
 
 # Audience labels: "all_users", "traders", "market_makers", "developers".
 # Surface labels: "trading", "funding", "accounts", "api", "explorer",
-# "documentation", "platform". Values newer than this SDK read as numbers.
+# "documentation", "platform", "market_data", "quickswap", "rewards". Values
+# newer than this SDK read as numbers.
 
 
 class ChangelogChange(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -34,10 +35,18 @@ class ChangelogChange(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class ChangelogSection(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """A post's changes under one heading."""
+    """A post's changes under one heading.
+
+    ``surface`` is the product area the section covers, as a surface label
+    (``"market_data"``), or ``""`` for a section not tied to one area, such as
+    the changes that need your attention. It does not change which changes a
+    ``list_changes`` surface filter matches: each change keeps its own
+    ``surfaces``.
+    """
 
     heading: str = ""
     summary: str | None = None
+    surface: str = ""
     changes: list[ChangelogChange] = msgspec.field(default_factory=list)
 
 

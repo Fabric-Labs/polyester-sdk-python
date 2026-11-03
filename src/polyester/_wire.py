@@ -13,7 +13,10 @@ from polyester.codecs.decode.ratelimit import (
 )
 from polyester.codecs.proto_helpers import error_code_name, format_uint64_id
 from polyester.errors import (
+    API_KEY_AUTH_ERROR_CODES,
+    AUTH_SESSION_KIND_NOT_ALLOWED,
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
+    AUTH_TIMESTAMP_SKEW,
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
@@ -21,16 +24,20 @@ from polyester.errors import (
     PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
+    PolyesterSessionRequiredError,
     PolyesterSubaccountOwnerRoleLockedError,
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
+    auth_error_code_from_rest,
 )
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
+from polyester.models.trading import OrderFieldViolation
+from polyester.transport import GatewayProblemError
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 _ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
@@ -83,6 +90,48 @@ def _rate_limit_error(message: str, *, proto_detail=None) -> PolyesterRateLimitE
     )
 
 
+def _order_error_code_from_rest(code: str) -> str:
+    """``QTY_STEP_SIZE`` -> ``ERROR_CODE_QTY_STEP_SIZE``; unknown codes stay as sent."""
+    prefixed = code if code.startswith("ERROR_CODE_") else f"ERROR_CODE_{code}"
+    return prefixed if prefixed in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else code
+
+
+def _rest_violations(items: list[dict[str, object]]) -> list[OrderFieldViolation]:
+    return [
+        OrderFieldViolation(
+            field_path=str(item.get("fieldPath") or item.get("field_path") or ""),
+            rule_id=str(item.get("ruleId") or item.get("rule_id") or ""),
+            message=str(item.get("message") or ""),
+        )
+        for item in items
+    ]
+
+
+def _map_gateway_problem(exc: GatewayProblemError):
+    """Map a REST problem body the gateway answered instead of a Connect error."""
+    code = exc.code.value
+    message = exc.detail or exc.problem_code
+    if exc.problem_code == AUTH_SESSION_KIND_NOT_ALLOWED:
+        return PolyesterSessionRequiredError(
+            exc.detail or "interactive session required", status_code=exc.http_status
+        )
+    if code in ("unauthenticated", "permission_denied"):
+        # The detail names what to fix, for example the API-key policy
+        # action to grant ("api key policy does not allow READ_AUTO_WITHDRAW").
+        return PolyesterAuthError(
+            message,
+            status_code=exc.http_status,
+            code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code,
+        )
+    if code in ("unavailable", "resource_exhausted", "internal", "unknown"):
+        return None
+    return PolyesterApiError(
+        message,
+        code=_order_error_code_from_rest(exc.problem_code),
+        violations=_rest_violations(exc.violations),
+    )
+
+
 def map_connect_error(exc: ConnectError):
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
@@ -94,6 +143,10 @@ def map_connect_error(exc: ConnectError):
         return PolyesterSubaccountOwnerRoleLockedError(
             status_code=412 if exc.code.value == "failed_precondition" else None
         )
+    if isinstance(exc, GatewayProblemError):
+        mapped = _map_gateway_problem(exc)
+        if mapped is not None:
+            return mapped
     error_message = exc.message or _EMPTY_ERROR_MESSAGE
     if exc.details:
         for detail in exc.details:
@@ -109,6 +162,24 @@ def map_connect_error(exc: ConnectError):
                         message,
                         status_code=412 if exc.code.value == "failed_precondition" else None,
                         raw=unpacked,
+                    )
+                if code_name == AUTH_TIMESTAMP_SKEW:
+                    # Same error as the gateway's TIMESTAMP_SKEW: re-sign and retry.
+                    return PolyesterTimestampSkewError(
+                        message,
+                        status_code=401 if exc.code.value == "unauthenticated" else None,
+                    )
+                if code_name == AUTH_SESSION_KIND_NOT_ALLOWED:
+                    return PolyesterSessionRequiredError(
+                        message,
+                        status_code=403 if exc.code.value == "permission_denied" else None,
+                        raw=unpacked,
+                    )
+                if code_name in API_KEY_AUTH_ERROR_CODES:
+                    return PolyesterAuthError(
+                        message,
+                        status_code=401 if exc.code.value == "unauthenticated" else None,
+                        code=code_name,
                     )
                 return PolyesterApiError(message, code=code_name, raw=unpacked)
             if full_name == "polyester.ratelimit.v1.RateLimitDetail":
@@ -133,6 +204,14 @@ def map_connect_error(exc: ConnectError):
                         if unpacked.existing_order_id
                         else None
                     ),
+                    violations=[
+                        OrderFieldViolation(
+                            field_path=item.field_path,
+                            rule_id=item.rule_id,
+                            message=item.message,
+                        )
+                        for item in unpacked.violations
+                    ],
                 )
             if full_name == "chain.withdraw.v1.ErrorDetail":
                 code_name = error_code_name(withdraw_pb2.ErrorCode, unpacked.code)
@@ -161,7 +240,9 @@ def map_connect_error(exc: ConnectError):
     if is_cloudflare_browser_ban(error_message):
         return PolyesterTransportError(cloudflare_1010_message())
     if code in ("unauthenticated", "permission_denied"):
-        return PolyesterAuthError(error_message)
+        return PolyesterAuthError(
+            error_message, code=auth_error_code_from_rest((exc.message or "").strip())
+        )
     if code in ("unavailable", "internal"):
         return PolyesterServerError(error_message)
     if code == "resource_exhausted":

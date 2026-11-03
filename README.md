@@ -455,6 +455,41 @@ if order is not None and order.reject_reason == "POST_ONLY_CROSS":
     ...  # reprice and resend
 ```
 
+A buy sized by a quote amount (`max_quote_debit`) that spends its amount ends
+`filled`, with nothing remaining; `MARKET_REMAINDER` and `IOC_REMAINDER` mean
+the book, its price limit or the market's maximum quantity stopped it first.
+
+Orders carry their exact execution totals across the lineage. `avg_price` is
+the exact average execution price as a `Decimal` with up to 18 decimals
+(`None` without fills); prefer it to `avg_px`, which is rounded down to 9
+decimals. `cum_notional_scaled` is the exact quote amount of the fills before
+fees and `cum_quote(base_quantity_scale)` returns it in quote units.
+`fee_total` (`amount`, `amount_e18`, `is_rebate`, `qty`) is the fee of those
+fills net of rebates, in `fee_asset`; order history and single-order reads
+with execution history carry it, open-order reads and stream updates do not.
+`quote_used(base_quantity_scale)` is what a buy's fills used, fees included,
+and `quote_unspent(quote_quantity_scale=..., base_quantity_scale=...)` what
+is left of its `submitted_max_quote_debit_scaled`. Both are `None` until
+`fee_total` covers every fill (`fee_total.qty == cum_qty`): read the order
+again. Take the scales from the catalog
+(`catalogs.base_quantity_scale_for_symbol_id`, `quote_quantity_scale_for_symbol`).
+
+```python
+order = (await client.orders.get(key=OrderId(order_id))).order
+base_scale = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)
+quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BTC-USDT")
+used = order.quote_used(base_scale)
+unspent = order.quote_unspent(quote_quantity_scale=quote_scale, base_quantity_scale=base_scale)
+```
+
+A cancel of an order that has already ended, a repeat of the cancel that ended
+it included, raises `PolyesterApiError` `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
+`is_order_already_terminal(err)` tells it apart. Treat it as "already done"
+and read the order for how it ended. A client order ID names its order for at
+least a minute after the order ends; a later cancel by client order ID may
+read `ERROR_CODE_ORDER_UNKNOWN`, so retry by order ID once you have it. Every
+cancel, a repeat included, counts against the cancel rate limit.
+
 `cancel_all(...)` requests cancellation of every matching order. The result
 lists up to 200 of them, oldest first, in `cancelled_orders` (each with
 `order_id` and `client_order_id`); `total_cancelled` counts all of them and
@@ -463,6 +498,21 @@ from the order stream and reads. A dry run lists none. Retrying with the same
 `request_id` within 120 seconds returns the original counts with an empty
 `cancelled_orders` and `listing_status="not_retained_read_open_orders"`; the
 empty list does not mean nothing was cancelled, so read open orders instead.
+
+`cancel_all` and the dead-man switch (`cancel_all_after`) cancel open orders
+only, never triggers: an armed stop still fires and places its order later, a
+TWAP keeps placing slices, and the triggers keep their reserved funds. Orders
+that triggers placed are canceled like any other. To stop all automated
+trading, `orders.stop_all_trading()` lists the live triggers (`created`,
+`armed`, `running`, `paused`, attached legs included) page by page, cancels
+each, and only then cancels all orders, so an order a trigger places before
+its cancel is still canceled; `symbol=` limits it to one market. An error
+while listing the triggers is raised before anything is canceled. A trigger
+whose cancel fails, for any reason, is recorded and the run goes on: the other
+triggers are still canceled and the cancel-all always runs; an error from the
+cancel-all itself is raised. The result has `canceled_trigger_ids`,
+`trigger_failures` (each a `StopAllTradingTriggerFailure` with `trigger_id`
+and `error`: check them, such a trigger may still be live) and `cancel_all`.
 
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
@@ -565,8 +615,12 @@ needs no API key, and the server rate-limits it per client address.
 Categories (`breaking_change`, `new_feature`, `improvement`, `bug_fix`),
 audiences (`all_users`, `traders`, `market_makers`, `developers`) and surfaces
 (`trading`, `funding`, `accounts`, `api`, `explorer`, `documentation`,
-`platform`) are lowercase labels. A value newer than this SDK reads as its
-number instead of failing. `change.id` is the change's base58 public ID.
+`platform`, `market_data`, `quickswap`, `rewards`) are lowercase labels. A
+value newer than this SDK reads as its number instead of failing. Each
+section's `surface` is the product area it covers, or `""` for a section not
+tied to one, such as the changes that need your attention; a change keeps its
+own `surfaces`, which the `surfaces` filter matches. `change.id` is the
+change's base58 public ID.
 Datetimes must be timezone-aware. The service raises `PolyesterServerError`
 (`Unavailable`) while it is starting.
 
@@ -653,6 +707,14 @@ A trailing stop attached to an order that sells buys back, so it requires
 `limit_price` too: the most its exit pays per unit, at least
 `activation_price` when that is set. A trailing stop attached to an order that
 buys takes none. Order reads do not return it yet; keep the value you sent.
+Create, preview and batch create check this before sending and raise
+`PolyesterValidationError` with the server's `code` and `violations` (field
+`order.attached_risk.trailing_stop.limit_price_ticks`): set on a buying order
+`ERROR_CODE_BAD_PRICE` / `sell_unset`, missing or not positive on a selling
+order `ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT` / `buy_required`, below the
+activation price `ERROR_CODE_BAD_PRICE` / `buy_at_least_activation`. `modify`
+sends the maximum as given: it does not know the order's side, so the server
+applies the side rule and answers `ERROR_CODE_BAD_PRICE` with no violation.
 
 ```python
 await client.orders.create(
@@ -719,6 +781,26 @@ expose typed `cancel_reason` / `failure_reason` labels (empty when unset). A
 market halt ends every open trigger of the market with `cancel_reason`
 `market_halted`. A reason number this SDK does not name reads as its number,
 for example `failure_reason == "212"`.
+
+A trigger's history records every fire refused while the trigger stayed live,
+as a `fire_refused` event: `child_seq` is the refused attempt (the next one
+takes the next number), `child_order_id` is empty, and `fire_refusal_reason`
+says why, with the `failure_reason` labels. `market_halted` or `pair_post_only`
+waits for the next price through the trigger price; `min_notional`,
+`min_quantity` or `step_size` means the order would have been below the
+market's minimum, and the trigger fires again once the position changes;
+`rate_limited` or `account_repairing` (an automatic account repair) fires
+again shortly. `fire_refused` is not terminal: the trigger stays `armed` or
+`running`. A refusal that ends the trigger is a `failed` event with
+`failure_reason`. `is_terminal_trigger_event(event_type)` is true only for
+`canceled` and `failed`; read the trigger's `status` rather than inferring it
+from its last event. `list_events(event_type="fire_refused")` filters them.
+
+A ladder whose levels were all canceled before any filled ends `cancelled`
+with `cancel_reason` `user_request`; one that filled anything ends
+`completed`. An attached leg's `qty` follows the order's whole settled
+position, less what its exit orders sold, so it can be larger than its working
+exit order.
 
 `triggers.get(...)` and `triggers.list(...)` show a trigger as the latest
 answered `modify`, `pause` or `resume` left it, or answer `unavailable`
@@ -1148,6 +1230,54 @@ signs again with a fresh timestamp. If it persists, fix the local clock. For
 large bursts, bound concurrency so requests do not wait locally past the skew
 window. Other gateway codes (`SIGNATURE_INVALID`, `KEY_DISABLED`,
 `IP_NOT_ALLOWED`, ...) raise a non-retryable `PolyesterAuthError` whose
-message is the code. A request whose deadline expires raises `PolyesterTimeoutError`, a
+message is the problem `detail`, or the code without one.
+
+Order reads, order and trigger writes and balance reads answer a refused
+API-key call over ConnectRPC with `unauthenticated` and an
+`auth.v1.AuthErrorDetail`; REST answers HTTP 401 with the same reason as the
+problem `code`, without the `AUTH_` prefix. `auth_error_code(err)` reads both
+the same way and returns the `AuthErrorCode` name: `AUTH_SIGNATURE_INVALID`,
+`AUTH_TIMESTAMP_SKEW`, `AUTH_MISSING_HEADERS`, `AUTH_KEY_EXPIRED`,
+`AUTH_KEY_DISABLED`, `AUTH_IP_NOT_ALLOWED`, `AUTH_API_KEY_NOT_ACCEPTED`
+(exported as constants), and `AUTH_AUTHENTICATION_REQUIRED` for a request
+with no or an invalid session token (REST `UNAUTHENTICATED`). It returns
+`None` for an error without an auth code. `AUTH_TIMESTAMP_SKEW` raises
+`PolyesterTimestampSkewError` on both transports, the one retryable reason:
+fix the clock offset and the retry signs again. The others raise
+`PolyesterAuthError` and need a change by the caller.
+
+```python
+from polyester import AUTH_IP_NOT_ALLOWED, auth_error_code
+
+try:
+    await client.orders.list_open()
+except PolyesterAuthError as err:
+    if auth_error_code(err) == AUTH_IP_NOT_ALLOWED:
+        ...  # call from an address on the key's allowlist
+```
+
+A method that accepts only a session token (withdrawals, auto-withdraw rules,
+portfolio equity reads, VIP status, ...) refuses an account API key with
+`AUTH_SESSION_KIND_NOT_ALLOWED`, Connect `permission_denied` or REST 403. It
+raises `PolyesterSessionRequiredError` (`is_session_required(err)`), which is
+both a `PolyesterAuthError` and a `PolyesterApiError`, so existing handlers
+keep catching it. Call the method with a session token instead.
+
+A refused call's server message reaches the caller unchanged. An API key whose
+policy lacks the action a withdraw or auto-withdraw read checks raises
+`PolyesterAuthError` with, for example, "api key policy does not allow
+READ_AUTO_WITHDRAW": grant that action in the key's policy.
+
+`PolyesterApiError.violations` names the request fields to fix, each with
+`field_path`, `rule_id` and `message`: from the `orders.v1.ErrorDetail` of a
+ConnectRPC answer, and from the `violations` of a REST problem body. ConnectRPC
+paths are proto field names (`order.base_qty_scaled`,
+`order.limit_gtc.price_ticks`, `items[1].new_attached_risk...`); REST paths
+are the REST request fields (`order.baseQty`). Branch on `code`, then on
+`rule_id`; messages are for people. A REST problem body at HTTP 400 raises
+`PolyesterApiError` with the `ERROR_CODE_` code (`ERROR_CODE_QTY_STEP_SIZE`),
+not a retryable server error.
+
+A request whose deadline expires raises `PolyesterTimeoutError`, a
 `PolyesterTransportError`: retryable, but a mutation may still have been
 applied, so reconcile first (`mutation_outcome_unknown(error)` is true).

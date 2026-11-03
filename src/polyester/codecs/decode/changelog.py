@@ -80,6 +80,7 @@ def changelog_post_from_proto(msg: changelog_pb2.GetPostResponse) -> ChangelogPo
             ChangelogSection(
                 heading=section.heading,
                 summary=section.summary if has_field(section, "summary") else None,
+                surface=proto_enum_name(changelog_pb2.Surface, int(section.surface)),
                 changes=[changelog_change_from_proto(change) for change in section.changes],
             )
             for section in msg.post.sections

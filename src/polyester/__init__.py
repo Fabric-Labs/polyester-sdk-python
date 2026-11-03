@@ -1,5 +1,6 @@
 from polyester._version import __version__
 from polyester.client import AsyncPolyester, Polyester
+from polyester.codecs.decode.triggers import is_terminal_trigger_event
 from polyester.codecs.ledger_amounts import LEDGER_SCALE, format_ledger_u128
 from polyester.codecs.scalars import MAX_PROTOCOL_SCALE
 from polyester.codecs.withdraw import (
@@ -18,13 +19,23 @@ from polyester.environment import (
     environment_from_name,
 )
 from polyester.errors import (
+    AUTH_API_KEY_NOT_ACCEPTED,
+    AUTH_AUTHENTICATION_REQUIRED,
     AUTH_INTERNAL_ERROR,
+    AUTH_IP_NOT_ALLOWED,
+    AUTH_KEY_DISABLED,
+    AUTH_KEY_EXPIRED,
     AUTH_MFA_ELEVATION_REQUIRED,
     AUTH_MFA_LAST_FACTOR_REQUIRED,
     AUTH_MFA_NOT_ENROLLED,
+    AUTH_MISSING_HEADERS,
+    AUTH_SESSION_KIND_NOT_ALLOWED,
+    AUTH_SIGNATURE_INVALID,
     AUTH_STEP_UP_REQUIRED,
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
     AUTH_TEMPORARILY_UNAVAILABLE,
+    AUTH_TIMESTAMP_SKEW,
+    ORDER_ALREADY_TERMINAL,
     PolyesterApiError,
     PolyesterAuthError,
     PolyesterBatchReplaceTimeoutError,
@@ -36,17 +47,21 @@ from polyester.errors import (
     PolyesterResponseContractError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
+    PolyesterSessionRequiredError,
     PolyesterSubaccountOwnerRoleLockedError,
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
     PolyesterValidationError,
     auth_error_code,
+    auth_error_code_from_rest,
     is_mfa_elevation_required,
     is_mfa_enrollment_required,
     is_mfa_last_factor_required,
     is_not_found,
+    is_order_already_terminal,
     is_retryable_error,
+    is_session_required,
     is_step_up_required,
     mutation_outcome_unknown,
 )
@@ -56,6 +71,20 @@ from polyester.services.withdraw import PreparedTradingWithdraw
 from polyester.types.money import AssetAmount, Price, Quantity, QuantityDomain
 
 __all__ = [
+    "AUTH_API_KEY_NOT_ACCEPTED",
+    "AUTH_AUTHENTICATION_REQUIRED",
+    "AUTH_IP_NOT_ALLOWED",
+    "AUTH_KEY_DISABLED",
+    "AUTH_KEY_EXPIRED",
+    "AUTH_MISSING_HEADERS",
+    "AUTH_SESSION_KIND_NOT_ALLOWED",
+    "AUTH_SIGNATURE_INVALID",
+    "AUTH_TIMESTAMP_SKEW",
+    "ORDER_ALREADY_TERMINAL",
+    "PolyesterSessionRequiredError",
+    "auth_error_code_from_rest",
+    "is_order_already_terminal",
+    "is_session_required",
     "AUTH_INTERNAL_ERROR",
     "AUTH_MFA_ELEVATION_REQUIRED",
     "AUTH_MFA_LAST_FACTOR_REQUIRED",
@@ -111,5 +140,6 @@ __all__ = [
     "is_not_found",
     "is_batch_replace_settled",
     "is_step_up_required",
+    "is_terminal_trigger_event",
     "wait_for_order_trades_complete",
 ]

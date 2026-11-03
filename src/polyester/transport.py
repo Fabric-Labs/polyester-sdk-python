@@ -40,10 +40,36 @@ class _ProtoJSONCodec:
 _PROTO_JSON_CODEC = _ProtoJSONCodec()
 
 
+class GatewayProblemError(ConnectError):
+    """A gateway answer that is not a Connect error, as a ``ConnectError``.
+
+    ``message`` is the problem ``code`` (``TIMESTAMP_SKEW``), as before.
+    ``problem_code``, ``detail``, ``http_status`` and ``violations`` keep the
+    rest of the problem body for the error mapping.
+    """
+
+    def __init__(
+        self,
+        code: Code,
+        problem_code: str,
+        *,
+        http_status: int,
+        detail: str = "",
+        violations: list[dict[str, object]] | None = None,
+    ) -> None:
+        super().__init__(code, problem_code)
+        self.problem_code = problem_code
+        self.http_status = http_status
+        self.detail = detail
+        self.violations = list(violations or [])
+
+
 _CONNECT_CODES = frozenset(code.value for code in Code)
 # HTTP status -> Connect code for a non-Connect error body (Connect protocol table).
 _HTTP_STATUS_TO_CODE = {
-    400: Code.INTERNAL,
+    # A REST problem body at 400 is a refused request (VALIDATION_ERROR,
+    # QTY_STEP_SIZE, ...), not a server failure.
+    400: Code.INVALID_ARGUMENT,
     401: Code.UNAUTHENTICATED,
     403: Code.PERMISSION_DENIED,
     404: Code.UNIMPLEMENTED,
@@ -83,7 +109,19 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         return response
     if code == TIMESTAMP_SKEW:
         raise ConnectError(Code.UNAUTHENTICATED, TIMESTAMP_SKEW)
-    raise ConnectError(_HTTP_STATUS_TO_CODE.get(response.status, Code.UNKNOWN), code)
+    detail = body.get("detail")
+    violations = body.get("violations")
+    raise GatewayProblemError(
+        _HTTP_STATUS_TO_CODE.get(response.status, Code.UNKNOWN),
+        code,
+        http_status=response.status,
+        detail=detail if isinstance(detail, str) else "",
+        violations=(
+            [item for item in violations if isinstance(item, dict)]
+            if isinstance(violations, list)
+            else None
+        ),
+    )
 
 
 class _ConnectHTTPClient:

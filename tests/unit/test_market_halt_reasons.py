@@ -1,5 +1,6 @@
 """A market halt ends orders (cancel reason 17) and triggers (cancel reason 13);
-a trigger the halted market refused reads the unnamed failure reason 212."""
+a trigger the halted market refused reads ``market_halted`` (failure reason 8).
+A failure reason this SDK does not name, such as 212, reads as its number."""
 
 from __future__ import annotations
 
@@ -92,8 +93,8 @@ def test_trigger_read_stream_and_events_label_the_market_halt() -> None:
     assert streamed.cancel_reason == "market_halted"
 
 
-def test_unnamed_trigger_failure_reason_212_decodes_as_its_number() -> None:
-    # Reads report 212 until the fix reports TRIGGER_FAILURE_REASON_MARKET_HALTED (8).
+def test_unnamed_trigger_failure_reason_decodes_as_its_number() -> None:
+    # No reason is special-cased: an unnamed number is not a market halt.
     failed = triggers_pb2.Trigger(trigger_id=9, symbol_id=1, status=triggers_pb2.STATUS_FAILED)
     failed.failure_reason = 212  # type: ignore[assignment]
     binary = get_trigger_from_proto(triggers_pb2.GetTriggerResponse(trigger=failed))

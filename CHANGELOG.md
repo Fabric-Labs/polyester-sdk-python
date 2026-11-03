@@ -10,7 +10,10 @@ a trigger read right after a modify, pause or resume no longer fails on the
 server's brief `unavailable`. It can tell from an order alone how much of a
 quote-sized buy was spent, see why a stop placed no order, act on why its API
 key was refused on either transport, and stop all its automated trading with
-one call.
+one call. Its attached take-profit, stop-loss and trailing stop exits never
+trade with the order they protect, it can choose the self-trade prevention
+mode they use, and it can read a sub-account's balances in the sub-account
+view.
 
 **Breaking changes**
 - None in the SDK API.
@@ -42,9 +45,11 @@ one call.
   `canceled` with `cancel_reason` `MARKET_HALTED`, and its triggers end
   `canceled` with `cancel_reason` `market_halted`, on reads and streams. An
   order the halted market refused after admission ends `rejected` with
-  `reject_reason` `MARKET_HALTED`. A trigger the halted market refused reads
-  the unnamed `failure_reason` `"212"` until the server reports
-  `market_halted`.
+  `reject_reason` `MARKET_HALTED`. A trigger the halted market refused ends
+  `failed` with `failure_reason` `market_halted`, on the trigger and on its
+  `failed` and `fire_refused` events; the server no longer reports the
+  unnamed reason 212 for it. A reason number this SDK does not name still
+  reads as its number.
 - `PolyesterSubaccountOwnerRoleLockedError`, a `PolyesterApiError` with code
   `AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED` (exported as a constant): inviting,
   re-roling or removing a sub-account's owner. It maps from Connect
@@ -95,6 +100,26 @@ one call.
 - Changelog: surfaces `market_data`, `quickswap` and `rewards`, and
   `ChangelogSection.surface`, the product area a section covers (`""` for
   none).
+- Attached exits and self-trade prevention: an order whose attached exit
+  fired while it still rested ends `canceled` with `cancel_reason`
+  `ATTACHED_EXIT_FIRED` (its unfilled remainder was canceled first; fills
+  before it stand). A `fire_refused` trigger event with
+  `fire_refusal_reason` `self_trade_prevented` means self-trade prevention
+  expired the exit's order against another of the account's resting orders:
+  `child_seq` names that order and the trigger stays live and fires again.
+  `is_terminal_trigger_event("fire_refused")` stays false. Error code
+  `SELF_TRADE_PREVENTED` (307) reads by name; no request is answered with it.
+- `self_trade_prevention_mode` (`expire_taker`, `expire_maker`,
+  `expire_both`) on `orders.create`, `orders.preview_order` and
+  `orders.batch_create` items, which the order's attached exits use too; an
+  unknown value raises `PolyesterValidationError`.
+  `Order.self_trade_prevention_mode` reads it back; a mode newer than this
+  SDK reads as its number.
+- `sub_accounts.get(include_balances=True)` returns the sub-account's
+  current balances on `GetSubaccountResult.balances`, a `BalancesList` as
+  `balances.list` returns; `None` without `include_balances`. It needs the
+  `READ_BALANCES` action on the sub-account; `AUTH_TEMPORARILY_UNAVAILABLE`
+  is retryable.
 
 ### Changed
 - `triggers.get` and `triggers.list` resend the same request while the server
@@ -123,6 +148,18 @@ one call.
   `order.attached_risk.trailing_stop.limit_price_ticks`, or
   `new_attached_risk...` for modify). `PolyesterValidationError` gains `code`
   and `violations`, empty for SDK-only checks.
+- A quantity or tick-checked price with a nonzero digit beyond its scale
+  raises `PolyesterValidationError` with the code and violation the server
+  answers for it: `ERROR_CODE_QTY_STEP_SIZE` / `step_size` at
+  `order.base_qty_scaled`, or `ERROR_CODE_PRICE_TICK_SIZE` / `tick_size` at
+  the price's field (limit price, attached take-profit and stop-loss trigger
+  and limit prices, attached trailing stop activation and limit prices, and
+  modify's `new_price_ticks` and `new_attached_risk...`). It had no `code`.
+  Zeros beyond the scale are accepted as before.
+- Docs: `Order.cum_notional_scaled`, `cum_quote`, `quote_used` and
+  `quote_unspent` are exact when the pair's `base_quantity_scale` is at most
+  9, and otherwise can exceed the settled quote by less than 1e-18 per fill.
+  A quote-amount buy (`max_quote_debit`) takes attached risk.
 - Docs: a spent quote-sized buy ends `filled`; a ladder whose levels were all
   canceled before any filled ends `cancelled`; attached legs follow the
   order's whole settled position; cancel-all and the dead-man switch leave

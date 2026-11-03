@@ -71,8 +71,21 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         include_members: bool = False,
         include_invites: bool = False,
         include_policy: bool = False,
+        include_balances: bool = False,
         invites_direction: str = "",
     ) -> GetSubaccountResult:
+        """Read the aggregated view of one sub-account.
+
+        ``include_balances=True`` also returns the sub-account's current
+        ``balances``, in the shape of ``balances.list``. It needs the
+        ``READ_BALANCES`` action on the sub-account (its role, its attached
+        policy and, for an API key, the key's policy), or the call raises
+        ``PermissionDenied`` (``AUTH_SUBACCOUNT_ACCESS_DENIED``); a root-scoped
+        API key cannot read a sub-account's balances. When balances cannot be
+        read right now it raises ``AUTH_TEMPORARILY_UNAVAILABLE``, which
+        :func:`polyester.is_retryable_error` reports retryable: retry, or omit
+        ``include_balances`` for the rest of the view.
+        """
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -84,6 +97,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             include_members=include_members,
             include_invites=include_invites,
             include_policy=include_policy,
+            include_balances=include_balances,
             invites_direction=invite_direction_from_label(invites_direction),
         )
         return await unary_auth_decoded(

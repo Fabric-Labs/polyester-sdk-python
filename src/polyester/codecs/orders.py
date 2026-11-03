@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
@@ -19,8 +20,11 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
-from polyester.codecs.scalars import id_to_int, omit_none, tick_count
-from polyester.codecs.triggers import trigger_price_source_to_proto
+from polyester.codecs.scalars import FractionalDigitsError, id_to_int, omit_none, tick_count
+from polyester.codecs.triggers import (
+    self_trade_prevention_mode_to_proto,
+    trigger_price_source_to_proto,
+)
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
@@ -46,6 +50,42 @@ MODIFY_BEHAVIOR_TO_PROTO = {
     "replace_only": "REPLACE_ONLY",
 }
 MAX_BATCH_ITEMS = 20
+
+QTY_STEP_SIZE = "ERROR_CODE_QTY_STEP_SIZE"
+PRICE_TICK_SIZE = "ERROR_CODE_PRICE_TICK_SIZE"
+_GRID_RULES = {
+    QTY_STEP_SIZE: ("step_size", "quantity does not align with the pair step size"),
+    PRICE_TICK_SIZE: ("tick_size", "price does not align with the pair tick size"),
+}
+
+
+@contextmanager
+def _on_grid(code: str, field_path: str) -> Iterator[None]:
+    """Report a decimal finer than its scale as the server does.
+
+    A nonzero digit beyond the scale is off the pair's step (quantity) or tick
+    (limit, trigger, activation and attached-exit prices), whatever the pair:
+    the server answers ``QTY_STEP_SIZE`` or ``PRICE_TICK_SIZE`` with the
+    violation at ``field_path``. Zeros beyond the scale parse.
+    """
+    try:
+        yield
+    except FractionalDigitsError as exc:
+        rule_id, message = _GRID_RULES[code]
+        raise PolyesterValidationError(
+            str(exc),
+            code=code,
+            violations=[
+                OrderFieldViolation(field_path=field_path, rule_id=rule_id, message=message)
+            ],
+        ) from exc
+
+
+def _limit_price_path(tif: str | None) -> str:
+    execution = {"gtd": "limit_gtd", "ioc": "limit_ioc", "fok": "limit_fok"}.get(
+        tif or "gtc", "limit_gtc"
+    )
+    return f"order.{execution}.price_ticks"
 
 
 def parse_gtd_expire_at(
@@ -235,11 +275,12 @@ def order_intent_from_request(
         side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
     )
     if request.qty is not None:
-        intent.base_qty_scaled = resolve_qty_scaled(
-            request.qty,
-            _codec_quantity_scale(request.qty, quantity_scale),
-            symbol=request.symbol,
-        )
+        with _on_grid(QTY_STEP_SIZE, "order.base_qty_scaled"):
+            intent.base_qty_scaled = resolve_qty_scaled(
+                request.qty,
+                _codec_quantity_scale(request.qty, quantity_scale),
+                symbol=request.symbol,
+            )
     else:
         if request.side != "buy":
             raise PolyesterValidationError("max_quote_debit is only valid for buy orders")
@@ -264,12 +305,18 @@ def order_intent_from_request(
         if request.side == "sell" and fee_asset != "quote":
             raise PolyesterValidationError("sell orders must use fee_asset=quote")
         intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_asset])
+    if request.self_trade_prevention_mode is not None:
+        # Attached take-profit, stop-loss and trailing-stop exits use this mode.
+        intent.self_trade_prevention_mode = self_trade_prevention_mode_to_proto(
+            request.self_trade_prevention_mode
+        )
 
-    price_ticks = (
-        resolve_price_ticks(request.price, "price", symbol=request.symbol)
-        if request.price is not None
-        else None
-    )
+    with _on_grid(PRICE_TICK_SIZE, _limit_price_path(request.tif)):
+        price_ticks = (
+            resolve_price_ticks(request.price, "price", symbol=request.symbol)
+            if request.price is not None
+            else None
+        )
     tif = request.tif or "gtc"
     if request.expires_at and tif != "gtd":
         raise PolyesterValidationError("expires_at is only valid for limit GTD orders")
@@ -526,8 +573,12 @@ def _resolve_optional_price_ticks(
     field_name: str,
     *,
     symbol: str | None,
+    field_path: str,
 ) -> int:
-    return resolve_price_ticks(value, field_name, symbol=symbol)  # type: ignore[arg-type]
+    """Resolve an attached-exit price; ``field_path`` is its wire path for a
+    ``PRICE_TICK_SIZE`` refusal."""
+    with _on_grid(PRICE_TICK_SIZE, field_path):
+        return resolve_price_ticks(value, field_name, symbol=symbol)  # type: ignore[arg-type]
 
 
 def _risk_execution_from_friendly(
@@ -536,6 +587,7 @@ def _risk_execution_from_friendly(
     limit_price: object | None,
     field_name: str,
     symbol: str | None,
+    field_path: str,
 ) -> orders_pb2.RiskExecution:
     child = orders_pb2.RiskExecution()
     label = str(order_type).strip().lower() if order_type is not None else "market"
@@ -548,7 +600,10 @@ def _risk_execution_from_friendly(
         if limit_price is None:
             raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
         child.limit_gtc.price_ticks = _resolve_optional_price_ticks(
-            limit_price, f"{field_name}.limit_price", symbol=symbol
+            limit_price,
+            f"{field_name}.limit_price",
+            symbol=symbol,
+            field_path=f"{field_path}.child.limit_gtc.price_ticks",
         )
         return child
     raise PolyesterValidationError(
@@ -561,6 +616,7 @@ def _risk_execution_from_child(
     *,
     field_name: str,
     symbol: str | None,
+    field_path: str,
 ) -> orders_pb2.RiskExecution:
     if not isinstance(child, dict):
         raise PolyesterValidationError(f"{field_name}.child must be an object")
@@ -592,7 +648,10 @@ def _risk_execution_from_child(
             )
         if price is not None:
             execution.limit_gtc.price_ticks = _resolve_optional_price_ticks(
-                price, f"{field_name}.child.limit_gtc.price", symbol=symbol
+                price,
+                f"{field_name}.child.limit_gtc.price",
+                symbol=symbol,
+                field_path=f"{field_path}.child.limit_gtc.price_ticks",
             )
         elif ticks is not None:
             execution.limit_gtc.price_ticks = tick_count(
@@ -621,11 +680,13 @@ def _risk_leg_from_dict(
     *,
     field_name: str,
     symbol: str | None,
+    risk_field: str = "order.attached_risk",
 ) -> orders_pb2.TakeProfitPolicy:
     if not isinstance(data, dict):
         raise PolyesterValidationError(f"{field_name} must be an object")
     _reject_unknown_keys(data, _RISK_LEG_KEYS, field_name=field_name)
     price_source = _attached_trigger_price_source(data, field_name=field_name)
+    leg_path = f"{risk_field}.{field_name}"
 
     trigger_price = _mapping_get(data, "trigger_price", "triggerPrice")
     trigger_ticks = _mapping_get(data, "trigger_price_ticks", "triggerPriceTicks")
@@ -635,7 +696,10 @@ def _risk_leg_from_dict(
         )
     if trigger_price is not None:
         ticks = _resolve_optional_price_ticks(
-            trigger_price, f"{field_name}.trigger_price", symbol=symbol
+            trigger_price,
+            f"{field_name}.trigger_price",
+            symbol=symbol,
+            field_path=f"{leg_path}.trigger_price_ticks",
         )
     elif trigger_ticks is not None:
         ticks = tick_count(trigger_ticks, f"{field_name}.trigger_price_ticks")
@@ -650,13 +714,16 @@ def _risk_leg_from_dict(
             f"{field_name} accepts friendly order_type/limit_price or child, not both"
         )
     if child_data is not None:
-        child = _risk_execution_from_child(child_data, field_name=field_name, symbol=symbol)
+        child = _risk_execution_from_child(
+            child_data, field_name=field_name, symbol=symbol, field_path=leg_path
+        )
     else:
         child = _risk_execution_from_friendly(
             order_type=order_type,
             limit_price=limit_price,
             field_name=field_name,
             symbol=symbol,
+            field_path=leg_path,
         )
 
     policy = orders_pb2.TakeProfitPolicy(
@@ -725,7 +792,10 @@ def _trailing_stop_from_dict(
         )
     if activation is not None:
         proto.activation_price_ticks = _resolve_optional_price_ticks(
-            activation, "attached_risk.trailing_stop.activation_price", symbol=symbol
+            activation,
+            "attached_risk.trailing_stop.activation_price",
+            symbol=symbol,
+            field_path=f"{risk_field}.trailing_stop.activation_price_ticks",
         )
     elif activation_ticks is not None:
         proto.activation_price_ticks = tick_count(activation_ticks, "activation_price_ticks")
@@ -740,7 +810,10 @@ def _trailing_stop_from_dict(
         )
     if limit is not None:
         proto.limit_price_ticks = _resolve_optional_price_ticks(
-            limit, "attached_risk.trailing_stop.limit_price", symbol=symbol
+            limit,
+            "attached_risk.trailing_stop.limit_price",
+            symbol=symbol,
+            field_path=f"{risk_field}.trailing_stop.limit_price_ticks",
         )
         if proto.limit_price_ticks <= 0:
             raise _trailing_limit_error(
@@ -835,10 +908,14 @@ def risk_policy_from_dict(
             raise PolyesterValidationError("attached_risk.oco must be a boolean")
         risk.oco = oco
     if take_profit is not None:
-        tp = _risk_leg_from_dict(take_profit, field_name="take_profit", symbol=symbol)
+        tp = _risk_leg_from_dict(
+            take_profit, field_name="take_profit", symbol=symbol, risk_field=risk_field
+        )
         risk.take_profit.CopyFrom(tp)
     if stop_loss is not None:
-        sl = _risk_leg_from_dict(stop_loss, field_name="stop_loss", symbol=symbol)
+        sl = _risk_leg_from_dict(
+            stop_loss, field_name="stop_loss", symbol=symbol, risk_field=risk_field
+        )
         risk.stop_loss.CopyFrom(
             orders_pb2.StopLossPolicy(
                 trigger_price_ticks=sl.trigger_price_ticks,
@@ -1035,7 +1112,8 @@ def modify_order_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if new_price is not None:
-        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")  # type: ignore[arg-type]
+        with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
+            proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")  # type: ignore[arg-type]
     if new_qty is not None:
         proto.new_qty_scaled = resolve_qty_scaled(
             new_qty,  # type: ignore[arg-type]

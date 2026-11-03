@@ -287,6 +287,9 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         version=int(msg.version),
         post_only=bool(msg.post_only),
         fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
+        self_trade_prevention_mode=proto_enum_name(
+            orders_pb2.SelfTradePreventionMode, int(msg.self_trade_prevention_mode)
+        ),
         submitted_max_quote_debit_scaled=(
             str(msg.submitted_max_quote_debit_scaled)
             if (

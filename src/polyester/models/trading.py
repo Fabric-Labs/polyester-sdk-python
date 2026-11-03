@@ -31,9 +31,12 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
       base unit (``avg_price_e18``, 18 decimals, rounded half to even);
       ``None`` without fills. Prefer it to ``avg_px``, which is rounded down
       to 9 decimals.
-    - ``cum_notional_scaled`` is the exact quote amount of the fills before
-      fees, scaled by ``10^(9 + base_quantity_scale)``; ``"0"`` without
-      fills. :meth:`cum_quote` returns it in quote units.
+    - ``cum_notional_scaled`` is the quote amount of the fills before fees,
+      scaled by ``10^(9 + base_quantity_scale)``; ``"0"`` without fills.
+      :meth:`cum_quote` returns it in quote units. Each fill settles its quote
+      rounded down to 18 decimals, so it is exactly the settled quote when the
+      pair's ``base_quantity_scale`` is at most 9; above that it can exceed
+      the settled quote by less than 1e-18 per fill.
     - ``fee_total`` is the fee of those fills net of rebates, in
       ``fee_asset``. Order history reads and single-order reads with
       execution history carry it; open-order reads and stream updates leave it
@@ -61,6 +64,10 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     version: int = 0
     post_only: bool = False
     fee_asset: str = ""
+    # ``expire_taker``, ``expire_maker`` or ``expire_both``, which the order's
+    # attached exits use too; empty when unset. A mode newer than this SDK
+    # reads as its number.
+    self_trade_prevention_mode: str = ""
     submitted_max_quote_debit_scaled: str = ""
     attached_risk: AttachedRisk | None = None
     lineage: OrderLineage | None = None
@@ -84,11 +91,13 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         return self.cum_qty.scale if self.cum_qty is not None else None
 
     def cum_quote(self, base_quantity_scale: int | None = None) -> Decimal:
-        """The exact quote amount of the fills, before fees (REST ``cumQuote``).
+        """The quote amount of the fills, before fees (REST ``cumQuote``).
 
         ``base_quantity_scale`` is the pair's base quantity scale
         (``CatalogManager.base_quantity_scale_for_symbol_id``); it defaults to
-        ``cum_qty.scale``. Zero without fills.
+        ``cum_qty.scale``. Zero without fills. Exactly the settled quote when
+        ``base_quantity_scale`` is at most 9; above that it can exceed the
+        settled quote by less than 1e-18 per fill.
         """
         scale = self._require_base_scale(base_quantity_scale)
         return Decimal(format_qty_scaled(int(self.cum_notional_scaled or 0), 9 + scale))
@@ -132,6 +141,9 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         ``quote``; ``cum_quote`` alone when the fee was taken from the base
         received. ``None`` until ``fee_total`` covers every fill (read the
         order again), and for an open-order read, which carries no fee total.
+        Exact when the pair's ``base_quantity_scale`` is at most 9; above that
+        it can exceed the settled debit by less than 1e-18 per fill (see
+        :meth:`cum_quote`).
         """
         used = self._quote_used_scaled(base_quantity_scale)
         if used is None:
@@ -601,11 +613,15 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``activated``, ``armed`` or ``fire_refused``; a type newer than this SDK
     reads as its lowercase name or number. ``fire_refused`` records an attempt
     whose order was refused while the trigger stayed live (armed or running):
-    ``child_seq`` is the refused attempt, ``child_order_id`` is empty, and
-    ``fire_refusal_reason`` says why, as a ``failure_reason`` label
-    (``rate_limited``, ``account_repairing``, ``market_halted``,
-    ``min_notional``, ...). It is set only on ``fire_refused``; a refusal that
-    ends the trigger is a ``failed`` event with ``failure_reason``. See
+    ``child_seq`` is the refused attempt and ``fire_refusal_reason`` says why,
+    as a ``failure_reason`` label (``rate_limited``, ``account_repairing``,
+    ``market_halted``, ``min_notional``, ``self_trade_prevented``, ...). It is
+    set only on ``fire_refused``; a refusal that ends the trigger is a
+    ``failed`` event with ``failure_reason``. With ``self_trade_prevented``
+    the attempt placed an order that self-trade prevention expired against
+    another of the account's resting orders: ``child_seq`` names that order,
+    which ends ``canceled`` with ``STP_EXPIRE_TAKER`` or ``STP_EXPIRE_BOTH``.
+    Every other refusal placed no order. See
     :func:`polyester.codecs.decode.triggers.is_terminal_trigger_event`.
     """
 

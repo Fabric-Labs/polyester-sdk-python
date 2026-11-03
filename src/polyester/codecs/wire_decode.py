@@ -632,6 +632,12 @@ def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
         failure_reason=str(
             _field(data, "failureReason", "failure_reason", default="") or ""
         ),
+        # ConnectRPC JSON names the reason in full, REST without its prefix.
+        fire_refusal_reason=str(
+            _field(data, "fireRefusalReason", "fire_refusal_reason", default="") or ""
+        )
+        .removeprefix("TRIGGER_FAILURE_REASON_")
+        .lower(),
     )
 
 

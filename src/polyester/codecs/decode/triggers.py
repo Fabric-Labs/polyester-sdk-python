@@ -51,6 +51,7 @@ _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
     triggers_pb2.EVENT_FAILED: "failed",
     triggers_pb2.EVENT_ACTIVATED: "activated",
     triggers_pb2.EVENT_ARMED: "armed",
+    triggers_pb2.EVENT_FIRE_REFUSED: "fire_refused",
 }
 _TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
     "fired": triggers_pb2.EVENT_FIRED,
@@ -60,7 +61,11 @@ _TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
     "failed": triggers_pb2.EVENT_FAILED,
     "activated": triggers_pb2.EVENT_ACTIVATED,
     "armed": triggers_pb2.EVENT_ARMED,
+    "fire_refused": triggers_pb2.EVENT_FIRE_REFUSED,
 }
+# Event types after which the trigger has ended. ``fire_refused`` is not one:
+# the trigger stays armed or running and fires again.
+_TERMINAL_TRIGGER_EVENT_TYPES = frozenset({"canceled", "failed"})
 
 
 def _trigger_status_label(value: int) -> str:
@@ -92,9 +97,18 @@ def trigger_event_type_from_label(label: str) -> int:
     if key not in _TRIGGER_EVENT_TYPE_FROM_LABEL:
         raise PolyesterValidationError(
             f"invalid trigger event type {label!r}; "
-            "expected one of: fired, canceled, updated, failed, activated, armed"
+            "expected one of: fired, canceled, updated, failed, activated, armed, fire_refused"
         )
     return _TRIGGER_EVENT_TYPE_FROM_LABEL[key]
+
+
+def is_terminal_trigger_event(event_type: str) -> bool:
+    """Whether a trigger event type ends its trigger (``canceled``, ``failed``).
+
+    ``fire_refused`` and event types this SDK does not know return false: read
+    the trigger's ``status`` rather than inferring it from its last event.
+    """
+    return event_type.strip().lower() in _TERMINAL_TRIGGER_EVENT_TYPES
 
 
 def _price(ticks: int, *, symbol: str | None = None) -> Price | None:
@@ -418,6 +432,9 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
         ),
         failure_reason=_terminal_reason_label(
             triggers_pb2.TriggerFailureReason, msg, "failure_reason"
+        ),
+        fire_refusal_reason=_terminal_reason_label(
+            triggers_pb2.TriggerFailureReason, msg, "fire_refusal_reason"
         ),
     )
 

@@ -173,21 +173,6 @@ class AsyncPolyester:
             catalogs=self.catalogs,
             realtime=self.realtime,
         )
-        self.orders = AsyncOrdersService(
-            self._transport,
-            self.catalogs,
-            default_sub_account_id,
-            default_account_id=default_account_id,
-            realtime=self.realtime,
-            wait_for_catalogs=self.wait_for_catalogs,
-        )
-        self.trades = AsyncTradesService(
-            self._transport,
-            self.catalogs,
-            default_sub_account_id,
-            default_account_id=default_account_id,
-            realtime=self.realtime,
-        )
         self.triggers = AsyncTriggersService(
             self._transport,
             self.catalogs,
@@ -195,6 +180,22 @@ class AsyncPolyester:
             default_account_id=default_account_id,
             realtime=self.realtime,
             wait_for_catalogs=self.wait_for_catalogs,
+        )
+        self.orders = AsyncOrdersService(
+            self._transport,
+            self.catalogs,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
+            wait_for_catalogs=self.wait_for_catalogs,
+            triggers=self.triggers,
+        )
+        self.trades = AsyncTradesService(
+            self._transport,
+            self.catalogs,
+            default_sub_account_id,
+            default_account_id=default_account_id,
+            realtime=self.realtime,
         )
         self.transfers = AsyncTransfersService(
             self._transport,

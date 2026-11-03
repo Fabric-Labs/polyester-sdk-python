@@ -7,7 +7,10 @@ environment it trades on, with no API key, and find the breaking or
 action-required changes published since it last looked. It can wait for a
 batch replace to settle and see which items were refused after admission, and
 a trigger read right after a modify, pause or resume no longer fails on the
-server's brief `unavailable`.
+server's brief `unavailable`. It can tell from an order alone how much of a
+quote-sized buy was spent, see why a stop placed no order, act on why its API
+key was refused on either transport, and stop all its automated trading with
+one call.
 
 **Breaking changes**
 - None in the SDK API.
@@ -47,6 +50,47 @@ server's brief `unavailable`.
   re-roling or removing a sub-account's owner. It maps from Connect
   `failed_precondition` with that `AuthErrorDetail` and from a REST 412
   problem body with that code; not retryable.
+- Exact order execution totals. `Order.avg_price` is the exact average
+  execution price (`avg_price_e18`) as a `Decimal`, `None` without fills;
+  prefer it to `avg_px`. `Order.cum_notional_scaled` is the exact quote amount
+  of the fills before fees and `Order.cum_quote(base_quantity_scale)` returns
+  it in quote units. `Order.fee_total` (new `OrderFeeTotal`: `amount`,
+  `amount_e18`, `is_rebate`, `qty`) is their fee net of rebates; order
+  history and single-order reads with execution history carry it.
+  `Order.quote_used(...)` and `Order.quote_unspent(...)` tell how much of a
+  buy's quote amount the fills used, and return `None` until the fee total
+  covers every fill. All exact, never through a float.
+- Refused trigger fires: trigger events of type `fire_refused` (filter with
+  `list_events(event_type="fire_refused")`) and `TriggerEvent.fire_refusal_reason`,
+  set only on them, with the `failure_reason` labels, `account_repairing`
+  included. `is_terminal_trigger_event(event_type)` is false for
+  `fire_refused` and for event types this SDK does not know.
+- `auth_error_code(err)` returns the `auth.v1.AuthErrorCode` name of an error
+  from a ConnectRPC `AuthErrorDetail` or a REST problem `code` (`AUTH_`
+  prefix added; `UNAUTHENTICATED` reads `AUTH_AUTHENTICATION_REQUIRED`), and
+  `auth_error_code_from_rest(code)` maps a REST code. Constants
+  `AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`, `AUTH_MISSING_HEADERS`,
+  `AUTH_KEY_EXPIRED`, `AUTH_KEY_DISABLED`, `AUTH_IP_NOT_ALLOWED`,
+  `AUTH_API_KEY_NOT_ACCEPTED`, `AUTH_AUTHENTICATION_REQUIRED` and
+  `AUTH_SESSION_KIND_NOT_ALLOWED`.
+- `PolyesterSessionRequiredError` (`is_session_required(err)`): a session-only
+  method called with an account API key (`AUTH_SESSION_KIND_NOT_ALLOWED`), from
+  Connect `permission_denied` with that `AuthErrorDetail` and from a REST 403
+  problem body, on every service. It is both a `PolyesterAuthError` and a
+  `PolyesterApiError`; not retryable.
+- `PolyesterApiError.violations`: the field violations (`field_path`,
+  `rule_id`, `message`) of an `orders.v1.ErrorDetail` or of a REST problem
+  body's `violations`, as `OrderFieldViolation`.
+- `is_order_already_terminal(err)` and `ORDER_ALREADY_TERMINAL`: a cancel of
+  an order that has already ended, a repeat of the cancel that ended it
+  included, which the server now refuses instead of answering `accepted`.
+- `orders.stop_all_trading(account=, sub_account_id=, symbol=, request_id=)`
+  cancels every live trigger (all pages of `created`, `armed`, `running` and
+  `paused`), then all open orders, and returns a `StopAllTradingResult`.
+  Cancel-all and the dead-man switch never cancel triggers.
+- Changelog: surfaces `market_data`, `quickswap` and `rewards`, and
+  `ChangelogSection.surface`, the product area a section covers (`""` for
+  none).
 
 ### Changed
 - `triggers.get` and `triggers.list` resend the same request while the server
@@ -55,6 +99,30 @@ server's brief `unavailable`.
   resume until they can show the change.
 - A non-Connect HTTP 412 error body now maps as Connect
   `failed_precondition` instead of `unknown`.
+- A Connect `unauthenticated` error with an `AuthErrorDetail` of
+  `AUTH_TIMESTAMP_SKEW` raises the retryable `PolyesterTimestampSkewError`, as
+  the gateway's `TIMESTAMP_SKEW` does; the other API-key reasons raise
+  `PolyesterAuthError` with their code (was `PolyesterApiError`).
+- `auth_error_code(err)` returns only auth error codes; it used to return any
+  `PolyesterApiError.code`, orders codes included.
+- A gateway problem body's `detail` is the error message (it was the bare
+  code), so a refusal such as "api key policy does not allow
+  READ_AUTO_WITHDRAW" reaches the caller as the server wrote it; the code
+  stays on `err.code`.
+- A REST problem body at HTTP 400 raises `PolyesterApiError` with its
+  `ERROR_CODE_` code and violations instead of a retryable
+  `PolyesterServerError`.
+- Client-side checks of an attached trailing stop's maximum raise
+  `PolyesterValidationError` with the server's `code` and `violations`
+  (`ERROR_CODE_BAD_PRICE` / `sell_unset` or `buy_at_least_activation`,
+  `ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT` / `buy_required`, on
+  `order.attached_risk.trailing_stop.limit_price_ticks`, or
+  `new_attached_risk...` for modify). `PolyesterValidationError` gains `code`
+  and `violations`, empty for SDK-only checks.
+- Docs: a spent quote-sized buy ends `filled`; a ladder whose levels were all
+  canceled before any filled ends `cancelled`; attached legs follow the
+  order's whole settled position; cancel-all and the dead-man switch leave
+  triggers live.
 
 ### Fixed
 - `get_batch_replace_status` no longer raises `PolyesterResponseContractError`

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec
 
@@ -38,6 +38,7 @@ from polyester.codecs.orders import (
 )
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import (
+    PolyesterApiError,
     PolyesterBatchReplaceTimeoutError,
     PolyesterRateLimitError,
     PolyesterTransportError,
@@ -70,6 +71,7 @@ from polyester.models import (
     OrderMutationResult,
     OrdersList,
     PreviewOrderResult,
+    StopAllTradingResult,
 )
 from polyester.models.private_orders import PrivateOrdersEvent
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
@@ -83,6 +85,17 @@ from polyester.services._symbols import (
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
+
+if TYPE_CHECKING:
+    from polyester.services.triggers import AsyncTriggersService
+
+# Trigger statuses a trigger can still fire from; stop_all_trading cancels them.
+LIVE_TRIGGER_STATUSES = ("created", "armed", "running", "paused")
+_STOP_ALL_TRIGGERS_PAGE = 1000
+# Cancel refusals of a trigger that ended before its cancel arrived.
+_TRIGGER_ENDED_CODES = frozenset(
+    {"ERROR_CODE_TRIGGER_NOT_FOUND", "ERROR_CODE_TRIGGER_STATUS_INVALID"}
+)
 
 # GetBatchReplaceStatus keeps a batch's status this long from acceptance.
 BATCH_REPLACE_STATUS_WINDOW_SECONDS = 60.0
@@ -100,6 +113,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         default_account_id: str | int | None = None,
         realtime: AsyncRealtimeClient | None = None,
         wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
+        triggers: AsyncTriggersService | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
@@ -107,6 +121,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self._default_account_id = default_account_id
         self._realtime = realtime
         self._wait_for_catalogs = wait_for_catalogs
+        self._triggers = triggers
 
     async def _ensure_catalogs(self) -> None:
         if self._wait_for_catalogs is not None:
@@ -367,6 +382,18 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
     ) -> OrderMutationResult:
+        """Cancel one order.
+
+        A cancel of an order that has already ended, by an earlier cancel
+        (this one repeated) or otherwise, raises :class:`PolyesterApiError`
+        ``ERROR_CODE_ORDER_ALREADY_TERMINAL``; :func:`is_order_already_terminal`
+        tells it apart from other refusals. Treat it as "already done" and read
+        the order for how it ended. A client order ID names its order for at
+        least a minute after the order ends; after that a retry by client
+        order ID may read ``ERROR_CODE_ORDER_UNKNOWN``, so retry by order ID
+        once you have it. Every cancel, a repeat included, counts against the
+        cancel rate limit.
+        """
         if symbol is not None and symbol_id is not None:
             raise PolyesterValidationError("cancel accepts only one of symbol or symbol_id")
         if symbol is not None:
@@ -465,6 +492,68 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.cancel_all_orders(req),
             proto_request,
             cancel_all_from_proto,
+        )
+
+    async def stop_all_trading(
+        self,
+        *,
+        account: AccountScope | None = None,
+        sub_account_id: str | None = None,
+        symbol: str | None = None,
+        request_id: str | None = None,
+    ) -> StopAllTradingResult:
+        """Cancel every live trigger, then every open order.
+
+        Cancel-all and the dead-man switch cancel open orders only, never
+        triggers: an armed stop still fires later. This lists the live
+        triggers (``created``, ``armed``, ``running``, ``paused``; attached legs
+        included) page by page, cancels each, and only then calls
+        :meth:`cancel_all`, so an order a trigger places before its cancel is
+        still canceled. ``symbol`` limits both steps to one market.
+
+        A trigger that ended before its cancel arrived is listed in
+        ``ended_trigger_ids``. Any other error is raised before the
+        cancel-all; call again to finish.
+        """
+        if self._triggers is None:
+            raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
+        scope = self._resolve_sub_account_id(sub_account_id, account=account)
+        trigger_ids: list[str] = []
+        page_token: str | None = None
+        while True:
+            page = await self._triggers.list(
+                sub_account_id=scope if scope is not None else "",
+                symbol=symbol,
+                status=LIVE_TRIGGER_STATUSES,
+                limit=_STOP_ALL_TRIGGERS_PAGE,
+                page_token=page_token,
+            )
+            trigger_ids.extend(t.trigger_id for t in page.triggers if t.trigger_id)
+            if not page.next_page_token:
+                break
+            page_token = page.next_page_token
+        canceled: list[str] = []
+        ended: list[str] = []
+        for trigger_id in dict.fromkeys(trigger_ids):
+            try:
+                await self._triggers.cancel(
+                    trigger_id=trigger_id, sub_account_id=scope if scope is not None else ""
+                )
+            except PolyesterApiError as exc:
+                if exc.code in _TRIGGER_ENDED_CODES or is_not_found(exc):
+                    ended.append(trigger_id)
+                    continue
+                raise
+            canceled.append(trigger_id)
+        cancel_all = await self.cancel_all(
+            sub_account_id=scope if scope is not None else "",
+            symbol=symbol,
+            request_id=request_id,
+        )
+        return StopAllTradingResult(
+            canceled_trigger_ids=canceled,
+            ended_trigger_ids=ended,
+            cancel_all=cancel_all,
         )
 
     async def batch_replace(

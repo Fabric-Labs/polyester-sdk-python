@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 import msgspec
 
+from polyester.codecs.scalars import format_qty_scaled
 from polyester.models.order_key import OrderKey
 from polyester.models.ratelimit import RateLimitDetail
 from polyester.types.money import AssetAmount, Price, Quantity
@@ -21,6 +23,24 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``inherited_cum_qty`` is the part of ``cum_qty`` carried over from
     predecessors when a replacement was accepted; zero for an order never
     replaced.
+
+    Exact execution totals, across the same lineage:
+
+    - ``avg_price`` is the exact average execution price in quote units per
+      base unit (``avg_price_e18``, 18 decimals, rounded half to even);
+      ``None`` without fills. Prefer it to ``avg_px``, which is rounded down
+      to 9 decimals.
+    - ``cum_notional_scaled`` is the exact quote amount of the fills before
+      fees, scaled by ``10^(9 + base_quantity_scale)``; ``"0"`` without
+      fills. :meth:`cum_quote` returns it in quote units.
+    - ``fee_total`` is the fee of those fills net of rebates, in
+      ``fee_asset``. Order history reads and single-order reads with
+      execution history carry it; open-order reads and stream updates leave it
+      ``None``. It can trail the fills: it covers them all once
+      ``fee_total.qty`` equals ``cum_qty``.
+
+    :meth:`quote_used` and :meth:`quote_unspent` tell how much of a buy's
+    quote amount (``submitted_max_quote_debit_scaled``) its fills used.
     """
 
     order_id: str
@@ -53,6 +73,106 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     # (for example ``USER_REQUEST`` or ``REPLACED``). ``None`` for every other
     # status. A number this SDK does not know reads ``UNKNOWN_CANCEL_REASON(n)``.
     cancel_reason: str | None = None
+    avg_price: Decimal | None = None
+    cum_notional_scaled: str = "0"
+    fee_total: OrderFeeTotal | None = None
+
+    def _base_scale(self, base_quantity_scale: int | None) -> int | None:
+        if base_quantity_scale is not None:
+            return base_quantity_scale
+        return self.cum_qty.scale if self.cum_qty is not None else None
+
+    def cum_quote(self, base_quantity_scale: int | None = None) -> Decimal:
+        """The exact quote amount of the fills, before fees (REST ``cumQuote``).
+
+        ``base_quantity_scale`` is the pair's base quantity scale
+        (``CatalogManager.base_quantity_scale_for_symbol_id``); it defaults to
+        ``cum_qty.scale``. Zero without fills.
+        """
+        scale = self._require_base_scale(base_quantity_scale)
+        return Decimal(format_qty_scaled(int(self.cum_notional_scaled or 0), 9 + scale))
+
+    def _require_base_scale(self, base_quantity_scale: int | None) -> int:
+        scale = self._base_scale(base_quantity_scale)
+        if scale is None:
+            from polyester.errors import PolyesterValidationError
+
+            raise PolyesterValidationError(
+                "base_quantity_scale is required: pass the pair's base quantity scale"
+            )
+        return scale
+
+    def _quote_used_scaled(self, base_quantity_scale: int | None) -> tuple[int, int] | None:
+        """``(amount, scale)`` of the quote the fills used, or ``None``."""
+        base_scale = self._require_base_scale(base_quantity_scale)
+        notional = int(self.cum_notional_scaled or 0)
+        notional_scale = 9 + base_scale
+        filled = self.cum_qty.scaled if self.cum_qty is not None else 0
+        fee = self.fee_total
+        if fee is None:
+            # No fills, so no fee to wait for.
+            return (0, notional_scale) if filled == 0 and notional == 0 else None
+        if (fee.qty.scaled if fee.qty is not None else 0) != filled:
+            return None
+        if self.fee_asset == "base":
+            # The fee came out of the base received.
+            return notional, notional_scale
+        if self.fee_asset != "quote":
+            return None
+        scale = max(notional_scale, 18)
+        fee_amount = int(fee.amount_e18 or 0) * 10 ** (scale - 18)
+        used = notional * 10 ** (scale - notional_scale)
+        return (used - fee_amount if fee.is_rebate else used + fee_amount), scale
+
+    def quote_used(self, base_quantity_scale: int | None = None) -> Decimal | None:
+        """How much quote the order's fills used, fees included.
+
+        ``cum_quote`` plus the quote fee (less a rebate) when ``fee_asset`` is
+        ``quote``; ``cum_quote`` alone when the fee was taken from the base
+        received. ``None`` until ``fee_total`` covers every fill (read the
+        order again), and for an open-order read, which carries no fee total.
+        """
+        used = self._quote_used_scaled(base_quantity_scale)
+        if used is None:
+            return None
+        return Decimal(format_qty_scaled(used[0], used[1]))
+
+    def quote_unspent(
+        self, *, quote_quantity_scale: int, base_quantity_scale: int | None = None
+    ) -> Decimal | None:
+        """The part of a buy's quote amount its fills did not use.
+
+        ``submitted_max_quote_debit_scaled`` (at the pair's
+        ``quote_quantity_scale``) less :meth:`quote_used`. ``None`` for an
+        order not sized by a quote amount, or while ``quote_used`` is ``None``.
+        """
+        if not self.submitted_max_quote_debit_scaled:
+            return None
+        used = self._quote_used_scaled(base_quantity_scale)
+        if used is None:
+            return None
+        scale = max(used[1], quote_quantity_scale)
+        budget = int(self.submitted_max_quote_debit_scaled) * 10 ** (scale - quote_quantity_scale)
+        spent = used[0] * 10 ** (scale - used[1])
+        return Decimal(format_qty_scaled(budget - spent, scale))
+
+
+class OrderFeeTotal(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Total fee of an order's fills, net of rebates, in the order's ``fee_asset``.
+
+    ``amount_e18`` is the exact amount scaled by 1e18 (as ``fee_amount_e18`` on
+    a trade); ``amount`` is the same in asset units. ``is_rebate`` is true when
+    rebates exceeded fees, so the amount was credited. ``qty`` is the executed
+    quantity of the fills it covers.
+    """
+
+    amount_e18: str = "0"
+    is_rebate: bool = False
+    qty: Quantity | None = None
+
+    @property
+    def amount(self) -> Decimal:
+        return Decimal(format_qty_scaled(int(self.amount_e18 or 0), 18))
 
 
 class OrderLineage(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -295,6 +415,20 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     listing_status: str = ""
 
 
+class StopAllTradingResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Outcome of ``orders.stop_all_trading``.
+
+    ``canceled_trigger_ids`` are the live triggers whose cancel was accepted,
+    in the order they were canceled; ``ended_trigger_ids`` the ones that had
+    already ended when their cancel arrived. ``cancel_all`` is the cancel-all
+    that followed, for the open orders, those triggers placed included.
+    """
+
+    canceled_trigger_ids: list[str] = []
+    ended_trigger_ids: list[str] = []
+    cancel_all: CancelAllOrdersResult | None = None
+
+
 class TriggerStopDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_price: Price | None = None
     trigger_price_source: str = ""
@@ -450,6 +584,20 @@ class DepositAddressesList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One step of a trigger's history.
+
+    ``event_type`` is ``fired``, ``canceled``, ``updated``, ``failed``,
+    ``activated``, ``armed`` or ``fire_refused``; a type newer than this SDK
+    reads as its lowercase name or number. ``fire_refused`` records an attempt
+    whose order was refused while the trigger stayed live (armed or running):
+    ``child_seq`` is the refused attempt, ``child_order_id`` is empty, and
+    ``fire_refusal_reason`` says why, as a ``failure_reason`` label
+    (``rate_limited``, ``account_repairing``, ``market_halted``,
+    ``min_notional``, ...). It is set only on ``fire_refused``; a refusal that
+    ends the trigger is a ``failed`` event with ``failure_reason``. See
+    :func:`polyester.codecs.decode.triggers.is_terminal_trigger_event`.
+    """
+
     trigger_id: str = ""
     subaccount_id: str = ""
     symbol_id: int = 0
@@ -461,6 +609,7 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     fire_price: Price | None = None
     cancel_reason: str = ""
     failure_reason: str = ""
+    fire_refusal_reason: str = ""
 
 
 class TriggerEventsList(msgspec.Struct, kw_only=True, omit_defaults=True):

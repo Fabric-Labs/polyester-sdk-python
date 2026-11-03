@@ -25,7 +25,7 @@ from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
-from polyester.models.trading import AttachedRisk, RiskLeg, TrailingStop
+from polyester.models.trading import AttachedRisk, OrderFieldViolation, RiskLeg, TrailingStop
 from polyester.types.money import (
     Quantity,
     resolve_price_ticks,
@@ -670,6 +670,7 @@ def _trailing_stop_from_dict(
     data: object,
     *,
     symbol: str | None,
+    risk_field: str = "order.attached_risk",
 ) -> orders_pb2.TrailingStopPolicy:
     if not isinstance(data, dict):
         raise PolyesterValidationError("attached_risk.trailing_stop must be an object")
@@ -742,16 +743,40 @@ def _trailing_stop_from_dict(
             limit, "attached_risk.trailing_stop.limit_price", symbol=symbol
         )
         if proto.limit_price_ticks <= 0:
-            raise PolyesterValidationError(
-                "attached_risk.trailing_stop.limit_price must be positive"
+            raise _trailing_limit_error(
+                "attached_risk.trailing_stop.limit_price must be positive",
+                code="ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
+                rule_id="buy_required",
+                risk_field=risk_field,
             )
     elif limit_ticks is not None:
         proto.limit_price_ticks = tick_count(limit_ticks, "limit_price_ticks")
     if proto.limit_price_ticks and proto.activation_price_ticks > proto.limit_price_ticks:
-        raise PolyesterValidationError(
-            "attached_risk.trailing_stop.limit_price must be at least activation_price"
+        raise _trailing_limit_error(
+            "attached_risk.trailing_stop.limit_price must be at least activation_price",
+            code="ERROR_CODE_BAD_PRICE",
+            rule_id="buy_at_least_activation",
+            risk_field=risk_field,
         )
     return proto
+
+
+def _trailing_limit_error(
+    message: str, *, code: str, rule_id: str, risk_field: str
+) -> PolyesterValidationError:
+    """A refused attached trailing-stop maximum, with the code, rule ID and
+    field path the server answers for the same mistake."""
+    return PolyesterValidationError(
+        message,
+        code=code,
+        violations=[
+            OrderFieldViolation(
+                field_path=f"{risk_field}.trailing_stop.limit_price_ticks",
+                rule_id=rule_id,
+                message=message,
+            )
+        ],
+    )
 
 
 def risk_policy_from_dict(
@@ -759,6 +784,7 @@ def risk_policy_from_dict(
     *,
     symbol: str | None = None,
     side: str | None = None,
+    risk_field: str = "order.attached_risk",
 ) -> orders_pb2.RiskPolicy | None:
     """Encode public attached-risk input onto the write ``RiskPolicy`` wire.
 
@@ -769,7 +795,16 @@ def risk_policy_from_dict(
 
     ``side`` is the parent order's side when known. A selling order's trailing
     stop buys back, so it requires ``limit_price``; a buying order's must not
-    set one. Without a side (modify), the server applies that rule.
+    set one. Without a side (modify), the server applies that rule and answers
+    ``ERROR_CODE_BAD_PRICE`` with no violation either way.
+
+    A refused trailing-stop maximum raises :class:`PolyesterValidationError`
+    with the code and the violation (rule ID and ``field_path`` under
+    ``risk_field``) the server answers for the same mistake: set on a buying
+    order ``ERROR_CODE_BAD_PRICE`` / ``sell_unset``; missing or not positive
+    on a selling order ``ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT`` /
+    ``buy_required``; below the activation price ``ERROR_CODE_BAD_PRICE`` /
+    ``buy_at_least_activation``.
     """
     if data is None:
         return None
@@ -812,15 +847,21 @@ def risk_policy_from_dict(
             )
         )
     if trailing_stop is not None:
-        trailing = _trailing_stop_from_dict(trailing_stop, symbol=symbol)
+        trailing = _trailing_stop_from_dict(trailing_stop, symbol=symbol, risk_field=risk_field)
         if side == "sell" and not trailing.limit_price_ticks:
-            raise PolyesterValidationError(
+            raise _trailing_limit_error(
                 "attached_risk.trailing_stop.limit_price is required when the order sells: "
-                "the trailing stop buys back and pays at most this price"
+                "the trailing stop buys back and pays at most this price",
+                code="ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
+                rule_id="buy_required",
+                risk_field=risk_field,
             )
         if side == "buy" and trailing.limit_price_ticks:
-            raise PolyesterValidationError(
-                "attached_risk.trailing_stop.limit_price must be unset when the order buys"
+            raise _trailing_limit_error(
+                "attached_risk.trailing_stop.limit_price must be unset when the order buys",
+                code="ERROR_CODE_BAD_PRICE",
+                rule_id="sell_unset",
+                risk_field=risk_field,
             )
         risk.trailing_stop.CopyFrom(trailing)
     return risk
@@ -1010,7 +1051,9 @@ def modify_order_to_proto(
         proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
     if new_client_order_id:
         proto.new_client_order_id = required_client_id(new_client_order_id, "new_client_order_id")
-    risk = risk_policy_from_dict(new_attached_risk, symbol=symbol)
+    # The modify request carries no side: the server applies the side rule to
+    # the trailing stop's maximum and answers ERROR_CODE_BAD_PRICE.
+    risk = risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
     return proto

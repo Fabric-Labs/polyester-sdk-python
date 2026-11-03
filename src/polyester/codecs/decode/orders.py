@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from google.protobuf.message import Message
 
 from polyester.codecs.decode.balances import u128_from_proto
@@ -10,10 +12,12 @@ from polyester.codecs.decode.invariants import (
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import (
     format_uint64_id,
+    has_field,
     proto_enum_name,
     timestamp_to_ms,
     timestamp_to_rfc3339,
 )
+from polyester.codecs.scalars import format_qty_scaled
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.orders.v1.orders_read_pb2 import (
@@ -48,6 +52,7 @@ from polyester.models import (
     GetOrderResult,
     ModifyOrderResult,
     OrderErrorDetail,
+    OrderFeeTotal,
     OrderFieldViolation,
     OrderLineage,
     OrderMutationResult,
@@ -65,6 +70,8 @@ from polyester.models import (
     UserTrade as PublicUserTrade,
 )
 from polyester.types.money import Price, Quantity, QuantityDomain
+
+_E18 = 18
 
 
 def _qty(
@@ -301,6 +308,27 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
         ),
         reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else None,
         cancel_reason=cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else None,
+        avg_price=(
+            Decimal(format_qty_scaled(int(u128_from_proto(msg.avg_price_e18)), _E18))
+            if has_field(msg, "avg_price_e18")
+            else None
+        ),
+        cum_notional_scaled=(
+            u128_from_proto(msg.cum_notional) if has_field(msg, "cum_notional") else "0"
+        ),
+        fee_total=(
+            OrderFeeTotal(
+                amount_e18=(
+                    u128_from_proto(msg.fee_total.amount_e18)
+                    if msg.fee_total.HasField("amount_e18")
+                    else "0"
+                ),
+                is_rebate=bool(msg.fee_total.is_rebate),
+                qty=_qty(msg.fee_total.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+            )
+            if has_field(msg, "fee_total")
+            else None
+        ),
     )
 
 

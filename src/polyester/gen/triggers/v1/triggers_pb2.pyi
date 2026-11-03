@@ -45,6 +45,7 @@ class TriggerEventType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EVENT_FAILED: _ClassVar[TriggerEventType]
     EVENT_ACTIVATED: _ClassVar[TriggerEventType]
     EVENT_ARMED: _ClassVar[TriggerEventType]
+    EVENT_FIRE_REFUSED: _ClassVar[TriggerEventType]
 
 class TriggerCancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -155,6 +156,7 @@ class TriggerFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: _ClassVar[TriggerFailureReason]
@@ -187,6 +189,7 @@ EVENT_UPDATED: TriggerEventType
 EVENT_FAILED: TriggerEventType
 EVENT_ACTIVATED: TriggerEventType
 EVENT_ARMED: TriggerEventType
+EVENT_FIRE_REFUSED: TriggerEventType
 TRIGGER_CANCEL_REASON_UNSPECIFIED: TriggerCancelReason
 TRIGGER_CANCEL_REASON_USER_REQUEST: TriggerCancelReason
 TRIGGER_CANCEL_REASON_OCO: TriggerCancelReason
@@ -291,6 +294,7 @@ TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION: TriggerFailureReason
 TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED: TriggerFailureReason
 TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT: TriggerFailureReason
 TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE: TriggerFailureReason
+TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING: TriggerFailureReason
 TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY: TriggerFailureReason
 TRIGGER_FAILURE_REASON_MISSING_REASON_CODE: TriggerFailureReason
@@ -513,7 +517,7 @@ class ListTriggerEventsRequest(_message.Message):
     def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class TriggerEvent(_message.Message):
-    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_type", "event_type", "ts_ns", "child_seq", "child_order_id", "fire_price_ticks", "cancel_reason", "failure_reason")
+    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_type", "event_type", "ts_ns", "child_seq", "child_order_id", "fire_price_ticks", "cancel_reason", "failure_reason", "fire_refusal_reason")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
@@ -525,6 +529,7 @@ class TriggerEvent(_message.Message):
     FIRE_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     CANCEL_REASON_FIELD_NUMBER: _ClassVar[int]
     FAILURE_REASON_FIELD_NUMBER: _ClassVar[int]
+    FIRE_REFUSAL_REASON_FIELD_NUMBER: _ClassVar[int]
     trigger_id: int
     subaccount_id: int
     symbol_id: int
@@ -536,7 +541,8 @@ class TriggerEvent(_message.Message):
     fire_price_ticks: int
     cancel_reason: TriggerCancelReason
     failure_reason: TriggerFailureReason
-    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_price_ticks: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ...) -> None: ...
+    fire_refusal_reason: TriggerFailureReason
+    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., event_type: _Optional[_Union[TriggerEventType, str]] = ..., ts_ns: _Optional[int] = ..., child_seq: _Optional[int] = ..., child_order_id: _Optional[int] = ..., fire_price_ticks: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ..., fire_refusal_reason: _Optional[_Union[TriggerFailureReason, str]] = ...) -> None: ...
 
 class TriggerEventBatch(_message.Message):
     __slots__ = ("events",)

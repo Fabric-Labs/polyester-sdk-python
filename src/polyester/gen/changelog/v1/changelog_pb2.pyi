@@ -40,6 +40,9 @@ class Surface(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EXPLORER: _ClassVar[Surface]
     DOCUMENTATION: _ClassVar[Surface]
     PLATFORM: _ClassVar[Surface]
+    MARKET_DATA: _ClassVar[Surface]
+    QUICKSWAP: _ClassVar[Surface]
+    REWARDS: _ClassVar[Surface]
 
 class SortDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -64,6 +67,9 @@ API: Surface
 EXPLORER: Surface
 DOCUMENTATION: Surface
 PLATFORM: Surface
+MARKET_DATA: Surface
+QUICKSWAP: Surface
+REWARDS: Surface
 SORT_DIRECTION_UNSPECIFIED: SortDirection
 SORT_ASC: SortDirection
 SORT_DESC: SortDirection
@@ -91,14 +97,16 @@ class Change(_message.Message):
     def __init__(self, id: _Optional[int] = ..., title: _Optional[str] = ..., summary: _Optional[str] = ..., details: _Optional[str] = ..., category: _Optional[_Union[ChangeCategory, str]] = ..., action_required: _Optional[bool] = ..., migration_guidance: _Optional[str] = ..., audiences: _Optional[_Iterable[_Union[Audience, str]]] = ..., surfaces: _Optional[_Iterable[_Union[Surface, str]]] = ...) -> None: ...
 
 class Section(_message.Message):
-    __slots__ = ("heading", "summary", "changes")
+    __slots__ = ("heading", "summary", "changes", "surface")
     HEADING_FIELD_NUMBER: _ClassVar[int]
     SUMMARY_FIELD_NUMBER: _ClassVar[int]
     CHANGES_FIELD_NUMBER: _ClassVar[int]
+    SURFACE_FIELD_NUMBER: _ClassVar[int]
     heading: str
     summary: str
     changes: _containers.RepeatedCompositeFieldContainer[Change]
-    def __init__(self, heading: _Optional[str] = ..., summary: _Optional[str] = ..., changes: _Optional[_Iterable[_Union[Change, _Mapping]]] = ...) -> None: ...
+    surface: Surface
+    def __init__(self, heading: _Optional[str] = ..., summary: _Optional[str] = ..., changes: _Optional[_Iterable[_Union[Change, _Mapping]]] = ..., surface: _Optional[_Union[Surface, str]] = ...) -> None: ...
 
 class PostSummary(_message.Message):
     __slots__ = ("slug", "title", "introduction", "published_at", "coverage_cutoff", "change_count", "breaking_change_count", "action_required_count", "new_feature_count", "improvement_count", "bug_fix_count")

@@ -69,6 +69,13 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED: _ClassVar[AuthErrorCode]
     AUTH_TEMPORARILY_UNAVAILABLE: _ClassVar[AuthErrorCode]
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED: _ClassVar[AuthErrorCode]
+    AUTH_SIGNATURE_INVALID: _ClassVar[AuthErrorCode]
+    AUTH_TIMESTAMP_SKEW: _ClassVar[AuthErrorCode]
+    AUTH_MISSING_HEADERS: _ClassVar[AuthErrorCode]
+    AUTH_KEY_EXPIRED: _ClassVar[AuthErrorCode]
+    AUTH_KEY_DISABLED: _ClassVar[AuthErrorCode]
+    AUTH_IP_NOT_ALLOWED: _ClassVar[AuthErrorCode]
+    AUTH_API_KEY_NOT_ACCEPTED: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -118,6 +125,13 @@ AUTH_SUBACCOUNT_CHALLENGE_INVALID: AuthErrorCode
 AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED: AuthErrorCode
 AUTH_TEMPORARILY_UNAVAILABLE: AuthErrorCode
 AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED: AuthErrorCode
+AUTH_SIGNATURE_INVALID: AuthErrorCode
+AUTH_TIMESTAMP_SKEW: AuthErrorCode
+AUTH_MISSING_HEADERS: AuthErrorCode
+AUTH_KEY_EXPIRED: AuthErrorCode
+AUTH_KEY_DISABLED: AuthErrorCode
+AUTH_IP_NOT_ALLOWED: AuthErrorCode
+AUTH_API_KEY_NOT_ACCEPTED: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

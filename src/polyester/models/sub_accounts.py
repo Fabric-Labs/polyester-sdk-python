@@ -5,7 +5,7 @@ from datetime import datetime
 import msgspec
 
 from polyester.models.policies import SubaccountPolicy
-from polyester.models.trading import ApiKeySummary
+from polyester.models.trading import ApiKeySummary, BalancesList
 
 
 class SubAccount(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -89,8 +89,16 @@ class SubAccountActivityList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class GetSubaccountResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Aggregated sub-account view.
+
+    ``balances`` is set only for ``include_balances=True``: the sub-account's
+    current balances in the shape of ``balances.list`` (one ``AssetBalance``
+    per asset). ``None`` otherwise.
+    """
+
     subaccount: SubAccount | None = None
     api_keys: list[ApiKeySummary] = []
     members: list[SubAccountMember] = []
     invites: list[SubAccountInvite] = []
     policy: SubaccountPolicy | None = None
+    balances: BalancesList | None = None

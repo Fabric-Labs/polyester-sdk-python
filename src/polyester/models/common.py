@@ -113,6 +113,10 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     # pair defaults. Rejected on limit orders. ``max_slippage_bps`` is 1–10000.
     max_slippage_ticks: int | None = None
     max_slippage_bps: int | None = None
+    # ``expire_taker``, ``expire_maker`` or ``expire_both``; omitted keeps the
+    # server default. The order's attached take-profit, stop-loss and trailing
+    # stop exits use the same mode: they have none of their own.
+    self_trade_prevention_mode: str | None = None
 
 
 __all__ = [

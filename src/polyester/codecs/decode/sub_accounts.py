@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.api_keys import api_key_from_proto
+from polyester.codecs.decode.balances import balances_list_from_proto
 from polyester.codecs.decode.policies import subaccount_policy_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
 from polyester.codecs.scalars import timestamp_dict_to_datetime
@@ -148,4 +149,5 @@ def get_subaccount_from_proto(msg: subaccounts_pb2.GetSubaccountResponse) -> Get
         members=[subaccount_member_from_proto(item) for item in msg.members],
         invites=[subaccount_invite_from_proto(item) for item in msg.invites],
         policy=policy,
+        balances=balances_list_from_proto(msg.balances) if has_field(msg, "balances") else None,
     )

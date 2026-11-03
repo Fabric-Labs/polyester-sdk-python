@@ -68,6 +68,24 @@ removing the owner) raises `PolyesterSubaccountOwnerRoleLockedError`, a
 not retryable: show "The owner's role can't be changed", and don't offer these
 actions for the member whose role is `OWNER`.
 
+`sub_accounts.get(sub_account_id=..., include_balances=True)` also returns the
+sub-account's current `balances`, a `BalancesList` in the shape of
+`balances.list` (one `AssetBalance` per asset: `funding`, `trading`,
+`reserved`, `available`). Without `include_balances`, `balances` is `None`.
+It needs the `READ_BALANCES` action on the sub-account (its role, its attached
+policy and, for an API key, the key's policy), or the call raises
+`PermissionDenied` with `AUTH_SUBACCOUNT_ACCESS_DENIED`. An API key bound to a
+sub-account reads only that one; a root-scoped API key cannot read a
+sub-account's balances. When balances cannot be read right now the call raises
+`AUTH_TEMPORARILY_UNAVAILABLE`, which `is_retryable_error(err)` reports
+retryable: retry, or omit `include_balances` for the rest of the view.
+
+```python
+view = await client.sub_accounts.get(sub_account_id=sub_id, include_balances=True)
+for row in view.balances.balances if view.balances else []:
+    print(row.asset_id, row.trading, row.available)
+```
+
 Private streams require an Account ID and the corresponding API-key permission.
 A successful subscribe call means the token exchange and realtime handshake
 completed. Treat a structured permission denial as non-transient and update the
@@ -343,6 +361,47 @@ result = await client.orders.create(
 )
 ```
 
+Decimals may carry zeros beyond their scale: `qty="1.500"` on a pair with base
+scale 2 is `1.5`, and `price="70000.0000000000"` is `70000`. A nonzero digit
+beyond the scale is off the pair's step or tick, so create, preview, batch
+create and modify raise `PolyesterValidationError` with the code and violation
+the server answers for that value: `ERROR_CODE_QTY_STEP_SIZE` / `step_size`
+at `order.base_qty_scaled` for the quantity, `ERROR_CODE_PRICE_TICK_SIZE` /
+`tick_size` for the limit price, the attached take-profit and stop-loss
+trigger and limit prices, the attached trailing stop's activation and limit
+prices, and modify's `new_price` (`new_price_ticks`). Other decimals
+(`max_quote_debit`, `market_client_ref_price`) raise it with no `code`.
+
+`self_trade_prevention_mode` (`expire_taker`, `expire_maker` or
+`expire_both`) sets the order's self-trade prevention on create, preview and
+batch create items; omit it for the server default. The order's attached
+take-profit, stop-loss and trailing stop exits use the same mode: they have
+none of their own. `Order.self_trade_prevention_mode` reads it back (empty
+when unset; a mode newer than this SDK reads as its number), and each leg's
+`Trigger.self_trade_prevention_mode` shows the mode its exit uses.
+
+```python
+await client.orders.create(
+    symbol="BTC-USDT",
+    side="buy",
+    order_type="limit",
+    post_only=True,
+    qty="0.001",
+    price="60000",
+    self_trade_prevention_mode="expire_taker",
+    attached_risk={"oco": True, "take_profit": {"trigger_price": "90000"},
+                   "stop_loss": {"trigger_price": "55000"}},
+)
+```
+
+A buy sized by a quote amount (`max_quote_debit`, market or limit IOC) takes
+`attached_risk` too. Its legs protect what it buys: they arm as its fills
+settle and follow each later fill. At create, each leg's exit is checked
+against the pair's minimums at the quantity the whole amount buys at the
+order's limit price (a market order's maximum slippage price), and refused
+with `ERROR_CODE_MIN_NOTIONAL`, `ERROR_CODE_MIN_QTY` or
+`ERROR_CODE_QTY_STEP_SIZE` below them.
+
 Scaled transfer/withdraw `AssetAmount` inputs must carry their source scale.
 `AssetAmount.from_scaled(..., scale=None)` is accepted for composition only and
 fails closed on encoding unless the request's `amount_scale` /
@@ -444,8 +503,11 @@ order's `cancel_reason` is one of `USER_REQUEST`, `IOC_REMAINDER`,
 `MARKET_REMAINDER`, `STP_EXPIRE_MAKER`, `STP_EXPIRE_TAKER`, `STP_EXPIRE_BOTH`,
 `REPLACED`, `GTD_EXPIRED`, `QTY_AT_OR_BELOW_FILLED`, `PAIR_DRAIN`,
 `ATTACHED_RISK_REFUSED`, `CANCEL_ALL_AFTER`, `ACCOUNT_REPAIR`,
-`TWAP_ROLLOVER`, `STRATEGY_CANCEL`, `SYSTEM` or `MARKET_HALTED` (the exchange
-halted the market and canceled its open orders). Both are `None` for every other
+`TWAP_ROLLOVER`, `STRATEGY_CANCEL`, `SYSTEM`, `MARKET_HALTED` (the exchange
+halted the market and canceled its open orders) or `ATTACHED_EXIT_FIRED` (its
+take-profit, stop-loss or trailing stop fired while it still rested, so its
+unfilled remainder was canceled first; fills before it stand, and it can no
+longer be modified). Both are `None` for every other
 status. A number this SDK does not know yet reads `UNKNOWN_ERROR_CODE(n)` or
 `UNKNOWN_CANCEL_REASON(n)`; treat it as a generic refusal or end.
 
@@ -462,8 +524,11 @@ the book, its price limit or the market's maximum quantity stopped it first.
 Orders carry their exact execution totals across the lineage. `avg_price` is
 the exact average execution price as a `Decimal` with up to 18 decimals
 (`None` without fills); prefer it to `avg_px`, which is rounded down to 9
-decimals. `cum_notional_scaled` is the exact quote amount of the fills before
-fees and `cum_quote(base_quantity_scale)` returns it in quote units.
+decimals. `cum_notional_scaled` is the quote amount of the fills before
+fees and `cum_quote(base_quantity_scale)` returns it in quote units. Each fill
+settles its quote rounded down to 18 decimals, so both, and `quote_used` /
+`quote_unspent`, are exact when the pair's `base_quantity_scale` is at most 9;
+above that they can exceed the settled quote by less than 1e-18 per fill.
 `fee_total` (`amount`, `amount_e18`, `is_rebate`, `qty`) is the fee of those
 fills net of rebates, in `fee_asset`; order history and single-order reads
 with execution history carry it, open-order reads and stream updates do not.
@@ -779,13 +844,21 @@ Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 (`fire_price_ticks` is optional on the wire). Canceled and failed triggers
 expose typed `cancel_reason` / `failure_reason` labels (empty when unset). A
 market halt ends every open trigger of the market with `cancel_reason`
-`market_halted`. A reason number this SDK does not name reads as its number,
-for example `failure_reason == "212"`.
+`market_halted`, and a trigger the halted market refused ends `failed` with
+`failure_reason` `market_halted`. A reason number this SDK does not name reads
+as its number, for example `failure_reason == "212"`; no number is a market
+halt.
 
 A trigger's history records every fire refused while the trigger stayed live,
 as a `fire_refused` event: `child_seq` is the refused attempt (the next one
-takes the next number), `child_order_id` is empty, and `fire_refusal_reason`
-says why, with the `failure_reason` labels. `market_halted` or `pair_post_only`
+takes the next number) and `fire_refusal_reason` says why, with the
+`failure_reason` labels. `self_trade_prevented` means self-trade prevention
+(`expire_taker` or `expire_both`) expired the exit's order against another of
+the account's resting orders: `child_seq` names that order, which ends
+`canceled` with `STP_EXPIRE_TAKER` or `STP_EXPIRE_BOTH`, and the trigger
+records it once per blocked episode and fires again at a new trade at or
+beyond its trigger price, or once the blocking order is gone or no longer at
+the best price. Every other refusal placed no order. `market_halted` or `pair_post_only`
 waits for the next price through the trigger price; `min_notional`,
 `min_quantity` or `step_size` means the order would have been below the
 market's minimum, and the trigger fires again once the position changes;

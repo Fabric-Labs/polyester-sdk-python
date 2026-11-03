@@ -22,6 +22,14 @@ MAX_PROTOCOL_SCALE = 36
 _STRICT_DECIMAL = re.compile(r"^\d+(?:\.\d+)?$")
 
 
+class FractionalDigitsError(PolyesterValidationError):
+    """A decimal with a nonzero digit beyond its scale (zeros beyond it parse).
+
+    Order encoders re-raise it for a quantity or tick-checked price with the
+    step or tick code the server answers for the same value.
+    """
+
+
 def validate_protocol_scale(scale: int, *, field_name: str = "scale") -> int:
     """Reject scales that would panic or allocate pathological padding."""
     if isinstance(scale, bool) or not isinstance(scale, int):
@@ -93,7 +101,7 @@ def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
     ok, scaled, reason = try_decimal_to_scaled(text, scale)
     if not ok or scaled is None:
         if reason == "precision":
-            raise PolyesterValidationError(
+            raise FractionalDigitsError(
                 f"{field_name} supports at most {scale} decimal places: {text}"
             )
         if reason == "scale":

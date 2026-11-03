@@ -61,6 +61,18 @@ SELF_TRADE_PREVENTION_MODE_TO_PROTO = {
     "expire_maker": "EXPIRE_MAKER",
     "expire_both": "EXPIRE_BOTH",
 }
+
+
+def self_trade_prevention_mode_to_proto(value: str) -> orders_pb2.SelfTradePreventionMode:
+    """Wire value of ``expire_taker``, ``expire_maker`` or ``expire_both`` (any case)."""
+    key = value.lower() if isinstance(value, str) else ""
+    if key not in SELF_TRADE_PREVENTION_MODE_TO_PROTO:
+        raise PolyesterValidationError(
+            "self_trade_prevention_mode must be expire_taker, expire_maker, or expire_both"
+        )
+    return getattr(orders_pb2, SELF_TRADE_PREVENTION_MODE_TO_PROTO[key])
+
+
 LADDER_DISTRIBUTION_TO_PROTO = {
     "linear": "LINEAR",
     "geometric": "GEOMETRIC",
@@ -196,13 +208,8 @@ def create_trigger_to_proto(
             raise PolyesterValidationError("fee_asset must be quote or base")
         intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_key])
     if self_trade_prevention_mode is not None:
-        stp_key = self_trade_prevention_mode.lower()
-        if stp_key not in SELF_TRADE_PREVENTION_MODE_TO_PROTO:
-            raise PolyesterValidationError(
-                "self_trade_prevention_mode must be expire_taker, expire_maker, or expire_both"
-            )
-        intent.self_trade_prevention_mode = getattr(
-            orders_pb2, SELF_TRADE_PREVENTION_MODE_TO_PROTO[stp_key]
+        intent.self_trade_prevention_mode = self_trade_prevention_mode_to_proto(
+            self_trade_prevention_mode
         )
 
     price_source = trigger_price_source_to_proto(trigger_price_source)

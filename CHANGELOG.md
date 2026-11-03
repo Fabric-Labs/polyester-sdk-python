@@ -4,7 +4,10 @@
 
 **What a trading bot gains.** A bot can read the product changelog of the
 environment it trades on, with no API key, and find the breaking or
-action-required changes published since it last looked.
+action-required changes published since it last looked. It can wait for a
+batch replace to settle and see which items were refused after admission, and
+a trigger read right after a modify, pause or resume no longer fails on the
+server's brief `unavailable`.
 
 **Breaking changes**
 - None in the SDK API.
@@ -21,6 +24,44 @@ action-required changes published since it last looked.
   slug raises `PolyesterApiError` code `not_found`.
 - The sync `Polyester` client turns async iterator methods into plain
   iterators, so `client.changelog.iter_posts()` works there too.
+- `orders.wait_batch_replace(batch_request_id=...)` polls
+  `get_batch_replace_status` with a short backoff until no item is
+  `admitted`, and returns that status. It polls through the `not_found` the
+  status read answers for a few seconds after admission, and through server
+  and network errors. It stops at the server's 60-second status window, or at
+  `timeout=`, even during a read, with the new
+  `PolyesterBatchReplaceTimeoutError` (a `PolyesterTimeoutError`) carrying the
+  last status read: reconcile the orders themselves after it.
+- `BatchReplaceStatusItem.error_code` names an item's refusal as
+  `PolyesterApiError.code` names it: the raw `code` (`POST_ONLY_CROSS`) with
+  the `ERROR_CODE_` prefix, or `code` unchanged when this SDK does not know it.
+- Market-halt reasons: when the exchange halts a market, its orders end
+  `canceled` with `cancel_reason` `MARKET_HALTED`, and its triggers end
+  `canceled` with `cancel_reason` `market_halted`, on reads and streams. An
+  order the halted market refused after admission ends `rejected` with
+  `reject_reason` `MARKET_HALTED`. A trigger the halted market refused reads
+  the unnamed `failure_reason` `"212"` until the server reports
+  `market_halted`.
+- `PolyesterSubaccountOwnerRoleLockedError`, a `PolyesterApiError` with code
+  `AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED` (exported as a constant): inviting,
+  re-roling or removing a sub-account's owner. It maps from Connect
+  `failed_precondition` with that `AuthErrorDetail` and from a REST 412
+  problem body with that code; not retryable.
+
+### Changed
+- `triggers.get` and `triggers.list` resend the same request while the server
+  answers `unavailable` (HTTP 503): after 25 ms, doubling up to 500 ms, for
+  about 2 seconds. Trigger reads answer it right after a modify, pause or
+  resume until they can show the change.
+- A non-Connect HTTP 412 error body now maps as Connect
+  `failed_precondition` instead of `unknown`.
+
+### Fixed
+- `get_batch_replace_status` no longer raises `PolyesterResponseContractError`
+  for an item refused after admission. Such an item reads `rejected` with a
+  code while the admission counts still count it as accepted.
+- A `rejected` batch replace status item never carries a
+  `replacement_order_id`.
 
 ## 0.5.1
 

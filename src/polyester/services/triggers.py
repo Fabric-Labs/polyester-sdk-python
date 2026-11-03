@@ -42,6 +42,10 @@ from polyester.services._realtime_subscribe import (
     subscribe_account_proto,
     subscribe_account_proto_batch,
 )
+from polyester.services._retry import (
+    TRIGGER_READ_RETRY,
+    unary_auth_decoded_retry_unavailable,
+)
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
@@ -97,6 +101,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
 
         ``status`` accepts one or more of: created, armed, running, completed,
         cancelled, failed, paused. Unknown values raise ``PolyesterValidationError``.
+
+        Like :meth:`get`, this read resends the same request while the server
+        answers ``unavailable`` (HTTP 503), for about 2 seconds.
         """
         validated_limit = validate_limit(limit)
         request = ListTriggersRequest(limit=validated_limit)
@@ -115,12 +122,13 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         if status is not None:
             labels = [status] if isinstance(status, str) else list(status)
             request.status.extend(trigger_status_from_label(label) for label in labels)
-        return await unary_auth_decoded(
+        return await unary_auth_decoded_retry_unavailable(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.list_triggers(req),
             request,
             triggers_list_from_proto,
+            policy=TRIGGER_READ_RETRY,
         )
 
     async def get(
@@ -130,18 +138,27 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         sub_account_id: str | None = None,
     ) -> Trigger | None:
+        """Read one trigger.
+
+        After an answered :meth:`modify`, :meth:`pause` or :meth:`resume`, the
+        read shows the change or answers ``unavailable`` (HTTP 503) until it
+        can. This method resends the same request on ``unavailable``: after
+        25 ms, doubling up to 500 ms, for about 2 seconds, then raises
+        ``PolyesterServerError``.
+        """
         request = GetTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        return await unary_auth_decoded(
+        return await unary_auth_decoded_retry_unavailable(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.get_trigger(req),
             request,
             get_trigger_from_proto,
+            policy=TRIGGER_READ_RETRY,
         )
 
     async def create(

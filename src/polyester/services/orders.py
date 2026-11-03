@@ -37,7 +37,14 @@ from polyester.codecs.orders import (
     set_order_key,
 )
 from polyester.codecs.scalars import id_to_int
-from polyester.errors import PolyesterTransportError, PolyesterValidationError
+from polyester.errors import (
+    PolyesterBatchReplaceTimeoutError,
+    PolyesterRateLimitError,
+    PolyesterTransportError,
+    PolyesterValidationError,
+    is_not_found,
+    is_retryable_error,
+)
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
@@ -76,6 +83,11 @@ from polyester.services._symbols import (
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
+
+# GetBatchReplaceStatus keeps a batch's status this long from acceptance.
+BATCH_REPLACE_STATUS_WINDOW_SECONDS = 60.0
+_BATCH_REPLACE_POLL_INITIAL = 0.05
+_BATCH_REPLACE_POLL_MAX = 0.5
 
 
 class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
@@ -514,6 +526,101 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             batch_replace_status_from_proto,
         )
 
+    async def wait_batch_replace(
+        self,
+        *,
+        batch_request_id: str,
+        account: AccountScope | None = None,
+        sub_account_id: str | None = None,
+        timeout: float | None = None,
+    ) -> BatchReplaceStatusResult:
+        """Poll :meth:`get_batch_replace_status` until no item is ``admitted``.
+
+        Returns the first status whose items are all ``working``, ``rejected``
+        or ``terminal``. A ``rejected`` item changed nothing: its order keeps
+        ``old_order_id`` and its previous price and quantity, and
+        ``error_code`` names the refusal as a single modify would raise it
+        (for example ``ERROR_CODE_POST_ONLY_CROSS``).
+
+        Polls start 50 ms apart and back off to 500 ms. The status appears a
+        few seconds after admission, so ``not_found`` keeps polling, as do
+        ``unavailable``, other server errors and network errors. The server
+        keeps a batch's status for 60 seconds from acceptance, so the wait
+        ends there, or after ``timeout`` seconds when that comes first, even
+        during a read, with
+        :class:`~polyester.errors.PolyesterBatchReplaceTimeoutError` carrying
+        the last status read: a ``not_found`` proves nothing, so reconcile the
+        orders themselves. Other errors, rate limits included, are raised as
+        they come; cancelling the call cancels it.
+        """
+        request = GetBatchReplaceStatusRequest(
+            batch_request_id=id_to_int(batch_request_id, "batch_request_id")
+        )
+        parsed_sub = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(sub_account_id, account=account)
+        )
+        if parsed_sub is not None:
+            request.subaccount_id = parsed_sub
+        started = time.monotonic()
+        deadline = started + BATCH_REPLACE_STATUS_WINDOW_SECONDS
+        if timeout is not None:
+            deadline = min(deadline, started + max(timeout, 0.0))
+        window_known = False
+        delay = _BATCH_REPLACE_POLL_INITIAL
+        last: BatchReplaceStatusResult | None = None
+
+        def expired(cause: BaseException | None = None) -> PolyesterBatchReplaceTimeoutError:
+            error = PolyesterBatchReplaceTimeoutError(
+                f"batch replace {batch_request_id} has no settled status by the end "
+                "of its status window; reconcile the orders with order reads",
+                batch_request_id=batch_request_id,
+                last_status=last,
+            )
+            error.__cause__ = cause
+            return error
+
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise expired()
+            # The deadline also bounds a read in flight.
+            read_deadline = asyncio.timeout(remaining)
+            try:
+                async with read_deadline:
+                    current = await unary_auth_decoded(
+                        self._transport,
+                        OrdersReadServiceClient,
+                        lambda client, req: client.get_batch_replace_status(req),
+                        request,
+                        batch_replace_status_from_proto,
+                    )
+            except Exception as exc:
+                if read_deadline.expired():
+                    raise expired(exc) from exc
+                task = asyncio.current_task()
+                if task is not None and task.cancelling():
+                    # connectrpc reports a cancelled request as an error;
+                    # the caller cancelled, so cancel.
+                    raise asyncio.CancelledError() from exc
+                if not _is_transient_status_read_error(exc):
+                    raise
+            else:
+                last = current
+                if is_batch_replace_settled(last):
+                    return last
+                if not window_known and last.accepted_ts_ns:
+                    # The window runs from acceptance; never extend it past
+                    # 60 s from the first read when clocks disagree.
+                    window_known = True
+                    left = (
+                        last.accepted_ts_ns / 1e9
+                        + BATCH_REPLACE_STATUS_WINDOW_SECONDS
+                        - time.time()
+                    )
+                    deadline = min(deadline, time.monotonic() + max(left, 0.0))
+            await asyncio.sleep(max(min(delay, deadline - time.monotonic()), 0.0))
+            delay = min(delay * 2, _BATCH_REPLACE_POLL_MAX)
+
     async def batch_create(
         self,
         *,
@@ -743,6 +850,15 @@ def _order_trades_projection_complete(result: GetOrderResult) -> bool:
             return False
         trade_sum += trade.qty.scaled
     return trade_sum == cum
+
+
+def _is_transient_status_read_error(exc: BaseException) -> bool:
+    """A status read error worth polling through: the status is not written
+    yet (``not_found``), or the server or network failed for now. Rate limits
+    are raised to the caller."""
+    if is_not_found(exc):
+        return True
+    return is_retryable_error(exc) and not isinstance(exc, PolyesterRateLimitError)
 
 
 def is_batch_replace_settled(status: BatchReplaceStatusResult) -> bool:

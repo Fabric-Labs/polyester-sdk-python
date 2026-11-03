@@ -23,6 +23,7 @@ class CaptureUnary:
         call: Callable[..., Awaitable[Message]],
         request: Message,
         decoder: Callable[[Message], T],
+        **_options: Any,
     ) -> T:
         self.request = request
         self.calls += 1

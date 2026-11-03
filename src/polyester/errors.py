@@ -9,6 +9,9 @@ AUTH_MFA_LAST_FACTOR_REQUIRED = "AUTH_MFA_LAST_FACTOR_REQUIRED"
 AUTH_INTERNAL_ERROR = "AUTH_INTERNAL_ERROR"
 # The account request changed nothing; retry the same request.
 AUTH_TEMPORARILY_UNAVAILABLE = "AUTH_TEMPORARILY_UNAVAILABLE"
+# A member call targeted the sub-account's owner: the owner cannot be invited,
+# re-roled or removed. The request changed nothing.
+AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED = "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED"
 
 # Gateway code for an API-key request whose signed timestamp is outside the
 # allowed skew window.
@@ -96,6 +99,22 @@ class PolyesterTimeoutError(PolyesterTransportError):
     """
 
 
+class PolyesterBatchReplaceTimeoutError(PolyesterTimeoutError):
+    """Raised when a batch replace has no status, or still has admitted items,
+    at the end of its status window or of the caller's timeout.
+
+    The server keeps a batch's status for 60 seconds from acceptance. A
+    ``not_found`` status read does not mean an item was refused, so reconcile
+    the orders themselves with order reads.
+    ``last_status`` is the last status read, or ``None`` when none succeeded.
+    """
+
+    def __init__(self, message: str, *, batch_request_id: str, last_status: object | None) -> None:
+        super().__init__(message)
+        self.batch_request_id = batch_request_id
+        self.last_status = last_status
+
+
 class PolyesterTimestampSkewError(PolyesterTransportError):
     """Raised when the API-key request timestamp is outside the allowed skew window.
 
@@ -139,6 +158,28 @@ class PolyesterApiError(PolyesterError):
         self.metadata = metadata or {}
         self.raw = raw
         self.existing_order_id = existing_order_id
+
+
+class PolyesterSubaccountOwnerRoleLockedError(PolyesterApiError):
+    """Raised when a sub-account member call targets the sub-account's owner.
+
+    Inviting the owner, accepting an invite whose grantee is the owner,
+    changing the owner's role and removing the owner are refused with
+    ``AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED`` (Connect ``failed_precondition``,
+    REST HTTP 412). The request changed nothing; it is not retryable. Show
+    "The owner's role can't be changed", and don't offer these actions for
+    the member whose role is ``OWNER``.
+    """
+
+    def __init__(
+        self,
+        message: str = "The sub-account owner's role can't be changed.",
+        *,
+        status_code: int | None = None,
+        raw: object | None = None,
+    ) -> None:
+        super().__init__(message, code=AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED, raw=raw)
+        self.status_code = status_code
 
 
 def auth_error_code(err: BaseException) -> str | None:

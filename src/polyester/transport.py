@@ -47,6 +47,9 @@ _HTTP_STATUS_TO_CODE = {
     401: Code.UNAUTHENTICATED,
     403: Code.PERMISSION_DENIED,
     404: Code.UNIMPLEMENTED,
+    # REST answers a precondition refusal (for example
+    # AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED) with 412, Connect with failed_precondition.
+    412: Code.FAILED_PRECONDITION,
     429: Code.UNAVAILABLE,
     502: Code.UNAVAILABLE,
     503: Code.UNAVAILABLE,

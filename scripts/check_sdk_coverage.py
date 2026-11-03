@@ -354,7 +354,8 @@ def extract_wrapped_python(
 ) -> set[str]:
     covered: set[str] = set()
     call_re = re.compile(
-        r"(?:unary_auth_decoded|unary_public_decoded|unary_auth|unary_public|"
+        r"(?:unary_auth_decoded_retry_unavailable|unary_auth_decoded|unary_public_decoded|"
+        r"unary_auth|unary_public|"
         r"unary_auth_message|unary_public_message)\(\s*"
         r"[^,]+,\s*([A-Za-z]+ServiceClient)\s*,\s*"
         r"lambda\s+client\s*,\s*\w+\s*:\s*client\.([a-z][a-z0-9_]*)\(",

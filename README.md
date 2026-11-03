@@ -60,6 +60,14 @@ Full cross-language comparison:
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, social-verification routes may require a JWT
 session or may not be mounted.
+A sub-account member call that targets the sub-account's owner (inviting the
+owner, accepting an invite for the owner, changing the owner's role or
+removing the owner) raises `PolyesterSubaccountOwnerRoleLockedError`, a
+`PolyesterApiError` with `code == "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED"`
+(Connect `failed_precondition`, REST 412). The request changed nothing and is
+not retryable: show "The owner's role can't be changed", and don't offer these
+actions for the member whose role is `OWNER`.
+
 Private streams require an Account ID and the corresponding API-key permission.
 A successful subscribe call means the token exchange and realtime handshake
 completed. Treat a structured permission denial as non-transient and update the
@@ -388,15 +396,42 @@ result = await client.orders.create(
 Compatible values from fills/books can be passed back into writes when the
 instrument/domain matches.
 
-`orders.batch_replace(...)` returns an admission receipt, not final execution.
-The predecessor ID can be stale after admission; reconcile the successor IDs
-and per-item phases by polling `get_batch_replace_status`. Use
-`is_batch_replace_settled(status)` only to determine that all items have moved
-to `working`, `rejected`, or `terminal`, not as a finality signal. Retry an
-ambiguous batch request with the same `request_id`. Each admission and status
-item carries `action_taken`: `"replaced"` when a successor order was admitted,
-`"amended"` for a cancel-only outcome with no successor (keep tracking
-`old_order_id` until it is terminal).
+`orders.batch_replace(...)` modifies up to 50 orders on one pair as one quote
+refresh, each item admitted or rejected on its own. An item that keeps the
+order's price, does not raise its total quantity and keeps its client order ID
+amends the order in place: same order ID, queue priority kept. A new price, a
+larger total quantity or a new client order ID replaces the order with a
+successor under a new order ID, with its queue priority reset. A new total
+quantity at or below the filled quantity ends the order at its filled
+quantity, with no successor. Each admission and status item carries
+`action_taken`: `"amended"` when the order keeps `old_order_id`, `"replaced"`
+when the successor `replacement_order_id` takes its place.
+
+The call returns an admission receipt, not final execution. An admitted item
+can still be refused when it is applied, for example a post-only price that
+would now cross: its status then reads `rejected` with a `code`, the order
+keeps its previous price and quantity, and no successor exists. So the
+receipt's `replacement_order_id` is a planned ID, not proof of an order.
+`orders.wait_batch_replace(batch_request_id=...)` polls
+`get_batch_replace_status` with a short backoff until no item is `admitted`,
+and returns that status. The status appears a few seconds after admission, so
+the wait polls through `not_found`, `unavailable` and other server or network
+errors; a rate limit or any other error is raised. A `rejected` item's `error_code` names the refusal as a
+single modify raises it (`ERROR_CODE_POST_ONLY_CROSS`; `code` is the raw
+`POST_ONLY_CROSS`), and its `replacement_order_id` is empty. The server keeps
+a batch's status for 60 seconds from acceptance, so the wait stops there (or
+at `timeout=`), even during a read, with `PolyesterBatchReplaceTimeoutError`,
+whose `last_status` is the last status read: a `not_found` proves nothing, so
+reconcile the orders themselves with order reads. `working` means the order is live, not that it is final. Retry an
+ambiguous batch request with the same `request_id`.
+
+```python
+receipt = await client.orders.batch_replace(symbol="BTC-USDT", items=items)
+status = await client.orders.wait_batch_replace(batch_request_id=receipt.batch_request_id)
+for item in status.items:
+    if item.phase == "rejected":
+        print(item.old_order_id, "unchanged:", item.error_code)
+```
 
 A replacement order's `cum_qty` includes the quantity filled by its
 predecessors; `Order.inherited_cum_qty` is that carried-over part (zero for an
@@ -409,7 +444,8 @@ order's `cancel_reason` is one of `USER_REQUEST`, `IOC_REMAINDER`,
 `MARKET_REMAINDER`, `STP_EXPIRE_MAKER`, `STP_EXPIRE_TAKER`, `STP_EXPIRE_BOTH`,
 `REPLACED`, `GTD_EXPIRED`, `QTY_AT_OR_BELOW_FILLED`, `PAIR_DRAIN`,
 `ATTACHED_RISK_REFUSED`, `CANCEL_ALL_AFTER`, `ACCOUNT_REPAIR`,
-`TWAP_ROLLOVER`, `STRATEGY_CANCEL` or `SYSTEM`. Both are `None` for every other
+`TWAP_ROLLOVER`, `STRATEGY_CANCEL`, `SYSTEM` or `MARKET_HALTED` (the exchange
+halted the market and canceled its open orders). Both are `None` for every other
 status. A number this SDK does not know yet reads `UNKNOWN_ERROR_CODE(n)` or
 `UNKNOWN_CANCEL_REASON(n)`; treat it as a generic refusal or end.
 
@@ -679,7 +715,17 @@ await client.triggers.resume(trigger_id=trigger_id)
 return only child orders created by that trigger (TWAP/ladder slices).
 Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 (`fire_price_ticks` is optional on the wire). Canceled and failed triggers
-expose typed `cancel_reason` / `failure_reason` labels (empty when unset).
+expose typed `cancel_reason` / `failure_reason` labels (empty when unset). A
+market halt ends every open trigger of the market with `cancel_reason`
+`market_halted`. A reason number this SDK does not name reads as its number,
+for example `failure_reason == "212"`.
+
+`triggers.get(...)` and `triggers.list(...)` show a trigger as the latest
+answered `modify`, `pause` or `resume` left it, or answer `unavailable`
+(HTTP 503) until they can. Both resend the same request on `unavailable`:
+after 25 ms, doubling up to 500 ms, for about 2 seconds, then raise
+`PolyesterServerError`. Read a trigger back after changing it with these
+methods.
 
 `Trigger.version` is 1 for a trigger's first state and higher for every later
 state change. Reads and realtime trigger updates carry the same version for
@@ -955,8 +1001,9 @@ async with subscription:
   revoked permission, close code 4400 or 4403) is raised from iteration, with
   `PolyesterRealtimeError.code` or `.close_code` set.
 - Batch-replace progress has no stream: poll
-  `client.orders.get_batch_replace_status(...)` and watch each order's
-  revisions on this stream.
+  `client.orders.get_batch_replace_status(...)` (or
+  `client.orders.wait_batch_replace(...)`) and watch each order's revisions on
+  this stream.
 
 ## Sync client
 

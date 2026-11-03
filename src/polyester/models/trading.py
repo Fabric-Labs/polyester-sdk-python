@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -415,17 +416,27 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     listing_status: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class StopAllTradingTriggerFailure:
+    """A trigger ``orders.stop_all_trading`` could not cancel, and why."""
+
+    trigger_id: str
+    error: Exception
+
+
 class StopAllTradingResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Outcome of ``orders.stop_all_trading``.
 
     ``canceled_trigger_ids`` are the live triggers whose cancel was accepted,
-    in the order they were canceled; ``ended_trigger_ids`` the ones that had
-    already ended when their cancel arrived. ``cancel_all`` is the cancel-all
-    that followed, for the open orders, those triggers placed included.
+    in the order they were canceled. ``trigger_failures`` are the ones whose
+    cancel failed, each with its error: a trigger that ended before its
+    cancel arrived, or any other refusal or transport error. Check it: a
+    failed trigger may still be live. ``cancel_all`` is the cancel-all that
+    followed, for the open orders, those triggers placed included.
     """
 
     canceled_trigger_ids: list[str] = []
-    ended_trigger_ids: list[str] = []
+    trigger_failures: list[StopAllTradingTriggerFailure] = []
     cancel_all: CancelAllOrdersResult | None = None
 
 

@@ -38,9 +38,9 @@ from polyester.codecs.orders import (
 )
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import (
-    PolyesterApiError,
     PolyesterBatchReplaceTimeoutError,
     PolyesterRateLimitError,
+    PolyesterResponseContractError,
     PolyesterTransportError,
     PolyesterValidationError,
     is_not_found,
@@ -72,6 +72,7 @@ from polyester.models import (
     OrdersList,
     PreviewOrderResult,
     StopAllTradingResult,
+    StopAllTradingTriggerFailure,
 )
 from polyester.models.private_orders import PrivateOrdersEvent
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
@@ -92,10 +93,6 @@ if TYPE_CHECKING:
 # Trigger statuses a trigger can still fire from; stop_all_trading cancels them.
 LIVE_TRIGGER_STATUSES = ("created", "armed", "running", "paused")
 _STOP_ALL_TRIGGERS_PAGE = 1000
-# Cancel refusals of a trigger that ended before its cancel arrived.
-_TRIGGER_ENDED_CODES = frozenset(
-    {"ERROR_CODE_TRIGGER_NOT_FOUND", "ERROR_CODE_TRIGGER_STATUS_INVALID"}
-)
 
 # GetBatchReplaceStatus keeps a batch's status this long from acceptance.
 BATCH_REPLACE_STATUS_WINDOW_SECONDS = 60.0
@@ -511,18 +508,22 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         :meth:`cancel_all`, so an order a trigger places before its cancel is
         still canceled. ``symbol`` limits both steps to one market.
 
-        A trigger that ended before its cancel arrived is listed in
-        ``ended_trigger_ids``. Any other error is raised before the
-        cancel-all; call again to finish.
+        An error while listing the triggers is raised before anything is
+        canceled. A trigger whose cancel fails, for any reason, is recorded in
+        ``trigger_failures`` with its error; the other triggers are still
+        canceled and the cancel-all still runs. An error from the cancel-all
+        itself is raised.
         """
         if self._triggers is None:
             raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
         scope = self._resolve_sub_account_id(sub_account_id, account=account)
+        explicit_scope = scope if scope is not None else ""
         trigger_ids: list[str] = []
+        seen_tokens: set[str] = set()
         page_token: str | None = None
         while True:
             page = await self._triggers.list(
-                sub_account_id=scope if scope is not None else "",
+                sub_account_id=explicit_scope,
                 symbol=symbol,
                 status=LIVE_TRIGGER_STATUSES,
                 limit=_STOP_ALL_TRIGGERS_PAGE,
@@ -531,28 +532,29 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             trigger_ids.extend(t.trigger_id for t in page.triggers if t.trigger_id)
             if not page.next_page_token:
                 break
+            if page.next_page_token in seen_tokens:
+                raise PolyesterResponseContractError(
+                    "ListTriggers", "next_page_token repeats an earlier page"
+                )
+            seen_tokens.add(page.next_page_token)
             page_token = page.next_page_token
         canceled: list[str] = []
-        ended: list[str] = []
+        failures: list[StopAllTradingTriggerFailure] = []
         for trigger_id in dict.fromkeys(trigger_ids):
             try:
-                await self._triggers.cancel(
-                    trigger_id=trigger_id, sub_account_id=scope if scope is not None else ""
-                )
-            except PolyesterApiError as exc:
-                if exc.code in _TRIGGER_ENDED_CODES or is_not_found(exc):
-                    ended.append(trigger_id)
-                    continue
-                raise
+                await self._triggers.cancel(trigger_id=trigger_id, sub_account_id=explicit_scope)
+            except Exception as exc:
+                failures.append(StopAllTradingTriggerFailure(trigger_id=trigger_id, error=exc))
+                continue
             canceled.append(trigger_id)
         cancel_all = await self.cancel_all(
-            sub_account_id=scope if scope is not None else "",
+            sub_account_id=explicit_scope,
             symbol=symbol,
             request_id=request_id,
         )
         return StopAllTradingResult(
             canceled_trigger_ids=canceled,
-            ended_trigger_ids=ended,
+            trigger_failures=failures,
             cancel_all=cancel_all,
         )
 

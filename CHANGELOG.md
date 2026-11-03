@@ -86,8 +86,12 @@ one call.
   included, which the server now refuses instead of answering `accepted`.
 - `orders.stop_all_trading(account=, sub_account_id=, symbol=, request_id=)`
   cancels every live trigger (all pages of `created`, `armed`, `running` and
-  `paused`), then all open orders, and returns a `StopAllTradingResult`.
-  Cancel-all and the dead-man switch never cancel triggers.
+  `paused`), then all open orders, and returns a `StopAllTradingResult` with
+  `canceled_trigger_ids`, `trigger_failures` (`StopAllTradingTriggerFailure`:
+  `trigger_id`, `error`) and `cancel_all`. A listing error, or a page token
+  that repeats, is raised before anything is canceled; a failed trigger cancel
+  is recorded and the other cancels and the cancel-all still run; a cancel-all
+  error is raised. Cancel-all and the dead-man switch never cancel triggers.
 - Changelog: surfaces `market_data`, `quickswap` and `rewards`, and
   `ChangelogSection.surface`, the product area a section covers (`""` for
   none).

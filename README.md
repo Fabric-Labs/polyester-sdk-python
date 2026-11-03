@@ -506,9 +506,13 @@ that triggers placed are canceled like any other. To stop all automated
 trading, `orders.stop_all_trading()` lists the live triggers (`created`,
 `armed`, `running`, `paused`, attached legs included) page by page, cancels
 each, and only then cancels all orders, so an order a trigger places before
-its cancel is still canceled. It returns the canceled trigger IDs, the ones
-that had already ended, and the cancel-all result; `symbol=` limits it to one
-market. Another refusal is raised before the cancel-all: call it again.
+its cancel is still canceled; `symbol=` limits it to one market. An error
+while listing the triggers is raised before anything is canceled. A trigger
+whose cancel fails, for any reason, is recorded and the run goes on: the other
+triggers are still canceled and the cancel-all always runs; an error from the
+cancel-all itself is raised. The result has `canceled_trigger_ids`,
+`trigger_failures` (each a `StopAllTradingTriggerFailure` with `trigger_id`
+and `error`: check them, such a trigger may still be live) and `cancel_all`.
 
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**

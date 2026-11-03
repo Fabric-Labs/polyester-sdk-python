@@ -8,6 +8,7 @@ from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
 from google.protobuf import field_mask_pb2 as _field_mask_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
+from polyester.gen.ledger.read.v1 import ledger_read_pb2 as _ledger_read_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.api.validation.v1 import predefined_string_rules_pb2 as _predefined_string_rules_pb2
 from google.protobuf.internal import containers as _containers
@@ -537,34 +538,38 @@ class RespondSubaccountInviteResponse(_message.Message):
     def __init__(self, invite: _Optional[_Union[SubaccountInvite, _Mapping]] = ...) -> None: ...
 
 class GetSubaccountRequest(_message.Message):
-    __slots__ = ("subaccount_id", "include_api_keys", "include_members", "include_invites", "include_policy", "invites_direction")
+    __slots__ = ("subaccount_id", "include_api_keys", "include_members", "include_invites", "include_policy", "include_balances", "invites_direction")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_API_KEYS_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_MEMBERS_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_INVITES_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_POLICY_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_BALANCES_FIELD_NUMBER: _ClassVar[int]
     INVITES_DIRECTION_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     include_api_keys: bool
     include_members: bool
     include_invites: bool
     include_policy: bool
+    include_balances: bool
     invites_direction: SubaccountInviteDirection
-    def __init__(self, subaccount_id: _Optional[int] = ..., include_api_keys: _Optional[bool] = ..., include_members: _Optional[bool] = ..., include_invites: _Optional[bool] = ..., include_policy: _Optional[bool] = ..., invites_direction: _Optional[_Union[SubaccountInviteDirection, str]] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., include_api_keys: _Optional[bool] = ..., include_members: _Optional[bool] = ..., include_invites: _Optional[bool] = ..., include_policy: _Optional[bool] = ..., include_balances: _Optional[bool] = ..., invites_direction: _Optional[_Union[SubaccountInviteDirection, str]] = ...) -> None: ...
 
 class GetSubaccountResponse(_message.Message):
-    __slots__ = ("subaccount", "api_keys", "members", "invites", "policy")
+    __slots__ = ("subaccount", "api_keys", "members", "invites", "policy", "balances")
     SUBACCOUNT_FIELD_NUMBER: _ClassVar[int]
     API_KEYS_FIELD_NUMBER: _ClassVar[int]
     MEMBERS_FIELD_NUMBER: _ClassVar[int]
     INVITES_FIELD_NUMBER: _ClassVar[int]
     POLICY_FIELD_NUMBER: _ClassVar[int]
+    BALANCES_FIELD_NUMBER: _ClassVar[int]
     subaccount: Subaccount
     api_keys: _containers.RepeatedCompositeFieldContainer[_api_keys_pb2.ApiKey]
     members: _containers.RepeatedCompositeFieldContainer[SubaccountMemberView]
     invites: _containers.RepeatedCompositeFieldContainer[SubaccountInvite]
     policy: _policies_pb2.SubaccountPolicyView
-    def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ..., api_keys: _Optional[_Iterable[_Union[_api_keys_pb2.ApiKey, _Mapping]]] = ..., members: _Optional[_Iterable[_Union[SubaccountMemberView, _Mapping]]] = ..., invites: _Optional[_Iterable[_Union[SubaccountInvite, _Mapping]]] = ..., policy: _Optional[_Union[_policies_pb2.SubaccountPolicyView, _Mapping]] = ...) -> None: ...
+    balances: _ledger_read_pb2.GetBalancesResponse
+    def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ..., api_keys: _Optional[_Iterable[_Union[_api_keys_pb2.ApiKey, _Mapping]]] = ..., members: _Optional[_Iterable[_Union[SubaccountMemberView, _Mapping]]] = ..., invites: _Optional[_Iterable[_Union[SubaccountInvite, _Mapping]]] = ..., policy: _Optional[_Union[_policies_pb2.SubaccountPolicyView, _Mapping]] = ..., balances: _Optional[_Union[_ledger_read_pb2.GetBalancesResponse, _Mapping]] = ...) -> None: ...
 
 class ActivityEvent(_message.Message):
     __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json")

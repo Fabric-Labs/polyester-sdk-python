@@ -45,6 +45,7 @@ class CancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CANCEL_REASON_STRATEGY_CANCEL: _ClassVar[CancelReason]
     CANCEL_REASON_SYSTEM: _ClassVar[CancelReason]
     CANCEL_REASON_MARKET_HALTED: _ClassVar[CancelReason]
+    CANCEL_REASON_ATTACHED_EXIT_FIRED: _ClassVar[CancelReason]
 
 class BatchReplacePhase(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -95,6 +96,7 @@ CANCEL_REASON_TWAP_ROLLOVER: CancelReason
 CANCEL_REASON_STRATEGY_CANCEL: CancelReason
 CANCEL_REASON_SYSTEM: CancelReason
 CANCEL_REASON_MARKET_HALTED: CancelReason
+CANCEL_REASON_ATTACHED_EXIT_FIRED: CancelReason
 BATCH_REPLACE_PHASE_UNSPECIFIED: BatchReplacePhase
 BATCH_REPLACE_PHASE_ADMITTED: BatchReplacePhase
 BATCH_REPLACE_PHASE_WORKING: BatchReplacePhase

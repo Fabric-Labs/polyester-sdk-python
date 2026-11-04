@@ -33,9 +33,6 @@ class LedgerReadService(Protocol):
     async def list_transfers(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def list_holds(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-
     async def get_balances(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -94,16 +91,6 @@ class LedgerReadServiceASGIApplication(ConnectASGIApplication[LedgerReadService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_transfers,
-                ),
-                "/ledger.read.v1.LedgerReadService/ListHolds": Endpoint.unary(
-                    method=MethodInfo(
-                        name="ListHolds",
-                        service_name="ledger.read.v1.LedgerReadService",
-                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest,
-                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
-                    ),
-                    function=svc.list_holds,
                 ),
                 "/ledger.read.v1.LedgerReadService/GetBalances": Endpoint.unary(
                     method=MethodInfo(
@@ -229,26 +216,6 @@ class LedgerReadServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
-    async def list_holds(
-        self,
-        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse:
-        return await self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="ListHolds",
-                service_name="ledger.read.v1.LedgerReadService",
-                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest,
-                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
     async def get_balances(
         self,
         request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesRequest,
@@ -283,8 +250,6 @@ class LedgerReadServiceSync(Protocol):
     def get_portfolio_equity_snapshot(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetPortfolioEquitySnapshotResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_transfers(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def list_holds(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_balances(self, request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.GetBalancesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -343,16 +308,6 @@ class LedgerReadServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_transfers,
-                ),
-                "/ledger.read.v1.LedgerReadService/ListHolds": EndpointSync.unary(
-                    method=MethodInfo(
-                        name="ListHolds",
-                        service_name="ledger.read.v1.LedgerReadService",
-                        input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest,
-                        output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse,
-                        idempotency_level=IdempotencyLevel.UNKNOWN,
-                    ),
-                    function=service.list_holds,
                 ),
                 "/ledger.read.v1.LedgerReadService/GetBalances": EndpointSync.unary(
                     method=MethodInfo(
@@ -472,26 +427,6 @@ class LedgerReadServiceClientSync(ConnectClientSync):
                 service_name="ledger.read.v1.LedgerReadService",
                 input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersRequest,
                 output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListTransfersResponse,
-                idempotency_level=IdempotencyLevel.UNKNOWN,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
-    def list_holds(
-        self,
-        request: ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-    ) -> ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse:
-        return self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="ListHolds",
-                service_name="ledger.read.v1.LedgerReadService",
-                input=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsRequest,
-                output=ledger_dot_read_dot_v1_dot_ledger__read__pb2.ListHoldsResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -6,22 +6,49 @@ from tests.unit.test_auth_error_codes import _rest_error
 
 
 @pytest.mark.parametrize(
-    "code,status,detail",
+    "code,status,detail,expected_type",
     [
-        ("UNAUTHENTICATED", 401, ""),
-        ("TIMESTAMP_SKEW", 401, "clock skew"),
-        ("AUTH_TIMESTAMP_SKEW", 401, "clock skew"),
-        ("AUTH_AUTHENTICATION_REQUIRED", 401, "unauthenticated"),
-        ("PERMISSION_DENIED", 403, "missing read permission"),
+        ("UNAUTHENTICATED", 401, "", "https://polyester.dev/problems/unauthenticated"),
+        ("TIMESTAMP_SKEW", 401, "clock skew", "https://polyester.dev/problems/timestamp-skew"),
+        (
+            "AUTH_TIMESTAMP_SKEW",
+            401,
+            "clock skew",
+            "https://polyester.dev/problems/auth-timestamp-skew",
+        ),
+        (
+            "AUTH_AUTHENTICATION_REQUIRED",
+            401,
+            "unauthenticated",
+            "https://polyester.dev/problems/auth-authentication-required",
+        ),
+        (
+            "PERMISSION_DENIED",
+            403,
+            "missing read permission",
+            "https://polyester.dev/problems/permission-denied",
+        ),
+        (
+            "AUTH_SESSION_KIND_NOT_ALLOWED",
+            403,
+            "",
+            "https://polyester.dev/problems/auth-session-kind-not-allowed",
+        ),
     ],
 )
-async def test_early_auth_and_realtime_share_problem_decoder(httpserver, code, status, detail):
+@pytest.mark.parametrize(
+    "supplied_type", [None, "https://polyester.dev/problems/AUTH_SESSION_KIND_NOT_ALLOWED"]
+)
+async def test_early_auth_and_realtime_share_problem_decoder(
+    httpserver, code, status, detail, expected_type, supplied_type
+):
     body = {
-        "type": "https://polyester.dev/problems/" + code.lower().replace("_", "-"),
         "code": code,
         "status": status,
         "detail": detail,
     }
+    if supplied_type is not None:
+        body["type"] = supplied_type
     gateway_error = await _rest_error(httpserver, status, body)
     realtime_error = _auth_http_error(
         status_code=status,
@@ -33,4 +60,4 @@ async def test_early_auth_and_realtime_share_problem_decoder(httpserver, code, s
         assert error.problem.code == code
         assert error.problem.status == status
         assert error.problem.detail == detail
-        assert error.problem.type == body["type"]
+        assert error.problem.type == expected_type

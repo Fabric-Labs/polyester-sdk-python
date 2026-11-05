@@ -45,6 +45,11 @@ _EMPTY_ERROR_MESSAGE = "request failed without server error details"
 # connectrpc reports a bare (non-Connect) HTTP error by its status phrase; a
 # bare 501 arrives as code ``unknown`` with this message.
 _HTTP_501_PHRASE = "Not Implemented"
+_SERVICE_ERROR_ENUMS = {
+    "orders.v1.ErrorDetail": orders_pb2.ErrorCode,
+    "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorCode,
+    "transfer.v1.ErrorDetail": transfer_pb2.ErrorCode,
+}
 
 
 def protobuf_to_public_dict(message: Message) -> dict[str, Any]:
@@ -167,6 +172,15 @@ def _map_connect_error(exc: ConnectError):
             if unpacked is None:
                 continue
             full_name = unpacked.DESCRIPTOR.full_name
+            # Service details describe the reason; the transport code determines
+            # whether the failure is temporary, regardless of the reason's name.
+            if exc.code.value == "unavailable" and full_name in _SERVICE_ERROR_ENUMS:
+                return PolyesterServerError(
+                    error_message,
+                    code=error_code_name(_SERVICE_ERROR_ENUMS[full_name], unpacked.code),
+                    status_code=503,
+                    raw=unpacked,
+                )
             if full_name == "auth.v1.AuthErrorDetail":
                 code_name = error_code_name(auth_pb2.AuthErrorCode, unpacked.code)
                 message = unpacked.message or error_message
@@ -199,13 +213,6 @@ def _map_connect_error(exc: ConnectError):
                 return _rate_limit_error(error_message, proto_detail=unpacked)
             if full_name == "orders.v1.ErrorDetail":
                 code_name = error_code_name(orders_pb2.ErrorCode, unpacked.code)
-                # A policy lookup outage is not a policy denial. Use the
-                # transport status too: some *_UNAVAILABLE codes are permanent
-                # failed preconditions (for example MARKET_PRICE_UNAVAILABLE).
-                if code_name.endswith("_UNAVAILABLE") and exc.code.value == "unavailable":
-                    return PolyesterServerError(
-                        error_message, code=code_name, status_code=503, raw=unpacked
-                    )
                 rate_limit = unpacked.rate_limit if unpacked.HasField("rate_limit") else None
                 if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
                     return _rate_limit_error(error_message, proto_detail=rate_limit)

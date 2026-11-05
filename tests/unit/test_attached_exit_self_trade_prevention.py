@@ -67,8 +67,8 @@ def test_order_read_and_stream_label_the_attached_exit_cancel() -> None:
 
 def test_unknown_cancel_reason_decodes_to_a_generic_label() -> None:
     newer = orders_read_pb2.Order(order_id=7, symbol_id=1, status=orders_read_pb2.CANCELED)
-    newer.cancel_reason = 212  # type: ignore[assignment]
-    assert order_from_proto(newer).cancel_reason == "UNKNOWN_CANCEL_REASON(212)"
+    newer.cancel_reason = 321  # type: ignore[assignment]
+    assert order_from_proto(newer).cancel_reason == "UNKNOWN_CANCEL_REASON(321)"
 
 
 def _stp_refusal(child_order_id: int = 0) -> triggers_pb2.TriggerEvent:
@@ -101,8 +101,8 @@ def test_self_trade_prevented_is_a_fire_refusal_naming_the_expired_child() -> No
 
 def test_unknown_fire_refusal_reason_decodes_without_failing() -> None:
     event = _stp_refusal()
-    event.fire_refusal_reason = 212  # type: ignore[assignment]
-    assert trigger_event_from_proto(event).fire_refusal_reason == "212"
+    event.fire_refusal_reason = 321  # type: ignore[assignment]
+    assert trigger_event_from_proto(event).fire_refusal_reason == "321"
 
 
 def test_halted_market_refusal_reads_market_halted() -> None:

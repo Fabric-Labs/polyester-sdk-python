@@ -7,7 +7,6 @@ from polyester.codecs.decode.balances import (
     balance_history_from_proto,
     balances_list_from_proto,
     equity_history_from_proto,
-    holds_list_from_proto,
 )
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
@@ -17,21 +16,18 @@ from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
     GetBalancesRequest,
     GetEquityHistorySeriesRequest,
-    ListHoldsRequest,
 )
 from polyester.models import (
     AssetBalance,
     BalanceHistory,
     BalancesList,
     EquityHistory,
-    HoldsList,
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._validation import validate_limit
 
 
 class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
@@ -124,28 +120,6 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.get_equity_history_series(req),
             request,
             equity_history_from_proto,
-        )
-
-    async def list_holds(
-        self,
-        *,
-        account: AccountScope | None = None,
-        sub_account_id: str | None = None,
-        limit: int = 50,
-        reversed: bool = False,
-    ) -> HoldsList:
-        request = ListHoldsRequest(limit=validate_limit(limit), reversed=reversed)
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is not None:
-            request.subaccount_id = parsed_sub
-        return await unary_auth_decoded(
-            self._transport,
-            LedgerReadServiceClient,
-            lambda client, req: client.list_holds(req),
-            request,
-            holds_list_from_proto,
         )
 
     async def subscribe(

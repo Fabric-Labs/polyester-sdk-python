@@ -679,17 +679,6 @@ class EquityHistory(msgspec.Struct, kw_only=True, omit_defaults=True):
     series: list[EquityHistorySeries] = []
 
 
-class Hold(msgspec.Struct, kw_only=True, omit_defaults=True):
-    hold_id: str = ""
-    asset_id: int = 0
-    amount_reserved: str = "0"
-    expires_at_ns: str = "0"
-
-
-class HoldsList(msgspec.Struct, kw_only=True, omit_defaults=True):
-    holds: list[Hold]
-
-
 class BucketTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     transfer_id: str = ""
     timestamp_ns: str = "0"

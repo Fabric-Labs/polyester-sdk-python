@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from polyester._problem import HTTPProblem
+
 if TYPE_CHECKING:
     from polyester.models.trading import OrderFieldViolation
 
@@ -62,6 +64,8 @@ _OUTCOME_UNKNOWN_SUFFIX = "_OUTCOME_UNKNOWN"
 
 class PolyesterError(Exception):
     """Base class for all SDK-raised errors."""
+
+    problem: HTTPProblem | None = None
 
 
 class PolyesterAuthError(PolyesterError):

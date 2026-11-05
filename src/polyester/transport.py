@@ -12,9 +12,10 @@ from connectrpc.interceptor import UnaryInterceptor
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
 
+from polyester._problem import decode_http_problem
 from polyester.auth import ApiKeyCredentials
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
-from polyester.errors import TIMESTAMP_SKEW, PolyesterAuthError, PolyesterTransportError
+from polyester.errors import PolyesterAuthError, PolyesterTransportError
 from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
 
 WireFormat = Literal["binary", "json"]
@@ -56,8 +57,10 @@ class GatewayProblemError(ConnectError):
         http_status: int,
         detail: str = "",
         violations: list[dict[str, object]] | None = None,
+        problem=None,
     ) -> None:
         super().__init__(code, problem_code)
+        self.problem = problem
         self.problem_code = problem_code
         self.http_status = http_status
         self.detail = detail
@@ -107,14 +110,13 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
     code = body.get("code")
     if not isinstance(code, str) or not code or code in _CONNECT_CODES:
         return response
-    if code == TIMESTAMP_SKEW:
-        raise ConnectError(Code.UNAUTHENTICATED, TIMESTAMP_SKEW)
     detail = body.get("detail")
     violations = body.get("violations")
     raise GatewayProblemError(
         _HTTP_STATUS_TO_CODE.get(response.status, Code.UNKNOWN),
         code,
         http_status=response.status,
+        problem=decode_http_problem(body, response.status),
         detail=detail if isinstance(detail, str) else "",
         violations=(
             [item for item in violations if isinstance(item, dict)]

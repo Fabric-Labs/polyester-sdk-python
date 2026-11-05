@@ -229,19 +229,13 @@ async def account_balances(live_client):
 
 @pytest.fixture(scope="session")
 async def capabilities(live_client, smoke_symbol):
-    caps = {"orderbook": True, "list_holds": True, "get_current_candle": True}
+    caps = {"orderbook": True, "get_current_candle": True}
     try:
         await live_client.orderbook.get(symbol=smoke_symbol, depth=5)
     except Exception as exc:
         if not _optional_route_unavailable(exc):
             raise
         caps["orderbook"] = False
-    try:
-        await live_client.balances.list_holds(limit=1)
-    except Exception as exc:
-        if not _optional_route_unavailable(exc):
-            raise
-        caps["list_holds"] = False
     try:
         await live_client.market_data.get_current_candle(symbol=smoke_symbol)
     except Exception as exc:

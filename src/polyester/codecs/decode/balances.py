@@ -11,8 +11,6 @@ from polyester.models import (
     BalancesList,
     EquityHistory,
     EquityHistorySeries,
-    Hold,
-    HoldsList,
 )
 
 _BALANCE_RANGE_LABELS: dict[int, str] = {
@@ -112,16 +110,3 @@ def equity_history_from_proto(
         points=int(msg.points),
         series=[equity_history_series_from_proto(item) for item in msg.series],
     )
-
-
-def hold_from_proto(msg: ledger_read_pb2.HoldRow) -> Hold:
-    return Hold(
-        hold_id=format_uint64_id(msg.hold_id),
-        asset_id=int(msg.asset_id),
-        amount_reserved=u128_from_proto(msg.amount_reserved_e18),
-        expires_at_ns=str(msg.expires_at_ns),
-    )
-
-
-def holds_list_from_proto(msg: ledger_read_pb2.ListHoldsResponse) -> HoldsList:
-    return HoldsList(holds=[hold_from_proto(item) for item in msg.holds])

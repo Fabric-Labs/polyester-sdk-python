@@ -356,38 +356,6 @@ class ListTransfersResponse(_message.Message):
     next_page_token: str
     def __init__(self, transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
-class ListHoldsRequest(_message.Message):
-    __slots__ = ("subaccount_id", "limit", "reversed", "page_token")
-    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_FIELD_NUMBER: _ClassVar[int]
-    REVERSED_FIELD_NUMBER: _ClassVar[int]
-    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
-    subaccount_id: int
-    limit: int
-    reversed: bool
-    page_token: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., reversed: _Optional[bool] = ..., page_token: _Optional[str] = ...) -> None: ...
-
-class HoldRow(_message.Message):
-    __slots__ = ("hold_id", "amount_reserved_e18", "asset_id", "expires_at_ns")
-    HOLD_ID_FIELD_NUMBER: _ClassVar[int]
-    AMOUNT_RESERVED_E18_FIELD_NUMBER: _ClassVar[int]
-    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    EXPIRES_AT_NS_FIELD_NUMBER: _ClassVar[int]
-    hold_id: int
-    amount_reserved_e18: _u128_pb2.U128
-    asset_id: int
-    expires_at_ns: int
-    def __init__(self, hold_id: _Optional[int] = ..., amount_reserved_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., asset_id: _Optional[int] = ..., expires_at_ns: _Optional[int] = ...) -> None: ...
-
-class ListHoldsResponse(_message.Message):
-    __slots__ = ("holds", "next_page_token")
-    HOLDS_FIELD_NUMBER: _ClassVar[int]
-    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
-    holds: _containers.RepeatedCompositeFieldContainer[HoldRow]
-    next_page_token: str
-    def __init__(self, holds: _Optional[_Iterable[_Union[HoldRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
-
 class ErrorDetail(_message.Message):
     __slots__ = ("code",)
     CODE_FIELD_NUMBER: _ClassVar[int]

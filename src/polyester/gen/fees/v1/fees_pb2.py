@@ -25,10 +25,11 @@ _sym_db = _symbol_database.Default()
 from polyester.gen.buf.validate import validate_pb2 as buf_dot_validate_dot_validate__pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as gnostic_dot_openapi_dot_v3_dot_annotations__pb2
 from polyester.gen.google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from polyester.gen.polyester.api import options_pb2 as polyester_dot_api_dot_options__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x66\x65\x65s/v1/fees.proto\x12\x07\x66\x65\x65s.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bpolyester/api/options.proto\"\xb9\x02\n\x0bSpotFeeRate\x12$\n\tsymbol_id\x18\x01 \x01(\rB\x07\xbaH\x04*\x02 \x00R\x08symbolId\x12p\n\x16maker_fee_rate_percent\x18\x03 \x01(\tB;\xbaH8r6\x10\x01\x18\x0e\x32\x30^-?(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x13makerFeeRatePercent\x12n\n\x16taker_fee_rate_percent\x18\x04 \x01(\tB9\xbaH6r4\x10\x01\x18\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x13takerFeeRatePercent\x12\"\n\x08vip_tier\x18\x05 \x01(\rB\x07\xbaH\x04*\x02\x18\nR\x07vipTier\"\x93\x01\n\x16GetSpotFeeRatesRequest\x12\x38\n\rsubaccount_id\x18\x01 \x01(\x06\x42\x0e\xbaH\x0bR\t!\x00\x00\x00\x00\x00\x00\x00\x00H\x00R\x0csubaccountId\x88\x01\x01\x12-\n\tsymbol_id\x18\x02 \x03(\rB\x10\xbaH\r\x92\x01\n\x10\x64\x18\x01\"\x04*\x02 \x00R\x08symbolIdB\x10\n\x0e_subaccount_id\"L\n\x17GetSpotFeeRatesResponse\x12\x31\n\tfee_rates\x18\x01 \x03(\x0b\x32\x14.fees.v1.SpotFeeRateR\x08\x66\x65\x65Rates2\x86\x02\n\nFeeService\x12\xea\x01\n\x0fGetSpotFeeRates\x12\x1f.fees.v1.GetSpotFeeRatesRequest\x1a .fees.v1.GetSpotFeeRatesResponse\"\x93\x01\xbaGp\n\x0b\x46\x65\x65 Service\x12\x12Get Spot Fee Rates\x1aMGet effective maker and taker fee rates for the authenticated account target.\xa2\xb5\x18\x02\x01\x02\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/spot/fee-rates\x1a\x0b\x8a\xb5\x18\x07tradingB\x7fZ:github.com/Fabric-Labs/polyester-sdk-go/gen/fees/v1;feesv1\xbaG@:>\n\x0b\x46\x65\x65 Service\x12/Authenticated effective spot trading fee rates.b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x66\x65\x65s/v1/fees.proto\x12\x07\x66\x65\x65s.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\"\xd3\x05\n\x0bSpotFeeRate\x12$\n\tsymbol_id\x18\x01 \x01(\rB\x07\xbaH\x04*\x02 \x00R\x08symbolId\x12p\n\x16maker_fee_rate_percent\x18\x03 \x01(\tB;\xbaH8r6\x10\x01\x18\x0e\x32\x30^-?(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x13makerFeeRatePercent\x12n\n\x16taker_fee_rate_percent\x18\x04 \x01(\tB9\xbaH6r4\x10\x01\x18\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x13takerFeeRatePercent\x12\"\n\x08vip_tier\x18\x05 \x01(\rB\x07\xbaH\x04*\x02\x18\nR\x07vipTier\x12r\n\x18reserve_fee_rate_percent\x18\x06 \x01(\tB9\xbaH6r4\x10\x01\x18\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x15reserveFeeRatePercent\x12\x84\x01\n\"post_only_reserve_fee_rate_percent\x18\x07 \x01(\tB9\xbaH6r4\x10\x01\x18\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x1dpostOnlyReserveFeeRatePercent\x12\x43\n\tbreakdown\x18\x08 \x01(\x0b\x32\x1d.fees.v1.SpotFeeRateBreakdownB\x06\xbaH\x03\xc8\x01\x01R\tbreakdown\x12\x45\n\x0enext_change_at\x18\t \x01(\x0b\x32\x1a.google.protobuf.TimestampH\x00R\x0cnextChangeAt\x88\x01\x01\x42\x11\n\x0f_next_change_at\"\x97\x04\n\x14SpotFeeRateBreakdown\x12y\n\x1btier_maker_fee_rate_percent\x18\x01 \x01(\tB;\xbaH8r6\x10\x01\x18\x0e\x32\x30^-?(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x17tierMakerFeeRatePercent\x12w\n\x1btier_taker_fee_rate_percent\x18\x02 \x01(\tB9\xbaH6r4\x10\x01\x18\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$R\x17tierTakerFeeRatePercent\x12L\n\x11market_multiplier\x18\x03 \x01(\x0b\x32\x1a.fees.v1.SpotFeeMultiplierH\x00R\x10marketMultiplier\x88\x01\x01\x12\x45\n\x11\x61\x63\x63ount_discounts\x18\x04 \x03(\x0b\x32\x18.fees.v1.SpotFeeDiscountR\x10\x61\x63\x63ountDiscounts\x12J\n\x11referral_discount\x18\x05 \x01(\x0b\x32\x18.fees.v1.SpotFeeDiscountH\x01R\x10referralDiscount\x88\x01\x01\x42\x14\n\x12_market_multiplierB\x14\n\x12_referral_discount\"\x95\x03\n\x11SpotFeeMultiplier\x12o\n\x18maker_multiplier_percent\x18\x01 \x01(\tB5\xbaH2r0\x10\x01\x18\x06\x32*^(100|([0-9]|[1-9][0-9])([.][0-9]{1,2})?)$R\x16makerMultiplierPercent\x12o\n\x18taker_multiplier_percent\x18\x02 \x01(\tB5\xbaH2r0\x10\x01\x18\x06\x32*^(100|([0-9]|[1-9][0-9])([.][0-9]{1,2})?)$R\x16takerMultiplierPercent\x12I\n\x0e\x65\x66\x66\x65\x63tive_from\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\reffectiveFrom\x12\x42\n\x0c\x65\x66\x66\x65\x63tive_to\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampH\x00R\x0b\x65\x66\x66\x65\x63tiveTo\x88\x01\x01\x42\x0f\n\r_effective_to\"\x8c\x03\n\x0fSpotFeeDiscount\x12[\n\x16maker_discount_percent\x18\x01 \x01(\tB%\xbaH\"r \x10\x01\x18\x18\x32\x1a^-?[0-9]+([.][0-9]{1,2})?$R\x14makerDiscountPercent\x12[\n\x16taker_discount_percent\x18\x02 \x01(\tB%\xbaH\"r \x10\x01\x18\x18\x32\x1a^-?[0-9]+([.][0-9]{1,2})?$R\x14takerDiscountPercent\x12\x1f\n\x0b\x61ll_markets\x18\x03 \x01(\x08R\nallMarkets\x12I\n\x0e\x65\x66\x66\x65\x63tive_from\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\reffectiveFrom\x12\x42\n\x0c\x65\x66\x66\x65\x63tive_to\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampH\x00R\x0b\x65\x66\x66\x65\x63tiveTo\x88\x01\x01\x42\x0f\n\r_effective_to\"\x93\x01\n\x16GetSpotFeeRatesRequest\x12\x38\n\rsubaccount_id\x18\x01 \x01(\x06\x42\x0e\xbaH\x0bR\t!\x00\x00\x00\x00\x00\x00\x00\x00H\x00R\x0csubaccountId\x88\x01\x01\x12-\n\tsymbol_id\x18\x02 \x03(\rB\x10\xbaH\r\x92\x01\n\x10\x64\x18\x01\"\x04*\x02 \x00R\x08symbolIdB\x10\n\x0e_subaccount_id\"L\n\x17GetSpotFeeRatesResponse\x12\x31\n\tfee_rates\x18\x01 \x03(\x0b\x32\x14.fees.v1.SpotFeeRateR\x08\x66\x65\x65Rates2\xdb\x02\n\nFeeService\x12\xbf\x02\n\x0fGetSpotFeeRates\x12\x1f.fees.v1.GetSpotFeeRatesRequest\x1a .fees.v1.GetSpotFeeRatesResponse\"\xe8\x01\xbaG\xc4\x01\n\x0b\x46\x65\x65 Service\x12\x12Get Spot Fee Rates\x1a\xa0\x01Get effective maker and taker fee rates, the rates an order reserves its fee at, and the components of the effective rates for the authenticated account target.\xa2\xb5\x18\x02\x01\x02\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/spot/fee-rates\x1a\x0b\x8a\xb5\x18\x07tradingB\x7fZ:github.com/Fabric-Labs/polyester-sdk-go/gen/fees/v1;feesv1\xbaG@:>\n\x0b\x46\x65\x65 Service\x12/Authenticated effective spot trading fee rates.b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -44,6 +45,28 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SPOTFEERATE'].fields_by_name['taker_fee_rate_percent']._serialized_options = b'\272H6r4\020\001\030\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$'
   _globals['_SPOTFEERATE'].fields_by_name['vip_tier']._loaded_options = None
   _globals['_SPOTFEERATE'].fields_by_name['vip_tier']._serialized_options = b'\272H\004*\002\030\n'
+  _globals['_SPOTFEERATE'].fields_by_name['reserve_fee_rate_percent']._loaded_options = None
+  _globals['_SPOTFEERATE'].fields_by_name['reserve_fee_rate_percent']._serialized_options = b'\272H6r4\020\001\030\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$'
+  _globals['_SPOTFEERATE'].fields_by_name['post_only_reserve_fee_rate_percent']._loaded_options = None
+  _globals['_SPOTFEERATE'].fields_by_name['post_only_reserve_fee_rate_percent']._serialized_options = b'\272H6r4\020\001\030\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$'
+  _globals['_SPOTFEERATE'].fields_by_name['breakdown']._loaded_options = None
+  _globals['_SPOTFEERATE'].fields_by_name['breakdown']._serialized_options = b'\272H\003\310\001\001'
+  _globals['_SPOTFEERATEBREAKDOWN'].fields_by_name['tier_maker_fee_rate_percent']._loaded_options = None
+  _globals['_SPOTFEERATEBREAKDOWN'].fields_by_name['tier_maker_fee_rate_percent']._serialized_options = b'\272H8r6\020\001\030\01620^-?(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$'
+  _globals['_SPOTFEERATEBREAKDOWN'].fields_by_name['tier_taker_fee_rate_percent']._loaded_options = None
+  _globals['_SPOTFEERATEBREAKDOWN'].fields_by_name['tier_taker_fee_rate_percent']._serialized_options = b'\272H6r4\020\001\030\r2.^(100([.]0+)?|([0-9]|[1-9][0-9])([.][0-9]+)?)$'
+  _globals['_SPOTFEEMULTIPLIER'].fields_by_name['maker_multiplier_percent']._loaded_options = None
+  _globals['_SPOTFEEMULTIPLIER'].fields_by_name['maker_multiplier_percent']._serialized_options = b'\272H2r0\020\001\030\0062*^(100|([0-9]|[1-9][0-9])([.][0-9]{1,2})?)$'
+  _globals['_SPOTFEEMULTIPLIER'].fields_by_name['taker_multiplier_percent']._loaded_options = None
+  _globals['_SPOTFEEMULTIPLIER'].fields_by_name['taker_multiplier_percent']._serialized_options = b'\272H2r0\020\001\030\0062*^(100|([0-9]|[1-9][0-9])([.][0-9]{1,2})?)$'
+  _globals['_SPOTFEEMULTIPLIER'].fields_by_name['effective_from']._loaded_options = None
+  _globals['_SPOTFEEMULTIPLIER'].fields_by_name['effective_from']._serialized_options = b'\272H\003\310\001\001'
+  _globals['_SPOTFEEDISCOUNT'].fields_by_name['maker_discount_percent']._loaded_options = None
+  _globals['_SPOTFEEDISCOUNT'].fields_by_name['maker_discount_percent']._serialized_options = b'\272H\"r \020\001\030\0302\032^-?[0-9]+([.][0-9]{1,2})?$'
+  _globals['_SPOTFEEDISCOUNT'].fields_by_name['taker_discount_percent']._loaded_options = None
+  _globals['_SPOTFEEDISCOUNT'].fields_by_name['taker_discount_percent']._serialized_options = b'\272H\"r \020\001\030\0302\032^-?[0-9]+([.][0-9]{1,2})?$'
+  _globals['_SPOTFEEDISCOUNT'].fields_by_name['effective_from']._loaded_options = None
+  _globals['_SPOTFEEDISCOUNT'].fields_by_name['effective_from']._serialized_options = b'\272H\003\310\001\001'
   _globals['_GETSPOTFEERATESREQUEST'].fields_by_name['subaccount_id']._loaded_options = None
   _globals['_GETSPOTFEERATESREQUEST'].fields_by_name['subaccount_id']._serialized_options = b'\272H\013R\t!\000\000\000\000\000\000\000\000'
   _globals['_GETSPOTFEERATESREQUEST'].fields_by_name['symbol_id']._loaded_options = None
@@ -51,13 +74,19 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_FEESERVICE']._loaded_options = None
   _globals['_FEESERVICE']._serialized_options = b'\212\265\030\007trading'
   _globals['_FEESERVICE'].methods_by_name['GetSpotFeeRates']._loaded_options = None
-  _globals['_FEESERVICE'].methods_by_name['GetSpotFeeRates']._serialized_options = b'\272Gp\n\013Fee Service\022\022Get Spot Fee Rates\032MGet effective maker and taker fee rates for the authenticated account target.\242\265\030\002\001\002\202\323\344\223\002\024\022\022/v1/spot/fee-rates'
-  _globals['_SPOTFEERATE']._serialized_start=158
-  _globals['_SPOTFEERATE']._serialized_end=471
-  _globals['_GETSPOTFEERATESREQUEST']._serialized_start=474
-  _globals['_GETSPOTFEERATESREQUEST']._serialized_end=621
-  _globals['_GETSPOTFEERATESRESPONSE']._serialized_start=623
-  _globals['_GETSPOTFEERATESRESPONSE']._serialized_end=699
-  _globals['_FEESERVICE']._serialized_start=702
-  _globals['_FEESERVICE']._serialized_end=964
+  _globals['_FEESERVICE'].methods_by_name['GetSpotFeeRates']._serialized_options = b'\272G\304\001\n\013Fee Service\022\022Get Spot Fee Rates\032\240\001Get effective maker and taker fee rates, the rates an order reserves its fee at, and the components of the effective rates for the authenticated account target.\242\265\030\002\001\002\202\323\344\223\002\024\022\022/v1/spot/fee-rates'
+  _globals['_SPOTFEERATE']._serialized_start=191
+  _globals['_SPOTFEERATE']._serialized_end=914
+  _globals['_SPOTFEERATEBREAKDOWN']._serialized_start=917
+  _globals['_SPOTFEERATEBREAKDOWN']._serialized_end=1452
+  _globals['_SPOTFEEMULTIPLIER']._serialized_start=1455
+  _globals['_SPOTFEEMULTIPLIER']._serialized_end=1860
+  _globals['_SPOTFEEDISCOUNT']._serialized_start=1863
+  _globals['_SPOTFEEDISCOUNT']._serialized_end=2259
+  _globals['_GETSPOTFEERATESREQUEST']._serialized_start=2262
+  _globals['_GETSPOTFEERATESREQUEST']._serialized_end=2409
+  _globals['_GETSPOTFEERATESRESPONSE']._serialized_start=2411
+  _globals['_GETSPOTFEERATESRESPONSE']._serialized_end=2487
+  _globals['_FEESERVICE']._serialized_start=2490
+  _globals['_FEESERVICE']._serialized_end=2837
 # @@protoc_insertion_point(module_scope)

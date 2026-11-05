@@ -52,7 +52,13 @@ from polyester.models.common import (
     PairOrderLimits,
     SpotConfig,
 )
-from polyester.models.fees import SpotFeeRate, SpotFeeRatesList
+from polyester.models.fees import (
+    SpotFeeDiscount,
+    SpotFeeMultiplier,
+    SpotFeeRate,
+    SpotFeeRateBreakdown,
+    SpotFeeRatesList,
+)
 from polyester.models.guard_signer import (
     BatchSignProtectedActionsResult,
     CreateGuardSignerWalletResult,
@@ -139,8 +145,6 @@ from polyester.models.trading import (
     EquityHistory,
     EquityHistorySeries,
     GetOrderResult,
-    Hold,
-    HoldsList,
     InternalTransferResult,
     LedgerTransfer,
     LifecycleFlowsList,
@@ -263,8 +267,6 @@ __all__ = [
     "GetSubaccountResult",
     "GuardApproval",
     "GuardSignerStatus",
-    "Hold",
-    "HoldsList",
     "InternalAddressBookEntryView",
     "InternalRecentDestination",
     "InternalTransferAccount",
@@ -323,6 +325,9 @@ __all__ = [
     "PairOrderLimits",
     "SpotConfig",
     "SpotFeeRate",
+    "SpotFeeRateBreakdown",
+    "SpotFeeMultiplier",
+    "SpotFeeDiscount",
     "SpotFeeRatesList",
     "SpotMarketRule",
     "SpotPairVolumeSeries",

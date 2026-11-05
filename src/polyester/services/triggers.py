@@ -388,12 +388,13 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             request.event_type = cast(TriggerEventType, trigger_event_type_from_label(event_type))
         if page_token:
             request.page_token = page_token
-        return await unary_auth_decoded(
+        return await unary_auth_decoded_retry_unavailable(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.list_trigger_events(req),
             request,
             trigger_events_list_from_proto,
+            policy=TRIGGER_READ_RETRY,
         )
 
     async def subscribe(

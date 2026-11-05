@@ -9,11 +9,14 @@ from polyester._wire import map_connect_error
 from polyester.errors import (
     PolyesterApiError,
     PolyesterAuthError,
+    PolyesterRateLimitError,
     PolyesterServerError,
     is_retryable_error,
+    mutation_outcome_unknown,
 )
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from tests.unit.test_auth_error_codes import _rest_error
 
@@ -116,3 +119,61 @@ def test_unavailable_precondition_is_not_a_retryable_server_error(module, name):
     )
     assert isinstance(mapped, PolyesterApiError)
     assert not is_retryable_error(mapped)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        name
+        for name in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name
+        if name.endswith("_OUTCOME_UNKNOWN")
+    ],
+)
+@pytest.mark.parametrize("packed", [False, True])
+def test_connect_unavailable_outcome_unknown_stays_non_retryable(name, packed):
+    detail = orders_pb2.ErrorDetail(code=orders_pb2.ErrorCode.Value(name))
+    wire_detail = detail
+    if packed:
+        wire_detail = Any()
+        wire_detail.Pack(detail)
+    mapped = map_connect_error(
+        ConnectError(Code.UNAVAILABLE, "check outcome", details=[wire_detail])
+    )
+
+    assert isinstance(mapped, PolyesterApiError)
+    assert mapped.code == name
+    assert not is_retryable_error(mapped)
+    assert mutation_outcome_unknown(mapped)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ERROR_CODE_UNAVAILABLE",
+        "ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE",
+        "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+    ],
+)
+def test_connect_unavailable_keeps_nested_rate_limit_delay(name):
+    detail = orders_pb2.ErrorDetail(
+        code=orders_pb2.ErrorCode.Value(name),
+        rate_limit=ratelimit_pb2.RateLimitDetail(
+            reason=ratelimit_pb2.AUTHORITY_UNAVAILABLE, retry_after_ms=1250
+        ),
+    )
+    mapped = map_connect_error(ConnectError(Code.UNAVAILABLE, "back off", details=[detail]))
+
+    assert isinstance(mapped, PolyesterRateLimitError)
+    assert mapped.retry_after == 1.25
+    assert is_retryable_error(mapped)
+    assert not mutation_outcome_unknown(mapped)
+
+
+@pytest.mark.parametrize("module", [orders_pb2, withdraw_pb2, transfer_pb2])
+def test_connect_unavailable_keeps_rate_limit_classification(module):
+    detail = module.ErrorDetail(code=module.ERROR_CODE_RATE_LIMIT_EXCEEDED)
+    mapped = map_connect_error(ConnectError(Code.UNAVAILABLE, "back off", details=[detail]))
+
+    assert isinstance(mapped, PolyesterRateLimitError)
+    assert is_retryable_error(mapped)
+    assert not mutation_outcome_unknown(mapped)

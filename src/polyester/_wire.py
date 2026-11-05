@@ -116,6 +116,13 @@ def _map_gateway_problem(exc: GatewayProblemError):
     """Map a REST problem body the gateway answered instead of a Connect error."""
     code = exc.code.value
     message = exc.detail or exc.problem_code
+    if exc.problem_code.endswith("_OUTCOME_UNKNOWN"):
+        # The business outcome takes precedence over the HTTP failure code.
+        return PolyesterApiError(
+            message,
+            code=_order_error_code_from_rest(exc.problem_code),
+            violations=_rest_violations(exc.violations),
+        )
     if exc.problem_code == AUTH_SESSION_KIND_NOT_ALLOWED:
         return PolyesterSessionRequiredError(
             exc.detail or "interactive session required", status_code=exc.http_status

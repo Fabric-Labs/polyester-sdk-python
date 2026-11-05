@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Temporary rate-limit policy, trading policy and fee lookup failures now raise
+  retryable server errors on Connect, matching REST responses. Policy denials
+  remain non-retryable.
+- Keep the error code and status on these failures so callers can identify
+  the reason while backing off.
+
 ## 0.6.0
 
 Git tag: `v0.6.0`. Released 2026-11-05.

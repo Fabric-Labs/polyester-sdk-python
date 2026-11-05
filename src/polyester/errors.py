@@ -147,6 +147,19 @@ class PolyesterRateLimitError(PolyesterTransportError):
 class PolyesterServerError(PolyesterTransportError):
     """Raised for server-side 5xx failures."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        status_code: int | None = None,
+        raw: object | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.status_code = status_code
+        self.raw = raw
+
 
 class PolyesterTimeoutError(PolyesterTransportError):
     """Raised when a request deadline expires before a response arrives.

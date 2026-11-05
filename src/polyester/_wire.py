@@ -123,7 +123,13 @@ def _map_gateway_problem(exc: GatewayProblemError):
             status_code=exc.http_status,
             code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code,
         )
-    if code in ("unavailable", "resource_exhausted", "internal", "unknown"):
+    if code in ("unavailable", "internal"):
+        return PolyesterServerError(
+            message,
+            code=_order_error_code_from_rest(exc.problem_code),
+            status_code=exc.http_status,
+        )
+    if code in ("resource_exhausted", "unknown"):
         return None
     return PolyesterApiError(
         message,
@@ -193,6 +199,13 @@ def _map_connect_error(exc: ConnectError):
                 return _rate_limit_error(error_message, proto_detail=unpacked)
             if full_name == "orders.v1.ErrorDetail":
                 code_name = error_code_name(orders_pb2.ErrorCode, unpacked.code)
+                # A policy lookup outage is not a policy denial. Use the
+                # transport status too: some *_UNAVAILABLE codes are permanent
+                # failed preconditions (for example MARKET_PRICE_UNAVAILABLE).
+                if code_name.endswith("_UNAVAILABLE") and exc.code.value == "unavailable":
+                    return PolyesterServerError(
+                        error_message, code=code_name, status_code=503, raw=unpacked
+                    )
                 rate_limit = unpacked.rate_limit if unpacked.HasField("rate_limit") else None
                 if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
                     return _rate_limit_error(error_message, proto_detail=rate_limit)
@@ -201,7 +214,13 @@ def _map_connect_error(exc: ConnectError):
                     or "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
                 ):
-                    return PolyesterAuthError(error_message)
+                    return PolyesterAuthError(
+                        error_message,
+                        code=code_name,
+                        status_code=403
+                        if exc.code.value == "permission_denied"
+                        else (401 if exc.code.value == "unauthenticated" else None),
+                    )
                 return PolyesterApiError(
                     error_message,
                     code=code_name,

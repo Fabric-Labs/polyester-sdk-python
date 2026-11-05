@@ -67,6 +67,7 @@ from polyester.models import (
     CreateOrderRequest,
     GetOrderResult,
     ModifyOrderResult,
+    OrderId,
     OrderKey,
     OrderMutationResult,
     OrdersList,
@@ -914,6 +915,8 @@ async def _get_order_execution_pages(
             page_token=page_token,
         )
         if page.order is not None:
+            if page.order.order_id:
+                key = OrderId(page.order.order_id)
             order = page.order
         trades.extend(page.trades)
         transfers.extend(page.transfers)

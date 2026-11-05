@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import os
 
 import pytest
@@ -78,13 +77,6 @@ async def _wait_no_open_cids(client, cids: set[str], *, timeout: float = 20) -> 
     open_orders = await client.orders.list_open(limit=100)
     remaining = {o.client_order_id for o in open_orders.orders if o.client_order_id in cids}
     raise AssertionError(f"test orders still open after cleanup: {sorted(remaining)}")
-
-
-async def _exercise_holds_route(client) -> None:
-    # Reserved balances remain the required reconciliation signal when this
-    # optional detailed route is not mounted in the target environment.
-    with contextlib.suppress(Exception):
-        await client.balances.list_holds(limit=1)
 
 
 async def _cancel_open_test_orders(client, cids: set[str]) -> list[str]:
@@ -318,7 +310,6 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
             f"base reserved not reconciled: before={base_reserved_before} "
             f"after={base_reserved_after}"
         )
-        await _exercise_holds_route(live_client)
         roundtrip_ok = True
     finally:
         cleanup_errors: list[str] = []

@@ -1,6 +1,6 @@
 """A market halt ends orders (cancel reason 17) and triggers (cancel reason 13);
 a trigger the halted market refused reads ``market_halted`` (failure reason 8).
-A failure reason this SDK does not name, such as 212, reads as its number."""
+A failure reason this SDK does not name, such as 321, reads as its number."""
 
 from __future__ import annotations
 
@@ -96,19 +96,19 @@ def test_trigger_read_stream_and_events_label_the_market_halt() -> None:
 def test_unnamed_trigger_failure_reason_decodes_as_its_number() -> None:
     # No reason is special-cased: an unnamed number is not a market halt.
     failed = triggers_pb2.Trigger(trigger_id=9, symbol_id=1, status=triggers_pb2.STATUS_FAILED)
-    failed.failure_reason = 212  # type: ignore[assignment]
+    failed.failure_reason = 321  # type: ignore[assignment]
     binary = get_trigger_from_proto(triggers_pb2.GetTriggerResponse(trigger=failed))
     assert binary is not None
-    assert binary.failure_reason == "212"
+    assert binary.failure_reason == "321"
 
-    # ConnectRPC JSON carries it as "failureReason": 212.
+    # ConnectRPC JSON carries it as "failureReason": 321.
     codec = codec_for_config(TransportConfig(api_url="https://example.test", wire_format="json"))
     payload = (
         b'{"trigger": {"triggerId": "9", "symbolId": 1,'
-        b' "status": "STATUS_FAILED", "failureReason": 212}}'
+        b' "status": "STATUS_FAILED", "failureReason": 321}}'
     )
     decoded = codec.decode(payload, triggers_pb2.GetTriggerResponse())
-    assert protobuf_to_public_dict(decoded)["trigger"]["failureReason"] == 212
+    assert protobuf_to_public_dict(decoded)["trigger"]["failureReason"] == 321
     json_read = get_trigger_from_proto(decoded)
     assert json_read is not None
-    assert json_read.failure_reason == "212"
+    assert json_read.failure_reason == "321"

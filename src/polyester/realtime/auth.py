@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 import httpx
 
+from polyester._problem import decode_http_problem
 from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import (
     TIMESTAMP_SKEW,
@@ -84,8 +85,10 @@ def _auth_http_error(
     truncated = _truncate_body(body)
     code: str | None = None
     server_message: str | None = None
+    problem = None
     try:
         payload = json.loads(body)
+        problem = decode_http_problem(payload, status_code)
         if isinstance(payload, dict):
             raw_code = payload.get("code")
             raw_message = payload.get("message")
@@ -96,15 +99,19 @@ def _auth_http_error(
     except (json.JSONDecodeError, UnicodeDecodeError):
         pass
     if code == TIMESTAMP_SKEW:
-        return PolyesterTimestampSkewError(f"{label}: {TIMESTAMP_SKEW}", status_code=status_code)
+        skew_error = PolyesterTimestampSkewError(
+            f"{label}: {TIMESTAMP_SKEW}", status_code=status_code
+        )
+        skew_error.problem = problem
+        return skew_error
     code = code or ("permission_denied" if status_code == 403 else "unauthenticated")
     kind = "permission denied" if status_code == 403 else "authentication failed"
-    detail = server_message or truncated
+    detail = problem.detail if problem is not None else server_message or truncated
     message = f"{label}: {kind} (HTTP {status_code}, code {code})"
     if detail:
         message = f"{message}: {detail}"
     message = f"{message} [{endpoint}]"
-    return PolyesterAuthError(
+    error = PolyesterAuthError(
         message,
         status_code=status_code,
         label=label,
@@ -113,6 +120,8 @@ def _auth_http_error(
         context=label,
         endpoint=endpoint,
     )
+    error.problem = problem
+    return error
 
 
 async def fetch_rt_token(

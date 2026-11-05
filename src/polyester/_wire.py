@@ -133,6 +133,13 @@ def _map_gateway_problem(exc: GatewayProblemError):
 
 
 def map_connect_error(exc: ConnectError):
+    mapped = _map_connect_error(exc)
+    if isinstance(exc, GatewayProblemError):
+        mapped.problem = exc.problem
+    return mapped
+
+
+def _map_connect_error(exc: ConnectError):
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
             status_code=401 if exc.code.value == "unauthenticated" else None

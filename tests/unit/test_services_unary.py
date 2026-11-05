@@ -83,7 +83,7 @@ async def test_triggers_list_and_list_events_pass_page_token() -> None:
     events_capture = CaptureUnary(
         triggers_pb2.ListTriggerEventsResponse(next_page_token="evt-page-2")
     )
-    with patch("polyester.services.triggers.unary_auth_decoded", events_capture):
+    with patch("polyester.services.triggers.unary_auth_decoded_retry_unavailable", events_capture):
         service = AsyncTriggersService(MagicMock(), MagicMock(), None)
         events = await service.list_events(
             trigger_id=7,

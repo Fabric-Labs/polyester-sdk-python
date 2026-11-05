@@ -35,8 +35,6 @@ from polyester.models.trading import (
     EquityHistory,
     EquityHistorySeries,
     GetOrderResult,
-    Hold,
-    HoldsList,
     InternalTransferResult,
     LedgerTransfer,
     LifecycleFlowsList,
@@ -741,29 +739,11 @@ def decode_equity_history(data: dict[str, Any]) -> EquityHistory:
     )
 
 
-def decode_hold(data: dict[str, Any]) -> Hold:
-    return Hold(
-        hold_id=_id_str(_field(data, "holdId", "hold_id")),
-        asset_id=int(_field(data, "assetId", "asset_id", default=0) or 0),
-        amount_reserved=_u128_str(_field(data, "amountReserved", "amount_reserved")),
-        expires_at_ns=str(_field(data, "expiresAtNs", "expires_at_ns", default="") or ""),
-    )
-
-
 def decode_bucket_transfer_result(data: dict[str, Any]) -> BucketTransferResult:
     return BucketTransferResult(
         transfer_id=str(_field(data, "transferId", "transfer_id", default="") or ""),
         timestamp_ns=str(_field(data, "timestamp", default="") or ""),
     )
-
-
-def decode_holds_list(data: dict[str, Any]) -> HoldsList:
-    holds = [
-        decode_hold(item)
-        for item in _field(data, "holds", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return HoldsList(holds=holds)
 
 
 def decode_market_trade_bytes(payload: bytes, *, quantity_scale: int) -> MarketTrade:

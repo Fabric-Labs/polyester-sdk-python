@@ -25,12 +25,3 @@ async def test_balances_get_balance_history(live_client):
         assert series.asset_id >= 0
         assert series.account_code >= 0
         assert len(series.balance_q) <= result.points
-
-
-@pytest.mark.integration
-@pytest.mark.optional
-async def test_balances_list_holds(live_client, capabilities):
-    if not capabilities["list_holds"]:
-        pytest.skip("list_holds unavailable on devnet")
-    result = await live_client.balances.list_holds(limit=5)
-    assert isinstance(result.holds, list)

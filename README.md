@@ -1,5 +1,8 @@
 # Polyester Python SDK
 
+For the holds-list removal, reserve fee fields, trigger-event errors and REST
+problem metadata, see [the contract migration notes](docs/contract-748066a.md).
+
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
@@ -846,8 +849,7 @@ expose typed `cancel_reason` / `failure_reason` labels (empty when unset). A
 market halt ends every open trigger of the market with `cancel_reason`
 `market_halted`, and a trigger the halted market refused ends `failed` with
 `failure_reason` `market_halted`. A reason number this SDK does not name reads
-as its number, for example `failure_reason == "212"`; no number is a market
-halt.
+as its number, for example `failure_reason == "321"`.
 
 A trigger's history records every fire refused while the trigger stayed live,
 as a `fire_refused` event: `child_seq` is the refused attempt (the next one

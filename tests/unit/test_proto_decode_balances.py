@@ -2,13 +2,11 @@ from polyester.codecs.decode.balances import (
     asset_balance_from_proto,
     balance_history_from_proto,
     equity_history_from_proto,
-    holds_list_from_proto,
 )
 from polyester.codecs.proto_helpers import format_uint64_id
 from polyester.codecs.scalars import format_id
 from polyester.codecs.wire_decode import decode_equity_history_series
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
-from polyester.gen.polyester.type.v1 import u128_pb2
 
 
 def test_asset_balance_from_proto_preserves_uint64_revisions() -> None:
@@ -106,20 +104,3 @@ def test_decode_equity_history_series_portfolio_account_wire() -> None:
     assert named.portfolio_remaining is False
     assert remaining.portfolio_account_id == ""
     assert remaining.portfolio_remaining is True
-
-
-def test_holds_list_from_proto() -> None:
-    msg = ledger_read_pb2.ListHoldsResponse(
-        holds=[
-            ledger_read_pb2.HoldRow(
-                hold_id=42,
-                asset_id=1,
-                amount_reserved_e18=u128_pb2.U128(hi=0, lo=500),
-                expires_at_ns=1_700_000_000_000,
-            )
-        ]
-    )
-    result = holds_list_from_proto(msg)
-    assert len(result.holds) == 1
-    assert result.holds[0].hold_id == format_id(42)
-    assert result.holds[0].amount_reserved == "500"

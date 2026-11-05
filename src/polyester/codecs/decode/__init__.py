@@ -9,7 +9,6 @@ from polyester.codecs.decode.balances import (
     balance_history_from_proto,
     balances_list_from_proto,
     equity_history_from_proto,
-    holds_list_from_proto,
 )
 from polyester.codecs.decode.changelog import (
     changelog_change_from_proto,
@@ -103,7 +102,6 @@ __all__ = [
     "get_order_from_proto",
     "get_trigger_from_proto",
     "heatmap_from_proto",
-    "holds_list_from_proto",
     "internal_transfer_from_proto",
     "market_overview_list_from_proto",
     "spot_volume_history_from_proto",

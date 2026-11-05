@@ -17,9 +17,7 @@ from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.orders.v1 import orders_pb2
 
 _OUTCOME_UNKNOWN_CODES = sorted(
-    value
-    for name, value in orders_pb2.ErrorCode.items()
-    if name.endswith("_OUTCOME_UNKNOWN")
+    value for name, value in orders_pb2.ErrorCode.items() if name.endswith("_OUTCOME_UNKNOWN")
 )
 
 
@@ -87,3 +85,119 @@ def test_definite_api_errors_are_neither_retryable_nor_ambiguous(detail: object)
     assert type(mapped) is PolyesterApiError
     assert not is_retryable_error(mapped)
     assert not mutation_outcome_unknown(mapped)
+
+
+@pytest.mark.parametrize("code", _OUTCOME_UNKNOWN_CODES, ids=orders_pb2.ErrorCode.Name)
+@pytest.mark.parametrize("status", [504, 503])
+async def test_rest_outcome_unknown_matches_connect(httpserver, code: int, status: int) -> None:
+    from tests.unit.test_auth_error_codes import _rest_error
+
+    name = orders_pb2.ErrorCode.Name(code)
+    mapped = await _rest_error(
+        httpserver,
+        status,
+        {"code": name.removeprefix("ERROR_CODE_"), "detail": "read back first"},
+    )
+    assert (type(mapped), is_retryable_error(mapped), mutation_outcome_unknown(mapped)) == (
+        PolyesterApiError,
+        False,
+        True,
+    )
+    assert mapped.code == name
+    assert mapped.problem.status == status
+    assert str(mapped) == "read back first"
+
+
+@pytest.mark.parametrize(
+    "body,content_type",
+    [
+        ("<html>Gateway Timeout</html>", "text/html"),
+        ('{"code":"UNKNOWN_GATEWAY_FAILURE"}', "application/problem+json"),
+    ],
+)
+async def test_unrecognised_rest_504_remains_ambiguous_transport_failure(
+    httpserver,
+    body: str,
+    content_type: str,
+) -> None:
+    from polyester.errors import PolyesterServerError
+    from polyester.services.market_data import AsyncMarketDataService
+    from polyester.transport import TransportConfig, TransportFactory
+    from tests.unit.test_auth_error_codes import SPOT_CONFIG_PATH
+
+    httpserver.expect_request(SPOT_CONFIG_PATH, method="POST").respond_with_data(
+        body,
+        status=504,
+        content_type=content_type,
+    )
+    transport = TransportFactory(TransportConfig(api_url=httpserver.url_for("").rstrip("/")))
+    try:
+        with pytest.raises(PolyesterServerError) as caught:
+            await AsyncMarketDataService(transport).get_spot_config()
+    finally:
+        await transport.aclose()
+    assert is_retryable_error(caught.value)
+    assert mutation_outcome_unknown(caught.value)
+
+
+@pytest.mark.parametrize(
+    "status,body,content_type",
+    [
+        (504, '{"code":"ORDER_CREATE_OUTCOME_UNKNOWN"}', "application/problem+json"),
+        (504, "<html>Gateway Timeout</html>", "text/html"),
+        (
+            503,
+            '{"code":"unavailable","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}',
+            "application/json",
+        ),
+        (
+            504,
+            '{"code":"deadline_exceeded","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}',
+            "application/json",
+        ),
+    ],
+)
+async def test_order_create_never_resends_unknown_outcome(
+    httpserver, status, body, content_type
+) -> None:
+    from polyester import AsyncPolyester, Quantity
+
+    calls = []
+
+    def respond(request):
+        from werkzeug.wrappers import Response
+
+        calls.append(request.path)
+        return Response(body, status=status, content_type=content_type)
+
+    path = "/orders.v1.OrdersService/CreateOrder"
+    httpserver.expect_request(path, method="POST").respond_with_handler(respond)
+    client = AsyncPolyester(
+        api_url=httpserver.url_for("").rstrip("/"),
+        api_key_id="ak_test",
+        api_private_key="01" * 32,
+        hydrate_catalogs=False,
+    )
+    client.catalogs.hydrate_spot_config(
+        {
+            "pairs": [
+                {"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8},
+            ]
+        }
+    )
+    try:
+        with pytest.raises(Exception) as caught:
+            await client.orders.create(
+                symbol="BTC-USDT",
+                side="buy",
+                order_type="market",
+                qty=Quantity.from_scaled(1, scale=8),
+                client_order_id="reconcile-first",
+            )
+    finally:
+        await client.aclose()
+    assert mutation_outcome_unknown(caught.value)
+    assert calls == [path]
+    if content_type != "text/html":
+        assert type(caught.value) is PolyesterApiError
+        assert not is_retryable_error(caught.value)

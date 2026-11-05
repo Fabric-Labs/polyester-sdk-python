@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
+
+Git tag: `v0.6.0`. Released 2026-11-05.
 
 - **Breaking:** a trailing stop created with an activation price already
   reached now ends `FAILED` with
@@ -179,7 +181,9 @@ view.
   Zeros beyond the scale are accepted as before.
 - Docs: `Order.cum_notional_scaled`, `cum_quote`, `quote_used` and
   `quote_unspent` are exact when the pair's `base_quantity_scale` is at most
-  9, and otherwise can exceed the settled quote by less than 1e-18 per fill.
+  9. Otherwise the first three can exceed the settled quote by less than 1e-18
+  per fill, and `quote_unspent` can read lower than what is left by the same
+  margin.
   A quote-amount buy (`max_quote_debit`) takes attached risk.
 - Docs: a spent quote-sized buy ends `filled`; a ladder whose levels were all
   canceled before any filled ends `cancelled`; attached legs follow the

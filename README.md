@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** `0.5.1`, pre-1.0: a minor release may include breaking changes (see
+**Status:** `0.6.0`, pre-1.0: a minor release may include breaking changes (see
 [CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
@@ -96,7 +96,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.5.1"
+pip install "polyester-sdk==0.6.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -526,9 +526,10 @@ the exact average execution price as a `Decimal` with up to 18 decimals
 (`None` without fills); prefer it to `avg_px`, which is rounded down to 9
 decimals. `cum_notional_scaled` is the quote amount of the fills before
 fees and `cum_quote(base_quantity_scale)` returns it in quote units. Each fill
-settles its quote rounded down to 18 decimals, so both, and `quote_used` /
-`quote_unspent`, are exact when the pair's `base_quantity_scale` is at most 9;
-above that they can exceed the settled quote by less than 1e-18 per fill.
+settles its quote rounded down to 18 decimals, so both, and `quote_used`, are
+exact when the pair's `base_quantity_scale` is at most 9; above that they can
+exceed the settled quote by less than 1e-18 per fill, and `quote_unspent` can
+read lower than what is left by the same margin.
 `fee_total` (`amount`, `amount_e18`, `is_rebate`, `qty`) is the fee of those
 fills net of rebates, in `fee_asset`; order history and single-order reads
 with execution history carry it, open-order reads and stream updates do not.
@@ -600,9 +601,11 @@ surface, not a guaranteed quote of every future fill. The completed user-trade r
 owns the exact charge.
 
 Rows also expose `reserve_fee_rate_percent`,
-`post_only_reserve_fee_rate_percent`, `next_change_at` and `breakdown`. Size
-buys with the reserve rate, using the post-only reserve rate for post-only
-orders; effective maker/taker rates apply to fills. Refetch rates at
+`post_only_reserve_fee_rate_percent`, `next_change_at` and `breakdown`. Size a
+buy limit order that pays its fee in the quote asset with the reserve rate,
+using the post-only reserve rate for a post-only order. A buy sized by a quote
+amount reserves at the lower of the reserve and taker rates. Effective
+maker/taker rates apply to fills. Refetch rates at
 `next_change_at` when present. `breakdown` contains tier rates, a market
 multiplier, account discounts and a referral discount. Optional components
 and times may be `None`; absent account discounts decode as an empty list.

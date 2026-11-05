@@ -45,6 +45,11 @@ _EMPTY_ERROR_MESSAGE = "request failed without server error details"
 # connectrpc reports a bare (non-Connect) HTTP error by its status phrase; a
 # bare 501 arrives as code ``unknown`` with this message.
 _HTTP_501_PHRASE = "Not Implemented"
+_SERVICE_ERROR_ENUMS = {
+    "orders.v1.ErrorDetail": orders_pb2.ErrorCode,
+    "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorCode,
+    "transfer.v1.ErrorDetail": transfer_pb2.ErrorCode,
+}
 
 
 def protobuf_to_public_dict(message: Message) -> dict[str, Any]:
@@ -123,7 +128,13 @@ def _map_gateway_problem(exc: GatewayProblemError):
             status_code=exc.http_status,
             code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code,
         )
-    if code in ("unavailable", "resource_exhausted", "internal", "unknown"):
+    if code in ("unavailable", "internal"):
+        return PolyesterServerError(
+            message,
+            code=_order_error_code_from_rest(exc.problem_code),
+            status_code=exc.http_status,
+        )
+    if code in ("resource_exhausted", "unknown"):
         return None
     return PolyesterApiError(
         message,
@@ -161,6 +172,21 @@ def _map_connect_error(exc: ConnectError):
             if unpacked is None:
                 continue
             full_name = unpacked.DESCRIPTOR.full_name
+            if full_name in _SERVICE_ERROR_ENUMS:
+                code_name = error_code_name(_SERVICE_ERROR_ENUMS[full_name], unpacked.code)
+                rate_limit = (
+                    unpacked.rate_limit
+                    if full_name == "orders.v1.ErrorDetail" and unpacked.HasField("rate_limit")
+                    else None
+                )
+                # Preserve backoff hints and unknown mutation outcomes before
+                # applying the transport's temporary-failure classification.
+                if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
+                    return _rate_limit_error(error_message, proto_detail=rate_limit)
+                if exc.code.value == "unavailable" and not code_name.endswith("_OUTCOME_UNKNOWN"):
+                    return PolyesterServerError(
+                        error_message, code=code_name, status_code=503, raw=unpacked
+                    )
             if full_name == "auth.v1.AuthErrorDetail":
                 code_name = error_code_name(auth_pb2.AuthErrorCode, unpacked.code)
                 message = unpacked.message or error_message
@@ -193,15 +219,18 @@ def _map_connect_error(exc: ConnectError):
                 return _rate_limit_error(error_message, proto_detail=unpacked)
             if full_name == "orders.v1.ErrorDetail":
                 code_name = error_code_name(orders_pb2.ErrorCode, unpacked.code)
-                rate_limit = unpacked.rate_limit if unpacked.HasField("rate_limit") else None
-                if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
-                    return _rate_limit_error(error_message, proto_detail=rate_limit)
                 if (
                     "POLICY" in code_name
                     or "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
                 ):
-                    return PolyesterAuthError(error_message)
+                    return PolyesterAuthError(
+                        error_message,
+                        code=code_name,
+                        status_code=403
+                        if exc.code.value == "permission_denied"
+                        else (401 if exc.code.value == "unauthenticated" else None),
+                    )
                 return PolyesterApiError(
                     error_message,
                     code=code_name,
@@ -229,8 +258,6 @@ def _map_connect_error(exc: ConnectError):
                     or "WALLET_BINDING" in code_name
                 ):
                     return PolyesterAuthError(error_message)
-                if code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
-                    return _rate_limit_error(error_message)
                 return PolyesterApiError(error_message, code=code_name)
             if full_name == "transfer.v1.ErrorDetail":
                 code_name = error_code_name(transfer_pb2.ErrorCode, unpacked.code)
@@ -240,8 +267,6 @@ def _map_connect_error(exc: ConnectError):
                     or "POLICY" in code_name
                 ):
                     return PolyesterAuthError(error_message)
-                if code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
-                    return _rate_limit_error(error_message)
                 return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
     if is_cloudflare_browser_ban(error_message):

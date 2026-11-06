@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
+from math import isfinite
 from typing import Literal
 
 import httpx
@@ -58,9 +60,11 @@ class GatewayProblemError(ConnectError):
         detail: str = "",
         violations: list[dict[str, object]] | None = None,
         problem=None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(code, problem_code)
         self.problem = problem
+        self.retry_after = retry_after
         self.problem_code = problem_code
         self.http_status = http_status
         self.detail = detail
@@ -99,17 +103,33 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
     if response.status == 200:
         return response
     content_type = response.headers.get("content-type", "").lower()
-    if "json" not in content_type:
+    body = None
+    if "json" in content_type:
+        with suppress(Exception):
+            body = response.json()
+    code = body.get("code") if isinstance(body, dict) else None
+    if isinstance(code, str) and code in _CONNECT_CODES:
         return response
-    try:
-        body = response.json()
-    except Exception:
+    # A non-Connect 504 cannot prove that a mutation was refused, even if
+    # the gateway sent HTML, malformed JSON, or no structured code at all.
+    if response.status != 504 and (
+        not isinstance(body, dict) or not isinstance(code, str) or not code
+    ):
         return response
     if not isinstance(body, dict):
-        return response
-    code = body.get("code")
-    if not isinstance(code, str) or not code or code in _CONNECT_CODES:
-        return response
+        body = {}
+    code = code if isinstance(code, str) else ""
+    retry_after = None
+    for header, divisor in (
+        ("retry-after", 1),
+        ("retry-after-ms", 1000),
+        ("grpc-retry-pushback-ms", 1000),
+    ):
+        with suppress(ValueError, TypeError):
+            value = float(response.headers.get(header, "")) / divisor
+            if isfinite(value) and value >= 0:
+                retry_after = value
+                break
     detail = body.get("detail")
     violations = body.get("violations")
     raise GatewayProblemError(
@@ -117,6 +137,7 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         code,
         http_status=response.status,
         problem=decode_http_problem(body, response.status),
+        retry_after=retry_after,
         detail=detail if isinstance(detail, str) else "",
         violations=(
             [item for item in violations if isinstance(item, dict)]

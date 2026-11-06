@@ -136,7 +136,7 @@ async def test_unrecognised_rest_504_remains_ambiguous_transport_failure(
             await AsyncMarketDataService(transport).get_spot_config()
     finally:
         await transport.aclose()
-    assert is_retryable_error(caught.value)
+    assert not is_retryable_error(caught.value)
     assert mutation_outcome_unknown(caught.value)
 
 
@@ -157,8 +157,9 @@ async def test_unrecognised_rest_504_remains_ambiguous_transport_failure(
         ),
     ],
 )
+@pytest.mark.parametrize("client_order_id", [None, "reconcile-first"])
 async def test_order_create_never_resends_unknown_outcome(
-    httpserver, status, body, content_type
+    httpserver, status, body, content_type, client_order_id
 ) -> None:
     from polyester import AsyncPolyester, Quantity
 
@@ -192,12 +193,12 @@ async def test_order_create_never_resends_unknown_outcome(
                 side="buy",
                 order_type="market",
                 qty=Quantity.from_scaled(1, scale=8),
-                client_order_id="reconcile-first",
+                client_order_id=client_order_id,
             )
     finally:
         await client.aclose()
     assert mutation_outcome_unknown(caught.value)
     assert calls == [path]
+    assert not is_retryable_error(caught.value)
     if content_type != "text/html":
         assert type(caught.value) is PolyesterApiError
-        assert not is_retryable_error(caught.value)

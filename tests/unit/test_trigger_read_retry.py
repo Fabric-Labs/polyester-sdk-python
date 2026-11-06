@@ -28,7 +28,12 @@ def _service(httpserver: HTTPServer) -> tuple[AsyncTriggersService, TransportFac
     return AsyncTriggersService(transport, None, None), transport  # type: ignore[arg-type]
 
 
-def _unavailable(httpserver: HTTPServer, path: str, *, rest: bool = False) -> None:
+def _unavailable(httpserver: HTTPServer, path: str, *, rest: bool | str = False) -> None:
+    if rest == "gateway":
+        httpserver.expect_oneshot_request(path, method="POST").respond_with_data(
+            "<html>Gateway Timeout</html>", status=504, content_type="text/html"
+        )
+        return
     if rest:
         # The REST problem shape a gateway may answer instead of a Connect error.
         httpserver.expect_oneshot_request(path, method="POST").respond_with_json(
@@ -49,9 +54,11 @@ def _trigger_response() -> bytes:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("rest", [False, True], ids=["connect", "rest-problem"])
+@pytest.mark.parametrize(
+    "rest", [False, True, "gateway"], ids=["connect", "rest-problem", "gateway-504"]
+)
 async def test_get_trigger_retries_unavailable_with_the_same_request(
-    httpserver: HTTPServer, rest: bool
+    httpserver: HTTPServer, rest: bool | str
 ) -> None:
     _unavailable(httpserver, GET_PATH, rest=rest)
     _unavailable(httpserver, GET_PATH, rest=rest)
@@ -133,7 +140,9 @@ async def test_trigger_reads_do_not_retry_other_errors(httpserver: HTTPServer) -
     assert len(httpserver.log) == 1
 
 
-@pytest.mark.parametrize("rest", [False, True], ids=["connect", "rest-problem"])
+@pytest.mark.parametrize(
+    "rest", [False, True, "gateway"], ids=["connect", "rest-problem", "gateway-504"]
+)
 async def test_trigger_events_retry_and_keep_request(httpserver: HTTPServer, rest: bool) -> None:
     path = "/triggers.v1.TriggersService/ListTriggerEvents"
     _unavailable(httpserver, path, rest=rest)
@@ -145,8 +154,11 @@ async def test_trigger_events_retry_and_keep_request(httpserver: HTTPServer, res
     triggers, transport = _service(httpserver)
     try:
         result = await triggers.list_events(
-            trigger_id=str(TRIGGER_ID), sub_account_id="12", limit=17,
-            event_type="fired", page_token="next-page",
+            trigger_id=str(TRIGGER_ID),
+            sub_account_id="12",
+            limit=17,
+            event_type="fired",
+            page_token="next-page",
         )
     finally:
         await transport.aclose()
@@ -154,8 +166,11 @@ async def test_trigger_events_retry_and_keep_request(httpserver: HTTPServer, res
     assert len(httpserver.log) == 3
     assert {request.data for request, _ in httpserver.log} == {
         triggers_pb2.ListTriggerEventsRequest(
-            trigger_id=TRIGGER_ID, subaccount_id=12, limit=17,
-            event_type=triggers_pb2.EVENT_FIRED, page_token="next-page",
+            trigger_id=TRIGGER_ID,
+            subaccount_id=12,
+            limit=17,
+            event_type=triggers_pb2.EVENT_FIRED,
+            page_token="next-page",
         ).SerializeToString()
     }
 
@@ -164,7 +179,8 @@ async def test_trigger_events_not_found_matches_get(httpserver: HTTPServer) -> N
     path = "/triggers.v1.TriggersService/ListTriggerEvents"
     for route in (GET_PATH, path):
         httpserver.expect_oneshot_request(route, method="POST").respond_with_json(
-            {"code": "not_found", "message": "NOT_FOUND"}, status=404,
+            {"code": "not_found", "message": "NOT_FOUND"},
+            status=404,
         )
     triggers, transport = _service(httpserver)
     try:

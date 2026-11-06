@@ -109,4 +109,5 @@ def equity_history_from_proto(
         quote_asset=msg.quote_asset,
         points=int(msg.points),
         series=[equity_history_series_from_proto(item) for item in msg.series],
+        btc_prices_q=[int(v) for v in msg.btc_prices_q],
     )

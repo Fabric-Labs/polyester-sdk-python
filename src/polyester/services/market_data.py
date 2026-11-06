@@ -182,6 +182,7 @@ class AsyncMarketDataService(BaseService):
         end_time: datetime | None = None,
         include_incomplete: bool = False,
         include_reference: bool = False,
+        page_token: str = "",
     ) -> CandlesResult:
         request = _build_candles_request(
             self._catalogs,
@@ -193,6 +194,7 @@ class AsyncMarketDataService(BaseService):
             end_time=end_time,
             include_incomplete=include_incomplete,
             include_reference=include_reference,
+            page_token=page_token,
         )
         volume_scale = _volume_scale_for_symbol_id(self._catalogs, request.symbol_id)
         reference_price_scale = _reference_price_scale_for_symbol_id(
@@ -221,6 +223,7 @@ class AsyncMarketDataService(BaseService):
         end_time: datetime | None = None,
         include_incomplete: bool = False,
         include_reference: bool = False,
+        page_token: str = "",
     ) -> CandlesResult:
         request = _build_candles_request(
             self._catalogs,
@@ -232,6 +235,7 @@ class AsyncMarketDataService(BaseService):
             end_time=end_time,
             include_incomplete=include_incomplete,
             include_reference=include_reference,
+            page_token=page_token,
         )
         volume_scale = _volume_scale_for_symbol_id(self._catalogs, request.symbol_id)
         reference_price_scale = _reference_price_scale_for_symbol_id(
@@ -326,6 +330,7 @@ def _build_candles_request(
     end_time: datetime | None,
     include_incomplete: bool,
     include_reference: bool = False,
+    page_token: str = "",
 ) -> GetCandlesRequest:
     from polyester.gen.marketdata.v1 import marketdata_pb2
 
@@ -349,6 +354,7 @@ def _build_candles_request(
         limit=validated_limit,
         include_incomplete=include_incomplete,
         include_reference=include_reference,
+        page_token=page_token,
     )
     if start_time is not None:
         request.start_time.CopyFrom(_datetime_to_timestamp(start_time))

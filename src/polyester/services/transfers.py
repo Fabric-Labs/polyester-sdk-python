@@ -37,9 +37,16 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         limit: int = 50,
         reversed: bool = False,
         since: int | None = None,
+        page_token: str = "",
     ) -> TransfersList:
-        """List transfers with an inclusive ``since`` bound in UTC epoch microseconds."""
-        request = ListTransfersRequest(limit=validate_limit(limit), reversed=reversed)
+        """Read a page; reuse its token with the same scope, filters and direction.
+
+        ``since`` is an inclusive lower timestamp bound in microseconds.
+        An empty ``next_page_token`` marks the terminal page.
+        """
+        request = ListTransfersRequest(
+            limit=validate_limit(limit), reversed=reversed, page_token=page_token
+        )
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

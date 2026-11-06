@@ -19,6 +19,17 @@
 - Trigger create and modify now reject competing ticks and basis-point
   settings for trailing distance or slippage. A single zero slippage setting
   on modify still clears the cap.
+- **Breaking:** transfer history now returns the opaque `next_page_token` string
+  instead of an integer `next_cursor`. Pass it as `page_token` on the next
+  `transfers.list` call with the same scope, filters and direction. An empty
+  string ends pagination. The `since` lower timestamp bound works with this token.
+- Preserve continuation tokens in market-overview and candle results. Both
+  candle helpers now accept `page_token` for reading the next page.
+- Preview by symbol ID now uses the catalog base quantity scale. Without that
+  catalog entry, pass a `Quantity` with an explicit scale; an unknown scale
+  raises a validation error instead of formatting the result at scale zero.
+- Equity history now exposes `btc_prices_q`: the returned BTC-USDT closes as
+  integers scaled by 1e9, in timestamp order. An omitted series is an empty list.
 
 ## 0.6.2
 

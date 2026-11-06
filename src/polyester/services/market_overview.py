@@ -199,6 +199,7 @@ class AsyncMarketOverviewService(BaseService):
         by_symbol_id: dict[int, MarketOverviewEntry] = {}
         queue: asyncio.Queue[list[MarketOverviewEntry] | None] = asyncio.Queue(maxsize=50)
         close = asyncio.Event()
+        stream_holder: dict[str, AsyncSnapshotThenStreamSubscription | None] = {"stream": None}
 
         def emit() -> None:
             if close.is_set():
@@ -217,10 +218,10 @@ class AsyncMarketOverviewService(BaseService):
                     close=close,
                     message="market overview subscription queue full; consumer too slow",
                 )
-            except Exception:
-                close.set()
-                with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(None)
+            except Exception as exc:
+                stream = stream_holder["stream"]
+                if stream is not None:
+                    stream._fail_closed(exc)
 
         def matches_symbol(row: MarketOverviewEntry) -> bool:
             return not wanted_ids or row.symbol_id in wanted_ids
@@ -250,6 +251,11 @@ class AsyncMarketOverviewService(BaseService):
             apply_rows(rows)
             emit()
 
+        def terminal_close() -> None:
+            close.set()
+            with contextlib.suppress(asyncio.QueueFull):
+                queue.put_nowait(None)
+
         stream = AsyncSnapshotThenStreamSubscription(
             realtime=realtime,
             channel=channel,
@@ -262,7 +268,9 @@ class AsyncMarketOverviewService(BaseService):
             on_open=on_open,
             on_close=on_close,
             on_error=on_error,
+            on_terminal=terminal_close,
         )
+        stream_holder["stream"] = stream
 
         subscription = MarketOverviewSubscription(
             queue=queue,

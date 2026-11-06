@@ -7,7 +7,12 @@ from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
 from polyester.errors import PolyesterRealtimeError, PolyesterRealtimeOverflowError
-from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription, _ReconnectBackoff
+from polyester.realtime.client import (
+    AsyncRealtimeClient,
+    AsyncSubscription,
+    _ReconnectBackoff,
+    _TerminalRealtimeError,
+)
 
 TSnapshot = TypeVar("TSnapshot")
 TPublication = TypeVar("TPublication")
@@ -37,6 +42,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         on_error: Callable[[Exception], None] | None = None,
         on_reconnect: Callable[[], None] | None = None,
         on_snapshot_refresh: Callable[[], None] | None = None,
+        on_terminal: Callable[[], None] | None = None,
     ) -> None:
         self._realtime = realtime
         self._channel = channel
@@ -51,6 +57,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         self._on_error = on_error
         self._on_reconnect = on_reconnect
         self._on_snapshot_refresh = on_snapshot_refresh
+        self._on_terminal = on_terminal
 
         self._ready = False
         self._disposed = False
@@ -84,7 +91,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                 error = self._last_error or PolyesterRealtimeError("initial snapshot failed")
                 raise error
         except BaseException as exc:
-            if isinstance(exc, Exception):
+            if isinstance(exc, Exception) and self._last_error is not exc:
                 self._last_error = exc
                 self._report_snapshot_error(exc)
             await self.aclose()
@@ -273,13 +280,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             self._last_error = PolyesterRealtimeError(
                 "snapshot refresh failed after reconnect; subscription closed"
             )
-        self._disposed = True
-        self._ready = False
-        self._report_snapshot_error(
-            self._last_error
-            if isinstance(self._last_error, Exception)
-            else Exception(str(self._last_error))
-        )
+        error = self._last_error
+        self._fail_closed(error if isinstance(error, Exception) else Exception(str(error)))
 
     async def _run_ws_loop(self) -> None:
         first = True
@@ -317,7 +319,11 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     if self._disposed:
                         break
                     self._handle_publication(message)
-                if sub.error is not None:
+                    if self._disposed:
+                        break
+                if isinstance(sub.error, (_TerminalRealtimeError, PolyesterRealtimeOverflowError)):
+                    self._fail_closed(sub.error)
+                elif sub.error is not None:
                     self._last_error = sub.error
                     self._report_snapshot_error(
                         sub.error
@@ -326,6 +332,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     )
             except asyncio.CancelledError:
                 break
+            except (_TerminalRealtimeError, PolyesterRealtimeOverflowError) as exc:
+                self._fail_closed(exc)
             except Exception as exc:
                 if not self._disposed:
                     self._last_error = exc
@@ -334,6 +342,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                         and self._initial_handshake is not None
                         and not self._initial_handshake.done()
                     ):
+                        self._report_snapshot_error(exc)
                         self._initial_handshake.set_exception(exc)
                         return
                     self._report_snapshot_error(exc)
@@ -358,10 +367,19 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                 callback()
 
     def _fail_closed(self, error: Exception) -> None:
+        if self._disposed:
+            return
         self._last_error = error
         self._disposed = True
+        handshake = self._initial_handshake
+        if handshake is not None and not handshake.done():
+            handshake.set_exception(error)
         self._generation += 1
         with self._state_lock:
             self._ready = False
             self._pending.clear()
+        self._notify(self._on_terminal)
+        runner = self._runner_task
+        if runner is not None and runner is not asyncio.current_task() and not runner.done():
+            runner.cancel()
         self._report_snapshot_error(error)

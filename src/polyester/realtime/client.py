@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import secrets
+from collections import deque
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
@@ -473,6 +474,7 @@ class AsyncRealtimeClient:
                 raise PolyesterRealtimeError(
                     "server did not negotiate centrifuge-protobuf websocket subprotocol"
                 )
+            pending: deque[Ping | Publication | Reply] = deque()
             if is_private_channel(channel):
                 http = self._require_http()
                 credentials = self._require_credentials()
@@ -482,7 +484,7 @@ class AsyncRealtimeClient:
                     credentials,
                     api_url=api_url,
                 )
-                await self._centrifugo_connect(ws, token=connection_token)
+                await self._centrifugo_connect(ws, token=connection_token, pending=pending)
                 subscription_token = await fetch_subscription_token(
                     http,
                     credentials,
@@ -493,33 +495,19 @@ class AsyncRealtimeClient:
                     ws,
                     channel,
                     token=subscription_token,
+                    pending=pending,
                 )
             else:
-                await self._centrifugo_connect(ws)
-                await self._centrifugo_subscribe(ws, channel)
+                await self._centrifugo_connect(ws, pending=pending)
+                await self._centrifugo_subscribe(ws, channel, pending=pending)
             if on_ready is not None:
                 on_ready()
             while not close.is_set():
-                try:
-                    raw = await asyncio.wait_for(ws.recv(), timeout=CENTRIFUGO_READ_TIMEOUT)
-                except TimeoutError as exc:
-                    # Timeout = connection death (half-open). Exit so reconnect
-                    # can run when enabled; do not spin forever on continue.
-                    raise PolyesterRealtimeError("realtime read timeout") from exc
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    if _is_oversized_websocket_error(exc):
-                        raise _TerminalRealtimeError(
-                            f"realtime message exceeds {WS_MAX_MESSAGE_BYTES} bytes"
-                        ) from exc
-                    raise PolyesterRealtimeError(str(exc)) from exc
-                if not isinstance(raw, bytes):
-                    raise _TerminalRealtimeError("received JSON text frame on protobuf websocket")
-                try:
-                    incoming_messages = decode_replies(raw)
-                except Exception as exc:
-                    raise _TerminalRealtimeError(f"invalid realtime protobuf frame: {exc}") from exc
+                if pending:
+                    incoming_messages = list(pending)
+                    pending.clear()
+                else:
+                    incoming_messages = await self._read_live_frame(ws)
                 for incoming in incoming_messages:
                     if isinstance(incoming, Ping):
                         await ws.send(pong_command())
@@ -535,6 +523,26 @@ class AsyncRealtimeClient:
                             enqueue_or_overflow(queue, member, close=close)
                     elif isinstance(incoming, Reply) and incoming.error is not None:
                         raise self._protocol_error(incoming)
+
+    async def _read_live_frame(self, ws: ClientConnection) -> list[Ping | Publication | Reply]:
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=CENTRIFUGO_READ_TIMEOUT)
+        except TimeoutError as exc:
+            raise PolyesterRealtimeError("realtime read timeout") from exc
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if _is_oversized_websocket_error(exc):
+                raise _TerminalRealtimeError(
+                    f"realtime message exceeds {WS_MAX_MESSAGE_BYTES} bytes"
+                ) from exc
+            raise PolyesterRealtimeError(str(exc)) from exc
+        if not isinstance(raw, bytes):
+            raise _TerminalRealtimeError("received JSON text frame on protobuf websocket")
+        try:
+            return decode_replies(raw)
+        except Exception as exc:
+            raise _TerminalRealtimeError(f"invalid realtime protobuf frame: {exc}") from exc
 
     def _require_private_auth(self, channel: str) -> None:
         if self._credentials is None:
@@ -564,9 +572,10 @@ class AsyncRealtimeClient:
         ws: ClientConnection,
         *,
         token: str | None = None,
+        pending: deque[Ping | Publication | Reply] | None = None,
     ) -> None:
         await ws.send(connect_command(1, token))
-        await self._read_centrifugo_reply(ws, expected_id=1)
+        await self._read_centrifugo_reply(ws, expected_id=1, pending=pending)
 
     async def _centrifugo_subscribe(
         self,
@@ -574,27 +583,36 @@ class AsyncRealtimeClient:
         channel: str,
         *,
         token: str | None = None,
+        pending: deque[Ping | Publication | Reply] | None = None,
     ) -> None:
         await ws.send(subscribe_command(2, channel, token))
-        await self._read_centrifugo_reply(ws, expected_id=2)
+        await self._read_centrifugo_reply(ws, expected_id=2, pending=pending)
 
     async def _read_centrifugo_reply(
         self,
         ws: ClientConnection,
         *,
         expected_id: int,
+        pending: deque[Ping | Publication | Reply] | None = None,
     ) -> None:
         while True:
             raw = await asyncio.wait_for(ws.recv(), timeout=10)
             if not isinstance(raw, bytes):
                 raise PolyesterRealtimeError("received JSON text reply on protobuf websocket")
+            matched = False
             for incoming in decode_replies(raw):
                 if isinstance(incoming, Ping):
                     await ws.send(pong_command())
                 elif isinstance(incoming, Reply) and incoming.id == expected_id:
                     if incoming.error is not None:
                         raise self._protocol_error(incoming)
-                    return
+                    matched = True
+                elif pending is not None:
+                    if len(pending) >= 200:
+                        raise PolyesterRealtimeOverflowError("realtime setup buffer full")
+                    pending.append(incoming)
+            if matched:
+                return
 
     @staticmethod
     def _protocol_error(reply: Reply) -> PolyesterRealtimeError:

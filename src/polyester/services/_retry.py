@@ -13,6 +13,12 @@ from connectrpc.errors import ConnectError
 from google.protobuf.message import Message
 
 from polyester._wire import map_connect_error
+from polyester.errors import (
+    PolyesterRateLimitError,
+    PolyesterServerError,
+    PolyesterTransportError,
+    mutation_outcome_unknown,
+)
 from polyester.transport import TransportFactory
 
 TRequest = TypeVar("TRequest", bound=Message)
@@ -41,6 +47,22 @@ class UnavailableRetry:
 TRIGGER_READ_RETRY = UnavailableRetry()
 
 
+def _is_real_unavailability(exc: ConnectError) -> bool:
+    """Whether a read may retry, by what the error means and not only its code.
+
+    The Connect table gives HTTP 429 and 503 the code ``unavailable``, so a
+    typed REST refusal arrives with it too. That refusal is final for this read.
+    """
+    if exc.code not in (Code.UNAVAILABLE, Code.DEADLINE_EXCEEDED):
+        return False
+    mapped = map_connect_error(exc)
+    if isinstance(mapped, PolyesterRateLimitError):
+        return False
+    return isinstance(
+        mapped, (PolyesterServerError, PolyesterTransportError)
+    ) or mutation_outcome_unknown(mapped)
+
+
 async def unary_auth_decoded_retry_unavailable(
     transport: TransportFactory,
     client_cls: type,
@@ -63,10 +85,7 @@ async def unary_auth_decoded_retry_unavailable(
         try:
             response: TResponse = await call(client, request)
         except ConnectError as exc:
-            if (
-                exc.code not in (Code.UNAVAILABLE, Code.DEADLINE_EXCEEDED)
-                or _monotonic() - started + delay > policy.budget
-            ):
+            if not _is_real_unavailability(exc) or _monotonic() - started + delay > policy.budget:
                 raise map_connect_error(exc) from exc
             await _sleep(delay)
             delay = min(delay * 2, policy.max_delay)

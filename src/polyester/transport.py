@@ -3,6 +3,7 @@ from __future__ import annotations
 from base64 import b64decode
 from contextlib import suppress
 from dataclasses import dataclass
+from http import HTTPStatus
 from math import isfinite
 from typing import Literal
 
@@ -98,6 +99,58 @@ _HTTP_STATUS_TO_CODE = {
 }
 
 
+# HTTP status -> Connect code for an unreadable Connect body. Unlike a REST
+# problem with a code of its own, a 400 here proves no refusal.
+_UNREADABLE_BODY_STATUS_TO_CODE = {
+    400: Code.INTERNAL,
+    401: Code.UNAUTHENTICATED,
+    403: Code.PERMISSION_DENIED,
+    404: Code.UNIMPLEMENTED,
+    429: Code.UNAVAILABLE,
+    502: Code.UNAVAILABLE,
+    503: Code.UNAVAILABLE,
+    504: Code.UNAVAILABLE,
+}
+
+
+def _connect_error_details(value: object) -> list[AnyMessage] | None:
+    """Decode a Connect error's ``details``; ``None`` when they are malformed.
+
+    A detail with no type or value is skipped, as the Connect client skips it.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return None
+    details = []
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        type_name = item.get("type")
+        data = item.get("value")
+        if type_name is None or data is None:
+            continue
+        if not isinstance(type_name, str) or not isinstance(data, str):
+            return None
+        try:
+            raw = b64decode(data + "===")
+        except ValueError:
+            return None
+        details.append(AnyMessage(type_url="type.googleapis.com/" + type_name, value=raw))
+    return details
+
+
+def _unreadable_connect_error(status: int) -> ConnectError:
+    """Report a Connect body that can't be read by its HTTP status alone."""
+    try:
+        phrase = HTTPStatus(status).phrase
+    except ValueError:
+        phrase = ""
+    return ConnectError(
+        _UNREADABLE_BODY_STATUS_TO_CODE.get(status, Code.UNKNOWN), f"{status} {phrase}".strip()
+    )
+
+
 def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.FullResponse:
     """Map an API-gateway rejection that is not a Connect error.
 
@@ -128,20 +181,14 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
                 retry_after = value
                 break
     if isinstance(body, dict) and isinstance(code, str) and code in _CONNECT_CODES:
+        details = _connect_error_details(body.get("details"))
+        message = body.get("message")
+        if details is None or not isinstance(message, str | None):
+            raise _unreadable_connect_error(response.status)
         if code == "resource_exhausted" and retry_after is not None:
             # Preserve valid Connect details while carrying response backoff
             # through a ConnectError, whose upstream type has no metadata.
-            with suppress(ValueError, TypeError, KeyError):
-                details = [
-                    AnyMessage(
-                        type_url="type.googleapis.com/" + d["type"],
-                        value=b64decode(d["value"] + "==="),
-                    )
-                    for d in body.get("details", [])
-                    if "type" in d and "value" in d
-                ]
-                error = _ConnectErrorWithRetryAfter(body.get("message", ""), details, retry_after)
-                raise error
+            raise _ConnectErrorWithRetryAfter(message or "", details, retry_after)
         return response
     # A non-Connect 504 cannot prove that a mutation was refused, even if
     # the gateway sent HTML, malformed JSON, or no structured code at all.

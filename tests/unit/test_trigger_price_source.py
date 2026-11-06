@@ -212,6 +212,7 @@ def test_trigger_without_a_source_sends_none() -> None:
     [
         ("stop_loss", "oracle", "trigger_price_source must be last or index"),
         ("twap", "index", "applies to stop_loss, take_profit and trailing_stop only"),
+        ("ladder", "index", "applies to stop_loss, take_profit and trailing_stop only"),
     ],
 )
 def test_trigger_price_source_rejections(trigger_type: str, source: str, match: str) -> None:

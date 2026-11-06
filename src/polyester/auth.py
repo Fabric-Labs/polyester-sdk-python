@@ -6,7 +6,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from urllib.parse import parse_qsl, quote_from_bytes, urlsplit
+from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -166,7 +166,11 @@ def canonical_signing_string(
     url: str,
     body: bytes,
 ) -> str:
-    pathname = _validated_url(url).path or "/"
+    # The server verifies the decoded path. Keep percent-escaped bytes that are
+    # not UTF-8 as surrogates, so signing turns them back into the same bytes.
+    pathname = unquote_to_bytes(_validated_url(url).path or "/").decode(
+        "utf-8", "surrogateescape"
+    )
     return "\n".join(
         [timestamp_ms, method.upper(), pathname, canonical_query(url), sha256_hex(body)]
     )
@@ -224,7 +228,7 @@ def _sign_request_at_timestamp(
         body=body,
     )
     key = Ed25519PrivateKey.from_private_bytes(credentials.private_key)
-    signature = key.sign(canonical.encode("utf-8")).hex()
+    signature = key.sign(canonical.encode("utf-8", "surrogateescape")).hex()
     return {
         "X-API-KEY-ID": credentials.key_id,
         "X-API-TIMESTAMP": timestamp,

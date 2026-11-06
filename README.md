@@ -875,6 +875,12 @@ market halt ends every open trigger of the market with `cancel_reason`
 `failure_reason` `market_halted`. A reason number this SDK does not name reads
 as its number, for example `failure_reason == "321"`.
 
+`client_trigger_id` identifies a create. Left out or empty, `triggers.create`
+generates one, which reads back on the trigger. Set your own to find the
+trigger after an unknown outcome, such as
+`ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`. A blank one is refused before
+sending.
+
 A trigger's history records every fire refused while the trigger stayed live,
 as a `fire_refused` event: `child_seq` is the refused attempt (the next one
 takes the next number) and `fire_refusal_reason` says why, with the
@@ -894,6 +900,20 @@ again shortly. `fire_refused` is not terminal: the trigger stays `armed` or
 `failure_reason`. `is_terminal_trigger_event(event_type)` is true only for
 `canceled` and `failed`; read the trigger's `status` rather than inferring it
 from its last event. `list_events(event_type="fire_refused")` filters them.
+
+`TriggerEvent.event_type` is `fired`, `canceled`, `updated`, `failed`,
+`activated` (a trailing stop started tracking), `armed` (an attached
+take-profit, stop-loss or trailing stop started protecting its parent's filled
+quantity, once) or `fire_refused`. A ladder has no event types of its own: read
+its `status`, `completed`, `cancelled` or `failed`. A completed ladder may not
+have filled: read its executed quantity and levels.
+
+A trigger change that names a listed pair other than the trigger's own is
+refused with `ERROR_CODE_TRIGGER_SYMBOL_MISMATCH` (305). Nothing changed: name
+the trigger's own pair or omit the symbol. A pair that is not listed is
+`ERROR_CODE_UNKNOWN_SYMBOL`. A balance or other ledger read given a zero or
+malformed sub-account ID is refused with the ledger code
+`ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), read from `PolyesterApiError.code`.
 
 A ladder whose levels were all canceled before any filled ends `cancelled`
 with `cancel_reason` `user_request`; one that filled anything ends

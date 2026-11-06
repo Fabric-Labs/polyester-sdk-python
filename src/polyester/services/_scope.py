@@ -11,7 +11,8 @@ AccountScope = Literal["main", "active"] | str | dict[str, str]
 def resolve_sub_account_id(value: str | None, default: str | None) -> str | None:
     if value == "":
         return None
-    return value if value is not None else default
+    # An empty default means no scope, as an empty value does.
+    return value if value is not None else (default or None)
 
 
 def scoped_sub_account_id(

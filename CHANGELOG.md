@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Breaking:** `triggers.create` raises `PolyesterValidationError` for a blank `client_trigger_id` before sending. Migrate by passing a real ID or leaving it out.
+- **Breaking:** A ledger refusal carrying `ledger.read.v1.ErrorDetail` now reports `PolyesterApiError` with its specific code, such as `ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), instead of code `invalid_argument`. Migrate by branching on the specific code.
+- **Breaking:** A Connect error body with malformed `message` or `details` now reports by its HTTP status, such as a `PolyesterServerError` with message `400 Bad Request`, instead of a raw `AttributeError` or a server error carrying Python exception text. Migrate by catching SDK errors. Undecodable detail bytes keep the Connect code instead of raising `DecodeError`.
+- Trigger reads return a REST 429 refusal and a 503 `ACCOUNT_ROUTING_INVALID` on the first request with their typed reason, instead of retrying them for two seconds. Real unavailability keeps its bounded retry.
+- `triggers.create` without a `client_trigger_id` generates one, as the contract requires an ID and Go already does, instead of sending none.
+- An empty `default_sub_account_id` now means no scope on every path, instead of raising `PolyesterValidationError` on `orders.batch_replace`, `orders.modify`, `triggers.create` and other writes.
+- `sign_request` signs the decoded URL path, as the server verifies it, including percent-escapes that are not UTF-8. A path with percent-escapes no longer gets `401 SIGNATURE_INVALID`. The shared signing vectors now cover escaped paths.
 - **Breaking:** Bare REST `UNAVAILABLE` cannot establish an orders-service refusal: report outcome unknown and non-retryable. Only a typed `orders.v1.ErrorDetail` carrying `UNAVAILABLE` establishes a known, retryable refusal. Migration: read back after an unknown outcome; retry reads explicitly.
 - **Breaking:** The additional retry-later resource codes `CLIENT_ORDER_IDS_EXHAUSTED`, `CLIENT_ORDER_ID_CAPACITY_REACHED`, `MARKET_LADDER_LIMIT_EXCEEDED`, `MARKET_TRIGGER_LIMIT_EXCEEDED`, `MARKET_TWAP_LIMIT_EXCEEDED`, `NEW_ACCOUNT_CAPACITY_REACHED`, `REQUEST_RECEIPTS_EXHAUSTED`, `RESERVATION_CAPACITY_REACHED`, `TRIGGER_CAPACITY_REACHED`, `TRIGGER_CONTROL_SHARE_EXHAUSTED`, `TWAP_CAPACITY_REACHED` report outcome known and retryable, preserving any server retry delay.
 - **Breaking:** Retry-After headers on Connect resource refusals are retained alongside typed retry details.

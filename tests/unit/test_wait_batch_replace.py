@@ -150,9 +150,17 @@ def _respond_unavailable(httpserver: HTTPServer) -> None:
 
 
 @pytest.mark.asyncio
-async def test_wait_batch_replace_polls_until_no_item_is_admitted(httpserver: HTTPServer) -> None:
+@pytest.mark.parametrize("gateway", [False, True])
+async def test_wait_batch_replace_polls_until_no_item_is_admitted(
+    httpserver: HTTPServer, gateway: bool
+) -> None:
     _respond(httpserver, _status(_admitted(0), _admitted(1), accepted=2))
-    _respond_unavailable(httpserver)
+    if gateway:
+        httpserver.expect_oneshot_request(STATUS_PATH, method="POST").respond_with_data(
+            "<html>Gateway Timeout</html>", status=504, content_type="text/html"
+        )
+    else:
+        _respond_unavailable(httpserver)
     _respond(httpserver, _status(_working(0), _admitted(1), accepted=2))
     _respond(httpserver, _status(_working(0), _refused(1), accepted=2))
     orders, transport = _orders_service(httpserver)
@@ -364,3 +372,36 @@ async def test_wait_batch_replace_caller_cancellation_still_cancels(
 
     assert elapsed < 0.8
     assert len(httpserver.log) == 1
+
+
+async def test_snapshot_refresh_retries_gateway_504_even_when_flag_is_false(httpserver):
+    from polyester.realtime import AsyncRealtimeClient
+    from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
+
+    httpserver.expect_oneshot_request(STATUS_PATH, method="POST").respond_with_data(
+        "Gateway Timeout", status=504, content_type="text/html"
+    )
+    _respond(httpserver, _status(_working(), accepted=1))
+    orders, transport = _orders_service(httpserver)
+    realtime = AsyncRealtimeClient("ws://example.invalid")
+    sub = AsyncSnapshotThenStreamSubscription(
+        realtime=realtime,
+        channel="public:test",
+        decode=lambda b: b,
+        fetch_snapshot=lambda: orders.get_batch_replace_status(batch_request_id=str(BATCH_ID)),
+        read_publication=lambda p: [p],
+        apply_snapshot=lambda _s, _p: None,
+        apply_live_publications=lambda _p: None,
+    )
+    try:
+        sub.request_refresh()
+        async with asyncio.timeout(2):
+            while not sub.is_ready() and not sub.is_disposed():
+                await asyncio.sleep(0.001)
+        assert sub.is_ready()
+        assert len(httpserver.log) == 2
+        assert sub.last_error is None
+    finally:
+        await sub.aclose()
+        await realtime.aclose()
+        await transport.aclose()

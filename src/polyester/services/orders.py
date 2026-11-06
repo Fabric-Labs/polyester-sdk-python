@@ -41,6 +41,7 @@ from polyester.errors import (
     PolyesterBatchReplaceTimeoutError,
     PolyesterRateLimitError,
     PolyesterResponseContractError,
+    PolyesterServerError,
     PolyesterTransportError,
     PolyesterValidationError,
     is_not_found,
@@ -969,7 +970,9 @@ def _is_transient_status_read_error(exc: BaseException) -> bool:
     """A status read error worth polling through: the status is not written
     yet (``not_found``), or the server or network failed for now. Rate limits
     are raised to the caller."""
-    if is_not_found(exc):
+    # This operation only reads status, so an ambiguous gateway timeout is safe
+    # to poll through even though its general mutation retry flag is false.
+    if is_not_found(exc) or (isinstance(exc, PolyesterServerError) and exc.status_code == 504):
         return True
     return is_retryable_error(exc) and not isinstance(exc, PolyesterRateLimitError)
 

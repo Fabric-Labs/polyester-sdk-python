@@ -445,12 +445,19 @@ def is_retryable_error(err: BaseException) -> bool:
     twice. Read the order or trigger back first; see
     :func:`mutation_outcome_unknown`.
 
+    A REST gateway 504 is non-retryable with outcome unknown, even without
+    a recognized code. This classifier has no operation context: a caller
+    may explicitly retry a side-effect-free read, but must reconcile a write.
+    A client order ID enables lookup, not exact replay of a single create.
+
     A true result does not guarantee that a mutation was not applied: a
     timeout is retryable but may still have applied. Preserve the original
     idempotency key and reconcile first when :func:`mutation_outcome_unknown`
     returns true.
     """
-    if _is_outcome_unknown_api_error(err):
+    if _is_outcome_unknown_api_error(err) or (
+        isinstance(err, PolyesterServerError) and err.status_code == 504
+    ):
         return False
     if isinstance(err, PolyesterApiError) and err.code == AUTH_TEMPORARILY_UNAVAILABLE:
         return True

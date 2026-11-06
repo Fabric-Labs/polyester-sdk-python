@@ -50,9 +50,16 @@ def _connect_auth_error(code: int, message: str, connect_code: Code = Code.UNAUT
     return map_connect_error(ConnectError(connect_code, message, details=[detail]))
 
 
-async def _rest_error(httpserver: HTTPServer, status: int, body: dict) -> BaseException:
+async def _rest_error(
+    httpserver: HTTPServer,
+    status: int,
+    body: dict,
+    *,
+    content_type: str = "application/problem+json",
+    headers: dict | None = None,
+) -> BaseException:
     httpserver.expect_request(SPOT_CONFIG_PATH, method="POST").respond_with_data(
-        json.dumps(body), status=status, content_type="application/problem+json"
+        json.dumps(body), status=status, content_type=content_type, headers=headers
     )
     transport = TransportFactory(TransportConfig(api_url=httpserver.url_for("").rstrip("/")))
     try:

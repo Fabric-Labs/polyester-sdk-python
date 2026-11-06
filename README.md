@@ -1388,3 +1388,17 @@ not a retryable server error.
 A request whose deadline expires raises `PolyesterTimeoutError`, a
 `PolyesterTransportError`: retryable, but a mutation may still have been
 applied, so reconcile first (`mutation_outcome_unknown(error)` is true).
+
+
+A plain REST gateway 504 raises `PolyesterServerError` with `status_code == 504`:
+`is_retryable_error` is false and `mutation_outcome_unknown` is true. The
+classifier has no operation context. Reads may retry a 504 explicitly; writes
+read back first. A client order ID helps reconcile a create but does not make it
+an exact replay. Without one, read open orders before deciding whether to submit
+again. The SDK never automatically resends a create; bounded trigger/status reads
+and snapshot recovery keep their own safe read retries.
+
+`OVERLOADED` and `SYSTEM_RATE_LIMITED` are retryable admission refusals on
+Connect and REST: nothing was admitted. Respect `retry_after` when supplied;
+for `OVERLOADED`, wait for an outstanding request to complete. In contrast,
+`ORDER_SEQUENCE_EXHAUSTED` is permanent; contact support instead of retrying.

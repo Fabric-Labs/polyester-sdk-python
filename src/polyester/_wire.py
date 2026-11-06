@@ -123,6 +123,15 @@ def _map_gateway_problem(exc: GatewayProblemError):
             code=_order_error_code_from_rest(exc.problem_code),
             violations=_rest_violations(exc.violations),
         )
+    order_code = _order_error_code_from_rest(exc.problem_code)
+    if order_code in ("ERROR_CODE_OVERLOADED", "ERROR_CODE_SYSTEM_RATE_LIMITED"):
+        return PolyesterRateLimitError(message, retry_after=exc.retry_after)
+    if order_code == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED":
+        return PolyesterApiError(message, code=order_code)
+    if exc.http_status == 504:
+        return PolyesterServerError(
+            message or "Gateway Timeout", code=exc.problem_code or None, status_code=504
+        )
     if exc.problem_code == AUTH_SESSION_KIND_NOT_ALLOWED:
         return PolyesterSessionRequiredError(
             exc.detail or "interactive session required", status_code=exc.http_status
@@ -157,6 +166,10 @@ def map_connect_error(exc: ConnectError):
     return mapped
 
 
+def _auth_status(exc: ConnectError) -> int | None:
+    return {"unauthenticated": 401, "permission_denied": 403}.get(exc.code.value)
+
+
 def _map_connect_error(exc: ConnectError):
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
@@ -188,7 +201,11 @@ def _map_connect_error(exc: ConnectError):
                 )
                 # Preserve backoff hints and unknown mutation outcomes before
                 # applying the transport's temporary-failure classification.
-                if rate_limit is not None or code_name == "ERROR_CODE_RATE_LIMIT_EXCEEDED":
+                if rate_limit is not None or code_name in (
+                    "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+                    "ERROR_CODE_SYSTEM_RATE_LIMITED",
+                    "ERROR_CODE_OVERLOADED",
+                ):
                     return _rate_limit_error(error_message, proto_detail=rate_limit)
                 if exc.code.value == "unavailable" and not code_name.endswith("_OUTCOME_UNKNOWN"):
                     return PolyesterServerError(
@@ -218,7 +235,7 @@ def _map_connect_error(exc: ConnectError):
                 if code_name in API_KEY_AUTH_ERROR_CODES:
                     return PolyesterAuthError(
                         message,
-                        status_code=401 if exc.code.value == "unauthenticated" else None,
+                        status_code=_auth_status(exc),
                         code=code_name,
                     )
                 return PolyesterApiError(message, code=code_name, raw=unpacked)
@@ -264,7 +281,9 @@ def _map_connect_error(exc: ConnectError):
                     or "API_KEY" in code_name
                     or "WALLET_BINDING" in code_name
                 ):
-                    return PolyesterAuthError(error_message)
+                    return PolyesterAuthError(
+                        error_message, code=code_name, status_code=_auth_status(exc)
+                    )
                 return PolyesterApiError(error_message, code=code_name)
             if full_name == "transfer.v1.ErrorDetail":
                 code_name = error_code_name(transfer_pb2.ErrorCode, unpacked.code)
@@ -273,14 +292,26 @@ def _map_connect_error(exc: ConnectError):
                     or "PERMISSION" in code_name
                     or "POLICY" in code_name
                 ):
-                    return PolyesterAuthError(error_message)
+                    return PolyesterAuthError(
+                        error_message, code=code_name, status_code=_auth_status(exc)
+                    )
                 return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
+    message_code = (exc.message or "").strip()
+    if message_code.endswith("_OUTCOME_UNKNOWN"):
+        return PolyesterApiError(error_message, code=_order_error_code_from_rest(message_code))
+    if (
+        code == "resource_exhausted"
+        and _order_error_code_from_rest(message_code) == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
+    ):
+        return PolyesterApiError(error_message, code="ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED")
     if is_cloudflare_browser_ban(error_message):
         return PolyesterTransportError(cloudflare_1010_message())
     if code in ("unauthenticated", "permission_denied"):
         return PolyesterAuthError(
-            error_message, code=auth_error_code_from_rest((exc.message or "").strip())
+            error_message,
+            code=auth_error_code_from_rest((exc.message or "").strip()) or code,
+            status_code=_auth_status(exc),
         )
     if code in ("unavailable", "internal"):
         return PolyesterServerError(error_message)

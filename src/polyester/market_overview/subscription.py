@@ -37,7 +37,8 @@ class MarketOverviewSubscription:
         if self._start_task is not None and not self._start_task.done():
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._start_task
-        await self._queue.put(None)
+        with contextlib.suppress(asyncio.QueueFull):
+            self._queue.put_nowait(None)
 
     async def __aenter__(self) -> MarketOverviewSubscription:
         return self
@@ -52,7 +53,7 @@ class MarketOverviewSubscription:
         return self
 
     async def __anext__(self) -> list[MarketOverviewEntry]:
-        if self._close.is_set():
+        if self._close.is_set() and self._queue.empty():
             raise StopAsyncIteration
         item = await self._queue.get()
         if item is None:

@@ -143,12 +143,10 @@ def sha256_hex(body: bytes) -> str:
 
 
 def canonical_query(url: str) -> str:
+    """Sort decoded keys and values before RFC 3986 encoding, as the server does."""
     _validated_url(url)
-    pairs = []
-    for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True):
-        pairs.append(f"{quote(key, safe='')}={quote(value, safe='')}")
-    pairs.sort()
-    return "&".join(pairs)
+    pairs = sorted(parse_qsl(urlsplit(url).query, keep_blank_values=True))
+    return "&".join(f"{quote(key, safe='')}={quote(value, safe='')}" for key, value in pairs)
 
 
 def canonical_signing_string(

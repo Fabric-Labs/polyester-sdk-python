@@ -140,3 +140,64 @@ async def test_limit_price_and_post_only_controls(kind):
             assert child.price_ticks == 100 * 10**9
         if kind != "twap":
             assert child.post_only
+
+
+@pytest.mark.parametrize("kind", ["stop_loss", "trailing_stop"])
+@pytest.mark.parametrize("tif", [None, "", 1, False])
+async def test_invalid_tif_uses_validation_error_before_transport(kind, tif):
+    kwargs = base_options(kind)
+    kwargs["tif"] = tif
+    async with capture_transport() as (transport, requests):
+        with pytest.raises(PolyesterValidationError, match="tif"):
+            await triggers(transport).create(**kwargs)
+        assert len(requests) == 0
+
+
+@pytest.mark.parametrize(
+    "side,order_type", [("sell", "limit"), ("buy", "limit"), ("buy", "market")]
+)
+async def test_trailing_stop_side_execution_and_buy_maximum(side, order_type):
+    kwargs = base_options("trailing_stop")
+    kwargs.update(side=side, order_type=order_type)
+    if side == "buy":
+        kwargs["limit_price"] = "100"
+    async with capture_transport() as (transport, requests):
+        if side == "sell":
+            with pytest.raises(PolyesterValidationError, match="order_type=limit"):
+                await triggers(transport).create(**kwargs)
+            assert len(requests) == 0
+        else:
+            await triggers(transport).create(**kwargs)
+            assert len(requests) == 1
+            intent = triggers_pb2.CreateTriggerRequest.FromString(requests[0].body).trigger
+            assert intent.WhichOneof("strategy") == "trailing_stop"
+            assert intent.trailing_stop.limit_price_ticks == 100 * 10**9
+
+
+@pytest.mark.parametrize("option", ["max_slippage_ticks", "max_slippage_bps"])
+async def test_trailing_stop_slippage_controls(option):
+    kwargs = base_options("trailing_stop")
+    kwargs[option] = 5
+    async with capture_transport() as (transport, requests):
+        await triggers(transport).create(**kwargs)
+        assert len(requests) == 1
+        trailing = triggers_pb2.CreateTriggerRequest.FromString(
+            requests[0].body
+        ).trigger.trailing_stop
+        assert trailing.WhichOneof("max_slippage") == option
+        assert getattr(trailing, option) == 5
+
+
+@pytest.mark.parametrize("kind", ["stop_loss", "take_profit"])
+@pytest.mark.parametrize("tif", ["ioc", "fok"])
+async def test_limit_stop_time_in_force_controls(kind, tif):
+    kwargs = base_options(kind)
+    kwargs.update(order_type="limit", limit_price="100", tif=tif)
+    async with capture_transport() as (transport, requests):
+        await triggers(transport).create(**kwargs)
+        assert len(requests) == 1
+        intent = triggers_pb2.CreateTriggerRequest.FromString(requests[0].body).trigger
+        assert intent.WhichOneof("strategy") == kind
+        child = getattr(intent, kind).child
+        assert child.WhichOneof("execution") == f"limit_{tif}"
+        assert getattr(child, f"limit_{tif}").price_ticks == 100 * 10**9

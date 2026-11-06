@@ -223,6 +223,8 @@ def create_trigger_to_proto(
         raise PolyesterValidationError(
             "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop"
         )
+    if not isinstance(tif, str):
+        raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
     tif_key = tif.lower()
     if tif_key not in ("gtc", "ioc", "fok"):
         raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")

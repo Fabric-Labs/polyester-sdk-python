@@ -142,7 +142,6 @@ async def test_create_ladder_trigger(
             side="buy",
             qty=total_qty,
             order_type="limit",
-            limit_price=ladder_price_max,
             ladder_price_min=ladder_price_min,
             ladder_price_max=ladder_price_max,
             ladder_levels=levels,

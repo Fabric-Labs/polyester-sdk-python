@@ -20,7 +20,13 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
-from polyester.codecs.scalars import FractionalDigitsError, id_to_int, omit_none, tick_count
+from polyester.codecs.scalars import (
+    FractionalDigitsError,
+    id_to_int,
+    omit_none,
+    refuse_item_scope,
+    tick_count,
+)
 from polyester.codecs.triggers import (
     self_trade_prevention_mode_to_proto,
     trigger_price_source_to_proto,
@@ -961,6 +967,7 @@ def batch_replace_item_to_proto(
             "new_qty": item.new_qty,
             "new_client_order_id": item.new_client_order_id,
         }
+    refuse_item_scope(item, "batch_replace")
     key = _item_order_key(item, label="each batch replace item")
     new_price = item.get("new_price")
     new_qty = item.get("new_qty")
@@ -1028,6 +1035,7 @@ def batch_create_orders_to_proto(
 
 
 def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelItem:
+    refuse_item_scope(item, "batch_cancel")
     key = _item_order_key(item, label="each batch cancel item")
     symbol_id = item.get("symbol_id")
     proto = orders_pb2.BatchCancelItem()

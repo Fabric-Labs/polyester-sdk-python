@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-import random
 import time
 
 import httpx
@@ -549,64 +548,75 @@ async def test_l2_jsonrpc_rejects_oversized_chunked_and_envelopes() -> None:
 
 
 def test_l2_jsonrpc_25_concurrent_reordered_responses_succeed() -> None:
-    """25 concurrent JsonRpcClient.request calls; server replies in shuffled id order."""
-    import socket
+    """All 25 calls overlap; replies are sent in reverse request-arrival order."""
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-    barrier = threading.Barrier(25)
-    seen: dict[int, None] = {}
-    order_lock = threading.Lock()
-    release_order: list[int] = []
+    concurrent_requests = 25
+    barrier = threading.Barrier(concurrent_requests)
+    order = threading.Condition()
+    arrival_order: list[int] = []
+    response_order: list[int] = []
+
+    class _Server(ThreadingHTTPServer):
+        # Python 3.12 defaults to five queued connections. A 25-connection burst
+        # can overflow that backlog and strand callers before the barrier.
+        request_queue_size = concurrent_requests
 
     class _Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
             length = int(self.headers.get("Content-Length") or 0)
-            body = self.rfile.read(length)
-            try:
-                req_id = int(json.loads(body.decode()).get("id"))
-            except Exception:
-                self.send_error(400)
-                return
-            with order_lock:
-                seen[req_id] = None
+            req = json.loads(self.rfile.read(length))
+            req_id = req["id"]
+            with order:
+                arrival_order.append(req_id)
             try:
                 barrier.wait(timeout=5)
             except threading.BrokenBarrierError:
                 self.send_error(500)
                 return
-            with order_lock:
-                if not release_order:
-                    release_order.extend(seen.keys())
-                    random.shuffle(release_order)
-                idx = release_order.index(req_id)
-            time.sleep(idx * 0.005)
-            resp = json.dumps({"jsonrpc": "2.0", "id": req_id, "result": f"0x{req_id:x}"}).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(resp)))
-            self.end_headers()
-            self.wfile.write(resp)
+            with order:
+                # Serialize writes in reverse arrival order, rather than relying
+                # on random sleeps to happen to reorder responses.
+                if not order.wait_for(
+                    lambda: req_id == arrival_order[-1 - len(response_order)], timeout=5
+                ):
+                    self.send_error(500)
+                    return
+                resp = json.dumps(
+                    {"jsonrpc": "2.0", "id": req_id, "result": req["params"][0]}
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                response_order.append(req_id)
+                order.notify_all()
 
         def log_message(self, format: str, *args) -> None:  # noqa: A003
             return
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        host, port = s.getsockname()
-    server = ThreadingHTTPServer((host, port), _Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        rpc = JsonRpcClient(f"http://{host}:{port}", timeout=5.0)
-        with ThreadPoolExecutor(max_workers=25) as pool:
-            futures = [pool.submit(rpc.request, "eth_chainId", []) for _ in range(25)]
-            results = [f.result(timeout=10) for f in as_completed(futures)]
-        assert len(results) == 25
-        assert all(isinstance(r, str) and r.startswith("0x") for r in results)
-    finally:
-        server.shutdown()
+    with _Server(("127.0.0.1", 0), _Handler) as server:
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            rpc = JsonRpcClient(f"http://{host}:{port}", timeout=5.0)
+            with ThreadPoolExecutor(max_workers=concurrent_requests) as pool:
+                futures = {
+                    pool.submit(rpc.request, "echo", [value]): value
+                    for value in range(concurrent_requests)
+                }
+                for future in as_completed(futures, timeout=10):
+                    assert future.result() == futures[future]
+            assert len(arrival_order) == concurrent_requests
+            assert set(arrival_order) == set(range(1, concurrent_requests + 1))
+            assert response_order == arrival_order[::-1]
+        finally:
+            server.shutdown()
+            thread.join()
 
 
 # ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fixed API-key request signing to sort decoded query bytes before encoding and preserve percent-encoded bytes, including bytes outside valid UTF-8 text. Prefix keys, repeated values and escaped values now match the server.
+- **Breaking:** Trigger creation now rejects options that do not apply to the selected strategy or child execution before sending. Migration: remove incompatible options, or select the trigger type and execution that support them (use `trailing_stop` for trailing distances and activation price).
 
 - Transfer history's `since` filter now works, including zero. It is an
   inclusive lower bound in microseconds since the UTC Unix epoch. Invalid

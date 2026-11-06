@@ -193,6 +193,51 @@ def create_trigger_to_proto(
     order_key = order_type.lower()
     if order_key not in ("limit", "market"):
         raise PolyesterValidationError("order_type must be limit or market")
+    # Validate presence, including explicit zero values, before selecting a
+    # strategy. A field outside its strategy must never disappear silently.
+    for option, value, supported in (
+        ("trailing_distance_ticks", trailing_distance_ticks, ("trailing_stop",)),
+        ("trailing_distance_bps", trailing_distance_bps, ("trailing_stop",)),
+        ("activation_price", activation_price, ("trailing_stop",)),
+        ("twap_duration_ms", twap_duration_ms, ("twap",)),
+        ("twap_slice_interval_ms", twap_slice_interval_ms, ("twap",)),
+        ("ladder_price_min", ladder_price_min, ("ladder",)),
+        ("ladder_price_max", ladder_price_max, ("ladder",)),
+        ("ladder_levels", ladder_levels, ("ladder",)),
+        ("ladder_distribution", ladder_distribution, ("ladder",)),
+        ("trigger_price", trigger_price, ("stop_loss", "take_profit")),
+    ):
+        if value is not None and type_key not in supported:
+            raise PolyesterValidationError(f"{option} applies only to {' or '.join(supported)}")
+    if post_only and type_key in ("trailing_stop", "twap"):
+        raise PolyesterValidationError("post_only applies only to limit GTC stops or ladder")
+    if limit_price is not None and (
+        type_key == "ladder" or (type_key != "trailing_stop" and order_key == "market")
+    ):
+        raise PolyesterValidationError(
+            "limit_price applies only to limit children or a buy trailing_stop"
+        )
+    if (type_key == "ladder" or (type_key == "twap" and order_key == "limit")) and (
+        max_slippage_ticks is not None or max_slippage_bps is not None
+    ):
+        raise PolyesterValidationError(
+            "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop"
+        )
+    tif_key = tif.lower()
+    if tif_key not in ("gtc", "ioc", "fok"):
+        raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
+    # gtc is the public helper's default. Fixed IOC executions also accept ioc.
+    if type_key == "ladder" or (type_key == "twap" and order_key == "limit"):
+        if tif_key != "gtc":
+            raise PolyesterValidationError("tif must be gtc for ladder or twap limit slices")
+    elif (type_key == "trailing_stop" or order_key == "market") and tif_key == "fok":
+        raise PolyesterValidationError(
+            "tif=fok applies only to stop_loss or take_profit limit children"
+        )
+    if type_key == "trailing_stop" and side_key == "sell" and order_key == "limit":
+        raise PolyesterValidationError(
+            "order_type=limit applies only to buy trailing_stop children"
+        )
     side_proto = orders_pb2.BUY if side_key == "buy" else orders_pb2.SELL
 
     intent = triggers_pb2.TriggerIntent(

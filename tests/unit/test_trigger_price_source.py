@@ -223,8 +223,8 @@ def test_trigger_price_source_rejections(trigger_type: str, source: str, match: 
             side="sell",
             qty="0.1",
             quantity_scale=8,
-            trigger_price="80",
-            twap_duration_ms=60_000,
-            twap_slice_interval_ms=10_000,
+            trigger_price="80" if trigger_type == "stop_loss" else None,
+            twap_duration_ms=60_000 if trigger_type == "twap" else None,
+            twap_slice_interval_ms=10_000 if trigger_type == "twap" else None,
             trigger_price_source=source,
         )

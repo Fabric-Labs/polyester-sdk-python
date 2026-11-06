@@ -193,6 +193,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
     ) -> TriggerMutationResult:
         """Create a standalone trigger.
 
+        Options for another strategy or child execution raise
+        ``PolyesterValidationError`` before sending. Trailing distances and
+        ``activation_price`` apply only to ``trailing_stop``; TWAP and ladder
+        settings apply only to their respective strategies.
+
         ``limit_price`` is the child's limit price for a limit stop-loss or
         take-profit. For ``trigger_type="trailing_stop"`` with ``side="buy"`` it
         is the required maximum price, the most the child pays per unit (a

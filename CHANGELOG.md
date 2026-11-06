@@ -52,6 +52,8 @@ Git tag: `v0.7.0`. Released 2026-11-06. Built on public contract `748066a`.
   raises a validation error instead of formatting the result at scale zero.
 - Equity history now exposes `btc_prices_q`: the returned BTC-USDT closes as
   integers scaled by 1e9, in timestamp order. An omitted series is an empty list.
+- Realtime subscriptions preserve publications sent alongside or before the subscribe reply.
+- Managed order books finish their update stream after terminal failure and reject conflicting market name and ID selectors before connecting.
 
 ## 0.6.2
 

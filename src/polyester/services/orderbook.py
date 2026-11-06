@@ -110,6 +110,12 @@ class AsyncOrderbookService(BaseService):
                 f"symbol_id is required for orderbook subscriptions ({symbol!r})"
             )
 
+        catalog_id = self._catalogs.symbol_id_for_symbol(symbol)
+        if catalog_id != resolved_symbol_id:
+            raise PolyesterValidationError(
+                f"orderbook symbol {symbol!r} does not match symbol_id {resolved_symbol_id}"
+            )
+
         ws_depth = min(500, max(1, int(depth)))
         channel = f"public:spot:orderbook:deltas:depth:{ws_depth}:{resolved_symbol_id}:proto"
 
@@ -211,6 +217,11 @@ class AsyncOrderbookService(BaseService):
                 return
             emit()
 
+        def terminal_close() -> None:
+            close.set()
+            with contextlib.suppress(asyncio.QueueFull):
+                queue.put_nowait(None)
+
         stream = AsyncSnapshotThenStreamSubscription(
             realtime=realtime,
             channel=channel,
@@ -222,6 +233,7 @@ class AsyncOrderbookService(BaseService):
             on_open=on_open,
             on_close=on_close,
             on_error=on_error,
+            on_terminal=terminal_close,
             on_reconnect=on_reconnect,
             on_snapshot_refresh=on_snapshot_refresh,
         )

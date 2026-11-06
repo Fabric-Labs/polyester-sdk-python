@@ -58,7 +58,7 @@ class OrderbookSubscription:
         return self
 
     async def __anext__(self) -> OrderbookData:
-        if self._close.is_set():
+        if self._close.is_set() and self._queue.empty():
             raise StopAsyncIteration
         item = await self._queue.get()
         if item is None:

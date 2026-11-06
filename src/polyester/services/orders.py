@@ -281,16 +281,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         creating again; a second create with the same id is a conflict if the
         first attempt admitted.
         """
-        if account is not None:
-            kwargs = {
-                **kwargs,
-                "sub_account_id": self._resolve_sub_account_id(account=account),
-            }
         normalized = normalize_create_order_request(request, **kwargs)
-        if normalized.sub_account_id is None:
-            resolved_sub = self._resolve_sub_account_id(None)
-            if resolved_sub is not None:
-                normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
+        normalized = msgspec.structs.replace(
+            normalized,
+            sub_account_id=self._resolve_sub_account_id(normalized.sub_account_id, account=account),
+        )
         await self._ensure_catalogs()
         canonical_symbol, symbol_id = resolve_order_identity(
             self._catalogs,
@@ -333,16 +328,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         Does not return fee or quote-debit estimates. Accepts the same public
         create shape; the wire request wraps an ``OrderIntent``.
         """
-        if account is not None:
-            kwargs = {
-                **kwargs,
-                "sub_account_id": self._resolve_sub_account_id(account=account),
-            }
         normalized = normalize_create_order_request(request, **kwargs)
-        if normalized.sub_account_id is None:
-            resolved_sub = self._resolve_sub_account_id(None)
-            if resolved_sub is not None:
-                normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
+        normalized = msgspec.structs.replace(
+            normalized,
+            sub_account_id=self._resolve_sub_account_id(normalized.sub_account_id, account=account),
+        )
         await self._ensure_catalogs()
         canonical_symbol, symbol_id = resolve_order_identity(
             self._catalogs,

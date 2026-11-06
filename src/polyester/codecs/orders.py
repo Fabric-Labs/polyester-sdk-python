@@ -1006,6 +1006,10 @@ def batch_create_orders_to_proto(
             normalized = item
         else:
             normalized = normalize_create_order_request(item)
+        if normalized.sub_account_id is not None:
+            raise PolyesterValidationError(
+                "batch_create item scope is unsupported; use the batch-level sub_account_id"
+            )
         base_scale, quote_scale = (
             item_scales[index] if item_scales is not None else (quantity_scale, None)
         )

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed API-key request signing to sort decoded query keys and values before encoding. Prefix keys and escaped values such as `a1=x&a=y` and `v=0&v=%3A` now match the server.
+- Fixed API-key request signing to sort decoded query bytes before encoding and preserve percent-encoded bytes, including bytes outside valid UTF-8 text. Prefix keys, repeated values and escaped values now match the server.
 
 - Transfer history's `since` filter now works, including zero. It is an
   inclusive lower bound in microseconds since the UTC Unix epoch. Invalid

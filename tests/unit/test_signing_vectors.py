@@ -6,7 +6,7 @@ import pytest
 from polyester.auth import ApiKeyCredentials, canonical_query, sign_request, sign_request_async
 
 # Identical fixtures live in Go, Python and Rust. Expected queries follow
-# server shared/pkg/auth/apikeys.go: decoded key/value sort, then RFC 3986 escape.
+# the server's canonicalization: decoded key/value bytes sorted, then RFC 3986 escaped.
 # Golden signatures use the public test seed 00..1f, timestamp 123, GET, no body.
 VECTORS = json.loads(
     (Path(__file__).parents[2] / "testdata/signing_query_vectors.json").read_text()

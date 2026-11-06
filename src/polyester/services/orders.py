@@ -84,6 +84,7 @@ from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resol
 from polyester.services._symbols import (
     resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
+    resolve_order_identity,
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
@@ -290,18 +291,20 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             if resolved_sub is not None:
                 normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
-        quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
+        canonical_symbol, symbol_id = resolve_order_identity(
+            self._catalogs,
+            symbol=normalized.symbol,
+            symbol_id=normalized.symbol_id,
+            label="orders.create",
+        )
+        quantity_scale = resolve_quantity_scale(
+            self._catalogs, normalized.symbol, normalized.qty, symbol_id=symbol_id
+        )
         quote_quantity_scale = resolve_quote_quantity_scale(
-            self._catalogs, normalized.symbol, normalized.max_quote_debit
+            self._catalogs, normalized.symbol, normalized.max_quote_debit, symbol_id=symbol_id
         )
         normalized = msgspec.structs.replace(
-            normalized,
-            symbol_id=resolve_symbol_id(
-                self._catalogs,
-                symbol=normalized.symbol,
-                symbol_id=normalized.symbol_id,
-                label="orders.create",
-            ),
+            normalized, symbol_id=symbol_id, symbol=canonical_symbol
         )
         proto_request = create_order_to_proto(
             normalized,
@@ -340,11 +343,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             if resolved_sub is not None:
                 normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
-        symbol_id = resolve_symbol_id(
+        canonical_symbol, symbol_id = resolve_order_identity(
             self._catalogs,
             symbol=normalized.symbol,
             symbol_id=normalized.symbol_id,
             label="orders.preview",
+            require_catalog=False,
         )
         # The response uses the canonical pair's scale, even for a scaled input.
         quantity_scale = self._catalogs.base_quantity_scale_for_symbol_id(symbol_id)
@@ -360,7 +364,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, scale_symbol, normalized.max_quote_debit
         )
-        normalized = msgspec.structs.replace(normalized, symbol_id=symbol_id)
+        normalized = msgspec.structs.replace(
+            normalized, symbol_id=symbol_id, symbol=canonical_symbol
+        )
         proto_request = preview_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -591,6 +597,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         proto_request = batch_replace_orders_to_proto(
             items=items,
             symbol_id=symbol_id,
+            symbol=symbol,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             quantity_scale=scale,
@@ -731,43 +738,47 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         request_id: str | None = None,
         allow_partial: bool = False,
     ) -> BatchCreateOrdersResult:
-        qty_values: list[object | None] = []
-        scale_symbol = symbol
-        for item in items:
-            if isinstance(item, CreateOrderRequest):
-                qty_values.append(item.qty)
-                if scale_symbol is None and item.symbol:
-                    scale_symbol = item.symbol
-            else:
-                qty_values.append(item.get("qty"))
-                if scale_symbol is None and item.get("symbol"):
-                    scale_symbol = str(item["symbol"])
         await self._ensure_catalogs()
-        scale = resolve_quantity_scale(self._catalogs, scale_symbol, *qty_values)
         resolved_items: list[CreateOrderRequest] = []
+        item_scales: list[tuple[int, int]] = []
         for item in items:
             normalized = (
                 item
                 if isinstance(item, CreateOrderRequest)
                 else normalize_create_order_request(item)
             )
-            resolved_items.append(
-                msgspec.structs.replace(
-                    normalized,
-                    symbol_id=resolve_symbol_id(
+            canonical_symbol, symbol_id = resolve_order_identity(
+                self._catalogs,
+                symbol=(
+                    normalized.symbol
+                    if normalized.symbol_id is not None
+                    else normalized.symbol or symbol
+                ),
+                symbol_id=normalized.symbol_id,
+                label="batch_create",
+            )
+            item_scales.append(
+                (
+                    resolve_quantity_scale(
+                        self._catalogs, normalized.symbol, normalized.qty, symbol_id=symbol_id
+                    ),
+                    resolve_quote_quantity_scale(
                         self._catalogs,
-                        symbol=normalized.symbol,
-                        symbol_id=normalized.symbol_id,
-                        label="batch_create",
+                        normalized.symbol,
+                        normalized.max_quote_debit,
+                        symbol_id=symbol_id,
                     ),
                 )
+            )
+            resolved_items.append(
+                msgspec.structs.replace(normalized, symbol_id=symbol_id, symbol=canonical_symbol)
             )
         proto_request = batch_create_orders_to_proto(
             items=resolved_items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             allow_partial=allow_partial,
-            quantity_scale=scale,
+            item_scales=item_scales,
         )
         return await unary_auth_decoded(
             self._transport,

@@ -40,7 +40,8 @@ def test_resolve_quantity_scale_errors_when_catalog_missing_symbol() -> None:
         resolve_quantity_scale(catalogs, "ETH-USDT", "0.006")
 
 
-def test_scaled_quantity_skips_catalog_lookup() -> None:
+def test_scaled_quantity_requires_catalog_scale() -> None:
     catalogs = CatalogManager()
     qty = Quantity.from_scaled(1000, scale=6, domain=QuantityDomain.ORDER_BASE)
-    assert resolve_quantity_scale(catalogs, "ETH-USDT", qty) == 6
+    with pytest.raises(PolyesterValidationError, match="unavailable"):
+        resolve_quantity_scale(catalogs, "ETH-USDT", qty)

@@ -50,7 +50,7 @@ def test_transfers_list_from_proto_parses_cursor() -> None:
     )
     result = transfers_list_from_proto(msg)
     assert len(result.transfers) == 1
-    assert result.next_cursor == 12345
+    assert result.next_page_token == "12345"
 
 
 def test_deposit_address_from_proto() -> None:

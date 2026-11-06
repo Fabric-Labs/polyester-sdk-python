@@ -58,6 +58,7 @@ class CandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     timeframe: str = ""
     candles: list[Candle]
     reference_candles: list[Candle] = msgspec.field(default_factory=list)
+    next_page_token: str = ""
 
 
 class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -75,6 +76,7 @@ class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
 class MarketOverviewList(msgspec.Struct, kw_only=True, omit_defaults=True):
     markets: list[MarketOverviewEntry]
     total: int = 0
+    next_page_token: str = ""
 
 
 class SpotPairVolumeSeries(msgspec.Struct, kw_only=True, omit_defaults=True):

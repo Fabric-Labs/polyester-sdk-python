@@ -128,6 +128,7 @@ def candles_from_proto(
             "candle reference prices require reference_price_scale from GetSpotConfig"
         )
     return CandlesResult(
+        next_page_token=msg.next_page_token,
         symbol_id=int(msg.symbol_id),
         timeframe=_timeframe_label(msg.timeframe),
         candles=[candle_point_from_proto(item, volume_scale=volume_scale) for item in msg.candles],
@@ -185,6 +186,7 @@ def candles_columns_from_proto(
         msg, volume_scale=volume_scale, reference_price_scale=reference_price_scale
     )
     return CandlesResult(
+        next_page_token=msg.next_page_token,
         symbol_id=int(msg.symbol_id),
         timeframe=_timeframe_label(msg.timeframe),
         candles=candles,

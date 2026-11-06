@@ -87,6 +87,7 @@ from polyester.services._symbols import (
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
+from polyester.types import Quantity
 
 if TYPE_CHECKING:
     from polyester.services.triggers import AsyncTriggersService
@@ -339,20 +340,27 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             if resolved_sub is not None:
                 normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
-        quantity_scale = resolve_quantity_scale(self._catalogs, normalized.symbol, normalized.qty)
+        symbol_id = resolve_symbol_id(
+            self._catalogs,
+            symbol=normalized.symbol,
+            symbol_id=normalized.symbol_id,
+            label="orders.preview",
+        )
+        # The response uses the canonical pair's scale, even for a scaled input.
+        quantity_scale = self._catalogs.base_quantity_scale_for_symbol_id(symbol_id)
+        if quantity_scale is None:
+            if isinstance(normalized.qty, Quantity) and normalized.qty.scale is not None:
+                quantity_scale = normalized.qty.scale
+            else:
+                raise PolyesterValidationError(
+                    "preview quantity scale is unavailable; hydrate catalogs or pass "
+                    "a Quantity with an explicit scale"
+                )
+        scale_symbol = self._catalogs.symbol_for_symbol_id(symbol_id)
         quote_quantity_scale = resolve_quote_quantity_scale(
-            self._catalogs, normalized.symbol, normalized.max_quote_debit
+            self._catalogs, scale_symbol, normalized.max_quote_debit
         )
-        normalized = msgspec.structs.replace(
-            normalized,
-            symbol_id=resolve_symbol_id(
-                self._catalogs,
-                symbol=normalized.symbol,
-                symbol_id=normalized.symbol_id,
-                label="orders.preview",
-            ),
-        )
-        symbol_id = normalized.symbol_id
+        normalized = msgspec.structs.replace(normalized, symbol_id=symbol_id)
         proto_request = preview_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,

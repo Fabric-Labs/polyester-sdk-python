@@ -66,7 +66,9 @@ def market_overview_list_from_proto(
     catalogs: CatalogManager | None = None,
 ) -> MarketOverviewList:
     markets = [market_overview_entry_from_proto(item, catalogs) for item in msg.markets]
-    return MarketOverviewList(markets=markets, total=len(markets))
+    return MarketOverviewList(
+        markets=markets, total=len(markets), next_page_token=msg.next_page_token
+    )
 
 
 def spot_volume_history_from_proto(

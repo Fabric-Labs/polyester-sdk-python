@@ -586,7 +586,8 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):
     transfers: list[LedgerTransfer]
-    next_cursor: int | None = None
+    # Opaque continuation token; empty means the terminal page.
+    next_page_token: str = ""
 
 
 class InternalTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -677,6 +678,8 @@ class EquityHistory(msgspec.Struct, kw_only=True, omit_defaults=True):
     quote_asset: str = ""
     points: int = 0
     series: list[EquityHistorySeries] = []
+    # Raw BTC-USDT closes scaled by 1e9, aligned to the implicit timestamps.
+    btc_prices_q: list[int] = []
 
 
 class BucketTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):

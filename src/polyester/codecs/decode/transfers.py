@@ -51,12 +51,4 @@ def ledger_transfer_from_proto(msg: ledger_read_pb2.TransferRow) -> LedgerTransf
 
 def transfers_list_from_proto(msg: ledger_read_pb2.ListTransfersResponse) -> TransfersList:
     transfers = [ledger_transfer_from_proto(item) for item in msg.transfers]
-    next_cursor: int | None = None
-    if msg.next_page_token:
-        try:
-            parsed = int(msg.next_page_token)
-            if parsed != 0:
-                next_cursor = parsed
-        except ValueError:
-            next_cursor = None
-    return TransfersList(transfers=transfers, next_cursor=next_cursor)
+    return TransfersList(transfers=transfers, next_page_token=msg.next_page_token)

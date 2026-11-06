@@ -269,6 +269,7 @@ def decode_candles_list(data: dict[str, Any], *, volume_scale: int) -> CandlesRe
     if not candles:
         candles = _decode_columnar_candles(data, volume_scale=volume_scale)
     return CandlesResult(
+        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
         timeframe=str(_field(data, "timeframe", default="") or ""),
         candles=candles,
@@ -336,6 +337,7 @@ def decode_market_overview_list(data: dict[str, Any]) -> MarketOverviewList:
     ]
     return MarketOverviewList(
         markets=markets,
+        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
         total=int(_field(data, "total", default=0) or 0),
     )
 
@@ -560,9 +562,10 @@ def decode_transfers_list(data: dict[str, Any]) -> TransfersList:
         for item in _field(data, "transfers", default=[]) or []
         if isinstance(item, dict)
     ]
-    cursor = _field(data, "nextCursor", "next_cursor")
-    next_cursor = int(cursor) if cursor not in (None, "", 0) else None
-    return TransfersList(transfers=transfers, next_cursor=next_cursor)
+    return TransfersList(
+        transfers=transfers,
+        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
+    )
 
 
 def decode_internal_transfer_result(data: dict[str, Any]) -> InternalTransferResult:
@@ -736,6 +739,9 @@ def decode_equity_history(data: dict[str, Any]) -> EquityHistory:
         quote_asset=str(_field(data, "quoteAsset", "quote_asset", default="") or ""),
         points=int(_field(data, "points", default=0) or 0),
         series=series,
+        btc_prices_q=[
+            int(v) for v in _field(data, "btcPricesQ", "btc_prices_q", default=[]) or []
+        ],
     )
 
 

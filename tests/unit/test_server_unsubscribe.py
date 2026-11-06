@@ -176,6 +176,55 @@ def _book_service(rt, respond, monkeypatch) -> tuple[AsyncOrderbookService, list
     return AsyncOrderbookService(MagicMock(), catalogs=catalogs, realtime=rt), calls
 
 
+async def test_available_snapshot_cancels_pending_request(monkeypatch) -> None:
+    # A newer available snapshot makes the pending request obsolete: it must not
+    # fire, or a failure there could end a healthy stream.
+    async with CentrifugoServer() as server:
+        rt = AsyncRealtimeClient(server.url)
+        service, calls = _book_service(
+            rt,
+            lambda n: _book(0, available=False) if n == 1 else _book(10, available=True),
+            monkeypatch,
+        )
+        sub = await service.create_subscription(symbol="BTC-USDT", depth=10)
+        async with asyncio.timeout(5):
+            assert (await anext(sub)).available is False
+        await sub.refresh_snapshot()
+        async with asyncio.timeout(5):
+            assert (await anext(sub)).available is True
+        assert len(calls) == 2, "before the old timer is due"
+        # Past the 1 s delay the unavailable snapshot scheduled.
+        await asyncio.sleep(1.5)
+        assert len(calls) == 2, "an obsolete request fired"
+        assert sub.last_error is None
+        await sub.aclose()
+        await rt.aclose()
+
+
+async def test_reconnect_with_an_available_snapshot_cancels_pending_request(monkeypatch) -> None:
+    channel = "public:spot:orderbook:deltas:depth:10:1:proto"
+    async with CentrifugoServer() as server:
+        rt = AsyncRealtimeClient(server.url)
+        service, calls = _book_service(
+            rt,
+            lambda n: _book(0, available=False) if n == 1 else _book(10, available=True),
+            monkeypatch,
+        )
+        sub = await service.create_subscription(symbol="BTC-USDT", depth=10)
+        await server.wait_subscribed(channel)
+        async with asyncio.timeout(5):
+            assert (await anext(sub)).available is False
+        await server.conns[channel][-1].close()
+        async with asyncio.timeout(5):
+            assert (await anext(sub)).available is True
+        await server.wait_subscribed(channel)
+        assert len(calls) == 2
+        await asyncio.sleep(1.5)
+        assert len(calls) == 2, "an obsolete request fired"
+        await sub.aclose()
+        await rt.aclose()
+
+
 async def test_first_view_is_the_fetched_snapshot(monkeypatch) -> None:
     async with CentrifugoServer() as server:
         rt = AsyncRealtimeClient(server.url)
@@ -285,6 +334,9 @@ class ResumeApi:
         self.connection_tokens = 0
         self.list_response = self.listed(SUB_ID)
         self.token_refusal: httpx.Response | None = None
+        # Holds list answers open while set, and marks that one arrived.
+        self.list_gate: asyncio.Event | None = None
+        self.list_arrived = asyncio.Event()
         self.transport = httpx.MockTransport(self._handle)
 
     @staticmethod
@@ -293,7 +345,7 @@ class ResumeApi:
             200, json={"subaccounts": [{"id": str(i), "role": "VIEWER"} for i in ids]}
         )
 
-    def _handle(self, request: httpx.Request) -> httpx.Response:
+    async def _handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
         if path == "/v1/rt/token":
             self.connection_tokens += 1
@@ -305,6 +357,9 @@ class ResumeApi:
             return httpx.Response(200, json={"token": "subscribe"})
         if path == "/v1/auth/subaccounts":
             self.list_calls += 1
+            self.list_arrived.set()
+            if self.list_gate is not None:
+                await self.list_gate.wait()
             return (
                 self.list_response(self.list_calls)
                 if callable(self.list_response)
@@ -624,6 +679,73 @@ async def test_listed_decimal_id_without_a_zero_digit_still_matches() -> None:
         await server.push(channel, unsubscribe(channel))
         await server.wait_subscribed(channel)
         assert sub.error is None
+        await client.aclose()
+
+
+@pytest.mark.parametrize(
+    ("barrier", "removed"),
+    [("list", True), ("list", False), ("pacing", True), ("pacing", False)],
+)
+async def test_removal_while_deciding_stops_before_any_token(barrier: str, removed: bool) -> None:
+    """A removal during the list or the pacing wait must win over the older answer.
+
+    The removed false controls prove the same barriers still resume.
+    """
+    channel = _channel()
+    updates = "private:auth:subaccounts:root:proto"
+    api = ResumeApi()
+    timing = FAST
+    if barrier == "pacing":
+        timing = ResubscribeTiming(
+            max_attempts=3,
+            initial_backoff=0.01,
+            stable_after=3600,
+            attempt_spacing=0.4,
+            read_interval=0.001,
+        )
+    async with CentrifugoServer() as server:
+        client = _client(server, api, timing)
+        stream = await client.subscribe_proto(updates, decode=lambda data: data)
+        await server.wait_subscribed(updates)
+        sub = await client.subscribe_proto(channel, decode=lambda data: data)
+        await server.wait_subscribed(channel)
+        tokens = api.token_calls
+        access = client._access
+        occupied = 0.0
+        if barrier == "list":
+            api.list_gate = asyncio.Event()
+        else:
+            # Occupy the slot so the resume must wait for the next one.
+            access._reserve_attempt()
+            occupied = access._next_attempt_at
+
+        await server.push(channel, unsubscribe(channel))
+        async with asyncio.timeout(5):
+            if barrier == "list":
+                await api.list_arrived.wait()
+            else:
+                while access._next_attempt_at <= occupied:
+                    await asyncio.sleep(0.001)
+        assert api.token_calls == tokens, "no token before the barrier opens"
+
+        update = (
+            subaccounts_pb2.Subaccount(id=SUB_ID, removed=True)
+            if removed
+            else subaccounts_pb2.Subaccount(id=SUB_ID, role=subaccounts_pb2.VIEWER)
+        )
+        await server.push(updates, publication(update.SerializeToString()))
+        async with asyncio.timeout(5):
+            await anext(stream)
+        if api.list_gate is not None:
+            api.list_gate.set()
+
+        if removed:
+            assert (await _ended(sub)).reason == "access_removed"
+            assert api.token_calls == tokens, "no token after the removal"
+        else:
+            await server.wait_subscribed(channel)
+            assert api.token_calls == tokens + 1
+            assert sub.error is None
         await client.aclose()
 
 

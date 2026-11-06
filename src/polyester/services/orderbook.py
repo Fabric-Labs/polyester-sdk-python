@@ -212,7 +212,9 @@ class AsyncOrderbookService(BaseService):
             # with a paced delay, until it is available or the stream stops.
             nonlocal recheck_delay, recheck_handle
             if book_available:
+                # A pending request for the older unavailable snapshot is obsolete.
                 recheck_delay = _UNAVAILABLE_SNAPSHOT_INITIAL_DELAY
+                cancel_recheck()
                 return
             if recheck_handle is not None or close.is_set():
                 return
@@ -224,7 +226,12 @@ class AsyncOrderbookService(BaseService):
             nonlocal recheck_handle
             recheck_handle = None
             stream = stream_holder["stream"]
-            if stream is not None and not close.is_set() and not stream.is_disposed():
+            if (
+                stream is not None
+                and not book_available
+                and not close.is_set()
+                and not stream.is_disposed()
+            ):
                 stream.request_refresh()
 
         def cancel_recheck() -> None:

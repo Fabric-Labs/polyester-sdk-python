@@ -196,9 +196,14 @@ class SubaccountAccess:
             except Exception as exc:
                 attempt.last_error = exc
                 continue
+            # A removal that arrived during the read is newer than its answer.
+            if account in self._removed:
+                raise attempt.unsubscribed.ended(channel, "access_removed")
             if account not in listed:
                 raise attempt.unsubscribed.ended(channel, "not_listed")
             await asyncio.sleep(self._reserve_attempt())
+            if account in self._removed:
+                raise attempt.unsubscribed.ended(channel, "access_removed")
             return
 
     def _reserve_attempt(self) -> float:

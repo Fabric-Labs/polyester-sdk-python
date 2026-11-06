@@ -368,6 +368,9 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             return
         self._last_error = error
         self._disposed = True
+        handshake = self._initial_handshake
+        if handshake is not None and not handshake.done():
+            handshake.set_exception(error)
         self._generation += 1
         with self._state_lock:
             self._ready = False

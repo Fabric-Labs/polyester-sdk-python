@@ -184,3 +184,12 @@ async def test_managed_book_terminal_receiver_lifecycle(monkeypatch, mode):
     finally:
         pending.cancel()
         await sub.aclose()
+
+
+async def test_terminal_transport_error_during_start_releases_handshake(monkeypatch):
+    harness = BookHarness(monkeypatch)
+    error = _TerminalRealtimeError("invalid setup frame")
+    harness.rt.subscribe_proto.side_effect = error
+    with pytest.raises(_TerminalRealtimeError, match="invalid setup frame"):
+        await asyncio.wait_for(harness.service.create_subscription(symbol="BTC-USDT"), 10)
+    harness.fetch.assert_not_called()

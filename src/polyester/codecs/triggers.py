@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from polyester.catalogs import CatalogManager
@@ -8,7 +9,7 @@ from polyester.codecs.bps import (
     max_slippage_bps_for_side,
     validate_bps,
 )
-from polyester.codecs.correlation_id import optional_client_id
+from polyester.codecs.correlation_id import required_client_id
 from polyester.codecs.scalars import id_to_int, tick_count
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
@@ -248,9 +249,13 @@ def create_trigger_to_proto(
             qty, quantity_scale, "qty", symbol=symbol, symbol_id=symbol_id  # type: ignore[arg-type]
         ),
     )
-    validated_trigger_id = optional_client_id(client_trigger_id, "client_trigger_id")
-    if validated_trigger_id:
-        intent.client_trigger_id = validated_trigger_id
+    # The contract requires an ID. A blank one is a caller's mistake: replacing
+    # it would hide that a retry can no longer find its first attempt.
+    intent.client_trigger_id = (
+        required_client_id(client_trigger_id, "client_trigger_id")
+        if client_trigger_id
+        else f"trg-{uuid.uuid4().hex[:12]}"
+    )
     if fee_asset is not None:
         fee_key = fee_asset.lower()
         if fee_key not in FEE_ASSET_TO_PROTO:

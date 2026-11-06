@@ -6,7 +6,7 @@ from typing import Any
 from connectrpc.errors import ConnectError
 from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToDict
-from google.protobuf.message import Message
+from google.protobuf.message import DecodeError, Message
 
 from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
@@ -35,6 +35,7 @@ from polyester.errors import (
 )
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
+from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
@@ -51,6 +52,7 @@ _SERVICE_ERROR_ENUMS = {
     "orders.v1.ErrorDetail": orders_pb2.ErrorCode,
     "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorCode,
     "transfer.v1.ErrorDetail": transfer_pb2.ErrorCode,
+    "ledger.read.v1.ErrorDetail": ledger_read_pb2.ErrorCode,
 }
 
 
@@ -62,28 +64,27 @@ def protobuf_to_public_dict(message: Message) -> dict[str, Any]:
     )
 
 
+_DETAIL_MESSAGES: tuple[type[Message], ...] = (
+    auth_pb2.AuthErrorDetail,
+    orders_pb2.ErrorDetail,
+    withdraw_pb2.ErrorDetail,
+    transfer_pb2.ErrorDetail,
+    ledger_read_pb2.ErrorDetail,
+    ratelimit_pb2.RateLimitDetail,
+)
+
+
 def _unpack_error_detail(detail: Message) -> Message | None:
     if isinstance(detail, AnyMessage) or detail.DESCRIPTOR.full_name == "google.protobuf.Any":
-        if detail.Is(auth_pb2.AuthErrorDetail.DESCRIPTOR):
-            auth_detail = auth_pb2.AuthErrorDetail()
-            detail.Unpack(auth_detail)
-            return auth_detail
-        if detail.Is(orders_pb2.ErrorDetail.DESCRIPTOR):
-            order_detail = orders_pb2.ErrorDetail()
-            detail.Unpack(order_detail)
-            return order_detail
-        if detail.Is(withdraw_pb2.ErrorDetail.DESCRIPTOR):
-            withdraw_detail = withdraw_pb2.ErrorDetail()
-            detail.Unpack(withdraw_detail)
-            return withdraw_detail
-        if detail.Is(transfer_pb2.ErrorDetail.DESCRIPTOR):
-            transfer_detail = transfer_pb2.ErrorDetail()
-            detail.Unpack(transfer_detail)
-            return transfer_detail
-        if detail.Is(ratelimit_pb2.RateLimitDetail.DESCRIPTOR):
-            rate_limit = ratelimit_pb2.RateLimitDetail()
-            detail.Unpack(rate_limit)
-            return rate_limit
+        for message_type in _DETAIL_MESSAGES:
+            if detail.Is(message_type.DESCRIPTOR):
+                unpacked = message_type()
+                try:
+                    detail.Unpack(unpacked)
+                except DecodeError:
+                    # Undecodable bytes prove nothing; the Connect code still stands.
+                    return None
+                return unpacked
         return None
     return detail
 
@@ -357,6 +358,13 @@ def _map_connect_error(exc: ConnectError):
                     or "PERMISSION" in code_name
                     or "POLICY" in code_name
                 ):
+                    return PolyesterAuthError(
+                        error_message, code=code_name, status_code=_auth_status(exc)
+                    )
+                return PolyesterApiError(error_message, code=code_name)
+            if full_name == "ledger.read.v1.ErrorDetail":
+                code_name = error_code_name(ledger_read_pb2.ErrorCode, unpacked.code)
+                if "UNAUTHENTICATED" in code_name or "PERMISSION" in code_name:
                     return PolyesterAuthError(
                         error_message, code=code_name, status_code=_auth_status(exc)
                     )

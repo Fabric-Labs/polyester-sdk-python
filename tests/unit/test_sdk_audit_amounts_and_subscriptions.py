@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import threading
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from polyester import Polyester
+from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV
+from polyester.catalogs import CatalogManager
+from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterValidationError
+from polyester.gen.chain.withdraw.v1 import withdraw_pb2
+from polyester.gen.orderbook.v1 import orderbook_pb2
+from polyester.gen.transfer.v1 import internal_transfer_pb2
+from polyester.models.realtime import OrderBookDeltaUpdate
+from polyester.realtime.client import AsyncSubscription
+from polyester.services.internal_transfers import AsyncInternalTransfersService
+from polyester.services.orderbook import AsyncOrderbookService
+from polyester.services.orders import AsyncOrdersService
+from polyester.services.withdraw import AsyncWithdrawService
+from polyester.types.money import AssetAmount
+from tests.unit.test_request_builder_regressions import capture_transport
+
+
+async def send_amount(transport, path, amount, scale):
+    if path == "transfer":
+        return await AsyncInternalTransfersService(transport, CatalogManager(), None).create(
+            asset_id=7,
+            quantity=amount,
+            quantity_scale=scale,
+            idempotency_key="amount-capture",
+            destination_account_id=format_id(42),
+        )
+    service = AsyncWithdrawService(transport, None)
+    kwargs = dict(
+        asset_id=7,
+        quantity=amount,
+        idempotency_key="amount-capture",
+        nonce=42,
+        deadline_ts_sec=1_800_000_000,
+    )
+    if scale is not None:
+        kwargs["amount_scale"] = scale
+    if path == "wallet":
+        kwargs["amount"] = kwargs.pop("quantity")
+        return await service.create_wallet_trading_withdraw(
+            **kwargs,
+            action="to_funding",
+            signer_wallet="0xlocal",
+            payload_signature=b"capture",
+        )
+    if path == "prepare":
+        return service.prepare_api_key_to_funding(**kwargs)
+    if path == "external":
+        return await service.create_to_external_chain(
+            **kwargs,
+            payload_signature=b"capture",
+            destination_chain_id=1,
+            destination_address="0xlocal",
+        )
+    return await service.create_to_funding(**kwargs, payload_signature=b"capture")
+
+
+@pytest.mark.parametrize("path", ["transfer", "funding", "external", "prepare", "wallet"])
+@pytest.mark.parametrize(
+    ("scaled", "typed_scale", "argument_scale", "asset_id", "message"),
+    [
+        (1500000, None, None, 7, "scale"),
+        (1500000, 6, 8, 7, "scale"),
+        (1500000, 8, 6, 7, "scale"),
+        (0, 6, 6, 7, "positive"),
+        (1500000, 6, 6, 8, "asset_id"),
+        (1, 19, 19, 7, "exact"),
+    ],
+)
+async def test_ambiguous_or_invalid_amount_is_refused_before_dispatch(
+    path,
+    scaled,
+    typed_scale,
+    argument_scale,
+    asset_id,
+    message,
+):
+    amount = AssetAmount.from_scaled(scaled, scale=typed_scale, asset_id=asset_id)
+    async with capture_transport() as (transport, requests):
+        with pytest.raises(PolyesterValidationError, match=message):
+            await send_amount(transport, path, amount, argument_scale)
+        assert requests == []
+
+
+@pytest.mark.parametrize("path", ["transfer", "funding", "external", "prepare", "wallet"])
+@pytest.mark.parametrize(
+    ("amount", "scale", "expected"),
+    [
+        (AssetAmount.from_scaled(1500000, scale=6, asset_id=7), None, 15 * 10**17),
+        (AssetAmount.from_scaled(1500000, scale=6, asset_id=7), 6, 15 * 10**17),
+        (AssetAmount.from_scaled(1500000, scale=8, asset_id=7), 8, 15 * 10**15),
+        (AssetAmount.from_scaled(1500000, asset_id=7), 6, 15 * 10**17),
+        ("1.5", None, 15 * 10**17),
+        ("1.5", 6, 15 * 10**17),
+        (AssetAmount.from_scaled(15 * 10**17, scale=18, asset_id=7), 18, 15 * 10**17),
+    ],
+)
+async def test_declared_amount_scale_controls_round_trip(path, amount, scale, expected):
+    async with capture_transport() as (transport, requests):
+        result = await send_amount(transport, path, amount, scale)
+        if path == "prepare":
+            assert requests == []
+            request = withdraw_pb2.CreateTradingWithdrawRequest.FromString(result.request_bytes)
+            encoded = request.payload.amount_e18
+        else:
+            assert len(requests) == 1
+            if path == "transfer":
+                request = internal_transfer_pb2.CreateInternalTransferRequest.FromString(
+                    requests[0].body
+                )
+                encoded = request.amount_e18
+            else:
+                request_type = (
+                    withdraw_pb2.CreateWalletTradingWithdrawRequest
+                    if path == "wallet"
+                    else withdraw_pb2.CreateTradingWithdrawRequest
+                )
+                request = request_type.FromString(requests[0].body)
+                encoded = request.payload.amount_e18
+        assert (encoded.hi << 64) | encoded.lo == expected
+
+
+@pytest.mark.parametrize(
+    ("symbol", "bid", "ask", "coarse", "fine"),
+    [
+        ("DOGE-USDT", 71600000, 71700000, "0.1", "0.001"),
+        ("LTC-USDT", 51750000000, 51760000000, "100", "0.1"),
+        ("BNB-USDT", 650100000000, 650200000000, "100", "1"),
+    ],
+)
+async def test_managed_book_coarse_buckets_snapshot_change_and_delta(
+    monkeypatch,
+    symbol,
+    bid,
+    ask,
+    coarse,
+    fine,
+):
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {"pairs": [{"symbol": symbol, "symbol_id": 1, "base_quantity_scale": 8}]}
+    )
+    queue = asyncio.Queue()
+    realtime = MagicMock()
+    realtime.subscribe_proto = AsyncMock(
+        return_value=AsyncSubscription(queue=queue, close=asyncio.Event())
+    )
+    fetch = AsyncMock(
+        return_value=orderbook_pb2.GetOrderBookResponse(
+            book_seq=1,
+            available=True,
+            bids=[orderbook_pb2.PriceLevel(price_ticks=bid, qty_scaled=3)],
+            asks=[orderbook_pb2.PriceLevel(price_ticks=ask, qty_scaled=4)],
+        )
+    )
+    monkeypatch.setattr("polyester.services.orderbook.unary_public_decoded", fetch)
+    service = AsyncOrderbookService(MagicMock(), catalogs=catalogs, realtime=realtime)
+    sub = await service.create_subscription(symbol=symbol, bucket=coarse)
+    try:
+        for index, bucket in enumerate([coarse, fine, coarse, None]):
+            # Every bucket change must produce a view, including a zero bid boundary.
+            if index:
+                sub.set_bucket(bucket)
+            view = await asyncio.wait_for(anext(sub), 3)
+            ticks = int(Decimal(bucket) * 10**9) if bucket else 1
+            assert len(view.bids) == len(view.asks) == 1
+            assert view.bids[0].price.ticks == bid // ticks * ticks
+            assert view.asks[0].price.ticks == (ask + ticks - 1) // ticks * ticks
+            assert view.bids[0].qty.scaled == 3
+            assert view.asks[0].qty.scaled == 4
+        sub.set_bucket(coarse)
+        await asyncio.wait_for(anext(sub), 3)
+        await queue.put(
+            OrderBookDeltaUpdate(
+                symbol_id=1,
+                book_seq_start="2",
+                book_seq_end="2",
+                bids=[[str(bid), "5"]],
+                asks=[[str(ask), "0"]],
+            )
+        )
+        delta = await asyncio.wait_for(anext(sub), 3)
+        assert delta.book_seq == "2"
+        assert delta.bids[0].qty.scaled == 5
+        assert delta.asks == []
+        assert sub.last_error is None
+        fetch.assert_awaited_once()
+        realtime.subscribe_proto.assert_awaited_once()
+    finally:
+        await sub.aclose()
+
+
+@pytest.mark.parametrize("mode", ["setup", "iteration", "success"])
+def test_sync_subscription_delivers_setup_and_iteration_errors_once(monkeypatch, mode):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    attempted = threading.Event()
+    delivered = threading.Event()
+    closed = threading.Event()
+    events, errors = [], []
+    failure = ValueError(f"{mode}-proof")
+
+    class Stream:
+        async def __aiter__(self):
+            if mode == "iteration":
+                raise failure
+            yield "event-proof"
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            closed.set()
+
+    async def subscribe(self, **kwargs):
+        attempted.set()
+        if mode == "setup":
+            raise failure
+        return Stream()
+
+    def on_event(event):
+        events.append(event)
+        delivered.set()
+
+    def on_error(error):
+        errors.append(error)
+        delivered.set()
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    handle = client.orders.subscribe_sync(on_event=on_event, on_error=on_error)
+    try:
+        assert attempted.wait(3), "subscription setup was never attempted"
+        assert delivered.wait(3), "background failure was never delivered"
+        handle.close()
+        handle.close()
+        assert events == (["event-proof"] if mode == "success" else [])
+        assert errors == ([] if mode == "success" else [failure])
+        assert closed.is_set() == (mode != "setup")
+    finally:
+        with contextlib.suppress(ValueError):
+            handle.close()
+        client.close()
+
+
+def test_sync_private_subscription_missing_credentials_reports_once(monkeypatch):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    errors = []
+    delivered = threading.Event()
+
+    def report(error):
+        errors.append(error)
+        delivered.set()
+
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        handle = client.orders.subscribe_sync(
+            account_id=format_id(42), on_event=lambda _: None, on_error=report
+        )
+        assert delivered.wait(3), "private subscription failure was never delivered"
+        handle.close()
+        handle.close()
+        assert len(errors) == 1
+        assert "credentials" in str(errors[0]).lower() or "api key" in str(errors[0]).lower()
+    finally:
+        client.close()

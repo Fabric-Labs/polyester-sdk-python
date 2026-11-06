@@ -80,10 +80,11 @@ def format_orderbook_level(
     qty_scaled: int,
     quantity_scale: int,
     symbol: str | None = None,
+    allow_zero_price: bool = False,
 ) -> OrderbookLevel:
     from polyester.types.money import Price, Quantity
 
-    if price_ticks <= 0:
+    if price_ticks < 0 or (price_ticks == 0 and not allow_zero_price):
         raise PolyesterValidationError("orderbook level has invalid or missing price")
     if qty_scaled <= 0:
         raise PolyesterValidationError("orderbook level has invalid or missing quantity")
@@ -111,6 +112,8 @@ def side_to_levels(
         format_orderbook_level(
             price_ticks=price,
             qty_scaled=qty,
+            # A floor-rounded display boundary may be zero even for positive raw bids.
+            allow_zero_price=bucket_ticks is not None and bucket_ticks > 0,
             quantity_scale=quantity_scale,
         )
         for price, qty in entries[:limit]

@@ -388,11 +388,18 @@ def resolve_asset_amount_scaled_with_input_scale(
 ) -> int:
     """Rescale an asset amount exactly from its declared scale to ``target_scale``."""
     validate_protocol_scale(target_scale)
+    if input_scale is not None:
+        validate_protocol_scale(input_scale)
     if isinstance(value, AssetAmount):
         if value.asset_id is not None and asset_id is not None and value.asset_id != asset_id:
             raise PolyesterValidationError(
                 f"amount asset_id mismatch: value is for {value.asset_id}, "
                 f"destination is {asset_id}"
+            )
+        if value.scale is not None and input_scale is not None and value.scale != input_scale:
+            raise PolyesterValidationError(
+                f"{field_name} scale mismatch: value scale is {value.scale}, "
+                f"input scale is {input_scale}"
             )
         source_scale = value.scale if value.scale is not None else input_scale
         if source_scale is None:

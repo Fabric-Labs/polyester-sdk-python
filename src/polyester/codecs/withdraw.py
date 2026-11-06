@@ -19,13 +19,13 @@ DEFAULT_TRADING_WITHDRAW_DEADLINE_SECONDS = 5 * 60
 def str_to_u128_proto(
     value: str | Decimal | AssetAmount,
     *,
-    scale: int = 18,
+    scale: int | None = None,
     asset_id: int | None = None,
 ) -> u128_pb2.U128:
     """Encode an amount declared at ``scale`` into exact ledger scale-18 units."""
     big = resolve_asset_amount_scaled_with_input_scale(
         value,
-        scale,
+        scale if isinstance(value, AssetAmount) or scale is not None else 18,
         18,
         "amount",
         asset_id=asset_id,
@@ -59,7 +59,7 @@ def trading_withdraw_payload_to_proto(
     deadline_ts_sec: int | None = None,
     nonce: str | int,
     destination_address: str = "",
-    amount_scale: int = 18,
+    amount_scale: int | None = None,
 ) -> withdraw_pb2.TradingWithdrawIntentPayload:
     if not idempotency_key.strip():
         raise PolyesterValidationError("idempotency_key is required")

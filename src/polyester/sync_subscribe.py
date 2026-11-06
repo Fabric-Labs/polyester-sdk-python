@@ -55,9 +55,9 @@ def subscribe_sync(
     holder: dict[str, object | None] = {"sub": None, "task": None}
 
     async def _consume() -> None:
-        sub = await subscribe()
-        holder["sub"] = sub
         try:
+            sub = await subscribe()
+            holder["sub"] = sub
             async for event in sub:
                 on_event(event)
         except asyncio.CancelledError:

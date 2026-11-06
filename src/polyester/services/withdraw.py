@@ -130,7 +130,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         idempotency_key: str,
         destination_chain_id: int = 0,
         destination_address: str = "",
-        amount_scale: int = 18,
+        amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
         nonce: str | int | None = None,
     ) -> PreparedTradingWithdraw:
@@ -160,7 +160,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         quantity: str | AssetAmount,
         idempotency_key: str,
         destination_address: str = "",
-        amount_scale: int = 18,
+        amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
         nonce: str | int | None = None,
     ) -> PreparedTradingWithdraw:
@@ -184,7 +184,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         destination_chain_id: int,
         destination_address: str,
         idempotency_key: str,
-        amount_scale: int = 18,
+        amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
         nonce: str | int | None = None,
     ) -> PreparedTradingWithdraw:
@@ -261,7 +261,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
         destination_address: str = "",
-        amount_scale: int = 18,
+        amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
         """Move trading balance to funding using the authenticated API key's scope.
@@ -304,7 +304,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         nonce: str | int,
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
-        amount_scale: int = 18,
+        amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
         """Withdraw using the API key's scope; SDK default subaccounts do not route this call."""
@@ -363,7 +363,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         deadline_ts_sec: int | None = None,
         nonce: str | int,
         destination_address: str = "",
-        amount_scale: int = 18,
+        amount_scale: int | None = None,
     ) -> WithdrawIntentResult:
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")

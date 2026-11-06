@@ -91,7 +91,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                 error = self._last_error or PolyesterRealtimeError("initial snapshot failed")
                 raise error
         except BaseException as exc:
-            if isinstance(exc, Exception):
+            if isinstance(exc, Exception) and self._last_error is not exc:
                 self._last_error = exc
                 self._report_snapshot_error(exc)
             await self.aclose()
@@ -340,6 +340,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                         and self._initial_handshake is not None
                         and not self._initial_handshake.done()
                     ):
+                        self._report_snapshot_error(exc)
                         self._initial_handshake.set_exception(exc)
                         return
                     self._report_snapshot_error(exc)

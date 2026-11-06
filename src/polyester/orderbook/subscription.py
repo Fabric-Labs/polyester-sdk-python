@@ -42,7 +42,8 @@ class OrderbookSubscription:
         if self._start_task is not None and not self._start_task.done():
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._start_task
-        await self._queue.put(None)
+        with contextlib.suppress(asyncio.QueueFull):
+            self._queue.put_nowait(None)
 
     async def __aenter__(self) -> OrderbookSubscription:
         return self

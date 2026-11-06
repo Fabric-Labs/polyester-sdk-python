@@ -190,6 +190,104 @@ async def test_terminal_transport_error_during_start_releases_handshake(monkeypa
     harness = BookHarness(monkeypatch)
     error = _TerminalRealtimeError("invalid setup frame")
     harness.rt.subscribe_proto.side_effect = error
+    errors = []
     with pytest.raises(_TerminalRealtimeError, match="invalid setup frame"):
-        await asyncio.wait_for(harness.service.create_subscription(symbol="BTC-USDT"), 10)
+        await asyncio.wait_for(
+            harness.service.create_subscription(symbol="BTC-USDT", on_error=errors.append), 10
+        )
+    assert errors == [error]
+    harness.fetch.assert_not_called()
+
+
+@pytest.mark.parametrize("mode", ["gap", "contiguous", "reset"])
+async def test_zero_sequence_keeps_ordering(monkeypatch, mode):
+    harness = BookHarness(monkeypatch, seq=0)
+    gaps = []
+    sub = await harness.service.create_subscription(
+        symbol="BTC-USDT", on_sequence_gap=lambda: gaps.append(True)
+    )
+    try:
+        assert (await anext(sub)).book_seq == "0"
+        await harness.queue.put(
+            OrderBookDeltaUpdate(
+                book_seq_start="5" if mode != "contiguous" else "1",
+                book_seq_end="5" if mode != "contiguous" else "1",
+                reset=mode == "reset",
+                bids=[["100", "1"]],
+            )
+        )
+        view = await asyncio.wait_for(anext(sub), 10)
+        if mode == "gap":
+            assert view.book_seq == "0" and not view.bids
+            assert harness.fetch.call_count == 2 and gaps == [True]
+        else:
+            assert view.book_seq == ("1" if mode == "contiguous" else "5")
+            assert len(view.bids) == 1
+            assert harness.fetch.call_count == 1 and not gaps
+    finally:
+        await sub.aclose()
+
+
+async def test_unknown_matching_selectors_require_catalogs(monkeypatch):
+    harness = BookHarness(monkeypatch)
+    harness.service._catalogs = CatalogManager()
+    with pytest.raises(PolyesterValidationError, match="wait_for_catalogs"):
+        await harness.service.create_subscription(symbol="BTC-USDT", symbol_id=1)
+    harness.rt.subscribe_proto.assert_not_called()
+    harness.fetch.assert_not_called()
+
+
+async def test_book_overflow_closes_resources_and_keeps_error(monkeypatch):
+    from polyester.errors import PolyesterRealtimeOverflowError
+
+    harness = BookHarness(monkeypatch)
+    errors = []
+    failed = asyncio.Event()
+
+    def report(error):
+        errors.append(error)
+        failed.set()
+
+    sub = await harness.service.create_subscription(symbol="BTC-USDT", on_error=report)
+    try:
+        for seq in range(2, 203):
+            await harness.queue.put(
+                OrderBookDeltaUpdate(
+                    book_seq_start=str(seq),
+                    book_seq_end=str(seq),
+                )
+            )
+        await asyncio.wait_for(failed.wait(), 10)
+        assert isinstance(sub.last_error, PolyesterRealtimeOverflowError)
+        assert errors == [sub.last_error]
+        assert sub._stream.is_disposed()
+        await asyncio.wait_for(sub.aclose(), 10)
+        assert harness.transport_sub._close.is_set()
+        drained = [view async for view in sub]
+        assert len(drained) == 200
+    finally:
+        await asyncio.wait_for(sub.aclose(), 10)
+
+
+async def test_startup_overflow_reports_exactly_once(monkeypatch):
+    from polyester.errors import PolyesterRealtimeOverflowError
+
+    harness = BookHarness(monkeypatch)
+    error = PolyesterRealtimeOverflowError("setup queue full")
+    harness.rt.subscribe_proto.side_effect = error
+    errors = []
+    with pytest.raises(PolyesterRealtimeOverflowError):
+        await harness.service.create_subscription(symbol="BTC-USDT", on_error=errors.append)
+    assert errors == [error]
+    harness.fetch.assert_not_called()
+
+
+async def test_startup_realtime_failure_reports_exactly_once(monkeypatch):
+    harness = BookHarness(monkeypatch)
+    error = PolyesterRealtimeError("subscribe failed")
+    harness.rt.subscribe_proto.side_effect = error
+    errors = []
+    with pytest.raises(PolyesterRealtimeError):
+        await harness.service.create_subscription(symbol="BTC-USDT", on_error=errors.append)
+    assert errors == [error]
     harness.fetch.assert_not_called()

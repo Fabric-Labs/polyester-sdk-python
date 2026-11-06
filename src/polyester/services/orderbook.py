@@ -43,7 +43,8 @@ class AsyncOrderbookService(BaseService):
         scale = self._catalogs.base_quantity_scale_for_symbol(symbol)
         if scale is None:
             raise PolyesterValidationError(
-                f"orderbook decoding requires a hydrated catalog quantity scale for {symbol!r}"
+                f"orderbook decoding requires a hydrated catalog quantity scale for {symbol!r}; "
+                "call wait_for_catalogs or hydrate the spot catalog first"
             )
         return scale
 
@@ -111,11 +112,12 @@ class AsyncOrderbookService(BaseService):
             )
 
         catalog_id = self._catalogs.symbol_id_for_symbol(symbol)
-        if catalog_id != resolved_symbol_id:
+        if catalog_id is not None and catalog_id != resolved_symbol_id:
             raise PolyesterValidationError(
                 f"orderbook symbol {symbol!r} does not match symbol_id {resolved_symbol_id}"
             )
 
+        self._require_quantity_scale(symbol)
         ws_depth = min(500, max(1, int(depth)))
         channel = f"public:spot:orderbook:deltas:depth:{ws_depth}:{resolved_symbol_id}:proto"
 
@@ -156,12 +158,9 @@ class AsyncOrderbookService(BaseService):
                     message="orderbook subscription queue full; consumer too slow",
                 )
             except Exception as exc:
-                if on_error is not None:
-                    with contextlib.suppress(BaseException):
-                        on_error(exc)
-                close.set()
-                with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(None)
+                stream = stream_holder["stream"]
+                if stream is not None:
+                    stream._fail_closed(exc)
 
         def set_bucket(value: str | None) -> None:
             nonlocal bucket_ticks

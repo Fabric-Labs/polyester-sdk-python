@@ -189,7 +189,7 @@ def apply_delta(
     if delta.reset and seq_end <= current_book_seq:
         return current_book_seq, False
 
-    if not delta.reset and current_book_seq != 0 and seq_start > current_book_seq + 1:
+    if not delta.reset and seq_start > current_book_seq + 1:
         return current_book_seq, True
 
     if not delta.reset and seq_end <= current_book_seq:

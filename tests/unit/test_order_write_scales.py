@@ -209,3 +209,109 @@ async def test_batch_mismatched_scale_refused_before_send(order_client):
             ]
         )
     assert seen == []
+
+
+@pytest.mark.parametrize(
+    "operation", ["create_id", "create_name", "batch_create", "modify", "batch_replace", "trigger"]
+)
+@pytest.mark.parametrize("tag", ["id", "symbol", "read", "matching"])
+async def test_write_checks_quantity_pair_identity(order_client, operation, tag):
+    from polyester.codecs.decode.orders import order_from_proto
+    from polyester.gen.orders.v1.orders_read_pb2 import Order
+
+    client, seen = order_client
+    if tag == "read":
+        qty = order_from_proto(Order(symbol_id=2, orig_qty_scaled=16000)).orig_qty
+        assert qty.scale is None and qty.symbol_id == 2
+    else:
+        qty = (
+            Quantity.from_scaled(16000, symbol_id=1 if tag == "matching" else 2)
+            if tag != "symbol"
+            else Quantity.from_scaled(16000, symbol="ETH-USDT")
+        )
+
+    async def invoke():
+        intent = dict(side="buy", order_type="limit", price="100", qty=qty)
+        if operation == "create_id":
+            return await client.orders.create(symbol_id=1, **intent)
+        if operation == "create_name":
+            return await client.orders.create(symbol="BTC-USDT", **intent)
+        if operation == "batch_create":
+            return await client.orders.batch_create(items=[dict(symbol_id=1, **intent)])
+        if operation == "modify":
+            return await client.orders.modify(symbol="BTC-USDT", key=OrderId(42), new_qty=qty)
+        if operation == "batch_replace":
+            return await client.orders.batch_replace(
+                symbol="BTC-USDT", items=[dict(key=OrderId(42), new_qty=qty)]
+            )
+        return await client.triggers.create(
+            symbol="BTC-USDT", trigger_type="stop_loss", side="sell", qty=qty, trigger_price="100"
+        )
+
+    if tag == "matching":
+        await invoke()
+        assert len(seen) == 1
+    else:
+        with pytest.raises(PolyesterValidationError, match="mismatch"):
+            await invoke()
+        assert seen == []
+
+
+@pytest.mark.parametrize("batch", [False, True])
+async def test_conflicting_item_identity_refused(order_client, batch):
+    client, seen = order_client
+    intent = dict(
+        symbol="ETH-USDT", symbol_id=1, side="buy", order_type="limit", price="100", qty="0.00016"
+    )
+    with pytest.raises(PolyesterValidationError, match="mismatch"):
+        if batch:
+            await client.orders.batch_create(items=[intent])
+        else:
+            await client.orders.create(**intent)
+    assert seen == []
+
+
+@pytest.mark.parametrize("tag", ["id", "symbol", "matching"])
+@pytest.mark.parametrize("batch", [False, True])
+async def test_quote_budget_pair_identity(order_client, tag, batch):
+    client, seen = order_client
+    budget = Quantity.from_quote_scaled(
+        16000,
+        scale=6,
+        symbol="ETH-USDT" if tag == "symbol" else None,
+        symbol_id=2 if tag == "id" else 1,
+    )
+    intent = dict(symbol_id=1, side="buy", order_type="market", max_quote_debit=budget)
+
+    async def invoke():
+        return (
+            await client.orders.batch_create(items=[intent])
+            if batch
+            else await client.orders.create(**intent)
+        )
+
+    if tag == "matching":
+        await invoke()
+        assert len(seen) == 1
+    else:
+        with pytest.raises(PolyesterValidationError, match="mismatch"):
+            await invoke()
+        assert seen == []
+
+
+async def test_batch_outer_symbol_is_only_a_default(order_client):
+    client, seen = order_client
+    await client.orders.batch_create(
+        symbol="BTC-USDT",
+        items=[
+            dict(
+                symbol_id=2,
+                side="buy",
+                order_type="limit",
+                price="100",
+                qty=Quantity.from_scaled(16000, symbol="ETH-USDT", symbol_id=2),
+            )
+        ],
+    )
+    assert seen[0].items[0].symbol_id == 2
+    assert seen[0].items[0].base_qty_scaled == 16000

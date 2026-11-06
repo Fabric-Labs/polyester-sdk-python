@@ -244,7 +244,9 @@ def create_trigger_to_proto(
 
     intent = triggers_pb2.TriggerIntent(
         symbol_id=symbol_id,
-        qty_scaled=resolve_qty_scaled(qty, quantity_scale, "qty", symbol=symbol),  # type: ignore[arg-type]
+        qty_scaled=resolve_qty_scaled(
+            qty, quantity_scale, "qty", symbol=symbol, symbol_id=symbol_id  # type: ignore[arg-type]
+        ),
     )
     validated_trigger_id = optional_client_id(client_trigger_id, "client_trigger_id")
     if validated_trigger_id:

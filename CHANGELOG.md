@@ -1,14 +1,16 @@
 # Changelog
 
 ## Unreleased
+
 - **Breaking:** Order writes now require the destination pair's catalog quantity scale, including
   requests by symbol ID. An explicitly scaled quantity that disagrees with the
   catalog raises before sending; batches validate each pair separately.
-  Migration: hydrate catalogs and use each pair's scale, or pass decimal quantities.
+  Quantities tagged for another pair and conflicting symbol/name IDs now also
+  raise before sending on create, modify, batch replace and trigger create.
+  Migration: hydrate catalogs and use the destination pair's symbol, ID and scale.
 
 - Create results by symbol ID use the catalog scale for resolved quantities.
 - Batch create resolves base and quote-budget scales separately for each item.
-
 
 - Fixed API-key request signing to sort decoded query bytes before encoding and preserve percent-encoded bytes, including bytes outside valid UTF-8 text. Prefix keys, repeated values and escaped values now match the server.
 - **Breaking:** Trigger creation now rejects options that do not apply to the selected strategy or child execution before sending. Migration: remove incompatible options, or select the trigger type and execution that support them (use `trailing_stop` for trailing distances and activation price).

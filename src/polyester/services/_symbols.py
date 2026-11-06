@@ -28,6 +28,29 @@ def resolve_symbol_id(
     )
 
 
+def resolve_order_identity(
+    catalogs: CatalogManager | None,
+    *,
+    symbol: str | None,
+    symbol_id: int | None,
+    label: str,
+    require_catalog: bool = True,
+) -> tuple[str | None, int]:
+    """Resolve the wire pair and validate an explicitly supplied display symbol."""
+    resolved_id = resolve_symbol_id(catalogs, symbol=symbol, symbol_id=symbol_id, label=label)
+    canonical = catalogs.symbol_for_symbol_id(resolved_id) if catalogs is not None else None
+    if canonical is None and require_catalog:
+        raise PolyesterValidationError(
+            f"{label} quantity scale is unavailable for symbol_id {resolved_id}; hydrate catalogs"
+        )
+    if canonical is not None and symbol is not None and symbol != canonical:
+        raise PolyesterValidationError(
+            f"{label} symbol mismatch: {symbol!r} does not match "
+            f"symbol_id {resolved_id} ({canonical})"
+        )
+    return canonical or symbol, resolved_id
+
+
 def resolve_optional_symbol_id(
     catalogs: CatalogManager | None,
     *,

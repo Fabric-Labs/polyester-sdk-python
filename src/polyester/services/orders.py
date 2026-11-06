@@ -84,6 +84,7 @@ from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resol
 from polyester.services._symbols import (
     resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
+    resolve_order_identity,
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
@@ -290,7 +291,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             if resolved_sub is not None:
                 normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
-        symbol_id = resolve_symbol_id(
+        canonical_symbol, symbol_id = resolve_order_identity(
             self._catalogs,
             symbol=normalized.symbol,
             symbol_id=normalized.symbol_id,
@@ -302,7 +303,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, normalized.symbol, normalized.max_quote_debit, symbol_id=symbol_id
         )
-        normalized = msgspec.structs.replace(normalized, symbol_id=symbol_id)
+        normalized = msgspec.structs.replace(
+            normalized, symbol_id=symbol_id, symbol=canonical_symbol
+        )
         proto_request = create_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -340,11 +343,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             if resolved_sub is not None:
                 normalized = msgspec.structs.replace(normalized, sub_account_id=resolved_sub)
         await self._ensure_catalogs()
-        symbol_id = resolve_symbol_id(
+        canonical_symbol, symbol_id = resolve_order_identity(
             self._catalogs,
             symbol=normalized.symbol,
             symbol_id=normalized.symbol_id,
             label="orders.preview",
+            require_catalog=False,
         )
         # The response uses the canonical pair's scale, even for a scaled input.
         quantity_scale = self._catalogs.base_quantity_scale_for_symbol_id(symbol_id)
@@ -360,7 +364,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         quote_quantity_scale = resolve_quote_quantity_scale(
             self._catalogs, scale_symbol, normalized.max_quote_debit
         )
-        normalized = msgspec.structs.replace(normalized, symbol_id=symbol_id)
+        normalized = msgspec.structs.replace(
+            normalized, symbol_id=symbol_id, symbol=canonical_symbol
+        )
         proto_request = preview_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -591,6 +597,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         proto_request = batch_replace_orders_to_proto(
             items=items,
             symbol_id=symbol_id,
+            symbol=symbol,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
             quantity_scale=scale,
@@ -740,9 +747,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 if isinstance(item, CreateOrderRequest)
                 else normalize_create_order_request(item)
             )
-            symbol_id = resolve_symbol_id(
+            canonical_symbol, symbol_id = resolve_order_identity(
                 self._catalogs,
-                symbol=normalized.symbol or symbol,
+                symbol=(
+                    normalized.symbol
+                    if normalized.symbol_id is not None
+                    else normalized.symbol or symbol
+                ),
                 symbol_id=normalized.symbol_id,
                 label="batch_create",
             )
@@ -759,7 +770,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     ),
                 )
             )
-            resolved_items.append(msgspec.structs.replace(normalized, symbol_id=symbol_id))
+            resolved_items.append(
+                msgspec.structs.replace(normalized, symbol_id=symbol_id, symbol=canonical_symbol)
+            )
         proto_request = batch_create_orders_to_proto(
             items=resolved_items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),

@@ -223,6 +223,7 @@ def create_order_to_wire(
             cast(Any, request.qty),
             _codec_quantity_scale(request.qty, quantity_scale),
             symbol=request.symbol,
+            symbol_id=request.symbol_id,
         ),
         "limit_price_ticks": (
             resolve_price_ticks(request.price, "price", symbol=request.symbol)
@@ -280,6 +281,7 @@ def order_intent_from_request(
                 request.qty,
                 _codec_quantity_scale(request.qty, quantity_scale),
                 symbol=request.symbol,
+                symbol_id=request.symbol_id,
             )
     else:
         if request.side != "buy":
@@ -294,6 +296,7 @@ def order_intent_from_request(
             quote_quantity_scale,
             "max_quote_debit",
             symbol=request.symbol,
+            symbol_id=request.symbol_id,
         )
     client_order_id = optional_client_id(request.client_order_id)
     if client_order_id:
@@ -948,6 +951,8 @@ def batch_replace_item_to_proto(
     item: BatchReplaceItem | dict[str, Any],
     *,
     quantity_scale: int,
+    symbol: str | None = None,
+    symbol_id: int | None = None,
 ) -> orders_pb2.BatchReplaceOrderItem:
     if isinstance(item, BatchReplaceItem):
         item = {
@@ -964,9 +969,11 @@ def batch_replace_item_to_proto(
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
-        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")
+        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price", symbol=symbol)
     if new_qty is not None:
-        proto.new_qty_scaled = resolve_qty_scaled(new_qty, quantity_scale, "new_qty")
+        proto.new_qty_scaled = resolve_qty_scaled(
+            new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
+        )
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
@@ -1071,6 +1078,7 @@ def batch_replace_orders_to_proto(
     *,
     items: list[BatchReplaceItem | dict[str, Any]],
     symbol_id: int,
+    symbol: str | None = None,
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
     quantity_scale: int | None = None,
@@ -1087,7 +1095,11 @@ def batch_replace_orders_to_proto(
     for item in items:
         new_qty = item.new_qty if isinstance(item, BatchReplaceItem) else item.get("new_qty")
         item_scale = _codec_quantity_scale(new_qty, quantity_scale) if new_qty is not None else 0
-        proto.items.append(batch_replace_item_to_proto(item, quantity_scale=item_scale))
+        proto.items.append(
+            batch_replace_item_to_proto(
+                item, quantity_scale=item_scale, symbol=symbol, symbol_id=symbol_id
+            )
+        )
     return proto
 
 
@@ -1121,12 +1133,16 @@ def modify_order_to_proto(
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if new_price is not None:
         with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
-            proto.new_price_ticks = resolve_price_ticks(new_price, "new_price")  # type: ignore[arg-type]
+            proto.new_price_ticks = resolve_price_ticks(
+                new_price, "new_price", symbol=symbol  # type: ignore[arg-type]
+            )
     if new_qty is not None:
         proto.new_qty_scaled = resolve_qty_scaled(
             new_qty,  # type: ignore[arg-type]
             _codec_quantity_scale(new_qty, quantity_scale),
             "new_qty",
+            symbol=symbol,
+            symbol_id=symbol_id,
         )
     if behavior:
         behavior_key = behavior.lower()

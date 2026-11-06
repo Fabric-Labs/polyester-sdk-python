@@ -479,8 +479,15 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
             and not isinstance(err, (PolyesterRateLimitError, PolyesterTimestampSkewError))
             and not (
                 isinstance(err, PolyesterServerError)
-                and err.status_code in (502, 503)
-                and _is_known_admission_refusal(err.code)
+                and err.status_code == 503
+                and (
+                    _is_known_admission_refusal(err.code)
+                    or (
+                        err.code == "ERROR_CODE_UNAVAILABLE"
+                        and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
+                        == "orders.v1.ErrorDetail"
+                    )
+                )
             )
         )
     )
@@ -489,7 +496,6 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
 # Explicit orders.v1 admission refusals, not arbitrary 5xx responses.
 def _is_known_admission_refusal(code: str | None) -> bool:
     return bool(code) and str(code).removeprefix("ERROR_CODE_") in {
-        "UNAVAILABLE",
         "FEE_SCHEDULE_UNAVAILABLE",
         "POLICY_UNAVAILABLE",
         "RATE_LIMIT_POLICY_UNAVAILABLE",
@@ -499,4 +505,5 @@ def _is_known_admission_refusal(code: str | None) -> bool:
         "ORDER_PLACEMENT_PENDING",
         "TRIGGER_CONTROLS_BUSY",
         "TRIGGER_CONTROL_IN_PROGRESS",
+        "QUICKSWAP_ACCOUNT_OWNER_UNKNOWN",
     }

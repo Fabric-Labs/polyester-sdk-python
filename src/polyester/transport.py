@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from base64 import b64decode
 from contextlib import suppress
 from dataclasses import dataclass
 from math import isfinite
@@ -11,6 +12,7 @@ from connectrpc.code import Code
 from connectrpc.codec import proto_binary_codec
 from connectrpc.errors import ConnectError
 from connectrpc.interceptor import UnaryInterceptor
+from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
 
@@ -71,6 +73,12 @@ class GatewayProblemError(ConnectError):
         self.violations = list(violations or [])
 
 
+class _ConnectErrorWithRetryAfter(ConnectError):
+    def __init__(self, message: str, details: list[AnyMessage], retry_after: float) -> None:
+        super().__init__(Code.RESOURCE_EXHAUSTED, message, details)
+        self.retry_after = retry_after
+
+
 _CONNECT_CODES = frozenset(code.value for code in Code)
 # HTTP status -> Connect code for a non-Connect error body (Connect protocol table).
 _HTTP_STATUS_TO_CODE = {
@@ -96,7 +104,7 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
     The gateway answers API-key failures with a JSON body such as
     ``{"code": "TIMESTAMP_SKEW"}`` (``application/json`` or
     ``application/problem+json``). connectrpc would read that ``code`` as an
-    unknown Connect code and report ``unavailable``, a retryable server error.
+    unknown Connect code and report an ambiguous ``unavailable`` server error.
     Map it by HTTP status instead, keeping the gateway code as the message, so
     ``TIMESTAMP_SKEW`` and ``SIGNATURE_INVALID`` reach the error mapping.
     """
@@ -108,17 +116,6 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         with suppress(Exception):
             body = response.json()
     code = body.get("code") if isinstance(body, dict) else None
-    if isinstance(code, str) and code in _CONNECT_CODES:
-        return response
-    # A non-Connect 504 cannot prove that a mutation was refused, even if
-    # the gateway sent HTML, malformed JSON, or no structured code at all.
-    if response.status != 504 and (
-        not isinstance(body, dict) or not isinstance(code, str) or not code
-    ):
-        return response
-    if not isinstance(body, dict):
-        body = {}
-    code = code if isinstance(code, str) else ""
     retry_after = None
     for header, divisor in (
         ("retry-after", 1),
@@ -130,6 +127,31 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             if isfinite(value) and value >= 0:
                 retry_after = value
                 break
+    if isinstance(body, dict) and isinstance(code, str) and code in _CONNECT_CODES:
+        if code == "resource_exhausted" and retry_after is not None:
+            # Preserve valid Connect details while carrying response backoff
+            # through a ConnectError, whose upstream type has no metadata.
+            with suppress(ValueError, TypeError, KeyError):
+                details = [
+                    AnyMessage(
+                        type_url="type.googleapis.com/" + d["type"],
+                        value=b64decode(d["value"] + "==="),
+                    )
+                    for d in body.get("details", [])
+                    if "type" in d and "value" in d
+                ]
+                error = _ConnectErrorWithRetryAfter(body.get("message", ""), details, retry_after)
+                raise error
+        return response
+    # A non-Connect 504 cannot prove that a mutation was refused, even if
+    # the gateway sent HTML, malformed JSON, or no structured code at all.
+    if response.status != 504 and (
+        not isinstance(body, dict) or not isinstance(code, str) or not code
+    ):
+        return response
+    if not isinstance(body, dict):
+        body = {}
+    code = code if isinstance(code, str) else ""
     detail = body.get("detail")
     violations = body.get("violations")
     raise GatewayProblemError(

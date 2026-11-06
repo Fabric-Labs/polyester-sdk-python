@@ -76,6 +76,12 @@ def test_connect_unavailable_preserves_service_code(module, name, packed):
         wire_detail.Pack(detail)
     mapped = map_connect_error(ConnectError(Code.UNAVAILABLE, "retry later", details=[wire_detail]))
 
+    if name == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
+        assert isinstance(mapped, PolyesterApiError)
+        assert not is_retryable_error(mapped)
+        assert not mutation_outcome_unknown(mapped)
+        assert mapped.code == name
+        return
     assert isinstance(mapped, PolyesterServerError)
     assert not isinstance(mapped, PolyesterAuthError)
     assert is_retryable_error(mapped) is (name in KNOWN_REFUSALS)
@@ -94,10 +100,17 @@ async def test_rest_unavailable_preserves_service_code(httpserver, module, name)
         httpserver, status, {"code": code, "status": status, "detail": "retry later"}
     )
 
+    if name == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
+        assert isinstance(mapped, PolyesterApiError)
+        assert not is_retryable_error(mapped)
+        assert not mutation_outcome_unknown(mapped)
+        assert mapped.code == name
+        return
     assert isinstance(mapped, PolyesterServerError)
     assert not isinstance(mapped, PolyesterAuthError)
-    assert is_retryable_error(mapped) is (name in KNOWN_REFUSALS)
-    assert mutation_outcome_unknown(mapped) is (name not in KNOWN_REFUSALS)
+    known = name in KNOWN_REFUSALS and name != "ERROR_CODE_UNAVAILABLE"
+    assert is_retryable_error(mapped) is known
+    assert mutation_outcome_unknown(mapped) is (not known)
     expected_code = name if name in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else code
     assert mapped.code == expected_code
     assert mapped.status_code == status

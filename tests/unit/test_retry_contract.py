@@ -8,6 +8,7 @@ import pytest
 
 from polyester import is_retryable_error, mutation_outcome_unknown
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from tests.unit.test_auth_error_codes import _rest_error
 
 CATALOG = json.loads((Path(__file__).parents[1] / "fixtures/retry_contract.json").read_text())
@@ -22,16 +23,20 @@ async def test_contract_bad_requests_are_definite_refusals(httpserver, case):
     assert not mutation_outcome_unknown(error)
 
 
-@pytest.mark.parametrize("shape", ["rest", "message", "detail"])
+@pytest.mark.parametrize("shape", ["rest", "message", "detail", "hint"])
 @pytest.mark.parametrize("case", CATALOG["resources"], ids=lambda c: c["code"])
 async def test_contract_resource_codes(httpserver, case, shape):
+    expected = "retry" in case["guidance"].lower() or case["code"] == "RATE_LIMIT_EXCEEDED"
+    assert case["retryable"] is expected
     body = {"code": case["code"], "detail": "refused"}
     if shape != "rest":
         body = {"code": "resource_exhausted", "message": case["code"]}
-    if shape == "detail":
+    if shape in ("detail", "hint"):
         detail = orders_pb2.ErrorDetail(
             code=orders_pb2.ErrorCode.Value("ERROR_CODE_" + case["code"])
         )
+        if shape == "hint":
+            detail.rate_limit.retry_after_ms = 1250
         body["details"] = [
             {
                 "type": "orders.v1.ErrorDetail",
@@ -48,22 +53,17 @@ async def test_contract_resource_codes(httpserver, case, shape):
     assert is_retryable_error(error) is case["retryable"]
     assert not mutation_outcome_unknown(error)
     assert error.code == "ERROR_CODE_" + case["code"]
-    if shape == "rest" and case["retryable"]:
+    if case["retryable"]:
         assert error.retry_after == 1.25
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        "UNAVAILABLE",
-        "FEE_SCHEDULE_UNAVAILABLE",
-        "POLICY_UNAVAILABLE",
-        "RATE_LIMIT_POLICY_UNAVAILABLE",
-    ],
-)
-@pytest.mark.parametrize("shape", ["rest", "detail"])
-async def test_contract_unavailable_is_known_refusal(httpserver, name, shape):
+@pytest.mark.parametrize("case", CATALOG["unavailable"], ids=lambda c: c["code"])
+@pytest.mark.parametrize("shape", ["rest", "message", "detail", "rest502"])
+async def test_contract_unavailable_is_known_refusal(httpserver, case, shape):
+    name = case["code"]
     body = {"code": name, "detail": "not admitted"}
+    if shape == "message":
+        body = {"code": "unavailable", "message": name, "details": []}
     if shape == "detail":
         detail = orders_pb2.ErrorDetail(code=orders_pb2.ErrorCode.Value("ERROR_CODE_" + name))
         body = {
@@ -76,9 +76,14 @@ async def test_contract_unavailable_is_known_refusal(httpserver, name, shape):
                 }
             ],
         }
-    error = await _rest_error(httpserver, 503, body, content_type="application/json")
-    assert is_retryable_error(error)
-    assert not mutation_outcome_unknown(error)
+    error = await _rest_error(
+        httpserver, 502 if shape == "rest502" else 503, body, content_type="application/json"
+    )
+    unknown = shape == "rest502" or (name == "UNAVAILABLE" and shape != "detail")
+    assert is_retryable_error(error) is (case["retryable"] and not unknown)
+    assert mutation_outcome_unknown(error) is unknown
+    if not unknown:
+        assert error.code == "ERROR_CODE_" + name
 
 
 @pytest.mark.parametrize(
@@ -323,3 +328,41 @@ async def test_future_resource_code_is_not_blindly_retryable(httpserver):
     assert not is_retryable_error(error)
     assert not mutation_outcome_unknown(error)
     assert error.code == "FUTURE_PERMANENT_CAPACITY"
+
+
+@pytest.mark.parametrize("code", ["FUTURE_CAPACITY", "TOO_MANY_REQUESTS", "RESOURCE_EXHAUSTED"])
+async def test_future_rest_resource_code_is_known_refusal(httpserver, code):
+    error = await _rest_error(httpserver, 429, {"code": code, "detail": "refused"})
+    assert not is_retryable_error(error)
+    assert not mutation_outcome_unknown(error)
+    assert error.code == code
+
+
+@pytest.mark.parametrize("first", [True, False])
+async def test_standalone_backoff_never_hides_unknown_outcome(httpserver, first):
+    details = [
+        {
+            "type": "polyester.ratelimit.v1.RateLimitDetail",
+            "value": base64.b64encode(
+                ratelimit_pb2.RateLimitDetail(retry_after_ms=1250).SerializeToString()
+            ).decode(),
+        },
+        {
+            "type": "orders.v1.ErrorDetail",
+            "value": base64.b64encode(
+                orders_pb2.ErrorDetail(
+                    code=orders_pb2.ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN
+                ).SerializeToString()
+            ).decode(),
+        },
+    ]
+    if not first:
+        details.reverse()
+    error = await _rest_error(
+        httpserver,
+        503,
+        {"code": "unavailable", "message": "read back", "details": details},
+        content_type="application/json",
+    )
+    assert not is_retryable_error(error)
+    assert mutation_outcome_unknown(error)

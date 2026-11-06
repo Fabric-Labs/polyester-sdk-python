@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from connectrpc.errors import ConnectError
@@ -127,9 +128,14 @@ def _map_gateway_problem(exc: GatewayProblemError):
             violations=_rest_violations(exc.violations),
         )
     order_code = _order_error_code_from_rest(exc.problem_code)
-    if order_code in ("ERROR_CODE_OVERLOADED", "ERROR_CODE_SYSTEM_RATE_LIMITED"):
+    if order_code in (
+        "ERROR_CODE_OVERLOADED",
+        "ERROR_CODE_SYSTEM_RATE_LIMITED",
+        "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+        "ERROR_CODE_PRICE_LEVELS_EXHAUSTED",
+    ):
         return PolyesterRateLimitError(message, retry_after=exc.retry_after, code=order_code)
-    if order_code == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED":
+    if exc.http_status == 429 and order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name:
         return PolyesterApiError(message, code=order_code)
     if exc.http_status == 504:
         return PolyesterServerError(
@@ -204,10 +210,15 @@ def _map_connect_error(exc: ConnectError):
                 )
                 # Preserve backoff hints and unknown mutation outcomes before
                 # applying the transport's temporary-failure classification.
-                if rate_limit is not None or code_name in (
-                    "ERROR_CODE_RATE_LIMIT_EXCEEDED",
-                    "ERROR_CODE_SYSTEM_RATE_LIMITED",
-                    "ERROR_CODE_OVERLOADED",
+                if not code_name.endswith("_OUTCOME_UNKNOWN") and (
+                    rate_limit is not None
+                    or code_name
+                    in (
+                        "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+                        "ERROR_CODE_SYSTEM_RATE_LIMITED",
+                        "ERROR_CODE_OVERLOADED",
+                        "ERROR_CODE_PRICE_LEVELS_EXHAUSTED",
+                    )
                 ):
                     return _rate_limit_error(error_message, proto_detail=rate_limit, code=code_name)
                 if exc.code.value == "unavailable" and not code_name.endswith("_OUTCOME_UNKNOWN"):
@@ -303,11 +314,22 @@ def _map_connect_error(exc: ConnectError):
     message_code = (exc.message or "").strip()
     if message_code.endswith("_OUTCOME_UNKNOWN"):
         return PolyesterApiError(error_message, code=_order_error_code_from_rest(message_code))
+    order_code = _order_error_code_from_rest(message_code)
     if (
         code == "resource_exhausted"
-        and _order_error_code_from_rest(message_code) == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
+        and (
+            order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name
+            or re.fullmatch(r"[A-Z][A-Z0-9_]*", message_code)
+        )
+        and order_code
+        not in {
+            "ERROR_CODE_OVERLOADED",
+            "ERROR_CODE_SYSTEM_RATE_LIMITED",
+            "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+            "ERROR_CODE_PRICE_LEVELS_EXHAUSTED",
+        }
     ):
-        return PolyesterApiError(error_message, code="ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED")
+        return PolyesterApiError(error_message, code=order_code)
     if is_cloudflare_browser_ban(error_message):
         return PolyesterTransportError(cloudflare_1010_message())
     if code in ("unauthenticated", "permission_denied"):

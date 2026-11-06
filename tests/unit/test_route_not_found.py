@@ -28,7 +28,7 @@ def test_map_connect_resource_exhausted_is_rate_limit() -> None:
 
 def test_transport_retry_classification_preserves_ambiguity() -> None:
     err = PolyesterTransportError("deadline exceeded")
-    assert is_retryable_error(err)
+    assert not is_retryable_error(err)
     assert mutation_outcome_unknown(err)
 
 

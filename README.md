@@ -1386,9 +1386,23 @@ are the REST request fields (`order.baseQty`). Branch on `code`, then on
 not a retryable server error.
 
 A request whose deadline expires raises `PolyesterTimeoutError`, a
-`PolyesterTransportError`: retryable, but a mutation may still have been
-applied, so reconcile first (`mutation_outcome_unknown(error)` is true).
+`PolyesterTransportError`: non-retryable with outcome unknown. Read back first
+(`mutation_outcome_unknown(error)` is true); retry reads explicitly.
 
+
+
+The retry flag is always false when the mutation outcome is unknown. This includes
+bare Connect `unavailable` and `deadline_exceeded`, gateway 502/503 bodies and client
+timeouts. Read back after an unknown outcome; retry reads explicitly. Automatic
+trigger reads, status waits and snapshot refresh use read context and can retry these
+failures within their existing budgets. Creates are never automatically resent.
+
+A recognized order-service `UNAVAILABLE`, `FEE_SCHEDULE_UNAVAILABLE`,
+`POLICY_UNAVAILABLE` or `RATE_LIMIT_POLICY_UNAVAILABLE` code means admission was
+refused: outcome known and retryable. An HTTP status without that code does not
+establish refusal. `RATE_LIMIT_EXCEEDED` and `PRICE_LEVELS_EXHAUSTED` likewise mean
+nothing was admitted; retry after any server delay. Permanent resource-exhausted
+codes require caller action even when Connect sends their code only as its message.
 
 A plain REST gateway 504 raises `PolyesterServerError` with `status_code == 504`:
 `is_retryable_error` is false and `mutation_outcome_unknown` is true. The

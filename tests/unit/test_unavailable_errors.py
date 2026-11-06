@@ -46,6 +46,18 @@ TEMPORARY_CODES = [
     (transfer_pb2, "ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE"),
     (transfer_pb2, "ERROR_CODE_STEP_UP_UNAVAILABLE"),
 ]
+KNOWN_REFUSALS = {
+    "ERROR_CODE_UNAVAILABLE",
+    "ERROR_CODE_ORDER_MODIFY_IN_PROGRESS",
+    "ERROR_CODE_POLICY_UNAVAILABLE",
+    "ERROR_CODE_ORDER_PLACEMENT_PENDING",
+    "ERROR_CODE_PAIR_BACKLOGGED",
+    "ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE",
+    "ERROR_CODE_SETTLEMENT_BACKLOGGED",
+    "ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE",
+    "ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS",
+    "ERROR_CODE_TRIGGER_CONTROLS_BUSY",
+}
 DENIED_CODES = [
     "ERROR_CODE_POLICY_MARKET_DENY",
     "ERROR_CODE_POLICY_TRADING_HALTED",
@@ -56,7 +68,7 @@ DENIED_CODES = [
 
 @pytest.mark.parametrize("module,name", TEMPORARY_CODES)
 @pytest.mark.parametrize("packed", [False, True])
-def test_connect_unavailable_is_retryable_server_error(module, name, packed):
+def test_connect_unavailable_preserves_service_code(module, name, packed):
     detail = module.ErrorDetail(code=module.ErrorCode.Value(name))
     wire_detail = detail
     if packed:
@@ -66,7 +78,8 @@ def test_connect_unavailable_is_retryable_server_error(module, name, packed):
 
     assert isinstance(mapped, PolyesterServerError)
     assert not isinstance(mapped, PolyesterAuthError)
-    assert is_retryable_error(mapped)
+    assert is_retryable_error(mapped) is (name in KNOWN_REFUSALS)
+    assert mutation_outcome_unknown(mapped) is (name not in KNOWN_REFUSALS)
     assert mapped.code == name
     assert mapped.status_code == 503
     assert mapped.raw == detail
@@ -74,7 +87,7 @@ def test_connect_unavailable_is_retryable_server_error(module, name, packed):
 
 
 @pytest.mark.parametrize("module,name", TEMPORARY_CODES)
-async def test_rest_unavailable_is_retryable_server_error(httpserver, module, name):
+async def test_rest_unavailable_preserves_service_code(httpserver, module, name):
     code = name.removeprefix("ERROR_CODE_")
     status = 502 if code == "UPSTREAM_ERROR" else 503
     mapped = await _rest_error(
@@ -83,7 +96,8 @@ async def test_rest_unavailable_is_retryable_server_error(httpserver, module, na
 
     assert isinstance(mapped, PolyesterServerError)
     assert not isinstance(mapped, PolyesterAuthError)
-    assert is_retryable_error(mapped)
+    assert is_retryable_error(mapped) is (name in KNOWN_REFUSALS)
+    assert mutation_outcome_unknown(mapped) is (name not in KNOWN_REFUSALS)
     expected_code = name if name in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else code
     assert mapped.code == expected_code
     assert mapped.status_code == status

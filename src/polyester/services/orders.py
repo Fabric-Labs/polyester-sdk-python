@@ -38,6 +38,7 @@ from polyester.codecs.orders import (
 )
 from polyester.codecs.scalars import id_to_int
 from polyester.errors import (
+    PolyesterApiError,
     PolyesterBatchReplaceTimeoutError,
     PolyesterRateLimitError,
     PolyesterResponseContractError,
@@ -45,7 +46,6 @@ from polyester.errors import (
     PolyesterTransportError,
     PolyesterValidationError,
     is_not_found,
-    is_retryable_error,
 )
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
@@ -972,9 +972,14 @@ def _is_transient_status_read_error(exc: BaseException) -> bool:
     are raised to the caller."""
     # This operation only reads status, so an ambiguous gateway timeout is safe
     # to poll through even though its general mutation retry flag is false.
-    if is_not_found(exc) or (isinstance(exc, PolyesterServerError) and exc.status_code == 504):
+    if isinstance(exc, PolyesterRateLimitError):
+        return False
+    if is_not_found(exc) or isinstance(exc, (PolyesterServerError, PolyesterTransportError)):
         return True
-    return is_retryable_error(exc) and not isinstance(exc, PolyesterRateLimitError)
+    return isinstance(exc, PolyesterApiError) and exc.code in (
+        "AUTH_TEMPORARILY_UNAVAILABLE",
+        "ERROR_CODE_ACCOUNT_REPAIRING",
+    )
 
 
 def is_batch_replace_settled(status: BatchReplaceStatusResult) -> bool:

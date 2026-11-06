@@ -248,9 +248,9 @@ async def test_client_timeout_read_recovery(operation):
     import asyncio
     import time
 
-    from pytest_httpserver import HTTPServer
     from werkzeug.wrappers import Response
 
+    from tests.hardening_support import ProbeFreeHTTPServer
     from tests.unit.test_trigger_read_retry import GET_PATH, _service, _trigger_response
     from tests.unit.test_wait_batch_replace import (
         BATCH_ID,
@@ -261,7 +261,7 @@ async def test_client_timeout_read_recovery(operation):
         _working,
     )
 
-    server = HTTPServer(host="127.0.0.1", threaded=True)
+    server = ProbeFreeHTTPServer(host="127.0.0.1", threaded=True)
     server.start()
     path = GET_PATH if operation == "trigger" else STATUS_PATH
 

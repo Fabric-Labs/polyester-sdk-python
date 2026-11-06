@@ -11,7 +11,9 @@ from enum import Enum, auto
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pytest_httpserver import HTTPServer
 from websockets.asyncio.server import ServerConnection, serve
+from werkzeug.wrappers import Request, Response
 
 from polyester.auth import ApiKeyCredentials
 
@@ -128,6 +130,23 @@ class HttpScript:
 HttpHandler = Callable[[ParsedRequest], HttpScript | Awaitable[HttpScript]]
 
 
+def is_port_probe(raw: bytes) -> bool:
+    """A tool on the host can send `HEAD /` to any port it finds listening.
+
+    The SDK never sends it, so a mock does not count it or show it to a test.
+    """
+    return raw.startswith(b"HEAD / ")
+
+
+class ProbeFreeHTTPServer(HTTPServer):
+    """pytest-httpserver server whose log holds only the SDK's own requests."""
+
+    def application(self, request: Request) -> Response:
+        if request.method == "HEAD" and request.path == "/":
+            return Response(status=404)
+        return super().application(request)
+
+
 class MockHttpServer:
     """Async TCP HTTP mock with active-connection + request counters."""
 
@@ -160,11 +179,17 @@ class MockHttpServer:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        self.active += 1
+        counted = False
         try:
             raw = await _read_http_request(reader)
             if raw is None:
                 return
+            if is_port_probe(raw):
+                writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n")
+                await writer.drain()
+                return
+            self.active += 1
+            counted = True
             req = _parse_http_request(raw)
             self.request_count += 1
             assert self._handler is not None
@@ -175,7 +200,8 @@ class MockHttpServer:
         except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError):
             return
         finally:
-            self.active = max(0, self.active - 1)
+            if counted:
+                self.active = max(0, self.active - 1)
             try:
                 writer.close()
                 await writer.wait_closed()

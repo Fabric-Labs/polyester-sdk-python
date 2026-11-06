@@ -1,11 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
+Git tag: `v0.7.0`. Released 2026-11-06. Built on public contract `748066a`.
+
+- **Breaking:** trigger creation also refuses an invalid `tif`, including an
+  empty string, and order writes refuse an empty `symbol` sent with a valid
+  symbol ID. These calls were accepted before.
 - **Breaking:** Order writes now require the destination pair's catalog quantity scale, including
   requests by symbol ID. An explicitly scaled quantity that disagrees with the
   catalog raises before sending; batches validate each pair separately.
-  Quantities tagged for another pair and conflicting symbol/name IDs now also
+  Quantities tagged for another pair and conflicting symbols and symbol IDs now also
   raise before sending on create, modify, batch replace and trigger create.
   Migration: hydrate catalogs and use the destination pair's symbol, ID and scale.
 

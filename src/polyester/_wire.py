@@ -244,6 +244,12 @@ def _map_connect_error(exc: ConnectError):
             d for detail in exc.details if (d := _unpack_error_detail(detail)) is not None
         ]
         unpacked_details.sort(key=_error_detail_priority)
+        if error_message.strip().endswith("_OUTCOME_UNKNOWN") and (
+            not unpacked_details or _error_detail_priority(unpacked_details[0]) != 0
+        ):
+            return PolyesterApiError(
+                error_message, code=_order_error_code_from_rest(error_message.strip())
+            )
         for unpacked in unpacked_details:
             full_name = unpacked.DESCRIPTOR.full_name
             if full_name in _SERVICE_ERROR_ENUMS:

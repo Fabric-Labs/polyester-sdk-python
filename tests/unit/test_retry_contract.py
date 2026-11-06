@@ -366,3 +366,24 @@ async def test_standalone_backoff_never_hides_unknown_outcome(httpserver, first)
     )
     assert not is_retryable_error(error)
     assert mutation_outcome_unknown(error)
+
+
+async def test_code_only_unknown_precedes_standalone_backoff(httpserver):
+    rate = ratelimit_pb2.RateLimitDetail(retry_after_ms=1250)
+    error = await _rest_error(
+        httpserver,
+        503,
+        {
+            "code": "unavailable",
+            "message": "ORDER_CREATE_OUTCOME_UNKNOWN",
+            "details": [
+                {
+                    "type": "polyester.ratelimit.v1.RateLimitDetail",
+                    "value": base64.b64encode(rate.SerializeToString()).decode(),
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+    assert mutation_outcome_unknown(error)
+    assert not is_retryable_error(error)

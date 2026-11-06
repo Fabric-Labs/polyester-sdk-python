@@ -40,11 +40,15 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         destination_smart_account_address: str | None = None,
         quantity_scale: int | None = None,
     ) -> InternalTransferResult:
+        destination_address = (
+            "" if destination_smart_account_address is None else destination_smart_account_address
+        )
+        has_destination_address = bool(destination_address.strip())
         destination_count = sum(
             (
                 destination_account_id is not None,
                 destination_subaccount_id is not None,
-                bool(destination_smart_account_address),
+                has_destination_address,
             )
         )
         if destination_count != 1:
@@ -75,8 +79,8 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
             request.destination_subaccount_id = id_to_int(
                 destination_subaccount_id, "destination_subaccount_id"
             )
-        if destination_smart_account_address:
-            request.destination_smart_account_address = destination_smart_account_address
+        if has_destination_address:
+            request.destination_smart_account_address = destination_address
         return await unary_auth_decoded(
             self._transport,
             InternalTransferServiceClient,

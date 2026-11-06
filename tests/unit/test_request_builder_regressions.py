@@ -63,7 +63,7 @@ async def capture_transport():
         await http.aclose()
 
 
-@pytest.mark.parametrize("since", [None, 0, 1_793_922_052_911_123])
+@pytest.mark.parametrize("since", [None, 0, 1_793_922_052_911_123, 2**64 - 1])
 async def test_poly_8471_since_is_inclusive_microsecond_lower_bound(since):
     async with capture_transport() as (transport, requests):
         await AsyncTransfersService(transport, None).list(since=since)
@@ -75,14 +75,33 @@ async def test_poly_8471_since_is_inclusive_microsecond_lower_bound(since):
     assert request.limit == 50
 
 
+@pytest.mark.parametrize("since", [-1, -(2**100), 2**64, 1.5, "5", True, False])
+async def test_poly_8471_invalid_since_is_rejected_before_transport(since):
+    async with capture_transport() as (transport, requests):
+        with pytest.raises(PolyesterValidationError, match="since"):
+            await AsyncTransfersService(transport, None).list(since=since)
+        assert not requests
+
+
 @pytest.mark.parametrize("destination", ["destination_account_id", "destination_subaccount_id"])
 @pytest.mark.parametrize("address", [None, "", " \t "])
 async def test_poly_8468_python_never_overwrites_a_valid_recipient(destination, address):
     async with capture_transport() as (transport, requests):
         service = AsyncInternalTransfersService(transport, CatalogManager(), None)
         kwargs = {destination: format_id(42), "destination_smart_account_address": address}
-        if address and address.strip() == "":
-            # Whitespace is treated as a competing selector and rejected.
+        await service.create(asset_id=7, quantity="1", idempotency_key="capture", **kwargs)
+        assert len(requests) == 1
+        request = internal_transfer_pb2.CreateInternalTransferRequest.FromString(requests[0].body)
+        assert request.WhichOneof("destination") == destination
+        assert getattr(request, destination) == 42
+
+
+@pytest.mark.parametrize("address", ["", " \t ", "0xlocal"])
+async def test_poly_8468_python_address_only_rejects_blanks(address):
+    async with capture_transport() as (transport, requests):
+        service = AsyncInternalTransfersService(transport, CatalogManager(), None)
+        kwargs = {"destination_smart_account_address": address}
+        if not address.strip():
             with pytest.raises(PolyesterValidationError, match="exactly one"):
                 await service.create(asset_id=7, quantity="1", idempotency_key="capture", **kwargs)
             assert not requests
@@ -92,8 +111,8 @@ async def test_poly_8468_python_never_overwrites_a_valid_recipient(destination, 
             request = internal_transfer_pb2.CreateInternalTransferRequest.FromString(
                 requests[0].body
             )
-            assert request.WhichOneof("destination") == destination
-            assert getattr(request, destination) == 42
+            assert request.WhichOneof("destination") == "destination_smart_account_address"
+            assert request.destination_smart_account_address == address
 
 
 WITHDRAW_BASE = dict(

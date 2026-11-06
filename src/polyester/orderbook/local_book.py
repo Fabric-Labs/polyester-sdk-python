@@ -59,6 +59,8 @@ def bucket_side(book: BookSide, bucket_ticks: int | None, *, asks: bool = False)
                 raise PolyesterValidationError("orderbook price ticks must be non-negative")
             if qty_scaled < 0:
                 raise PolyesterValidationError("orderbook quantity must be non-negative")
+            if price_ticks == 0 and qty_scaled > 0:
+                raise PolyesterValidationError("orderbook level has invalid or missing price")
         return book
     aggregated: BookSide = {}
     for price_ticks, qty_scaled in book.items():
@@ -66,6 +68,8 @@ def bucket_side(book: BookSide, bucket_ticks: int | None, *, asks: bool = False)
             raise PolyesterValidationError("orderbook price ticks must be non-negative")
         if qty_scaled <= 0:
             continue
+        if price_ticks == 0:
+            raise PolyesterValidationError("orderbook level has invalid or missing price")
         floor = (price_ticks // bucket_ticks) * bucket_ticks
         bucket_price = floor
         if asks and price_ticks % bucket_ticks != 0:
@@ -113,7 +117,7 @@ def side_to_levels(
             price_ticks=price,
             qty_scaled=qty,
             # A floor-rounded display boundary may be zero even for positive raw bids.
-            allow_zero_price=bucket_ticks is not None and bucket_ticks > 0,
+            allow_zero_price=side == "bids" and bucket_ticks is not None and bucket_ticks > 0,
             quantity_scale=quantity_scale,
         )
         for price, qty in entries[:limit]

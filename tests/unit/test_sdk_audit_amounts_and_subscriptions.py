@@ -12,7 +12,7 @@ from polyester import Polyester
 from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV
 from polyester.catalogs import CatalogManager
 from polyester.codecs.scalars import format_id
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterRealtimeError, PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2
@@ -273,3 +273,292 @@ def test_sync_private_subscription_missing_credentials_reports_once(monkeypatch)
         assert "credentials" in str(errors[0]).lower() or "api key" in str(errors[0]).lower()
     finally:
         client.close()
+
+
+@pytest.mark.parametrize("bucket", [None, "0.001", "0.1"])
+@pytest.mark.parametrize("side", ["bids", "asks"])
+@pytest.mark.parametrize("quantity", [9, 0])
+async def test_raw_zero_delta_never_becomes_a_display_bucket(monkeypatch, bucket, side, quantity):
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {"pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]}
+    )
+    queue = asyncio.Queue()
+    realtime = MagicMock()
+    realtime.subscribe_proto = AsyncMock(
+        return_value=AsyncSubscription(queue=queue, close=asyncio.Event())
+    )
+    fetch = AsyncMock(
+        return_value=orderbook_pb2.GetOrderBookResponse(
+            book_seq=1,
+            available=True,
+            bids=[orderbook_pb2.PriceLevel(price_ticks=71600000, qty_scaled=3)],
+            asks=[orderbook_pb2.PriceLevel(price_ticks=71700000, qty_scaled=4)],
+        )
+    )
+    monkeypatch.setattr("polyester.services.orderbook.unary_public_decoded", fetch)
+    service = AsyncOrderbookService(MagicMock(), catalogs=catalogs, realtime=realtime)
+    errors = []
+    sub = await service.create_subscription(
+        symbol="DOGE-USDT", bucket=bucket, on_error=errors.append
+    )
+    try:
+        initial = await asyncio.wait_for(anext(sub), 3)
+        assert initial.book_seq == "1"
+        assert len(initial.bids) == len(initial.asks) == 1
+        wire = orderbook_pb2.OrderBookDelta(symbol_id=1, book_seq_start=2, book_seq_end=2)
+        # An omitted proto3 price is zero; positive quantity must never materialize it.
+        getattr(wire, side).add(qty_scaled=quantity)
+        decode = realtime.subscribe_proto.call_args.kwargs["decode"]
+        delta = decode(wire.SerializeToString())
+        assert list(getattr(delta, side)) == [("0", str(quantity))]
+        await queue.put(delta)
+        if quantity:
+            with pytest.raises(StopAsyncIteration):
+                await asyncio.wait_for(anext(sub), 3)
+            assert sub.last_error is not None
+            assert "invalid or missing price" in str(sub.last_error)
+            assert len(errors) == 1
+        else:
+            view = await asyncio.wait_for(anext(sub), 3)
+            assert view.book_seq == "2"
+            assert view.bids == initial.bids
+            assert view.asks == initial.asks
+            assert sub.last_error is None
+            assert errors == []
+        fetch.assert_awaited_once()
+        realtime.subscribe_proto.assert_awaited_once()
+    finally:
+        await sub.aclose()
+
+
+@pytest.mark.parametrize("bucket", [None, "0.001", "0.1"])
+async def test_raw_zero_bid_outside_the_requested_depth_still_fails_closed(monkeypatch, bucket):
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {"pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]}
+    )
+    queue = asyncio.Queue()
+    realtime = MagicMock()
+    realtime.subscribe_proto = AsyncMock(
+        return_value=AsyncSubscription(queue=queue, close=asyncio.Event())
+    )
+    fetch = AsyncMock(
+        return_value=orderbook_pb2.GetOrderBookResponse(
+            book_seq=1,
+            available=True,
+            bids=[orderbook_pb2.PriceLevel(price_ticks=71600000, qty_scaled=3)],
+            asks=[orderbook_pb2.PriceLevel(price_ticks=71700000, qty_scaled=4)],
+        )
+    )
+    monkeypatch.setattr("polyester.services.orderbook.unary_public_decoded", fetch)
+    service = AsyncOrderbookService(MagicMock(), catalogs=catalogs, realtime=realtime)
+    errors = []
+    # A zero bid sorts last, so depth 1 alone would never render it.
+    sub = await service.create_subscription(
+        symbol="DOGE-USDT", depth=1, bucket=bucket, on_error=errors.append
+    )
+    try:
+        initial = await asyncio.wait_for(anext(sub), 3)
+        assert len(initial.bids) == 1
+        await queue.put(
+            OrderBookDeltaUpdate(
+                symbol_id=1,
+                book_seq_start="2",
+                book_seq_end="2",
+                bids=[["0", "9"]],
+                asks=[],
+            )
+        )
+        with pytest.raises(StopAsyncIteration):
+            await asyncio.wait_for(anext(sub), 3)
+        assert "invalid or missing price" in str(sub.last_error)
+        assert len(errors) == 1
+    finally:
+        await sub.aclose()
+
+
+def assert_clean_shutdown(client):
+    # Cleanup must not surface the setup error or leave the loop running.
+    close_error = None
+    try:
+        client.close()
+    except Exception as error:
+        close_error = error
+    thread_alive = client._loop_thread.is_alive()
+    if thread_alive:
+        client._loop.call_soon_threadsafe(client._loop.stop)
+        client._loop_thread.join(3)
+    assert close_error is None
+    assert not thread_alive
+
+
+def test_sync_setup_failure_without_callback_raises_once_and_does_not_register(monkeypatch):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    attempts = []
+    failure = ValueError("setup-proof")
+
+    async def subscribe(self, **kwargs):
+        attempts.append("setup")
+        raise failure
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        with pytest.raises(ValueError) as raised:
+            client.orders.subscribe_sync(on_event=lambda _: pytest.fail("unexpected event"))
+        assert raised.value is failure
+        assert attempts == ["setup"]
+        assert client._active_sync_subscriptions == []
+    finally:
+        assert_clean_shutdown(client)
+
+
+def test_sync_missing_credentials_without_callback_raises_once_and_does_not_register(monkeypatch):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        with pytest.raises(Exception, match="(?i)credentials|api key"):
+            client.orders.subscribe_sync(
+                account_id=format_id(42), on_event=lambda _: pytest.fail("unexpected event")
+            )
+        assert client._active_sync_subscriptions == []
+    finally:
+        assert_clean_shutdown(client)
+
+
+def test_sync_without_callback_returns_a_live_handle_after_setup(monkeypatch):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    delivered = threading.Event()
+    closed = threading.Event()
+    events = []
+
+    class Stream:
+        async def __aiter__(self):
+            yield "event-proof"
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            closed.set()
+
+    async def subscribe(self, **kwargs):
+        return Stream()
+
+    def on_event(event):
+        events.append(event)
+        delivered.set()
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        handle = client.orders.subscribe_sync(on_event=on_event)
+        assert delivered.wait(3), "event was never delivered"
+        assert events == ["event-proof"]
+        assert client._active_sync_subscriptions == [handle]
+        handle.close()
+        assert closed.is_set()
+    finally:
+        assert_clean_shutdown(client)
+
+
+def test_sync_setup_wait_ends_when_the_client_closes(monkeypatch):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    attempted = threading.Event()
+    outcome = []
+
+    async def subscribe(self, **kwargs):
+        attempted.set()
+        await asyncio.Event().wait()
+
+    def call():
+        try:
+            client.orders.subscribe_sync(on_event=lambda _: pytest.fail("unexpected event"))
+        except Exception as error:
+            outcome.append(error)
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    caller = threading.Thread(target=call, daemon=True)
+    caller.start()
+    assert attempted.wait(3), "subscription setup was never attempted"
+    assert_clean_shutdown(client)
+    caller.join(5)
+    assert not caller.is_alive(), "subscribe_sync kept waiting after the client closed"
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], PolyesterRealtimeError)
+    assert "closed during subscription setup" in str(outcome[0])
+    assert client._active_sync_subscriptions == []
+
+
+@pytest.mark.parametrize("nested_on_error", [None, lambda _: None])
+def test_sync_subscribe_from_a_client_callback_is_refused(monkeypatch, nested_on_error):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    finished = threading.Event()
+    outcome = []
+
+    class Stream:
+        async def __aiter__(self):
+            yield "event-proof"
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            pass
+
+    async def subscribe(self, **kwargs):
+        return Stream()
+
+    def on_event(_):
+        try:
+            client.orders.subscribe_sync(on_event=lambda _: None, on_error=nested_on_error)
+        except Exception as error:
+            outcome.append(error)
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        handle = client.orders.subscribe_sync(on_event=on_event, on_error=outcome.append)
+        assert finished.wait(5), "nested subscribe_sync blocked the client loop"
+        assert len(outcome) == 1
+        assert isinstance(outcome[0], PolyesterRealtimeError)
+        assert "client callback" in str(outcome[0])
+        assert client._active_sync_subscriptions == [handle]
+    finally:
+        client.close()
+
+
+def test_sync_without_callback_waits_for_setup_longer_than_ten_seconds(monkeypatch):
+    monkeypatch.delenv(API_KEY_ID_ENV, raising=False)
+    monkeypatch.delenv(API_PRIVATE_KEY_ENV, raising=False)
+    ready = threading.Event()
+    closed = threading.Event()
+
+    class Stream:
+        async def __aiter__(self):
+            await asyncio.Event().wait()
+            yield "unreachable"
+
+        async def aclose(self):
+            closed.set()
+
+    async def subscribe(self, **kwargs):
+        await asyncio.sleep(10.05)
+        ready.set()
+        return Stream()
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        handle = client.orders.subscribe_sync(on_event=lambda _: pytest.fail("unexpected event"))
+        assert ready.is_set(), "sync subscribe returned before setup completed"
+        handle.close()
+        assert closed.is_set()
+    finally:
+        client.close()
+    assert not client._loop_thread.is_alive()

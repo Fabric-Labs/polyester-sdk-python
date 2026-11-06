@@ -30,6 +30,17 @@ class FractionalDigitsError(PolyesterValidationError):
     """
 
 
+_ITEM_SCOPE_KEYS = ("sub_account_id", "subaccount_id", "subaccountId", "account")
+
+
+def refuse_item_scope(item: Any, label: str) -> None:
+    """Refuse a batch item that names its own account: the wire scope is batch-level."""
+    if any(item.get(key) is not None for key in _ITEM_SCOPE_KEYS):
+        raise PolyesterValidationError(
+            f"{label} item scope is unsupported; use the batch-level sub_account_id"
+        )
+
+
 def validate_protocol_scale(scale: int, *, field_name: str = "scale") -> int:
     """Reject scales that would panic or allocate pathological padding."""
     if isinstance(scale, bool) or not isinstance(scale, int):
@@ -217,7 +228,7 @@ def id_to_int(value: str | int, label: str = "id") -> int:
     if isinstance(value, int):
         parsed = value
     elif isinstance(value, str):
-        if not value:
+        if not value.strip():
             raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
         if value.isdecimal():
             # All-digit strings are ambiguous: prefer canonical SDK base58 when it

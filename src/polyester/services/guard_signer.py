@@ -15,6 +15,7 @@ from polyester.codecs.guard_signer import (
     protected_action_from_label,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.scalars import refuse_item_scope
 from polyester.gen.chain.guard.v1.guard_signer_connect import GuardSignerServiceClient
 from polyester.gen.chain.guard.v1.guard_signer_pb2 import (
     BatchSignProtectedActionItem,
@@ -125,6 +126,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
     ) -> BatchSignProtectedActionsResult:
         items = []
         for item in actions:
+            refuse_item_scope(item, "batch_sign_protected_actions")
             items.append(
                 BatchSignProtectedActionItem(
                     action=protected_action_from_label(str(item["action"])),

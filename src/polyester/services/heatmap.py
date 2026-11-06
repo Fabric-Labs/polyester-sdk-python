@@ -51,7 +51,13 @@ class AsyncHeatmapService(BaseService):
         from_ts_sec: int | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        page_token: str = "",
     ) -> ApiData:
+        """Read history, continuing with the returned opaque token and same filters.
+
+        A continuation omits the default time window. If a range is supplied
+        with a token, only its explicit bounds are sent; repeat the original range.
+        """
         from polyester.gen.marketdata.v1 import heatmap_pb2
 
         validated_limit = validate_limit(limit)
@@ -84,8 +90,21 @@ class AsyncHeatmapService(BaseService):
             depth=depth_enum,
             limit=validated_limit,
             quantity_mode=qty_enum,
+            page_token=page_token,
         )
-        if from_ts_sec is not None:
+        if page_token:
+            if from_ts_sec is not None or start_time is not None or end_time is not None:
+                time_range = HeatmapTimeRange()
+                if from_ts_sec is not None:
+                    time_range.start_time.CopyFrom(
+                        _datetime_to_timestamp(datetime.fromtimestamp(from_ts_sec, tz=UTC))
+                    )
+                elif start_time is not None:
+                    time_range.start_time.CopyFrom(_datetime_to_timestamp(start_time))
+                if end_time is not None:
+                    time_range.end_time.CopyFrom(_datetime_to_timestamp(end_time))
+                request.time_range.CopyFrom(time_range)
+        elif from_ts_sec is not None:
             now = datetime.now(UTC)
             start = datetime.fromtimestamp(from_ts_sec, tz=UTC)
             time_range = HeatmapTimeRange()

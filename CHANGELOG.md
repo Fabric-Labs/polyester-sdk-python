@@ -25,7 +25,10 @@
   string ends pagination. The `since` lower timestamp bound works with this token.
 - Preserve continuation tokens in market-overview and candle results. Both
   candle helpers now accept `page_token` for reading the next page.
-- Preview by symbol ID now uses the catalog base quantity scale. Without that
+- Heatmap history now accepts `page_token`. Continuation requests keep the
+  original filters and omit a new default time window; repeat an explicit
+  original range only when needed.
+- **Breaking:** preview by symbol ID now uses the catalog base quantity scale. Without that
   catalog entry, pass a `Quantity` with an explicit scale; an unknown scale
   raises a validation error instead of formatting the result at scale zero.
 - Equity history now exposes `btc_prices_q`: the returned BTC-USDT closes as

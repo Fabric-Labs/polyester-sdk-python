@@ -26,6 +26,11 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import require_realtime, subscribe_public_proto
 
+# A snapshot that came back unavailable is requested again after these delays:
+# the first delay doubles up to the limit, for as long as the stream runs.
+_UNAVAILABLE_SNAPSHOT_INITIAL_DELAY = 1.0
+_UNAVAILABLE_SNAPSHOT_MAX_DELAY = 8.0
+
 
 class AsyncOrderbookService(BaseService):
     def __init__(
@@ -126,14 +131,20 @@ class AsyncOrderbookService(BaseService):
         current_book_seq = 0
         # The last snapshot's wire ``available``; deltas, resets included, never change it.
         book_available = True
+        # Pacing for requests of a snapshot that came back unavailable.
+        last_view_unavailable = False
+        recheck_delay = _UNAVAILABLE_SNAPSHOT_INITIAL_DELAY
+        recheck_handle: asyncio.TimerHandle | None = None
         bucket_ticks: int | None = parse_bucket_ticks(bucket)
         queue: asyncio.Queue[OrderbookData | None] = asyncio.Queue(maxsize=200)
         close = asyncio.Event()
         stream_holder: dict[str, AsyncSnapshotThenStreamSubscription | None] = {"stream": None}
 
         def emit() -> None:
+            nonlocal last_view_unavailable
             if close.is_set():
                 return
+            last_view_unavailable = not book_available
             data = build_orderbook_data(
                 symbol=symbol,
                 depth=ws_depth,
@@ -187,11 +198,40 @@ class AsyncOrderbookService(BaseService):
             asks_map = levels_from_proto_levels(snapshot.asks)
             current_book_seq = int(snapshot.book_seq or 0)
             book_available = bool(snapshot.available)
-            emit()
+            # A repeated unavailable answer adds no view.
+            if book_available or not last_view_unavailable or buffered_deltas:
+                emit()
+            recheck_unavailable_snapshot()
             for delta in buffered_deltas:
                 if close.is_set():
                     return
                 handle_delta(delta)
+
+        def recheck_unavailable_snapshot() -> None:
+            # An unavailable book's levels are unknown, not empty: ask again later,
+            # with a paced delay, until it is available or the stream stops.
+            nonlocal recheck_delay, recheck_handle
+            if book_available:
+                recheck_delay = _UNAVAILABLE_SNAPSHOT_INITIAL_DELAY
+                return
+            if recheck_handle is not None or close.is_set():
+                return
+            delay = recheck_delay
+            recheck_delay = min(recheck_delay * 2, _UNAVAILABLE_SNAPSHOT_MAX_DELAY)
+            recheck_handle = asyncio.get_running_loop().call_later(delay, request_recheck)
+
+        def request_recheck() -> None:
+            nonlocal recheck_handle
+            recheck_handle = None
+            stream = stream_holder["stream"]
+            if stream is not None and not close.is_set() and not stream.is_disposed():
+                stream.request_refresh()
+
+        def cancel_recheck() -> None:
+            nonlocal recheck_handle
+            if recheck_handle is not None:
+                recheck_handle.cancel()
+                recheck_handle = None
 
         def apply_live_publications(deltas: list[OrderBookDeltaUpdate]) -> None:
             for delta in deltas:
@@ -218,6 +258,7 @@ class AsyncOrderbookService(BaseService):
 
         def terminal_close() -> None:
             close.set()
+            cancel_recheck()
             with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(None)
 
@@ -243,6 +284,7 @@ class AsyncOrderbookService(BaseService):
             close=close,
             stream=stream,
             set_bucket=set_bucket,
+            on_aclose=cancel_recheck,
         )
         try:
             await stream.start()

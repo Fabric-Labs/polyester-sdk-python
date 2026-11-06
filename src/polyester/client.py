@@ -451,8 +451,17 @@ class Polyester:
         return cls(**_apply_from_env(overrides))
 
     def close(self) -> None:
+        """Close every sync subscription and the client.
+
+        A subscription that failed with no ``on_error`` raises its failure here, once
+        everything has shut down.
+        """
+        first_failure: Exception | None = None
         for subscription in list(self._active_sync_subscriptions):
-            subscription.close()
+            try:
+                subscription.close()
+            except Exception as exc:
+                first_failure = first_failure or exc
         self._active_sync_subscriptions.clear()
 
         async def _shutdown() -> None:
@@ -463,6 +472,8 @@ class Polyester:
             future.result(timeout=10)
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._loop_thread.join(timeout=5)
+        if first_failure is not None:
+            raise first_failure
 
     def __enter__(self) -> Polyester:
         return self

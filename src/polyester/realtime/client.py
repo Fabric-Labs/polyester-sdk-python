@@ -17,16 +17,24 @@ from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
     PolyesterRealtimeOverflowError,
+    PolyesterSubscriptionEndedError,
 )
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
 from polyester.realtime.protocol import (
     Ping,
     Publication,
     Reply,
+    Unsubscribe,
     connect_command,
     decode_replies,
     pong_command,
     subscribe_command,
+)
+from polyester.realtime.resubscribe import (
+    SUBACCOUNTS_CHANNEL_PREFIX,
+    ResubscribeAttempt,
+    ServerUnsubscribedError,
+    SubaccountAccess,
 )
 
 if TYPE_CHECKING:
@@ -226,12 +234,15 @@ class AsyncRealtimeClient:
         self._api_url = api_url
         self._credentials = credentials
         self._http = http
+        # Decides whether a subscription the server ended may resume.
+        self._access = SubaccountAccess(self)
         self._max_queue_size = max_queue_size
         self._active_subs: set[AsyncSubscription[Any]] = set()
         self._private_orders: PrivateOrderStream | None = None
         self._closed = False
 
     async def aclose(self) -> None:
+        self._access.close()
         """Cancel all active subscriptions and await their tasks."""
         self._closed = True
         subs = list(self._active_subs)
@@ -357,6 +368,7 @@ class AsyncRealtimeClient:
         ready: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         handshake_count = 0
         backoff = _ReconnectBackoff()
+        resume: ResubscribeAttempt | None = None
 
         def signal_ready(exc: BaseException | None = None) -> None:
             if ready.done():
@@ -372,9 +384,12 @@ class AsyncRealtimeClient:
             backoff.reset()
             if handshake_count > 1:
                 sub._mark_resubscribed()
+            if resume is not None:
+                resume.note_ready()
             signal_ready(None)
 
         async def runner() -> None:
+            nonlocal resume
             try:
                 while not close.is_set():
                     try:
@@ -402,9 +417,32 @@ class AsyncRealtimeClient:
                         sub._set_error(exc)
                         signal_ready(exc)
                         break
+                    except ServerUnsubscribedError as exc:
+                        if close.is_set():
+                            break
+                        if exc.temporary:
+                            # The server asks for a new subscribe: an ordinary reconnect.
+                            if not auto_reconnect:
+                                sub._set_error(exc)
+                                break
+                            sub._notify_error(exc)
+                        elif not auto_reconnect:
+                            sub._set_error(exc.ended(channel, "not_resubscribable"))
+                            break
+                        else:
+                            resume = self._access.attempt_after(resume, exc)
+                            try:
+                                await self._access.await_resume(channel, resume)
+                            except PolyesterSubscriptionEndedError as ended:
+                                sub._set_error(ended)
+                                break
+                            continue
                     except PolyesterAuthError as exc:
                         # Auth failures must be observable; never hide behind reconnect.
-                        sub._set_error(exc)
+                        if resume is not None and not resume.ready:
+                            sub._set_error(resume.unsubscribed.ended(channel, "token_refused", exc))
+                        else:
+                            sub._set_error(exc)
                         signal_ready(exc)
                         break
                     except Exception as exc:
@@ -414,6 +452,16 @@ class AsyncRealtimeClient:
                             # Match Rust/Go: first handshake failure is terminal.
                             signal_ready(exc)
                             break
+                        if resume is not None and not resume.ready:
+                            # An attempt to resume failed: retry within its limit.
+                            resume.last_error = exc
+                            sub._notify_error(exc)
+                            try:
+                                await self._access.await_resume(channel, resume)
+                            except PolyesterSubscriptionEndedError as ended:
+                                sub._set_error(ended)
+                                break
+                            continue
                         # Transient transport failures reconnect after a successful handshake.
                         if not auto_reconnect:
                             sub._set_error(exc)
@@ -477,7 +525,7 @@ class AsyncRealtimeClient:
                 raise PolyesterRealtimeError(
                     "server did not negotiate centrifuge-protobuf websocket subprotocol"
                 )
-            pending: deque[Ping | Publication | Reply] = deque()
+            pending: deque[Ping | Publication | Reply | Unsubscribe] = deque()
             if is_private_channel(channel):
                 http = self._require_http()
                 credentials = self._require_credentials()
@@ -505,6 +553,7 @@ class AsyncRealtimeClient:
                 await self._centrifugo_subscribe(ws, channel, pending=pending)
             if on_ready is not None:
                 on_ready()
+            subaccounts_channel = channel.startswith(SUBACCOUNTS_CHANNEL_PREFIX)
             while not close.is_set():
                 if pending:
                     incoming_messages = list(pending)
@@ -515,6 +564,8 @@ class AsyncRealtimeClient:
                     if isinstance(incoming, Ping):
                         await ws.send(pong_command())
                     elif isinstance(incoming, Publication):
+                        if subaccounts_channel:
+                            self._access.note_update(incoming.data)
                         members = decode_batch(incoming.data)
                         if close.is_set():
                             return
@@ -524,10 +575,15 @@ class AsyncRealtimeClient:
                                     on_member_error(member)
                                 continue
                             enqueue_or_overflow(queue, member, close=close)
+                    elif isinstance(incoming, Unsubscribe):
+                        if incoming.channel in ("", channel):
+                            raise ServerUnsubscribedError(incoming.code, incoming.reason)
                     elif isinstance(incoming, Reply) and incoming.error is not None:
                         raise self._protocol_error(incoming)
 
-    async def _read_live_frame(self, ws: ClientConnection) -> list[Ping | Publication | Reply]:
+    async def _read_live_frame(
+        self, ws: ClientConnection
+    ) -> list[Ping | Publication | Reply | Unsubscribe]:
         try:
             raw = await asyncio.wait_for(ws.recv(), timeout=CENTRIFUGO_READ_TIMEOUT)
         except TimeoutError as exc:
@@ -575,7 +631,7 @@ class AsyncRealtimeClient:
         ws: ClientConnection,
         *,
         token: str | None = None,
-        pending: deque[Ping | Publication | Reply] | None = None,
+        pending: deque[Ping | Publication | Reply | Unsubscribe] | None = None,
     ) -> None:
         await ws.send(connect_command(1, token))
         await self._read_centrifugo_reply(ws, expected_id=1, pending=pending)
@@ -586,7 +642,7 @@ class AsyncRealtimeClient:
         channel: str,
         *,
         token: str | None = None,
-        pending: deque[Ping | Publication | Reply] | None = None,
+        pending: deque[Ping | Publication | Reply | Unsubscribe] | None = None,
     ) -> None:
         await ws.send(subscribe_command(2, channel, token))
         await self._read_centrifugo_reply(ws, expected_id=2, pending=pending)
@@ -596,7 +652,7 @@ class AsyncRealtimeClient:
         ws: ClientConnection,
         *,
         expected_id: int,
-        pending: deque[Ping | Publication | Reply] | None = None,
+        pending: deque[Ping | Publication | Reply | Unsubscribe] | None = None,
     ) -> None:
         deadline = time.monotonic() + CENTRIFUGO_REPLY_DEADLINE
         while True:

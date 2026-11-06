@@ -432,6 +432,45 @@ class PolyesterRealtimeOverflowError(PolyesterRealtimeError):
     """
 
 
+class PolyesterSubscriptionEndedError(PolyesterRealtimeError):
+    """The server ended a realtime subscription and the SDK stopped.
+
+    ``channel`` names it; ``unsubscribe_code`` and ``server_reason`` are the
+    server's code and text. ``reason`` says why it did not resume:
+
+    - ``not_resubscribable``: no sub-account's access governs the channel, or
+      automatic reconnection is off. Subscribe again if it should still be live.
+    - ``access_removed``: a sub-account update on this client said removed true.
+    - ``not_listed``: ``ListSubaccounts`` no longer lists it with a role.
+    - ``list_refused``: ``ListSubaccounts`` refused this key; ``__cause__`` holds it.
+    - ``token_refused``: a fresh subscribe token was refused; ``__cause__`` holds it.
+    - ``retries_exhausted``: bounded attempts did not hold; ``__cause__`` holds
+      the last failure, if any.
+    """
+
+    def __init__(
+        self,
+        *,
+        channel: str,
+        unsubscribe_code: int,
+        server_reason: str,
+        reason: str,
+        cause: BaseException | None = None,
+    ) -> None:
+        message = (
+            f"server ended realtime subscription to {channel!r} "
+            f"(code {unsubscribe_code}: {server_reason}): {reason}"
+        )
+        if cause is not None:
+            message = f"{message}: {cause}"
+        super().__init__(message)
+        self.channel = channel
+        self.unsubscribe_code = unsubscribe_code
+        self.server_reason = server_reason
+        self.reason = reason
+        self.__cause__ = cause
+
+
 def _is_outcome_unknown_api_error(err: BaseException) -> bool:
     return (
         isinstance(err, PolyesterApiError)

@@ -762,3 +762,71 @@ async def test_public_handshake_times_out_when_only_pings_arrive(monkeypatch):
             assert len(pings) > 3, "the handshake was not kept alive by pings"
         finally:
             await realtime.aclose()
+
+
+def test_client_close_shuts_everything_down_when_a_handle_failed_without_callback(monkeypatch):
+    failure = ValueError("iteration-proof")
+    closed = []
+
+    class Failing:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise failure
+
+        async def aclose(self):
+            closed.append("failing")
+
+    class Quiet:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            closed.append("quiet")
+
+    subs = iter([Failing(), Quiet()])
+
+    async def subscribe(self, *args, **kwargs):
+        return next(subs)
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    client.orders.subscribe_sync(on_event=lambda _: None)
+    client.orders.subscribe_sync(on_event=lambda _: None)
+    assert len(client._active_sync_subscriptions) == 2, "both handles must be live"
+    time.sleep(0.05)
+
+    with pytest.raises(ValueError, match="iteration-proof"):
+        client.close()
+
+    assert closed == ["failing", "quiet"], "every handle closes"
+    assert client._active_sync_subscriptions == []
+    assert not client._loop_thread.is_alive(), "the client must have shut down"
+
+
+def test_client_close_without_failures_raises_nothing(monkeypatch):
+    closed = []
+
+    class Quiet:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            closed.append("quiet")
+
+    async def subscribe(self, *args, **kwargs):
+        return Quiet()
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    client.orders.subscribe_sync(on_event=lambda _: None)
+    client.close()
+    assert closed == ["quiet"]
+    assert not client._loop_thread.is_alive()

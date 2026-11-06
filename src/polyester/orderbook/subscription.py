@@ -18,12 +18,14 @@ class OrderbookSubscription:
         stream,
         set_bucket: Callable[[str | None], None],
         start_task: asyncio.Task[None] | None = None,
+        on_aclose: Callable[[], None] | None = None,
     ) -> None:
         self._queue = queue
         self._close = close
         self._stream = stream
         self._set_bucket = set_bucket
         self._start_task = start_task
+        self._on_aclose = on_aclose
 
     def set_bucket(self, bucket: str | None) -> None:
         self._set_bucket(bucket)
@@ -38,6 +40,8 @@ class OrderbookSubscription:
 
     async def aclose(self) -> None:
         self._close.set()
+        if self._on_aclose is not None:
+            self._on_aclose()
         await self._stream.aclose()
         if self._start_task is not None and not self._start_task.done():
             with contextlib.suppress(asyncio.CancelledError, Exception):

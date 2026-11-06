@@ -751,3 +751,49 @@ async def test_orders_subscribe_routes_through_the_private_socket(
         await realtime.aclose()
         with pytest.raises(StopAsyncIteration):
             await next_event(sub)
+
+
+async def test_unanswered_resubscribe_on_a_confirmed_stream_retries_and_recovers(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(private_orders, "SUBSCRIBE_ACK_TIMEOUT", 0.2)
+    sub, conn = await open_stream(server, stream)
+    # A snapshot end with no snapshot makes a confirmed stream subscribe again.
+    await conn.send("s1", 1, snapshot_end=pb.SnapshotEnd(cursor="c1", count=1))
+    assert isinstance(await next_event(sub), PrivateOrdersDisconnected)
+    first_retry = await conn.expect("subscribe")
+
+    # The server keeps the connection alive and never answers it.
+    await conn.send(heartbeat=pb.Heartbeat(server_ts_ns=1))
+    reported = await next_event(sub)
+    assert isinstance(reported, PrivateOrdersError), reported
+    assert reported.kind == "subscribe"
+    assert "not confirmed" in str(reported.error)
+
+    # The stream keeps its subscription, retries, and recovers.
+    second_retry = await conn.expect("subscribe")
+    assert second_retry.id != first_retry.id
+    await conn.send("s3", subscribed=pb.Subscribed(id=second_retry.id, account=ACCOUNT))
+    assert isinstance(await next_event(sub), PrivateOrdersConnected)
+    await conn.send("s3", 1, snapshot_begin=pb.SnapshotBegin(epoch=1))
+    await conn.send("s3", 2, snapshot_end=pb.SnapshotEnd(cursor="c2", count=0))
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+    assert sub.error is None
+
+    # A late answer to the expired request is unsubscribed, not adopted.
+    await conn.send("late", subscribed=pb.Subscribed(id=first_retry.id, account=ACCOUNT))
+    assert (await conn.expect("unsubscribe")).sub == "late"
+
+
+async def test_answered_resubscribe_within_the_deadline_is_not_retried(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(private_orders, "SUBSCRIBE_ACK_TIMEOUT", 0.2)
+    sub, conn = await open_stream(server, stream)
+    await conn.send("s1", 1, snapshot_end=pb.SnapshotEnd(cursor="c1", count=1))
+    assert isinstance(await next_event(sub), PrivateOrdersDisconnected)
+    await conn.confirm("s2")
+    assert isinstance(await next_event(sub), PrivateOrdersConnected)
+    await asyncio.sleep(0.4)
+    assert len(conn.ops("subscribe")) == 2, "the initial subscribe and one resubscribe"
+    assert sub.error is None

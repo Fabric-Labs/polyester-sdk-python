@@ -99,13 +99,12 @@ _HTTP_STATUS_TO_CODE = {
 }
 
 
-# HTTP status -> Connect code for an unreadable Connect body. Unlike a REST
-# problem with a code of its own, a 400 here proves no refusal.
+# HTTP status -> Connect code for an unreadable JSON error body. Only a 401 or
+# 403 is a refusal on its status alone. The rest prove nothing about a mutation,
+# so they stay ambiguous; these unavailable statuses also let reads retry.
 _UNREADABLE_BODY_STATUS_TO_CODE = {
-    400: Code.INTERNAL,
     401: Code.UNAUTHENTICATED,
     403: Code.PERMISSION_DENIED,
-    404: Code.UNIMPLEMENTED,
     429: Code.UNAVAILABLE,
     502: Code.UNAVAILABLE,
     503: Code.UNAVAILABLE,
@@ -147,7 +146,7 @@ def _unreadable_connect_error(status: int) -> ConnectError:
     except ValueError:
         phrase = ""
     return ConnectError(
-        _UNREADABLE_BODY_STATUS_TO_CODE.get(status, Code.UNKNOWN), f"{status} {phrase}".strip()
+        _UNREADABLE_BODY_STATUS_TO_CODE.get(status, Code.INTERNAL), f"{status} {phrase}".strip()
     )
 
 

@@ -120,6 +120,19 @@ async def test_real_unavailability_still_retries(read, status, body) -> None:
     assert calls == 3
 
 
+@pytest.mark.parametrize("status", [429, 502, 503])
+async def test_unreadable_body_at_an_unavailable_status_still_retries(status: int) -> None:
+    result, calls = await _read("get", status, {"details": [1]}, fail_for=2)
+    assert not isinstance(result, Exception), result
+    assert calls == 3
+
+
+async def test_unreadable_500_is_not_retried() -> None:
+    error, calls = await _read("get", 500, {"details": [1]}, fail_for=1 << 30)
+    assert type(error) is PolyesterServerError
+    assert calls == 1
+
+
 async def test_retry_of_real_unavailability_stays_bounded() -> None:
     error, calls = await _read(
         "get", 503, {"code": "UNAVAILABLE", "detail": "catching up"}, fail_for=1 << 30

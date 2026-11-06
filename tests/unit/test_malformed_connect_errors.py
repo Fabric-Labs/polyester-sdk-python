@@ -161,6 +161,29 @@ async def test_malformed_body_without_a_connect_code_is_ambiguous(body: object) 
 
 
 @pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param({"details": [1]}, id="no-code-detail-int"),
+        pytest.param({"message": "m", "details": [1]}, id="no-code-readable-message"),
+        pytest.param({"message": 5}, id="no-code-message-int"),
+        pytest.param({"code": "internal", "details": [1]}, id="internal-detail-int"),
+        pytest.param({"code": "invalid_argument", "details": [1]}, id="refusal-code-detail-int"),
+    ],
+)
+@pytest.mark.parametrize(
+    "status", [400, 402, 404, 405, 409, 412, 418, 422, 429, 431, 500, 501, 502, 503, 505, 520]
+)
+async def test_unreadable_body_proves_nothing_at_other_statuses(status: int, body: object) -> None:
+    """Only a definite 401 or 403 survives an unreadable body; the rest stays ambiguous."""
+    error, calls = await _status_error(status, body)
+    assert calls == 1
+    assert type(error) is PolyesterServerError
+    assert mutation_outcome_unknown(error)
+    assert not is_retryable_error(error)
+    assert str(error).startswith(str(status))
+
+
+@pytest.mark.parametrize(
     ("status", "body", "message"),
     [
         pytest.param(
@@ -192,6 +215,15 @@ async def test_malformed_body_keeps_a_definite_http_refusal(
         pytest.param(400, {"code": 5, "message": "m"}, PolyesterServerError, "m", id="400-int"),
         pytest.param(401, {"message": "m"}, PolyesterAuthError, "m", id="401-no-code"),
         pytest.param(504, {"message": 5}, PolyesterServerError, None, id="504-gateway"),
+        pytest.param(
+            500, {"code": "internal", "message": "m"}, PolyesterServerError, "m", id="500-internal"
+        ),
+        pytest.param(
+            503, {"code": "unavailable", "message": "m"}, PolyesterServerError, "m", id="503-coded"
+        ),
+        pytest.param(
+            401, {"code": "unauthenticated", "message": "m"}, PolyesterAuthError, "m", id="401-ok"
+        ),
     ],
 )
 async def test_readable_fallback_body_is_unchanged_control(

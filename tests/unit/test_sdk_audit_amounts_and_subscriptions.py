@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import threading
+import time
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from websockets.asyncio.server import serve
 
 from polyester import Polyester
 from polyester.auth import API_KEY_ID_ENV, API_PRIVATE_KEY_ENV
@@ -15,14 +17,24 @@ from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterRealtimeError, PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.orderbook.v1 import orderbook_pb2
+from polyester.gen.privatews.v1 import private_ws_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2
 from polyester.models.realtime import OrderBookDeltaUpdate
-from polyester.realtime.client import AsyncSubscription
+from polyester.realtime import client as realtime_client
+from polyester.realtime import private_orders
+from polyester.realtime.client import (
+    CENTRIFUGO_PROTOBUF_SUBPROTOCOL,
+    AsyncRealtimeClient,
+    AsyncSubscription,
+)
+from polyester.realtime.private_orders import PrivateOrderStream, private_ws_url
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.withdraw import AsyncWithdrawService
 from polyester.types.money import AssetAmount
+from tests.hardening_support import make_test_credentials
+from tests.unit.test_private_orders_stream import FakePrivateWsServer, Tokens
 from tests.unit.test_request_builder_regressions import capture_transport
 
 
@@ -562,3 +574,191 @@ def test_sync_without_callback_waits_for_setup_longer_than_ten_seconds(monkeypat
     finally:
         client.close()
     assert not client._loop_thread.is_alive()
+
+
+class HeartbeatOnlyPrivateServer:
+    """Answers tokens and sends valid heartbeats, but never confirms a subscribe."""
+
+    def __init__(self) -> None:
+        self.server = FakePrivateWsServer()
+        self.subscribes = []
+        self.unsubscribes = []
+        self.heartbeats = 0
+        # Seconds before confirming, per account; an absent account is never confirmed.
+        self.confirm_after = {}
+        self._tasks = []
+
+    async def __aenter__(self):
+        await self.server.start()
+        self._tasks.append(asyncio.create_task(self._serve()))
+        return self
+
+    async def __aexit__(self, *exc_info):
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await self.server.aclose()
+
+    async def _serve(self):
+        while True:
+            conn = await self.server.connections.get()
+            self._tasks.append(asyncio.create_task(self._beat(conn)))
+            self._tasks.append(asyncio.create_task(self._read(conn)))
+
+    async def _beat(self, conn):
+        with contextlib.suppress(Exception):
+            while True:
+                await conn.send(heartbeat=private_ws_pb2.Heartbeat(server_ts_ns=1))
+                self.heartbeats += 1
+                await asyncio.sleep(0.02)
+
+    async def _read(self, conn):
+        while True:
+            msg = await conn.received.get()
+            kind = msg.WhichOneof("op")
+            if kind == "unsubscribe":
+                self.unsubscribes.append(msg.unsubscribe)
+            elif kind == "subscribe":
+                self.subscribes.append(msg.subscribe)
+                delay = self.confirm_after.get(msg.subscribe.account)
+                if delay is not None:
+                    confirm = self._confirm(conn, msg.subscribe, delay)
+                    self._tasks.append(asyncio.create_task(confirm))
+
+    async def _confirm(self, conn, request, delay):
+        await asyncio.sleep(delay)
+        with contextlib.suppress(Exception):
+            await conn.send(
+                f"s{request.account}",
+                subscribed=private_ws_pb2.Subscribed(id=request.id, account=request.account),
+            )
+
+
+def private_sync_client(server):
+    credentials = make_test_credentials()
+    return Polyester(
+        api_url=server.server.api_url,
+        api_key_id=credentials.key_id,
+        api_private_key=credentials.private_key,
+        default_account_id=format_id(42),
+        hydrate_catalogs=False,
+    )
+
+
+async def test_sync_setup_without_callback_times_out_when_heartbeats_never_confirm(monkeypatch):
+    monkeypatch.setattr(private_orders, "SUBSCRIBE_ACK_TIMEOUT", 0.3)
+    async with HeartbeatOnlyPrivateServer() as server:
+        client = private_sync_client(server)
+        try:
+            with pytest.raises(PolyesterRealtimeError, match="not confirmed") as raised:
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.orders.subscribe_sync,
+                        on_event=lambda _: pytest.fail("unexpected event"),
+                    ),
+                    5,
+                )
+            assert "timed out" in str(raised.value)
+            assert len(server.subscribes) == 1, "subscribe was never sent"
+            assert server.heartbeats > 3, "the connection was not kept alive by heartbeats"
+            assert client._active_sync_subscriptions == []
+            assert client._client.realtime._private_orders.active_accounts == 0
+        finally:
+            await asyncio.to_thread(assert_clean_shutdown, client)
+
+
+async def test_sync_setup_with_callback_reports_an_unconfirmed_subscribe_once(monkeypatch):
+    monkeypatch.setattr(private_orders, "SUBSCRIBE_ACK_TIMEOUT", 0.3)
+    errors = []
+    delivered = threading.Event()
+
+    def report(error):
+        errors.append(error)
+        delivered.set()
+
+    async with HeartbeatOnlyPrivateServer() as server:
+        client = private_sync_client(server)
+        try:
+            handle = await asyncio.to_thread(
+                client.orders.subscribe_sync,
+                on_event=lambda _: pytest.fail("unexpected event"),
+                on_error=report,
+            )
+            assert await asyncio.to_thread(delivered.wait, 5), "timeout was never reported"
+            await asyncio.to_thread(handle.close)
+            assert len(errors) == 1
+            assert "not confirmed" in str(errors[0])
+            assert len(server.subscribes) == 1
+        finally:
+            await asyncio.to_thread(assert_clean_shutdown, client)
+
+
+async def test_late_confirmation_after_the_ack_timeout_is_unsubscribed(monkeypatch):
+    monkeypatch.setattr(private_orders, "SUBSCRIBE_ACK_TIMEOUT", 0.2)
+    tokens = Tokens()
+    async with HeartbeatOnlyPrivateServer() as server:
+        # A confirmed account keeps the shared connection open past the timeout.
+        server.confirm_after = {43: 0, 42: 0.4}
+        stream = PrivateOrderStream(
+            url=private_ws_url(server.server.api_url),
+            fetch_connect_token=tokens.connect,
+            fetch_subscribe_token=tokens.subscribe,
+        )
+        healthy = await asyncio.wait_for(stream.subscribe(format_id(43)), 3)
+        with pytest.raises(PolyesterRealtimeError, match="not confirmed"):
+            await asyncio.wait_for(stream.subscribe(format_id(42)), 3)
+        assert stream.active_accounts == 1
+        for _ in range(100):
+            if server.unsubscribes:
+                break
+            await asyncio.sleep(0.02)
+        assert [item.sub for item in server.unsubscribes] == ["s42"]
+        assert healthy.error is None
+        await stream.aclose()
+
+
+async def test_sync_setup_waits_past_ten_seconds_for_a_slow_confirmation(monkeypatch):
+    async with HeartbeatOnlyPrivateServer() as server:
+        server.confirm_after = {42: 10.05}
+        client = private_sync_client(server)
+        try:
+            handle = await asyncio.to_thread(
+                client.orders.subscribe_sync, on_event=lambda _: None
+            )
+            assert len(server.subscribes) == 1
+            assert client._active_sync_subscriptions == [handle]
+            await asyncio.to_thread(handle.close)
+        finally:
+            await asyncio.to_thread(assert_clean_shutdown, client)
+
+
+async def test_public_handshake_times_out_when_only_pings_arrive(monkeypatch):
+    monkeypatch.setattr(realtime_client, "CENTRIFUGO_REPLY_DEADLINE", 0.3)
+    pings = []
+
+    async def handler(ws):
+        with contextlib.suppress(Exception):
+            while True:
+                await ws.send(b"\x00")
+                pings.append(1)
+                await asyncio.sleep(0.02)
+
+    async with serve(
+        handler, "127.0.0.1", 0, subprotocols=[CENTRIFUGO_PROTOBUF_SUBPROTOCOL]
+    ) as server:
+        port = server.sockets[0].getsockname()[1]
+        realtime = AsyncRealtimeClient(f"ws://127.0.0.1:{port}")
+        try:
+            started = time.monotonic()
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(
+                    realtime.subscribe_proto(
+                        "public:spot:market:trades:1:proto", decode=lambda raw: raw
+                    ),
+                    5,
+                )
+            # The outer limit raises the same type, so only the elapsed time proves the deadline.
+            assert time.monotonic() - started < 3
+            assert len(pings) > 3, "the handshake was not kept alive by pings"
+        finally:
+            await realtime.aclose()

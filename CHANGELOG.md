@@ -12,6 +12,7 @@
 - **Breaking:** Transfers and withdrawals now reject integer `AssetAmount` inputs with no source scale or conflicting scale declarations. Migration: set the amount's `scale` or pass `quantity_scale` / `amount_scale`, and keep both declarations equal when supplying both.
 - **Breaking:** A live order-book delta with a zero or missing price and positive quantity now closes the managed stream with an invalid-price error at every bucket and depth, including when the row would sort outside the requested depth; `bucket_side` and `side_to_levels` refuse it too. Migration: handle the stream error and resubscribe.
 - **Breaking:** `subscribe_sync` with no `on_error` now waits for setup, raises a setup failure from the call and returns no handle. Migration: catch the exception at the call, or pass `on_error` to receive it there.
+- **Breaking:** Realtime setup now fails after 30 seconds when the server keeps the connection alive but never confirms: a new private order subscription raises `PolyesterRealtimeError`, and a handshake reply raises `TimeoutError`. Migration: catch the error and subscribe again.
 - Managed order books now display a zero bid bucket when a coarse bucket exceeds the market price, preserving bid floor and ask ceiling rounding. Zero-quantity removals at price zero stay harmless.
 - Synchronous subscriptions with `on_error` now deliver setup failures to it once, like iteration failures, and closing the handle no longer raises them.
 

@@ -319,6 +319,8 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     if self._disposed:
                         break
                     self._handle_publication(message)
+                    if self._disposed:
+                        break
                 if isinstance(sub.error, (_TerminalRealtimeError, PolyesterRealtimeOverflowError)):
                     self._fail_closed(sub.error)
                 elif sub.error is not None:

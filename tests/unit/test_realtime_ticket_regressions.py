@@ -250,7 +250,7 @@ async def test_book_overflow_closes_resources_and_keeps_error(monkeypatch):
 
     sub = await harness.service.create_subscription(symbol="BTC-USDT", on_error=report)
     try:
-        for seq in range(2, 203):
+        for seq in range(2, 202):
             await harness.queue.put(
                 OrderBookDeltaUpdate(
                     book_seq_start=str(seq),
@@ -261,8 +261,9 @@ async def test_book_overflow_closes_resources_and_keeps_error(monkeypatch):
         assert isinstance(sub.last_error, PolyesterRealtimeOverflowError)
         assert errors == [sub.last_error]
         assert sub._stream.is_disposed()
+        # No publication follows the overflow: cleanup must not wait for another frame.
+        await asyncio.wait_for(harness.transport_sub._close.wait(), 10)
         await asyncio.wait_for(sub.aclose(), 10)
-        assert harness.transport_sub._close.is_set()
         drained = [view async for view in sub]
         assert len(drained) == 200
     finally:

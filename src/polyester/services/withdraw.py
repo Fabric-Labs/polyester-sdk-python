@@ -264,7 +264,12 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         amount_scale: int = 18,
         deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
-        """Move trading balance to funding via a signed withdraw intent."""
+        """Move trading balance to funding using the authenticated API key's scope.
+
+        Per-call account selectors are unsupported. The SDK's default subaccount
+        applies to wallet withdrawals, not this API-key request.
+        """
+        self._validate_api_key_scope(account, sub_account_id)
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")
         if deadline_ts_sec is None or deadline_ts_sec <= 0:
@@ -302,6 +307,8 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         amount_scale: int = 18,
         deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
+        """Withdraw using the API key's scope; SDK default subaccounts do not route this call."""
+        self._validate_api_key_scope(account, sub_account_id)
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")
         if deadline_ts_sec is None or deadline_ts_sec <= 0:
@@ -328,6 +335,18 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
             payload_signature=payload_signature,
         )
         return await self._create_trading_withdraw(request)
+
+    @staticmethod
+    def _validate_api_key_scope(
+        account: AccountScope | None, sub_account_id: str | None
+    ) -> None:
+        if account is not None or sub_account_id is not None:
+            raise PolyesterValidationError(
+                "API-key withdrawals use the authenticated key's scope; "
+                "account and sub_account_id selectors are unsupported. "
+                "Omit them and use a key bound to the intended account, "
+                "or use create_wallet_trading_withdraw for wallet scope selection."
+            )
 
     async def create_wallet_trading_withdraw(
         self,

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Transfer history's `since` filter now works, including zero. It is an
+  inclusive lower bound in microseconds since the UTC Unix epoch.
+- API-key withdrawal helpers now reject explicit account or subaccount
+  selectors before sending, instead of silently ignoring them. Omit selectors
+  and use an API key bound to the intended account or subaccount. Configured
+  SDK defaults do not route API-key withdrawals; wallet withdrawals still
+  support account selection and configured defaults.
+- Trigger create and modify now reject competing ticks and basis-point
+  settings for trailing distance or slippage. A single zero slippage setting
+  on modify still clears the cap.
+
 ## 0.6.2
 
 Git tag: `v0.6.2`. Released 2026-11-06.

@@ -37,6 +37,7 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         reversed: bool = False,
         since: int | None = None,
     ) -> TransfersList:
+        """List transfers with an inclusive ``since`` bound in UTC epoch microseconds."""
         request = ListTransfersRequest(limit=validate_limit(limit), reversed=reversed)
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -44,7 +45,7 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
         if since is not None:
-            request.since = since
+            request.ts_min_us = since
         return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,

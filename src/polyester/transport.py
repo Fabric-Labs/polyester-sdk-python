@@ -180,7 +180,13 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             if isfinite(value) and value >= 0:
                 retry_after = value
                 break
-    if isinstance(body, dict) and isinstance(code, str) and code in _CONNECT_CODES:
+    has_connect_code = isinstance(code, str) and code in _CONNECT_CODES
+    # A non-Connect 504 cannot prove that a mutation was refused, even if
+    # the gateway sent HTML, malformed JSON, or no structured code at all.
+    no_usable_code = response.status != 504 and (not isinstance(code, str) or not code)
+    if isinstance(body, dict) and (has_connect_code or no_usable_code):
+        # The Connect client decodes both of these bodies, and neither its
+        # decoder nor the error mapping tolerates a malformed one.
         details = _connect_error_details(body.get("details"))
         message = body.get("message")
         if details is None or not isinstance(message, str | None):
@@ -190,11 +196,7 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             # through a ConnectError, whose upstream type has no metadata.
             raise _ConnectErrorWithRetryAfter(message or "", details, retry_after)
         return response
-    # A non-Connect 504 cannot prove that a mutation was refused, even if
-    # the gateway sent HTML, malformed JSON, or no structured code at all.
-    if response.status != 504 and (
-        not isinstance(body, dict) or not isinstance(code, str) or not code
-    ):
+    if no_usable_code:
         return response
     if not isinstance(body, dict):
         body = {}

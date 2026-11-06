@@ -136,11 +136,72 @@ async def test_malformed_envelope_is_an_ambiguous_server_error(body: object) -> 
     assert str(error) == "400 Bad Request"
 
 
-async def test_malformed_envelope_keeps_a_definite_http_status() -> None:
-    error, calls = await _status_error(401, {"code": "unauthenticated", "details": "nope"})
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param({"message": 5}, id="no-code-message-int"),
+        pytest.param({"code": "", "message": 5}, id="empty-code-message-int"),
+        pytest.param({"code": None, "message": ["m"]}, id="null-code-message-list"),
+        pytest.param({"code": 5, "message": 5}, id="int-code-message-int"),
+        pytest.param({"details": [1]}, id="no-code-detail-int"),
+        pytest.param({"code": "", "details": "nope"}, id="empty-code-details-string"),
+        pytest.param({"code": None, "details": 5}, id="null-code-details-int"),
+        pytest.param(
+            {"details": [{"type": ORDER_DETAIL, "value": "a"}]}, id="no-code-value-bad-base64"
+        ),
+    ],
+)
+async def test_malformed_body_without_a_connect_code_is_ambiguous(body: object) -> None:
+    error, calls = await _status_error(400, body)
+    assert calls == 1
+    assert type(error) is PolyesterServerError
+    assert mutation_outcome_unknown(error)
+    assert not is_retryable_error(error)
+    assert str(error) == "400 Bad Request"
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "message"),
+    [
+        pytest.param(
+            401, {"code": "unauthenticated", "details": "nope"}, "401 Unauthorized", id="401-coded"
+        ),
+        pytest.param(401, {"message": 5}, "401 Unauthorized", id="401-no-code"),
+        pytest.param(401, {"code": "", "details": [1]}, "401 Unauthorized", id="401-empty-code"),
+        pytest.param(403, {"code": None, "message": ["m"]}, "403 Forbidden", id="403-null-code"),
+    ],
+)
+async def test_malformed_body_keeps_a_definite_http_refusal(
+    status: int, body: object, message: str
+) -> None:
+    error, calls = await _status_error(status, body)
     assert calls == 1
     assert type(error) is PolyesterAuthError
-    assert str(error) == "401 Unauthorized"
+    assert error.status_code == status
+    assert str(error) == message
+    assert not mutation_outcome_unknown(error)
+    assert not is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "expected", "message"),
+    [
+        pytest.param(400, {"message": "m"}, PolyesterServerError, "m", id="400-no-code"),
+        pytest.param(400, {"code": "", "message": "m"}, PolyesterServerError, "m", id="400-empty"),
+        pytest.param(400, {"code": None, "details": []}, PolyesterServerError, None, id="400-null"),
+        pytest.param(400, {"code": 5, "message": "m"}, PolyesterServerError, "m", id="400-int"),
+        pytest.param(401, {"message": "m"}, PolyesterAuthError, "m", id="401-no-code"),
+        pytest.param(504, {"message": 5}, PolyesterServerError, None, id="504-gateway"),
+    ],
+)
+async def test_readable_fallback_body_is_unchanged_control(
+    status: int, body: object, expected: type[PolyesterError], message: str | None
+) -> None:
+    error, calls = await _status_error(status, body)
+    assert calls == 1
+    assert type(error) is expected
+    if message is not None:
+        assert str(error) == message
 
 
 async def test_well_formed_error_is_unchanged_control() -> None:

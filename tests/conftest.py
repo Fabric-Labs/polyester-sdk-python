@@ -6,6 +6,7 @@ import pytest
 
 from polyester import AsyncPolyester
 from polyester.errors import PolyesterApiError, PolyesterRouteNotFoundError
+from tests.hardening_support import ProbeFreeHTTPServer
 from tests.helpers import (
     live_client_kwargs_from_env,
     min_trading_quote_required,
@@ -23,6 +24,22 @@ except ImportError:
 
 if load_dotenv is not None:
     load_dotenv()
+
+
+@pytest.fixture(scope="session")
+def make_httpserver(httpserver_listen_address, httpserver_ssl_context):
+    """The plugin's session server, without counting port probes in its log."""
+    host, port = httpserver_listen_address
+    server = ProbeFreeHTTPServer(
+        host=host or ProbeFreeHTTPServer.DEFAULT_LISTEN_HOST,
+        port=port or ProbeFreeHTTPServer.DEFAULT_LISTEN_PORT,
+        ssl_context=httpserver_ssl_context,
+    )
+    server.start()
+    yield server
+    server.clear()
+    if server.is_running():
+        server.stop()
 
 
 def pytest_configure(config: pytest.Config) -> None:

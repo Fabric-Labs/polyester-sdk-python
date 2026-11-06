@@ -4,14 +4,15 @@
 
 Git tag: `v0.7.0`. Released 2026-11-06. Built on public contract `748066a`.
 
-- **Breaking:** trigger creation also refuses an invalid `tif`, including an
-  empty string, and order writes refuse an empty `symbol` sent with a valid
-  symbol ID. These calls were accepted before.
+- **Breaking:** trigger creation now refuses an invalid `tif`, including an
+  empty string, on every path, and an order write with a scaled `Quantity`
+  refuses an empty `symbol` sent with a valid symbol ID.
 - **Breaking:** Order writes now require the destination pair's catalog quantity scale, including
   requests by symbol ID. An explicitly scaled quantity that disagrees with the
   catalog raises before sending; batches validate each pair separately.
-  Quantities tagged for another pair and conflicting symbols and symbol IDs now also
-  raise before sending on create, modify, batch replace and trigger create.
+  Quantities tagged for another pair now also raise before sending on create,
+  modify, batch replace and trigger create, and a conflicting symbol and symbol
+  ID raise on create and batch create.
   Migration: hydrate catalogs and use the destination pair's symbol, ID and scale.
 
 - Create results by symbol ID use the catalog scale for resolved quantities.
@@ -31,10 +32,10 @@ Git tag: `v0.7.0`. Released 2026-11-06. Built on public contract `748066a`.
   `None`) and use an API key bound to the intended source. Configured SDK
   defaults do not route API-key withdrawals; wallet withdrawals still support
   account selection and configured defaults.
-- Internal transfers now reject a blank or whitespace-only address when it
+- **Breaking:** internal transfers now reject a blank or whitespace-only address when it
   is the only destination. A blank address alongside a valid account or
   subaccount is ignored, preserving that recipient.
-- Trigger create and modify now reject competing ticks and basis-point
+- **Breaking:** trigger create and modify now reject competing ticks and basis-point
   settings for trailing distance or slippage. A single zero slippage setting
   on modify still clears the cap.
 - **Breaking:** transfer history now returns the opaque `next_page_token` string

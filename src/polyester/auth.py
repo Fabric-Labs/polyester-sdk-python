@@ -6,7 +6,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from urllib.parse import parse_qsl, quote, urlsplit
+from urllib.parse import parse_qsl, quote_from_bytes, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -143,12 +143,20 @@ def sha256_hex(body: bytes) -> str:
 
 
 def canonical_query(url: str) -> str:
+    """Sort decoded key/value bytes before RFC 3986 encoding, as the server does."""
     _validated_url(url)
-    pairs = []
-    for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True):
-        pairs.append(f"{quote(key, safe='')}={quote(value, safe='')}")
-    pairs.sort()
-    return "&".join(pairs)
+    # Preserve percent-escaped bytes that are not UTF-8 instead of replacing
+    # them. Sort bytes, since surrogate character order is not byte order.
+    pairs = sorted(
+        (key.encode("utf-8", "surrogateescape"), value.encode("utf-8", "surrogateescape"))
+        for key, value in parse_qsl(
+            urlsplit(url).query, keep_blank_values=True, errors="surrogateescape"
+        )
+    )
+    return "&".join(
+        f"{quote_from_bytes(key, safe='')}={quote_from_bytes(value, safe='')}"
+        for key, value in pairs
+    )
 
 
 def canonical_signing_string(

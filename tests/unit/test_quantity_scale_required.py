@@ -56,9 +56,10 @@ def test_resolve_quantity_scale_raises_for_decimal_qty_without_catalog() -> None
         resolve_quantity_scale(MagicMock(), None, "0.1")
 
 
-def test_resolve_quantity_scale_allows_scaled_quantity_without_catalog() -> None:
+def test_resolve_quantity_scale_refuses_scaled_quantity_without_catalog() -> None:
     qty = Quantity.from_scaled(100_000, scale=6, symbol="BTC-USD")
-    assert resolve_quantity_scale(None, None, qty) == 6
+    with pytest.raises(PolyesterValidationError, match="catalogs"):
+        resolve_quantity_scale(None, None, qty)
 
 
 def test_batch_replace_decimal_qty_without_resolved_scale_raises() -> None:

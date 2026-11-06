@@ -981,6 +981,7 @@ def batch_create_orders_to_proto(
     request_id: str | None = None,
     allow_partial: bool = False,
     quantity_scale: int | None = None,
+    item_scales: Sequence[tuple[int, int]] | None = None,
 ) -> orders_pb2.BatchCreateOrdersRequest:
     # ``allow_partial`` was removed from the wire in POLY-3701; it is accepted
     # for backwards compatibility but ignored.
@@ -990,13 +991,20 @@ def batch_create_orders_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+    if item_scales is not None and len(item_scales) != len(items):
+        raise PolyesterValidationError("batch_create requires scales for every item")
     seen_client_order_ids: set[str] = set()
-    for item in items:
+    for index, item in enumerate(items):
         if isinstance(item, CreateOrderRequest):
             normalized = item
         else:
             normalized = normalize_create_order_request(item)
-        intent = order_intent_from_request(normalized, quantity_scale=quantity_scale)
+        base_scale, quote_scale = (
+            item_scales[index] if item_scales is not None else (quantity_scale, None)
+        )
+        intent = order_intent_from_request(
+            normalized, quantity_scale=base_scale, quote_quantity_scale=quote_scale
+        )
         client_order_id = intent.client_order_id
         if client_order_id and client_order_id in seen_client_order_ids:
             raise PolyesterValidationError(
@@ -1182,34 +1190,37 @@ def cancel_all_orders_to_proto(
     return proto
 
 
-def quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | None) -> int:
-    if not symbol or catalogs is None:
-        raise PolyesterValidationError(
-            "quantity scale requires symbol and catalogs "
-            "(or pass a scaled Quantity / explicit quantity_scale)"
-        )
-    scale = catalogs.base_quantity_scale_for_symbol(symbol)
+def quantity_scale_for_symbol(
+    catalogs: CatalogManager | None, symbol: str | None, *, symbol_id: int | None = None
+) -> int:
+    if catalogs is None or (symbol_id is None and not symbol):
+        raise PolyesterValidationError("quantity scale requires symbol or symbol_id and catalogs")
+    scale = (
+        catalogs.base_quantity_scale_for_symbol_id(symbol_id)
+        if symbol_id is not None
+        else catalogs.base_quantity_scale_for_symbol(str(symbol))
+    )
     if scale is None:
         raise PolyesterValidationError(
-            f"quantity scale for {symbol!r} is unavailable; "
-            "await client.wait_for_catalogs() before placing orders, "
-            "or pass a scaled Quantity"
+            f"quantity scale for {symbol_id if symbol_id is not None else symbol!r} "
+            "is unavailable; "
+            "await client.wait_for_catalogs() before placing orders"
         )
     return scale
 
 
-def quote_quantity_scale_for_symbol(catalogs: CatalogManager | None, symbol: str | None) -> int:
+def quote_quantity_scale_for_symbol(
+    catalogs: CatalogManager | None, symbol: str | None, *, symbol_id: int | None = None
+) -> int:
+    if catalogs is not None and symbol_id is not None:
+        symbol = catalogs.symbol_for_symbol_id(symbol_id)
     if not symbol or catalogs is None:
-        raise PolyesterValidationError(
-            "quote quantity scale requires symbol and catalogs "
-            "(or pass a scaled Quantity / explicit quote_quantity_scale)"
-        )
+        raise PolyesterValidationError("quote quantity scale requires a catalog symbol")
     scale = catalogs.quote_quantity_scale_for_symbol(symbol)
     if scale is None:
         raise PolyesterValidationError(
             f"quote quantity scale for {symbol!r} is unavailable; "
-            "await client.wait_for_catalogs() before placing orders, "
-            "or pass a scaled Quantity"
+            "await client.wait_for_catalogs() before placing orders"
         )
     return scale
 
@@ -1218,42 +1229,29 @@ def resolve_quantity_scale(
     catalogs: CatalogManager | None,
     symbol: str | None,
     *values: object | None,
+    symbol_id: int | None = None,
 ) -> int:
-    """Resolve base quantity scale for decimal qty inputs.
-
-    Scaled :class:`Quantity` values do not require catalogs/symbol. Decimal
-    strings/Decimals hard-error when scale cannot be resolved.
-    """
-    needs_catalog_scale = any(
-        value is not None and not isinstance(value, Quantity) for value in values
-    )
-    if not needs_catalog_scale:
-        if symbol and catalogs is not None:
-            scale = catalogs.base_quantity_scale_for_symbol(symbol)
-            if scale is not None:
-                return scale
-        for value in values:
-            if isinstance(value, Quantity) and value.scale is not None:
-                return value.scale
-        return 0
-    return quantity_scale_for_symbol(catalogs, symbol)
+    """Resolve the destination catalog scale, including for raw scaled inputs."""
+    scale = quantity_scale_for_symbol(catalogs, symbol, symbol_id=symbol_id)
+    for value in values:
+        if isinstance(value, Quantity) and value.scale is not None and value.scale != scale:
+            raise PolyesterValidationError(
+                f"quantity scale mismatch: value scale is {value.scale}, destination is {scale}"
+            )
+    return scale
 
 
 def resolve_quote_quantity_scale(
     catalogs: CatalogManager | None,
     symbol: str | None,
     value: object | None,
+    *,
+    symbol_id: int | None = None,
 ) -> int:
-    """Resolve catalog quote quantity scale for quote-debit budgets.
-
-    Always looks up the pair's catalog ``quote_quantity_scale``. Typed
-    :class:`Quantity` values must embed a matching scale; decimal/str inputs
-    require the catalog scale (no silent bypass when ``Quantity.scale`` is
-    missing).
-    """
+    """Resolve and validate the catalog scale for a quote-debit budget."""
     if value is None:
         return 0
-    catalog_scale = quote_quantity_scale_for_symbol(catalogs, symbol)
+    catalog_scale = quote_quantity_scale_for_symbol(catalogs, symbol, symbol_id=symbol_id)
     if isinstance(value, Quantity):
         if value.scale is None:
             raise PolyesterValidationError(

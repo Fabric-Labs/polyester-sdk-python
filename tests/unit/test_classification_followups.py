@@ -31,6 +31,7 @@ async def test_connect_admission_classification(httpserver, name, retryable, typ
     error = await _rest_error(httpserver, 429, body, content_type="application/json")
     assert is_retryable_error(error) is retryable
     assert not mutation_outcome_unknown(error)
+    assert error.code == "ERROR_CODE_" + name
 
 
 @pytest.mark.parametrize(
@@ -45,6 +46,7 @@ async def test_rest_admission_classification(httpserver, name, status, retryable
     error = await _rest_error(httpserver, status, {"code": name, "detail": "admission refused"})
     assert is_retryable_error(error) is retryable
     assert not mutation_outcome_unknown(error)
+    assert error.code == "ERROR_CODE_" + name
 
 
 @pytest.mark.parametrize("status", [503, 504])
@@ -59,6 +61,7 @@ async def test_future_outcome_code_on_public_decoder(httpserver, status, connect
     error = await _rest_error(httpserver, status, body, content_type="application/json")
     assert not is_retryable_error(error)
     assert mutation_outcome_unknown(error)
+    assert error.code == name
 
 
 @pytest.mark.parametrize("typed", [False, True])

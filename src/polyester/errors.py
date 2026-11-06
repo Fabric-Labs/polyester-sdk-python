@@ -127,6 +127,9 @@ class PolyesterResponseContractError(PolyesterError):
 class PolyesterRateLimitError(PolyesterTransportError):
     """Raised when the API returns a rate-limit response.
 
+    ``code`` retains a service error name, or is ``None`` when none was supplied.
+    Known order codes use their ``ERROR_CODE_`` enum names.
+
     ``detail`` is the structured ``polyester.ratelimit.v1.RateLimitDetail``
     payload when the server attached it. ``retry_after`` prefers
     ``detail.retry_after_ms``, then response headers when available.
@@ -138,10 +141,12 @@ class PolyesterRateLimitError(PolyesterTransportError):
         *,
         retry_after: float | None = None,
         detail: object | None = None,
+        code: str | None = None,
     ) -> None:
         super().__init__(message)
         self.retry_after = retry_after
         self.detail = detail
+        self.code = code
 
 
 class PolyesterServerError(PolyesterTransportError):

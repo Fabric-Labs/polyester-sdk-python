@@ -1400,5 +1400,6 @@ and snapshot recovery keep their own safe read retries.
 
 `OVERLOADED` and `SYSTEM_RATE_LIMITED` are retryable admission refusals on
 Connect and REST: nothing was admitted. Respect `retry_after` when supplied;
-for `OVERLOADED`, wait for an outstanding request to complete. In contrast,
+branch on `PolyesterRateLimitError.code`: `ERROR_CODE_OVERLOADED` means wait for an
+outstanding request to complete; `ERROR_CODE_SYSTEM_RATE_LIMITED` names a venue-wide limit.
 `ORDER_SEQUENCE_EXHAUSTED` is permanent; contact support instead of retrying.

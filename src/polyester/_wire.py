@@ -86,12 +86,15 @@ def _unpack_error_detail(detail: Message) -> Message | None:
     return detail
 
 
-def _rate_limit_error(message: str, *, proto_detail=None) -> PolyesterRateLimitError:
+def _rate_limit_error(
+    message: str, *, proto_detail=None, code: str | None = None
+) -> PolyesterRateLimitError:
     detail = rate_limit_detail_from_proto(proto_detail)
     return PolyesterRateLimitError(
         message,
         retry_after=retry_after_seconds_from_detail(detail),
         detail=detail,
+        code=code,
     )
 
 
@@ -125,7 +128,7 @@ def _map_gateway_problem(exc: GatewayProblemError):
         )
     order_code = _order_error_code_from_rest(exc.problem_code)
     if order_code in ("ERROR_CODE_OVERLOADED", "ERROR_CODE_SYSTEM_RATE_LIMITED"):
-        return PolyesterRateLimitError(message, retry_after=exc.retry_after)
+        return PolyesterRateLimitError(message, retry_after=exc.retry_after, code=order_code)
     if order_code == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED":
         return PolyesterApiError(message, code=order_code)
     if exc.http_status == 504:
@@ -206,7 +209,7 @@ def _map_connect_error(exc: ConnectError):
                     "ERROR_CODE_SYSTEM_RATE_LIMITED",
                     "ERROR_CODE_OVERLOADED",
                 ):
-                    return _rate_limit_error(error_message, proto_detail=rate_limit)
+                    return _rate_limit_error(error_message, proto_detail=rate_limit, code=code_name)
                 if exc.code.value == "unavailable" and not code_name.endswith("_OUTCOME_UNKNOWN"):
                     return PolyesterServerError(
                         error_message, code=code_name, status_code=503, raw=unpacked
@@ -319,7 +322,11 @@ def _map_connect_error(exc: ConnectError):
         # connectrpc-python does not currently retain response metadata on
         # ConnectError, so header retry_after cannot be recovered on this path.
         # Structured RateLimitDetail above populates retry_after when attached.
-        return PolyesterRateLimitError(error_message)
+        order_code = _order_error_code_from_rest(message_code)
+        service_code = (
+            order_code if order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else None
+        )
+        return PolyesterRateLimitError(error_message, code=service_code)
     if code == "deadline_exceeded":
         return PolyesterTimeoutError(error_message)
     message = (exc.message or "").strip().lower()

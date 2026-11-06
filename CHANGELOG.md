@@ -3,8 +3,8 @@
 ## Unreleased
 
 - **Breaking:** A plain REST gateway 504 is now non-retryable with mutation outcome unknown. Reads may retry a 504 explicitly; writes read back first. A client order ID enables reconciliation, not exact replay of a single create. Automatic read retries remain operation-specific; creates are never automatically resent.
-- **Breaking:** `OVERLOADED` and `SYSTEM_RATE_LIMITED` now classify as retryable admission refusals with no unknown mutation outcome on Connect and REST. `ORDER_SEQUENCE_EXHAUSTED` remains a permanent refusal, including REST 429 and Connect responses without typed details. Supplied retry delays are preserved.
-- **Breaking:** A Connect message naming an `*_OUTCOME_UNKNOWN` code now classifies as non-retryable with outcome unknown, including codes introduced by a newer server.
+- **Breaking:** `OVERLOADED` and `SYSTEM_RATE_LIMITED` now return `PolyesterRateLimitError` instead of API/server errors on Connect and REST. They are retryable admission refusals with no unknown mutation outcome. The new `code` field retains the service code; known order codes use the `ERROR_CODE_` prefix. `ORDER_SEQUENCE_EXHAUSTED` remains a permanent refusal, including REST 429 and Connect responses without typed details. Supplied retry delays are preserved.
+- **Breaking:** A Connect message naming an `*_OUTCOME_UNKNOWN` code now classifies as non-retryable with outcome unknown, including codes introduced by a newer server. Known order names are normalized to `ERROR_CODE_…`; future names remain as sent.
 - **Breaking:** Connect auth refusals now populate `code` and `status_code`, including transfer/withdrawal service details and refusals without typed details.
 
 ## 0.7.1

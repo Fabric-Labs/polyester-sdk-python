@@ -54,6 +54,9 @@ RECONNECT_MAX_DELAY = 10.0
 # A connection that stayed up this long resets the reconnect backoff.
 STABLE_CONNECTION = 10.0
 OPEN_TIMEOUT = 10.0
+# How long the server may take to confirm a new subscription. Heartbeats keep the
+# connection alive without answering it, so the heartbeat timeout cannot bound this.
+SUBSCRIBE_ACK_TIMEOUT = 30.0
 # A malformed frame (4400) and a rejected connect token (4403) recur on every reconnect.
 TERMINAL_CLOSE_CODES = frozenset({4400, 4403})
 HEARTBEAT_TIMEOUT_CLOSE_CODE = 4000
@@ -511,6 +514,22 @@ class PrivateOrderStream:
                 )
             ),
         )
+        if not s.confirmed:
+            asyncio.get_running_loop().call_later(
+                SUBSCRIBE_ACK_TIMEOUT, self._expire_subscribe, s, request_id, request
+            )
+
+    def _expire_subscribe(
+        self, s: _Subscription, request_id: str, request: _PendingRequest
+    ) -> None:
+        """End a new subscription the server never answered; a late answer is unsubscribed."""
+        if self._pending.get(request_id) is request and not s.confirmed:
+            self._terminate(
+                s,
+                PolyesterRealtimeError(
+                    "private order stream subscribe timed out: subscription not confirmed"
+                ),
+            )
 
     def _retry_subscribe(self, ws: ClientConnection, s: _Subscription) -> None:
         """Subscribe again after a backoff that grows until the subscription delivers data."""

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import secrets
+import time
 from collections import deque
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
@@ -36,6 +37,8 @@ T = TypeVar("T")
 
 # Match Go: long read deadline so Centrifugo ping/pong completes without reconnect churn.
 CENTRIFUGO_READ_TIMEOUT = 30.0
+# Pings keep a connection alive without answering, so each handshake reply has a deadline.
+CENTRIFUGO_REPLY_DEADLINE = 30.0
 CENTRIFUGO_RECONNECT_INITIAL_CAP = 0.5
 CENTRIFUGO_RECONNECT_MAX_CAP = 30.0
 CENTRIFUGO_PROTOBUF_SUBPROTOCOL = "centrifuge-protobuf"
@@ -595,8 +598,10 @@ class AsyncRealtimeClient:
         expected_id: int,
         pending: deque[Ping | Publication | Reply] | None = None,
     ) -> None:
+        deadline = time.monotonic() + CENTRIFUGO_REPLY_DEADLINE
         while True:
-            raw = await asyncio.wait_for(ws.recv(), timeout=10)
+            remaining = deadline - time.monotonic()
+            raw = await asyncio.wait_for(ws.recv(), timeout=min(10, remaining))
             if not isinstance(raw, bytes):
                 raise PolyesterRealtimeError("received JSON text reply on protobuf websocket")
             matched = False

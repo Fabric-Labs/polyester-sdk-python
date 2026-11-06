@@ -1215,6 +1215,10 @@ client. Private API-key policy snapshots use
 `client.policies.subscribe_api_policies_sync(...)` (async:
 `await client.policies.subscribe_api_policies(...)`).
 
+With `on_error`, setup and iteration failures are delivered to it once. Without
+`on_error`, `subscribe_sync` waits for setup and raises a setup failure from the
+call, returning no handle.
+
 ## Testing (contributors)
 
 **CI (no network):**

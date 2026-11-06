@@ -128,7 +128,9 @@ class PolyesterRateLimitError(PolyesterTransportError):
     """Raised when the API returns a rate-limit response.
 
     ``code`` retains a service error name, or is ``None`` when none was supplied.
-    Known order codes use their ``ERROR_CODE_`` enum names.
+    Known order codes use their ``ERROR_CODE_`` enum names. An attached orders
+    detail with no code uses ``ERROR_CODE_UNSPECIFIED``; a standalone rate-limit
+    detail has no service code.
 
     ``detail`` is the structured ``polyester.ratelimit.v1.RateLimitDetail``
     payload when the server attached it. ``retry_after`` prefers
@@ -169,7 +171,7 @@ class PolyesterServerError(PolyesterTransportError):
 class PolyesterTimeoutError(PolyesterTransportError):
     """Raised when a request deadline expires before a response arrives.
 
-    Retryable, but the outcome is unknown: a mutation may still have been
+    Non-retryable with outcome unknown: a mutation may still have been
     applied, so reconcile before retrying it (see :func:`mutation_outcome_unknown`).
     """
 
@@ -439,32 +441,19 @@ def _is_outcome_unknown_api_error(err: BaseException) -> bool:
 
 
 def is_retryable_error(err: BaseException) -> bool:
-    """Return whether retrying may succeed after backoff.
+    """True only when retrying may succeed and the mutation outcome is known.
 
-    True for transport, rate-limit, timestamp-skew and server errors, and for
-    ``AUTH_TEMPORARILY_UNAVAILABLE`` (the request changed nothing).
-
-    False for an order or trigger create, cancel, modify or control whose
-    outcome is unknown (``ERROR_CODE_*_OUTCOME_UNKNOWN``): the server may
-    have applied it, so a blind retry could, for example, place an order
-    twice. Read the order or trigger back first; see
-    :func:`mutation_outcome_unknown`.
-
-    A REST gateway 504 is non-retryable with outcome unknown, even without
-    a recognized code. This classifier has no operation context: a caller
-    may explicitly retry a side-effect-free read, but must reconcile a write.
-    A client order ID enables lookup, not exact replay of a single create.
-
-    A true result does not guarantee that a mutation was not applied: a
-    timeout is retryable but may still have applied. Preserve the original
-    idempotency key and reconcile first when :func:`mutation_outcome_unknown`
-    returns true.
+    Unknown outcomes, including client timeouts and bare server/transport
+    failures, always return False. Read back before sending a mutation again.
+    Safe reads may retry explicitly from read context. A client order ID
+    enables reconciliation, not exact replay of a single create.
     """
-    if _is_outcome_unknown_api_error(err) or (
-        isinstance(err, PolyesterServerError) and err.status_code == 504
-    ):
+    if mutation_outcome_unknown(err):
         return False
-    if isinstance(err, PolyesterApiError) and err.code == AUTH_TEMPORARILY_UNAVAILABLE:
+    if isinstance(err, PolyesterApiError) and err.code in (
+        AUTH_TEMPORARILY_UNAVAILABLE,
+        "ERROR_CODE_ACCOUNT_REPAIRING",
+    ):
         return True
     return isinstance(
         err,
@@ -475,8 +464,8 @@ def is_retryable_error(err: BaseException) -> bool:
 def mutation_outcome_unknown(err: BaseException) -> bool:
     """Return whether the server may have applied a failed mutation.
 
-    True for transport and server errors (except rate limits and timestamp
-    skew, which the gateway rejects before any service sees the request), for
+    True for ambiguous transport and server errors (excluding known admission
+    refusals, rate limits and timestamp skew), for
     a malformed success response, and for an order or trigger create, cancel,
     modify or control that was sent but not confirmed in time
     (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or trigger back before
@@ -488,5 +477,33 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
         or (
             isinstance(err, (PolyesterTransportError, PolyesterServerError))
             and not isinstance(err, (PolyesterRateLimitError, PolyesterTimestampSkewError))
+            and not (
+                isinstance(err, PolyesterServerError)
+                and err.status_code == 503
+                and (
+                    _is_known_admission_refusal(err.code)
+                    or (
+                        err.code == "ERROR_CODE_UNAVAILABLE"
+                        and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
+                        == "orders.v1.ErrorDetail"
+                    )
+                )
+            )
         )
     )
+
+
+# Explicit orders.v1 admission refusals, not arbitrary 5xx responses.
+def _is_known_admission_refusal(code: str | None) -> bool:
+    return bool(code) and str(code).removeprefix("ERROR_CODE_") in {
+        "FEE_SCHEDULE_UNAVAILABLE",
+        "POLICY_UNAVAILABLE",
+        "RATE_LIMIT_POLICY_UNAVAILABLE",
+        "PAIR_BACKLOGGED",
+        "SETTLEMENT_BACKLOGGED",
+        "ORDER_MODIFY_IN_PROGRESS",
+        "ORDER_PLACEMENT_PENDING",
+        "TRIGGER_CONTROLS_BUSY",
+        "TRIGGER_CONTROL_IN_PROGRESS",
+        "QUICKSWAP_ACCOUNT_OWNER_UNKNOWN",
+    }

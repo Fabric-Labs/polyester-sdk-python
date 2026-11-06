@@ -193,7 +193,7 @@ cooperative backpressure without blocking the event loop. The low-level synchron
 capacity is exhausted; honor `retry_after`. Neither path reuses a signature or drifts outside the
 API's 10-second freshness window.
 
-Connect `resource_exhausted` and HTTP 429 responses raise `PolyesterRateLimitError`. When the
+Recognized retry-later Connect `resource_exhausted` and REST admission-limit responses raise `PolyesterRateLimitError`. When the
 server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), inspect `error.detail` for `policy_class`, `scope`,
 `operation_id`, and presence-aware quota fields. `retry_after` prefers `detail.retry_after_ms`,
@@ -836,7 +836,7 @@ await client.triggers.create(
 
 `triggers.list_events(...)` returns the same not-found error as
 `triggers.get(...)` for an unreadable trigger. It retries catching-up
-`UNAVAILABLE` responses with the same bounded policy and request as trigger
+`UNAVAILABLE` and `DEADLINE_EXCEEDED` responses with the same bounded policy and request as trigger
 reads.
 
 A trailing stop created with an activation price the market has already
@@ -1386,9 +1386,48 @@ are the REST request fields (`order.baseQty`). Branch on `code`, then on
 not a retryable server error.
 
 A request whose deadline expires raises `PolyesterTimeoutError`, a
-`PolyesterTransportError`: retryable, but a mutation may still have been
-applied, so reconcile first (`mutation_outcome_unknown(error)` is true).
+`PolyesterTransportError`: non-retryable with outcome unknown. Read back first
+(`mutation_outcome_unknown(error)` is true); retry reads explicitly.
 
+
+
+The retry flag is always false when the mutation outcome is unknown. This includes
+bare Connect `unavailable`, `internal` and `deadline_exceeded`, gateway 502/503
+bodies, bare or HTML 429 responses and client timeouts. Read back after an unknown outcome; retry reads explicitly. Automatic
+trigger reads, status waits and snapshot refresh use read context and can retry these
+failures within their existing budgets. Creates are never automatically resent.
+
+A typed `orders.v1.ErrorDetail` carrying `UNAVAILABLE` proves a known, retryable
+orders refusal. A bare REST `UNAVAILABLE` or a Connect message with only that
+name does not establish its source: outcome unknown and non-retryable. Specific
+refusals such as `FEE_SCHEDULE_UNAVAILABLE`, `POLICY_UNAVAILABLE` and
+`RATE_LIMIT_POLICY_UNAVAILABLE` are known and retryable on typed Connect,
+code-only Connect messages and recognized REST 503 problems. A REST 502 cannot
+establish these refusals. `QUICKSWAP_ACCOUNT_OWNER_UNKNOWN` means no order was
+placed and may retry; `ACCOUNT_ROUTING_INVALID` means the trigger was not admitted
+and requires the caller to correct its routing.
+
+`RATE_LIMIT_EXCEEDED`, `PRICE_LEVELS_EXHAUSTED` and retry-later capacity codes
+are known, retryable admission refusals; preserve and respect any server delay.
+The additional retry-later codes are:
+
+- `CLIENT_ORDER_IDS_EXHAUSTED`
+- `CLIENT_ORDER_ID_CAPACITY_REACHED`
+- `MARKET_LADDER_LIMIT_EXCEEDED`
+- `MARKET_TRIGGER_LIMIT_EXCEEDED`
+- `MARKET_TWAP_LIMIT_EXCEEDED`
+- `NEW_ACCOUNT_CAPACITY_REACHED`
+- `REQUEST_RECEIPTS_EXHAUSTED`
+- `RESERVATION_CAPACITY_REACHED`
+- `TRIGGER_CAPACITY_REACHED`
+- `TRIGGER_CONTROL_SHARE_EXHAUSTED`
+- `TWAP_CAPACITY_REACHED`
+
+These behave the same on REST, typed Connect and code-only Connect messages.
+The resource codes without retry guidance are `ORDER_SEQUENCE_EXHAUSTED`,
+`TRIGGER_FIRE_LIMIT_REACHED`, `QUICKSWAP_CAPACITY_REACHED`,
+`ACCOUNT_RESERVATION_LIMIT_REACHED` and `TRIGGER_LIMIT_EXCEEDED`: outcome known,
+non-retryable, including message-only responses.
 
 A plain REST gateway 504 raises `PolyesterServerError` with `status_code == 504`:
 `is_retryable_error` is false and `mutation_outcome_unknown` is true. The

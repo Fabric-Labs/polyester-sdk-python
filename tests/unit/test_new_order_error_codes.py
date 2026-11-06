@@ -8,11 +8,15 @@ from connectrpc.errors import ConnectError
 
 from polyester._wire import map_connect_error
 from polyester.codecs.decode.orders import order_from_proto
-from polyester.errors import PolyesterApiError, is_retryable_error, mutation_outcome_unknown
+from polyester.errors import (
+    PolyesterApiError,
+    PolyesterRateLimitError,
+    is_retryable_error,
+    mutation_outcome_unknown,
+)
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 
-# None of these comments promises that a retry can succeed: each is a refusal
-# of the request as sent.
+# These refusals change nothing. TWAP capacity explicitly permits retrying later.
 _NEW_CODES = [
     orders_pb2.ERROR_CODE_ATTACHED_LEGS_EXCEEDED,
     orders_pb2.ERROR_CODE_FEE_ASSET_INVALID,
@@ -36,13 +40,14 @@ def test_new_codes_are_86_to_94() -> None:
     ids=lambda code: code.value,
 )
 @pytest.mark.parametrize("code", _NEW_CODES, ids=orders_pb2.ErrorCode.Name)
-def test_new_codes_are_definite_non_retryable_refusals(code: int, connect_code: Code) -> None:
+def test_new_codes_follow_contract_retry_guidance(code: int, connect_code: Code) -> None:
     mapped = map_connect_error(
         ConnectError(connect_code, "refused", details=[orders_pb2.ErrorDetail(code=code)])
     )
-    assert type(mapped) is PolyesterApiError
+    retryable = code == orders_pb2.ERROR_CODE_TWAP_CAPACITY_REACHED
+    assert type(mapped) is (PolyesterRateLimitError if retryable else PolyesterApiError)
     assert mapped.code == orders_pb2.ErrorCode.Name(code)
-    assert not is_retryable_error(mapped)
+    assert is_retryable_error(mapped) is retryable
     assert not mutation_outcome_unknown(mapped)
 
 

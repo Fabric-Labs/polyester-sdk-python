@@ -24,12 +24,12 @@ from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.services.trades import AsyncTradesService
 
 
-def test_deadline_exceeded_is_a_typed_retryable_timeout_with_unknown_outcome() -> None:
+def test_deadline_exceeded_is_a_typed_non_retryable_timeout_with_unknown_outcome() -> None:
     mapped = map_connect_error(ConnectError(Code.DEADLINE_EXCEEDED, "Request timed out"))
 
     assert isinstance(mapped, PolyesterTimeoutError)
     assert isinstance(mapped, PolyesterTransportError)
-    assert is_retryable_error(mapped)
+    assert not is_retryable_error(mapped)
     assert mutation_outcome_unknown(mapped)
 
 

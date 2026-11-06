@@ -144,6 +144,10 @@ async def test_unrecognised_rest_504_remains_ambiguous_transport_failure(
     "status,body,content_type",
     [
         (504, '{"code":"ORDER_CREATE_OUTCOME_UNKNOWN"}', "application/problem+json"),
+        (502, "", "text/plain"),
+        (503, "<html>Service Unavailable</html>", "text/html"),
+        (504, '{"code":"deadline_exceeded"}', "application/json"),
+        (503, '{"code":"unavailable"}', "application/json"),
         (504, "<html>Gateway Timeout</html>", "text/html"),
         (
             503,
@@ -200,5 +204,5 @@ async def test_order_create_never_resends_unknown_outcome(
     assert mutation_outcome_unknown(caught.value)
     assert calls == [path]
     assert not is_retryable_error(caught.value)
-    if content_type != "text/html":
+    if "OUTCOME_UNKNOWN" in body or "details" in body:
         assert type(caught.value) is PolyesterApiError

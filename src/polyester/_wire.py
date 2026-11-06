@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from connectrpc.errors import ConnectError
@@ -29,6 +30,7 @@ from polyester.errors import (
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
+    _is_known_admission_refusal,
     auth_error_code_from_rest,
 )
 from polyester.gen.auth.v1 import auth_pb2
@@ -86,6 +88,50 @@ def _unpack_error_detail(detail: Message) -> Message | None:
     return detail
 
 
+_FINAL_RESOURCE_CODES = frozenset(
+    [
+        "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED",
+        "ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED",
+        "ERROR_CODE_QUICKSWAP_CAPACITY_REACHED",
+        "ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED",
+        "ERROR_CODE_TRIGGER_LIMIT_EXCEEDED",
+    ]
+)
+
+
+_RETRYABLE_RESOURCE_CODES = frozenset(
+    [
+        "ERROR_CODE_OVERLOADED",
+        "ERROR_CODE_SYSTEM_RATE_LIMITED",
+        "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+        "ERROR_CODE_PRICE_LEVELS_EXHAUSTED",
+        "ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED",
+        "ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED",
+        "ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED",
+        "ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED",
+        "ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED",
+        "ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED",
+        "ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED",
+        "ERROR_CODE_RESERVATION_CAPACITY_REACHED",
+        "ERROR_CODE_TRIGGER_CAPACITY_REACHED",
+        "ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED",
+        "ERROR_CODE_TWAP_CAPACITY_REACHED",
+    ]
+)
+
+
+def _error_detail_priority(detail: Message) -> int:
+    full_name = detail.DESCRIPTOR.full_name
+    if full_name not in _SERVICE_ERROR_ENUMS:
+        return 2
+    code = error_code_name(_SERVICE_ERROR_ENUMS[full_name], detail.code)
+    if code.endswith("_OUTCOME_UNKNOWN"):
+        return 0
+    if full_name == "orders.v1.ErrorDetail" and code in _FINAL_RESOURCE_CODES:
+        return 1
+    return 2
+
+
 def _rate_limit_error(
     message: str, *, proto_detail=None, code: str | None = None
 ) -> PolyesterRateLimitError:
@@ -127,9 +173,9 @@ def _map_gateway_problem(exc: GatewayProblemError):
             violations=_rest_violations(exc.violations),
         )
     order_code = _order_error_code_from_rest(exc.problem_code)
-    if order_code in ("ERROR_CODE_OVERLOADED", "ERROR_CODE_SYSTEM_RATE_LIMITED"):
+    if order_code in _RETRYABLE_RESOURCE_CODES:
         return PolyesterRateLimitError(message, retry_after=exc.retry_after, code=order_code)
-    if order_code == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED":
+    if exc.http_status == 429:
         return PolyesterApiError(message, code=order_code)
     if exc.http_status == 504:
         return PolyesterServerError(
@@ -147,6 +193,8 @@ def _map_gateway_problem(exc: GatewayProblemError):
             status_code=exc.http_status,
             code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code,
         )
+    if exc.http_status == 503 and order_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
+        return PolyesterApiError(message, code=order_code)
     if code in ("unavailable", "internal"):
         return PolyesterServerError(
             message,
@@ -164,6 +212,8 @@ def _map_gateway_problem(exc: GatewayProblemError):
 
 def map_connect_error(exc: ConnectError):
     mapped = _map_connect_error(exc)
+    if isinstance(mapped, PolyesterRateLimitError) and mapped.retry_after is None:
+        mapped.retry_after = getattr(exc, "retry_after", None)
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
     return mapped
@@ -190,10 +240,17 @@ def _map_connect_error(exc: ConnectError):
             return mapped
     error_message = exc.message or _EMPTY_ERROR_MESSAGE
     if exc.details:
-        for detail in exc.details:
-            unpacked = _unpack_error_detail(detail)
-            if unpacked is None:
-                continue
+        unpacked_details = [
+            d for detail in exc.details if (d := _unpack_error_detail(detail)) is not None
+        ]
+        unpacked_details.sort(key=_error_detail_priority)
+        if error_message.strip().endswith("_OUTCOME_UNKNOWN") and (
+            not unpacked_details or _error_detail_priority(unpacked_details[0]) != 0
+        ):
+            return PolyesterApiError(
+                error_message, code=_order_error_code_from_rest(error_message.strip())
+            )
+        for unpacked in unpacked_details:
             full_name = unpacked.DESCRIPTOR.full_name
             if full_name in _SERVICE_ERROR_ENUMS:
                 code_name = error_code_name(_SERVICE_ERROR_ENUMS[full_name], unpacked.code)
@@ -204,13 +261,18 @@ def _map_connect_error(exc: ConnectError):
                 )
                 # Preserve backoff hints and unknown mutation outcomes before
                 # applying the transport's temporary-failure classification.
-                if rate_limit is not None or code_name in (
-                    "ERROR_CODE_RATE_LIMIT_EXCEEDED",
-                    "ERROR_CODE_SYSTEM_RATE_LIMITED",
-                    "ERROR_CODE_OVERLOADED",
+                if (
+                    not code_name.endswith("_OUTCOME_UNKNOWN")
+                    and code_name not in _FINAL_RESOURCE_CODES
+                    and (rate_limit is not None or code_name in _RETRYABLE_RESOURCE_CODES)
                 ):
                     return _rate_limit_error(error_message, proto_detail=rate_limit, code=code_name)
-                if exc.code.value == "unavailable" and not code_name.endswith("_OUTCOME_UNKNOWN"):
+                if (
+                    exc.code.value == "unavailable"
+                    and not code_name.endswith("_OUTCOME_UNKNOWN")
+                    and code_name != "ERROR_CODE_ACCOUNT_ROUTING_INVALID"
+                    and code_name not in _FINAL_RESOURCE_CODES
+                ):
                     return PolyesterServerError(
                         error_message, code=code_name, status_code=503, raw=unpacked
                     )
@@ -303,11 +365,20 @@ def _map_connect_error(exc: ConnectError):
     message_code = (exc.message or "").strip()
     if message_code.endswith("_OUTCOME_UNKNOWN"):
         return PolyesterApiError(error_message, code=_order_error_code_from_rest(message_code))
-    if (
-        code == "resource_exhausted"
-        and _order_error_code_from_rest(message_code) == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
-    ):
-        return PolyesterApiError(error_message, code="ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED")
+    order_code = _order_error_code_from_rest(message_code)
+    if code == "unavailable" and order_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
+        return PolyesterApiError(error_message, code=order_code)
+    if code == "unavailable" and _is_known_admission_refusal(order_code):
+        return PolyesterServerError(error_message, code=order_code, status_code=503)
+    if code == "resource_exhausted":
+        if order_code in _RETRYABLE_RESOURCE_CODES:
+            return PolyesterRateLimitError(
+                error_message, code=order_code, retry_after=getattr(exc, "retry_after", None)
+            )
+        if order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name or re.fullmatch(
+            r"[A-Z][A-Z0-9_]*", message_code
+        ):
+            return PolyesterApiError(error_message, code=order_code)
     if is_cloudflare_browser_ban(error_message):
         return PolyesterTransportError(cloudflare_1010_message())
     if code in ("unauthenticated", "permission_denied"):
@@ -319,9 +390,8 @@ def _map_connect_error(exc: ConnectError):
     if code in ("unavailable", "internal"):
         return PolyesterServerError(error_message)
     if code == "resource_exhausted":
-        # connectrpc-python does not currently retain response metadata on
-        # ConnectError, so header retry_after cannot be recovered on this path.
-        # Structured RateLimitDetail above populates retry_after when attached.
+        # A structured detail supplies the delay first; response headers
+        # provide its fallback in map_connect_error.
         order_code = _order_error_code_from_rest(message_code)
         service_code = (
             order_code if order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else None

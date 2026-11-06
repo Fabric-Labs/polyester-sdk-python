@@ -1,4 +1,4 @@
-"""Retry of side-effect-free reads that answer Connect ``unavailable``."""
+"""Retry side-effect-free reads on unavailable responses or expired deadlines."""
 
 from __future__ import annotations
 
@@ -63,7 +63,10 @@ async def unary_auth_decoded_retry_unavailable(
         try:
             response: TResponse = await call(client, request)
         except ConnectError as exc:
-            if exc.code != Code.UNAVAILABLE or _monotonic() - started + delay > policy.budget:
+            if (
+                exc.code not in (Code.UNAVAILABLE, Code.DEADLINE_EXCEEDED)
+                or _monotonic() - started + delay > policy.budget
+            ):
                 raise map_connect_error(exc) from exc
             await _sleep(delay)
             delay = min(delay * 2, policy.max_delay)

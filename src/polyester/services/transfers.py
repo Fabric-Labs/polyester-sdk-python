@@ -3,6 +3,7 @@ from __future__ import annotations
 from polyester.codecs.decode.transfers import transfers_list_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_ledger_transfer_batch_bytes
+from polyester.errors import PolyesterValidationError
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import ListTransfersRequest
 from polyester.models import LedgerTransfer, TransfersList
@@ -37,6 +38,7 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         reversed: bool = False,
         since: int | None = None,
     ) -> TransfersList:
+        """List transfers with an inclusive ``since`` bound in UTC epoch microseconds."""
         request = ListTransfersRequest(limit=validate_limit(limit), reversed=reversed)
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -44,7 +46,11 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
         if since is not None:
-            request.since = since
+            if isinstance(since, bool) or not isinstance(since, int) or not 0 <= since < 2**64:
+                raise PolyesterValidationError(
+                    "since must be an integer between 0 and 2**64 - 1 (UTC epoch microseconds)"
+                )
+            request.ts_min_us = since
         return await unary_auth_decoded(
             self._transport,
             LedgerReadServiceClient,

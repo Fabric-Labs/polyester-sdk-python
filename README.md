@@ -941,6 +941,13 @@ SDK notes:
   without creating a withdraw (create RPCs remain authoritative).
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
 
+API-key withdrawals always use the authenticated key's bound account or
+subaccount. The SDK's default subaccount does not change that source.
+`create_to_funding` and `create_to_external_chain` reject explicit `account`
+or `sub_account_id` arguments. Omit these arguments and use a key bound to the
+intended source. For wallet/JWT withdrawals, `create_wallet_trading_withdraw`
+supports explicit account selection and the configured default subaccount.
+
 ```python
 from polyester.chain import (
     POLYESTER_DEVNET_ENVIRONMENT,

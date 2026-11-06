@@ -259,6 +259,14 @@ def create_trigger_to_proto(
                 "trailing_stop with side=sell does not take limit_price; "
                 "the maximum price applies to buys only"
             )
+        if trailing_distance_ticks is not None and trailing_distance_bps is not None:
+            raise PolyesterValidationError(
+                "set at most one of trailing_distance_ticks or trailing_distance_bps"
+            )
+        if max_slippage_ticks is not None and max_slippage_bps is not None:
+            raise PolyesterValidationError(
+                "set at most one of max_slippage_ticks or max_slippage_bps"
+            )
         if trailing_distance_ticks is not None:
             trailing.trailing_distance_ticks = tick_count(
                 trailing_distance_ticks, "trailing_distance_ticks"
@@ -405,6 +413,14 @@ def modify_trigger_to_proto(
         )
     if symbol_id < 0:
         raise PolyesterValidationError("modify trigger symbol_id must not be negative")
+    if trailing_distance_ticks is not None and trailing_distance_bps is not None:
+        raise PolyesterValidationError(
+            "set at most one of trailing_distance_ticks or trailing_distance_bps"
+        )
+    if max_slippage_ticks is not None and max_slippage_bps is not None:
+        raise PolyesterValidationError(
+            "set at most one of max_slippage_ticks or max_slippage_bps"
+        )
     proto = triggers_pb2.ModifyTriggerRequest(
         trigger_id=id_to_int(trigger_id, "trigger_id"),
         symbol_id=int(symbol_id),

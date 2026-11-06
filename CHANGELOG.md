@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- Transfer history's `since` filter now works, including zero. It is an
+  inclusive lower bound in microseconds since the UTC Unix epoch. Invalid
+  types (including booleans), negative values and values above uint64 now
+  raise a validation error naming `since` before sending.
+- **Breaking:** `create_to_funding` and `create_to_external_chain` now raise
+  `PolyesterValidationError` if `account` or `sub_account_id` is supplied,
+  including `"main"`, `"active"` or a selector matching the API key's scope.
+  These arguments previously had no effect. Omit both selectors (or pass
+  `None`) and use an API key bound to the intended source. Configured SDK
+  defaults do not route API-key withdrawals; wallet withdrawals still support
+  account selection and configured defaults.
+- Internal transfers now reject a blank or whitespace-only address when it
+  is the only destination. A blank address alongside a valid account or
+  subaccount is ignored, preserving that recipient.
+- Trigger create and modify now reject competing ticks and basis-point
+  settings for trailing distance or slippage. A single zero slippage setting
+  on modify still clears the cap.
+
 ## 0.6.2
 
 Git tag: `v0.6.2`. Released 2026-11-06.

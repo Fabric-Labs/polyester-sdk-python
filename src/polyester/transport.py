@@ -20,6 +20,9 @@ from google.protobuf.message import Message
 
 from polyester._contract_codes import (
     carries_contract_code,
+    decode_coded_detail,
+    future_code_label,
+    has_future_code,
     is_placeholder_code,
     is_recognised_rest_code,
 )
@@ -317,7 +320,16 @@ def _answer_without_a_code(
     # missing route.
     if status == 404 and _is_bare_404(response, body, is_json):
         return response
-    raise _no_recognised_code_error(response, body)
+    raise _no_recognised_code_error(response, body, code=_future_code(details))
+
+
+def _future_code(details: list[AnyMessage]) -> str:
+    """The label of a typed code this SDK can't name, kept for diagnosis only."""
+    for item in details:
+        detail = decode_coded_detail(item.type_url.removeprefix(_TYPE_URL_PREFIX), item.value)
+        if detail is not None and has_future_code(detail):
+            return future_code_label(detail)
+    return ""
 
 
 def _raise_problem(

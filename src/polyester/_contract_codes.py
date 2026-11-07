@@ -81,17 +81,42 @@ def is_placeholder_detail(detail: Message) -> bool:
     return detail.code == 0
 
 
-def carries_contract_code(detail_type: str, value: bytes) -> bool:
-    """Whether an encoded detail is a service detail that says something."""
+def has_future_code(detail: Message) -> bool:
+    """Whether a decoded service detail has a code this SDK's enum can't name.
+
+    Its type shows that a service sent it, not what the code means: it could be
+    a future refusal or a future unknown outcome.
+    """
+    field = detail.DESCRIPTOR.fields_by_name.get("code")
+    if detail.DESCRIPTOR.full_name not in _CODED_DETAILS or field is None:
+        return False
+    return detail.code != 0 and detail.code not in field.enum_type.values_by_number
+
+
+def future_code_label(detail: Message) -> str:
+    """The label a code from :func:`has_future_code` is reported under."""
+    return f"UNKNOWN_ERROR_CODE({detail.code})"
+
+
+def decode_coded_detail(detail_type: str, value: bytes) -> Message | None:
+    """An encoded service detail, or ``None`` for another type or bad bytes."""
     message_type = _CODED_DETAILS.get(detail_type)
     if message_type is None:
-        return False
+        return None
     detail = message_type()
     try:
         detail.ParseFromString(value)
     except DecodeError:
+        return None
+    return detail
+
+
+def carries_contract_code(detail_type: str, value: bytes) -> bool:
+    """Whether an encoded detail is a service detail with a code this SDK can name."""
+    detail = decode_coded_detail(detail_type, value)
+    if detail is None:
         return False
-    return not is_placeholder_detail(detail)
+    return not is_placeholder_detail(detail) and not has_future_code(detail)
 
 
 def is_recognised_rest_code(code: str) -> bool:

@@ -470,6 +470,100 @@ async def test_placeholder_detail_keeps_field_violations_on_a_recognised_code() 
     assert calls == 1
 
 
+# Code 999999, in the first field of every coded detail: an enum this SDK can't
+# name. It could be a future refusal or a future unknown outcome.
+FUTURE_CODE = bytes([0x08, 0xBF, 0x84, 0x3D])
+CODED_DETAIL_TYPES = DETAIL_TYPES[:-1]
+
+
+@pytest.mark.parametrize("op", ["read", "write"])
+@pytest.mark.parametrize("detail_type", CODED_DETAIL_TYPES)
+@pytest.mark.parametrize("status", [400, 404, 409, 500, 501, 520])
+async def test_future_typed_code_with_no_connect_code_proves_nothing(
+    op: str, detail_type: str, status: int
+) -> None:
+    error, calls = await _call(op, status, JSON, _detail_body(detail_type, FUTURE_CODE))
+    assert type(error) is PolyesterServerError, repr(error)
+    assert error.code == "UNKNOWN_ERROR_CODE(999999)"
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", CODED_DETAIL_TYPES)
+@pytest.mark.parametrize(
+    ("status", "connect_code"),
+    [
+        (500, "internal"),
+        (500, "unknown"),
+        (500, "data_loss"),
+        (500, "canceled"),
+        (503, "unavailable"),
+        (504, "deadline_exceeded"),
+    ],
+)
+async def test_future_typed_code_does_not_turn_a_server_failure_into_a_refusal(
+    detail_type: str, status: int, connect_code: str
+) -> None:
+    body = _detail_body(detail_type, FUTURE_CODE, code=connect_code)
+    error, calls = await _call("write", status, JSON, body)
+    assert not isinstance(error, PolyesterApiError), repr(error)
+    if isinstance(error, PolyesterServerError):
+        assert error.code == "UNKNOWN_ERROR_CODE(999999)"
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", CODED_DETAIL_TYPES)
+@pytest.mark.parametrize("connect_code", ["internal", "unknown", "data_loss"])
+async def test_read_of_a_future_typed_code_on_a_server_failure_sends_once(
+    detail_type: str, connect_code: str
+) -> None:
+    body = _detail_body(detail_type, FUTURE_CODE, code=connect_code)
+    error, calls = await _call("read", 500, JSON, body)
+    assert type(error) is PolyesterServerError, repr(error)
+    assert error.code == "UNKNOWN_ERROR_CODE(999999)"
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", CODED_DETAIL_TYPES)
+async def test_read_retries_a_future_typed_code_on_unavailable(detail_type: str) -> None:
+    body = _detail_body(detail_type, FUTURE_CODE, code="unavailable")
+    error, calls = await _call("read", 503, JSON, body, fail_for=2)
+    assert error is None, repr(error)
+    assert calls == 3
+
+
+async def test_future_typed_code_with_backoff_is_not_retryable_on_a_server_failure() -> None:
+    backoff = ratelimit_pb2.RateLimitDetail(retry_after_ms=1250).SerializeToString()
+    # Field 3 of orders.v1.ErrorDetail carries the backoff.
+    raw = FUTURE_CODE + bytes([0x1A, len(backoff)]) + backoff
+    for body in (
+        _detail_body("orders.v1.ErrorDetail", raw),
+        _detail_body("orders.v1.ErrorDetail", raw, code="internal"),
+    ):
+        error, calls = await _call("write", 500, JSON, body)
+        assert type(error) is PolyesterServerError, repr(error)
+        _assert_flags(error, retryable=False, unknown=True)
+        assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", CODED_DETAIL_TYPES)
+@pytest.mark.parametrize(
+    ("status", "connect_code"),
+    [(400, "failed_precondition"), (400, "invalid_argument"), (409, "already_exists")],
+)
+async def test_future_typed_code_keeps_its_label_on_a_recognised_refusal_control(
+    detail_type: str, status: int, connect_code: str
+) -> None:
+    body = _detail_body(detail_type, FUTURE_CODE, code=connect_code)
+    error, calls = await _call("write", status, JSON, body)
+    assert isinstance(error, PolyesterApiError), repr(error)
+    assert "999999" in str(error.code), repr(error)
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
 @pytest.mark.parametrize("encoding", ["br", "zstd"])
 @pytest.mark.parametrize("status", [400, 404, 409, 429, 500, 503, 504])
 async def test_body_the_client_cannot_decode_is_not_a_known_failure(

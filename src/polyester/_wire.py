@@ -8,7 +8,12 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError, Message
 
-from polyester._contract_codes import is_placeholder_code, is_placeholder_detail
+from polyester._contract_codes import (
+    future_code_label,
+    has_future_code,
+    is_placeholder_code,
+    is_placeholder_detail,
+)
 from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
@@ -49,6 +54,7 @@ from polyester.transport import (
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
 _EMPTY_ERROR_MESSAGE = "request failed without server error details"
+_SERVER_FAILURE_CODES = AMBIGUOUS_CONNECT_CODES | {"internal", "unavailable", "deadline_exceeded"}
 _SERVICE_ERROR_ENUMS = {
     "orders.v1.ErrorDetail": orders_pb2.ErrorCode,
     "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorCode,
@@ -246,11 +252,22 @@ def _map_connect_error(exc: ConnectError):
     # A detail with no code says nothing about the outcome, but its field
     # violations still name what to fix on a recognised Connect code.
     placeholder_violations: list[OrderFieldViolation] = []
+    future_code: str | None = None
     if exc.details:
         decoded_details = [
             d for detail in exc.details if (d := _unpack_error_detail(detail)) is not None
         ]
-        unpacked_details = [d for d in decoded_details if not is_placeholder_detail(d)]
+        # A code this SDK can't name stands only behind a recognised refusal.
+        server_failure = exc.code.value in _SERVER_FAILURE_CODES
+        unpacked_details = [
+            d
+            for d in decoded_details
+            if not is_placeholder_detail(d) and not (server_failure and has_future_code(d))
+        ]
+        if server_failure:
+            future_code = next(
+                (future_code_label(d) for d in decoded_details if has_future_code(d)), None
+            )
         placeholder_violations = [
             OrderFieldViolation(
                 field_path=item.field_path, rule_id=item.rule_id, message=item.message
@@ -413,7 +430,7 @@ def _map_connect_error(exc: ConnectError):
             status_code=_auth_status(exc),
         )
     if code in ("unavailable", "internal"):
-        return PolyesterServerError(error_message)
+        return PolyesterServerError(error_message, code=future_code)
     if code == "resource_exhausted":
         # A structured detail supplies the delay first; response headers
         # provide its fallback in map_connect_error.
@@ -430,5 +447,5 @@ def _map_connect_error(exc: ConnectError):
     if code == "unimplemented":
         return PolyesterNotImplementedError(error_message)
     if code in AMBIGUOUS_CONNECT_CODES:
-        return PolyesterServerError(error_message)
+        return PolyesterServerError(error_message, code=future_code)
     return PolyesterApiError(error_message, code=code, violations=placeholder_violations)

@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** `0.7.1`, pre-1.0: a minor release may include breaking changes (see
+**Status:** `0.8.0`, pre-1.0: a minor release may include breaking changes (see
 [CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
@@ -96,7 +96,7 @@ API-key policy before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.7.1"
+pip install "polyester-sdk==0.8.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -1464,9 +1464,8 @@ name does not establish its source: outcome unknown and non-retryable. Specific
 refusals such as `FEE_SCHEDULE_UNAVAILABLE`, `POLICY_UNAVAILABLE` and
 `RATE_LIMIT_POLICY_UNAVAILABLE` are known and retryable on typed Connect,
 code-only Connect messages and recognized REST 503 problems. A REST 502 cannot
-establish these refusals. `QUICKSWAP_ACCOUNT_OWNER_UNKNOWN` means no order was
-placed and may retry; `ACCOUNT_ROUTING_INVALID` means the trigger was not admitted
-and requires the caller to correct its routing.
+establish these refusals. `ACCOUNT_ROUTING_INVALID` means the trigger was not
+admitted; contact support if it persists.
 
 `RATE_LIMIT_EXCEEDED`, `PRICE_LEVELS_EXHAUSTED` and retry-later capacity codes
 are known, retryable admission refusals; preserve and respect any server delay.

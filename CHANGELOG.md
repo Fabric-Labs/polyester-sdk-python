@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+Git tag: `v0.8.0`. Released 2026-11-07. Built on public contract `748066a`.
+
+**Known issue:** a managed order book subscribed at a depth other than 1, 20, 50,
+200 or 500 can stop updating with no error. Use one of those depths until the
+next release.
 
 - A resubscribe on a confirmed private order stream that the server never answers no longer waits forever: after 30 seconds it reports `PrivateOrdersError(kind="subscribe")` and subscribes again with backoff.
 - `Polyester.close()` now closes every subscription and the client even when a subscription failed with no `on_error`, then raises the first such failure.

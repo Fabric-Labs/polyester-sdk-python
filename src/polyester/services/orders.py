@@ -866,6 +866,14 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         GetOrder can report lineage-cumulative ``cum_qty`` before every fill is
         visible on the trades list (eventual consistency). This helper pages
         execution history and does not treat an empty page as a watermark.
+        The result holds the last poll's order, trades and transfers, with that
+        read's ``executions_complete``.
+
+        ``timeout`` (seconds) bounds the whole wait, page reads included: a read
+        still in flight when it passes is abandoned and
+        ``PolyesterTransportError`` is raised; a timeout of 0 or less times out
+        before any read. A ``next_page_token`` that repeats a page token of the
+        same poll raises ``PolyesterResponseContractError``.
         """
         return await wait_for_order_trades_complete(
             self,
@@ -886,23 +894,42 @@ async def wait_for_order_trades_complete(
     timeout: float = 10.0,
     poll_interval: float = 0.1,
 ) -> GetOrderResult:
-    """Poll until ``sum(trade.qty) == order.cum_qty`` or ``timeout`` elapses."""
-    deadline = time.monotonic() + max(timeout, 0.0)
-    last: GetOrderResult | None = None
-    while True:
-        last = await _get_order_execution_pages(
-            orders,
-            key=key,
-            account=account,
-            sub_account_id=sub_account_id,
+    """Poll until ``sum(trade.qty) == order.cum_qty`` or ``timeout`` elapses.
+
+    One deadline bounds every page read and every sleep between polls.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(timeout, 0.0)
+
+    def timed_out() -> PolyesterTransportError:
+        return PolyesterTransportError(
+            f"timed out waiting for order trades to match cum_qty (key={key!r})"
         )
+
+    while True:
+        if loop.time() >= deadline:
+            raise timed_out()
+        budget = asyncio.timeout_at(deadline)
+        try:
+            async with budget:
+                last = await _get_order_execution_pages(
+                    orders,
+                    key=key,
+                    account=account,
+                    sub_account_id=sub_account_id,
+                )
+        except Exception as exc:
+            # The transport can report the read the deadline cut short as its
+            # own error rather than as a cancellation.
+            if budget.expired():
+                raise timed_out() from exc
+            raise
         if _order_trades_projection_complete(last):
             return last
-        if time.monotonic() >= deadline:
-            raise PolyesterTransportError(
-                f"timed out waiting for order trades to match cum_qty (key={key!r})"
-            )
-        await asyncio.sleep(max(poll_interval, 0.0))
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise timed_out()
+        await asyncio.sleep(min(max(poll_interval, 0.0), remaining))
 
 
 async def _get_order_execution_pages(
@@ -912,7 +939,11 @@ async def _get_order_execution_pages(
     account: AccountScope | None = None,
     sub_account_id: str | None = None,
 ) -> GetOrderResult:
+    """Read one order with every page of its execution history: the order, the
+    trades and transfers of all pages, and the final page's
+    ``executions_complete``."""
     page_token: str | None = None
+    requested: set[str] = set()
     trades: list = []
     transfers: list = []
     order = None
@@ -938,6 +969,11 @@ async def _get_order_execution_pages(
                 next_page_token="",
                 executions_complete=page.executions_complete,
             )
+        if page.next_page_token in requested:
+            raise PolyesterResponseContractError(
+                "GetOrder", "next_page_token repeats an earlier page token"
+            )
+        requested.add(page.next_page_token)
         page_token = page.next_page_token
 
 

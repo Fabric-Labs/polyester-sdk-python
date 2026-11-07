@@ -61,6 +61,9 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     price: Price | None = None
     avg_px: Price | None = None
     created_ts_ns: str = ""
+    # When the order became terminal, in Unix nanoseconds (UTC) as a decimal
+    # string; empty while it is open.
+    terminal_ts_ns: str = ""
     version: int = 0
     post_only: bool = False
     fee_asset: str = ""
@@ -71,6 +74,14 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     submitted_max_quote_debit_scaled: str = ""
     attached_risk: AttachedRisk | None = None
     lineage: OrderLineage | None = None
+    # How the order was created; ``None`` when the server does not say.
+    origin: OrderOrigin | None = None
+    # A MARKET order's slippage protection: the reference price it was
+    # measured from, and its cap as a price distance or in basis points.
+    # ``None`` or 0 when the order has none of that form.
+    market_client_ref_price: Price | None = None
+    market_max_slippage: Price | None = None
+    market_max_slippage_bps: int = 0
     # RFC3339 UTC expiry for GTD orders; omitted for every other TIF.
     expire_at: str | None = None
     # Why a ``rejected`` order was refused: the Orders API error code for the
@@ -200,6 +211,26 @@ class OrderLineage(msgspec.Struct, kw_only=True, omit_defaults=True):
 
     id: str = ""
     generation: int = 0
+
+
+class OrderOrigin(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """How an order was created.
+
+    ``scope`` is ``direct``, ``attached_risk``, ``standalone_trigger`` or
+    ``system`` (a scope newer than this SDK reads as its number).
+    ``trigger_type`` names the trigger strategy that placed the order
+    (``stop_loss``, ``take_profit``, ``trailing_stop``, ``twap`` or
+    ``ladder``) and is empty for a direct order. ``trigger_id`` is that
+    trigger, ``parent_order_id`` the parent order of an attached-risk child,
+    and ``child_seq`` the child's sequence number in a multi-child strategy
+    such as a TWAP; each is empty or 0 when it does not apply.
+    """
+
+    scope: str = ""
+    trigger_type: str = ""
+    trigger_id: str = ""
+    parent_order_id: str = ""
+    child_seq: int = 0
 
 
 class OrderTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):

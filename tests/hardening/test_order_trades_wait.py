@@ -9,6 +9,7 @@ earlier page token.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import random
 import time
@@ -35,6 +36,8 @@ from tests.hardening_support import (
 # shows up as a multi-second return.
 HTTP_TIMEOUT = 5.0
 TIMEOUT_MESSAGE = "timed out waiting for order trades"
+# An order the server answers outside its schedule, to warm a client up.
+WARMUP_ORDER_ID = 999
 
 
 @dataclass
@@ -53,12 +56,18 @@ class TradesServer:
     poll: int = 0
     started: bool = False
     arrivals: list[float] = field(default_factory=list)
+    served: list[float] = field(default_factory=list)
 
     async def handle(self, req: ParsedRequest) -> HttpScript:
         if "GetOrder" not in req.path:
             return HttpScript.not_found()
+        request = orders_read_pb2.GetOrderRequest.FromString(req.body)
+        if request.order_id == WARMUP_ORDER_ID:
+            order = orders_read_pb2.Order(order_id=WARMUP_ORDER_ID, symbol_id=1)
+            response = orders_read_pb2.GetOrderResponse(order=order)
+            return connect_proto_response(response.SerializeToString())
         self.arrivals.append(time.monotonic())
-        token = orders_read_pb2.GetOrderRequest.FromString(req.body).page_token
+        token = request.page_token
         if not token:
             if self.started and self.poll < len(self.polls) - 1:
                 self.poll += 1
@@ -70,6 +79,7 @@ class TradesServer:
             return HttpScript.never_respond()
         if page.delay:
             await asyncio.sleep(page.delay)
+        self.served.append(time.monotonic())
         response = orders_read_pb2.GetOrderResponse(
             order=orders_read_pb2.Order(order_id=1, symbol_id=1, cum_qty_scaled=self.cum),
             next_page_token=page.next,
@@ -290,17 +300,40 @@ def random_schedule(seed: int) -> Schedule:
     return s
 
 
+@asynccontextmanager
+async def loop_lag() -> AsyncIterator[list[float]]:
+    """Measure the worst event-loop lag while the block runs: a loaded
+    machine delays the wait's timer as much as any other callback."""
+    loop = asyncio.get_running_loop()
+    worst = [0.0]
+
+    async def watch() -> None:
+        while True:
+            before = loop.time()
+            await asyncio.sleep(0.005)
+            worst[0] = max(worst[0], loop.time() - before - 0.005)
+
+    task = asyncio.create_task(watch())
+    try:
+        yield worst
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 async def run_schedule(seed: int) -> None:
-    # Scheduling slack on a loaded machine; the HTTP timeout is 5 s, so an
-    # unbounded page read still stands out.
-    slack = 0.75
     s = random_schedule(seed)
     server = TradesServer(cum=s.cum, polls=s.polls)
     replay = (
         f"WAIT_SEED={seed} (timeout {s.timeout * 1000:.0f} ms, {len(s.polls)} polls, "
         f"outcome {s.outcome})"
     )
-    async with trades_client(server) as client:
+    async with trades_client(server) as client, loop_lag() as lag:
+        # A client's first request sets it up synchronously; keep that out of
+        # the measured wait.
+        await client.orders.get(key=OrderId(WARMUP_ORDER_ID))
+        lag[0] = 0.0
         started = time.monotonic()
         deadline = started + s.timeout
         result: GetOrderResult | None = None
@@ -311,18 +344,27 @@ async def run_schedule(seed: int) -> None:
         except Exception as exc:
             error = exc
         elapsed = time.monotonic() - started
+    # An abandoned read unwinds in the HTTP client's own thread, which a
+    # starved machine slows without lagging the loop: the return and page
+    # starts get 0.5 s plus the loop's lag. A read held to the HTTP timeout
+    # takes 5 s. A success is checked strictly below.
+    slack = 0.5 + 2 * lag[0]
     assert elapsed <= s.timeout + slack, f"{replay}: wait returned after {elapsed:.3f} s: {error!r}"
     for i, at in enumerate(server.arrivals):
         assert at <= deadline + slack, f"{replay}: page read {i} started {at - deadline:.3f} s late"
     if error is None:
         assert result is not None
         assert s.outcome == "success", f"{replay}: wait succeeded with trades {trade_qtys(result)}"
+        # Every page of a success was served before the deadline: a page
+        # served later reached the client after its timeout.
+        late = max(server.served) - deadline
+        assert late <= 0.005 + 2 * lag[0], f"{replay}: success used a page served {late:.3f} s late"
         assert trade_qtys(result) == s.want_trades, f"{replay}: trades {trade_qtys(result)}"
         assert result.executions_complete is s.want_complete, f"{replay}: executions_complete"
     elif isinstance(error, PolyesterResponseContractError):
         assert s.outcome == "cycle", f"{replay}: unexpected contract error {error!r}"
     elif isinstance(error, PolyesterTransportError) and TIMEOUT_MESSAGE in str(error):
-        assert s.outcome == "timeout" or time.monotonic() >= deadline, (
+        assert s.outcome == "timeout" or elapsed >= s.timeout, (
             f"{replay}: timed out after {elapsed:.3f} s, before the deadline"
         )
     else:
@@ -341,10 +383,14 @@ async def test_wait_random_schedules() -> None:
     poll (1-5), trades per page (0-3), per-page delays (0-60 ms), the wait
     timeout (30-300 ms), each terminal page's executions_complete, a page that
     never answers and a repeated next_page_token. Whatever the schedule, the
-    wait returns within its timeout plus slack and reads no page after its
+    wait returns within its timeout plus slack and starts no page after its
     deadline; a success is the schedule's, with that read's trades and
     terminal executions_complete; a repeated token raises a contract error;
     anything else is a timeout once the deadline passed.
+
+    Slack grows with the worst event-loop lag measured during the schedule,
+    so a loaded machine does not read as a late wait; a success must have
+    had every page served before the deadline.
 
     WAIT_SEEDS sets the seed count (default 64); WAIT_SEED replays one seed.
     Sixteen schedules run at a time.

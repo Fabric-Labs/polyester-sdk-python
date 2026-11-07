@@ -1,9 +1,12 @@
-from datetime import UTC, datetime, timedelta
+import random
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs import (
     align_price_ticks,
+    datetime_to_timestamp_dict,
     format_id,
     format_price_ticks,
     id_to_int,
@@ -198,3 +201,30 @@ def test_create_order_to_wire_maps_public_strings() -> None:
         "qty_scaled": 10_000_000,
         "limit_price_ticks": 50_000_000_000_000,
     }
+
+
+def test_datetime_to_timestamp_dict_matches_protobuf_from_datetime() -> None:
+    """Every aware datetime from year 1 to 9999 encodes as protobuf's own
+    FromDatetime does (seeded sweep plus the range ends)."""
+    rng = random.Random(8645)
+    low = datetime.min.replace(tzinfo=UTC) + timedelta(days=2)
+    span = int((datetime.max.replace(tzinfo=UTC) - timedelta(days=2) - low).total_seconds())
+    values = [
+        datetime.min.replace(tzinfo=UTC),
+        datetime.max.replace(tzinfo=UTC),
+        datetime(1969, 12, 31, 23, 59, 59, 999_999, tzinfo=UTC),
+        datetime(1970, 1, 1, 0, 0, 0, 1, tzinfo=UTC),
+    ]
+    for _ in range(5000):
+        zone = timezone(timedelta(minutes=rng.randrange(-23 * 60, 23 * 60 + 1)))
+        instant = low + timedelta(
+            seconds=rng.randrange(span), microseconds=rng.randrange(1_000_000)
+        )
+        values.append(instant.astimezone(zone))
+    for value in values:
+        want = Timestamp()
+        want.FromDatetime(value)
+        assert datetime_to_timestamp_dict(value) == {
+            "seconds": want.seconds,
+            "nanos": want.nanos,
+        }, value

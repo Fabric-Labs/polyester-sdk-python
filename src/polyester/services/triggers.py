@@ -18,6 +18,7 @@ from polyester.codecs.triggers import (
     create_trigger_to_proto,
     modify_trigger_to_proto,
 )
+from polyester.errors import PolyesterValidationError
 from polyester.gen.triggers.v1.triggers_connect import TriggersServiceClient
 from polyester.gen.triggers.v1.triggers_pb2 import (
     CancelTriggerRequest,
@@ -307,20 +308,28 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         resolved_symbol_id = await self._optional_control_symbol_id(
             symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
         )
-        if resolved_symbol_id and any(
-            isinstance(price, Price) and price.symbol is not None
+        market: str | None = None
+        bound = [
+            price
             for price in (trigger_price, activation_price)
-        ):
-            # The market name is needed to check a bound price.
+            if isinstance(price, Price) and price.symbol is not None
+        ]
+        if resolved_symbol_id and bound:
+            # A bound price is checked against the named market; one that
+            # can't be named can't be checked, so the price is refused.
             await self._ensure_catalogs()
+            if self._catalogs is not None:
+                market = self._catalogs.symbol_for_symbol_id(resolved_symbol_id)
+            if market is None:
+                raise PolyesterValidationError(
+                    f"triggers.modify cannot check a price bound to {bound[0].symbol} "
+                    f"against symbol_id {resolved_symbol_id}: the market is not in the "
+                    "catalogs; hydrate catalogs or pass an unbound price"
+                )
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
             symbol_id=resolved_symbol_id,
-            symbol=(
-                self._catalogs.symbol_for_symbol_id(resolved_symbol_id)
-                if self._catalogs is not None
-                else None
-            ),
+            symbol=market,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             trigger_price=trigger_price,
             trailing_distance_ticks=trailing_distance_ticks,

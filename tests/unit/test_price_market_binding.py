@@ -121,6 +121,71 @@ async def test_trigger_modify_without_a_market_sends_the_price() -> None:
     assert request.symbol_id == 0
 
 
+def _sol_only_catalogs() -> CatalogManager:
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {
+            "pairs": [
+                {
+                    "symbol": "SOL-USDT",
+                    "symbol_id": 2,
+                    "base_quantity_scale": 8,
+                    "quote_quantity_scale": 6,
+                }
+            ]
+        }
+    )
+    return catalogs
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["trigger_price", "activation_price"])
+@pytest.mark.parametrize("price", [SOL_PRICE, BTC_PRICE], ids=["sol_bound", "btc_bound"])
+@pytest.mark.parametrize(
+    "catalogs", [_sol_only_catalogs, lambda: None], ids=["missing_market", "no_catalogs"]
+)
+async def test_trigger_modify_refuses_a_bound_price_it_cannot_check(
+    field: str, price: Price, catalogs: Callable[[], CatalogManager | None]
+) -> None:
+    # symbol_id 1 is not in the catalogs, so its name is unknown and a bound
+    # price can't be checked against it.
+    service = AsyncTriggersService(MagicMock(), catalogs(), None)  # type: ignore[arg-type]
+    await _refused(
+        TRIGGERS,
+        MODIFIED,
+        lambda: service.modify(trigger_id=5, symbol_id=1, **{field: price}),
+        "cannot check a price bound to",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["trigger_price", "activation_price"])
+@pytest.mark.parametrize(
+    "catalogs", [_sol_only_catalogs, lambda: None], ids=["missing_market", "no_catalogs"]
+)
+async def test_trigger_modify_sends_an_unbound_price_for_an_unknown_market(
+    field: str, catalogs: Callable[[], CatalogManager | None]
+) -> None:
+    service = AsyncTriggersService(MagicMock(), catalogs(), None)  # type: ignore[arg-type]
+    unbound = Price.from_ticks(46_000_000_000_000)
+    request = await _sent(
+        TRIGGERS, MODIFIED, lambda: service.modify(trigger_id=5, symbol_id=1, **{field: unbound})
+    )
+    assert request.symbol_id == 1
+    assert getattr(request, f"{field}_ticks") == unbound.ticks
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["trigger_price", "activation_price"])
+async def test_trigger_modify_keeps_a_bound_price_for_its_market_by_id(field: str) -> None:
+    service = _triggers()
+    request = await _sent(
+        TRIGGERS, MODIFIED, lambda: service.modify(trigger_id=5, symbol_id=1, **{field: BTC_PRICE})
+    )
+    assert request.symbol_id == 1
+    assert getattr(request, f"{field}_ticks") == BTC_PRICE.ticks
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("field", ["trigger_price", "activation_price", "limit_price"])
 async def test_trigger_create_refuses_a_price_for_another_market(field: str) -> None:

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from google.protobuf.message import Message
@@ -16,6 +17,7 @@ from werkzeug import Request, Response
 from polyester import AsyncPolyester, Polyester
 from polyester.errors import (
     PolyesterApiError,
+    PolyesterError,
     PolyesterResponseContractError,
     PolyesterValidationError,
     is_not_found,
@@ -422,3 +424,31 @@ def test_sync_client_iterates_pages_and_runs_the_helpers(sync_client) -> None:
         client.changelog.get_post("2001-01-01")
     assert is_not_found(caught.value)
     assert not fake.auth_header_seen
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(
+            datetime(1969, 12, 31, 23, 59, 59, 500_000, tzinfo=UTC),
+            id="half a second before the epoch",
+        ),
+        pytest.param(datetime(1970, 1, 1, tzinfo=UTC), id="the epoch"),
+        pytest.param(
+            datetime(2026, 11, 7, 16, 30, 0, 123_456, tzinfo=timezone(timedelta(hours=2))),
+            id="an ordinary date in another zone",
+        ),
+        pytest.param(datetime.max.replace(tzinfo=UTC), id="the last microsecond of year 9999"),
+        pytest.param(datetime.min.replace(tzinfo=UTC), id="the first microsecond of year 1"),
+    ],
+)
+async def test_list_changes_sends_exact_time_bounds(public_client, value: datetime) -> None:
+    """Time bounds are sent as protobuf's own UTC conversion sends them."""
+    fake, client = public_client(1)
+    # The fake refuses an empty range; only the request matters here.
+    with contextlib.suppress(PolyesterError):
+        await client.changelog.list_changes(start_time=value, end_time=value)
+    req = fake.changes_calls[0]
+    want = _ts(value)
+    assert (req.start_time.seconds, req.start_time.nanos) == (want.seconds, want.nanos)
+    assert (req.end_time.seconds, req.end_time.nanos) == (want.seconds, want.nanos)

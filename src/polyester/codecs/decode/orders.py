@@ -32,6 +32,9 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     OrderLineage as ProtoOrderLineage,
 )
 from polyester.gen.orders.v1.orders_read_pb2 import (
+    OrderOrigin as ProtoOrderOrigin,
+)
+from polyester.gen.orders.v1.orders_read_pb2 import (
     OrderTransfer as ProtoOrderTransfer,
 )
 from polyester.models import (
@@ -56,6 +59,7 @@ from polyester.models import (
     OrderFieldViolation,
     OrderLineage,
     OrderMutationResult,
+    OrderOrigin,
     OrdersList,
     OrderTransfer,
     PreviewOrderResult,
@@ -238,6 +242,19 @@ def order_lineage_from_proto(msg: ProtoOrderLineage | None) -> OrderLineage | No
     return OrderLineage(id=format_uint64_id(msg.id), generation=int(msg.generation))
 
 
+def _order_origin_from_proto(msg: ProtoOrderOrigin) -> OrderOrigin | None:
+    origin = OrderOrigin(
+        scope=proto_enum_name(orders_read_pb2.OrderOriginScope, int(msg.scope)),
+        trigger_type=proto_enum_name(orders_read_pb2.OrderTriggerType, int(msg.trigger_type)),
+        trigger_id=format_uint64_id(msg.trigger_id) if msg.HasField("trigger_id") else "",
+        parent_order_id=(
+            format_uint64_id(msg.parent_order_id) if msg.HasField("parent_order_id") else ""
+        ),
+        child_seq=int(msg.child_seq),
+    )
+    return None if origin == OrderOrigin() else origin
+
+
 def order_transfer_from_proto(msg: ProtoOrderTransfer) -> OrderTransfer:
     return OrderTransfer(
         match_id=str(msg.match_id) if msg.match_id else "",
@@ -284,6 +301,12 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
             field_name="created_ts_ns",
             empty_when_zero=True,
         ),
+        terminal_ts_ns=ts_ns_string_from_response(
+            msg.terminal_ts_ns,
+            context="Order",
+            field_name="terminal_ts_ns",
+            empty_when_zero=True,
+        ),
         version=int(msg.version),
         post_only=bool(msg.post_only),
         fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
@@ -304,6 +327,16 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
             if "lineage" in msg.DESCRIPTOR.fields_by_name and msg.HasField("lineage")
             else None
         ),
+        origin=_order_origin_from_proto(msg.origin) if msg.HasField("origin") else None,
+        market_client_ref_price=(
+            _price(msg.market_client_ref_price_ticks)
+            if msg.market_client_ref_price_ticks > 0
+            else None
+        ),
+        market_max_slippage=(
+            _price(msg.market_max_slippage_ticks) if msg.market_max_slippage_ticks > 0 else None
+        ),
+        market_max_slippage_bps=int(msg.market_max_slippage_bps),
         expire_at=(
             timestamp_to_rfc3339(msg.expire_at)
             if "expire_at" in msg.DESCRIPTOR.fields_by_name and msg.HasField("expire_at")

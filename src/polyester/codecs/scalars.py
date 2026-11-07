@@ -340,13 +340,21 @@ def format_id(value: str | int) -> str:
     return _encode_id(id_to_int(value))
 
 
+_UNIX_EPOCH = datetime(1970, 1, 1)
+
+
 def datetime_to_timestamp_dict(value: datetime) -> dict[str, int]:
+    """Exact protobuf ``Timestamp`` fields for an aware datetime.
+
+    Integer arithmetic, as protobuf's ``FromDatetime``: ``seconds`` rounds
+    toward negative infinity and ``nanos`` is never negative, for every
+    datetime from year 1 to 9999.
+    """
     if value.tzinfo is None:
         raise PolyesterValidationError("datetime values must be timezone-aware")
-    utc = value.astimezone(UTC)
-    seconds = int(utc.timestamp())
-    nanos = utc.microsecond * 1000
-    return {"seconds": seconds, "nanos": nanos}
+    since_epoch = value.astimezone(UTC).replace(tzinfo=None) - _UNIX_EPOCH
+    seconds = since_epoch.days * 86_400 + since_epoch.seconds
+    return {"seconds": seconds, "nanos": since_epoch.microseconds * 1000}
 
 
 def timestamp_dict_to_datetime(value: Any) -> datetime | None:

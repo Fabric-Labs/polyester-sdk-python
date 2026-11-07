@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import re
+
 from polyester.gen.polyester.ratelimit.v1 import types_pb2
 from polyester.models.ratelimit import RateLimitDetail
+
+# A uint64 written in ASCII digits: at most 20 of them.
+_UINT64_TEXT = re.compile(r"[0-9]{1,20}")
 
 
 def _enum_label(enum_cls: object, raw: int, *, unknown_prefix: str) -> str:
@@ -65,7 +70,9 @@ def rate_limit_detail_from_json(value: object) -> RateLimitDetail | None:
             return None
         if isinstance(item, int):
             return item if 0 <= item < 1 << 64 else None
-        if isinstance(item, str) and item.strip().isdigit():
+        # Only ASCII digits within uint64: str.isdigit() also accepts "²"
+        # and "٣", and int() refuses more than 4300 digits.
+        if isinstance(item, str) and _UINT64_TEXT.fullmatch(item.strip()):
             parsed = int(item.strip())
             return parsed if parsed < 1 << 64 else None
         return None

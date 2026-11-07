@@ -308,6 +308,7 @@ def test_request_size_and_wallet_predicates_read_only_their_codes() -> None:
         pytest.param(str(1 << 64), id="above uint64"),
         pytest.param("-1", id="negative"),
         pytest.param("1.5", id="decimal"),
+        pytest.param("+5", id="plus sign"),
     ],
 )
 async def test_rate_limit_problem_ignores_an_unreadable_integer(

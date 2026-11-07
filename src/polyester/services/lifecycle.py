@@ -6,7 +6,7 @@ from polyester.codecs.decode.lifecycle import (
     flows_list_from_proto,
 )
 from polyester.codecs.realtime_decode import decode_flow_detail_bytes, decode_flow_summary_bytes
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import parse_account_id
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.lifecycle.v1.lifecycle_read_connect import LifecycleReadServiceClient
 from polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2 import (
@@ -57,7 +57,7 @@ class AsyncLifecycleService(BaseService):
                 )
             request.scope = scope_enum
         if owner_account_id is not None:
-            request.owner_account_id = id_to_int(owner_account_id, "owner_account_id")
+            request.owner_account_id = parse_account_id(owner_account_id, "owner_account_id")
         if smart_account_address:
             request.smart_account_address = smart_account_address
 

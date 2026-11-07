@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, parse_account_id
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import address_book_pb2
 from polyester.models.address_book import AddressBookTagInput
@@ -109,7 +109,7 @@ def create_entry_to_proto(
         new_tags=tag_inputs_from_public(new_tags),
     )
     if subaccount_id is not None:
-        request.subaccount_id = subaccount_id
+        request.subaccount_id = parse_account_id(subaccount_id, "subaccount_id")
     if has_external:
         if not isinstance(address, str) or not address:
             raise PolyesterValidationError("address is required for an external entry")

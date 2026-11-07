@@ -24,7 +24,7 @@ from polyester.codecs.decode.private_orders import (
     private_orders_from_proto,
     private_orders_unit_from_proto,
 )
-from polyester.codecs.scalars import format_id, id_to_int
+from polyester.codecs.scalars import format_id, parse_account_id
 from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
@@ -179,7 +179,7 @@ class PrivateOrderStream:
         """
         if self._closed:
             raise PolyesterRealtimeError("private order stream is closed")
-        account = id_to_int(account_id, "account_id")
+        account = parse_account_id(account_id, "account_id")
         channel = private_orders_channel(account)
         consumer = self._new_consumer()
         s = self._subs.get(channel)
@@ -334,9 +334,7 @@ class PrivateOrderStream:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    self._fail_all(
-                        "connection_token", exc, terminal=_is_terminal_token_error(exc)
-                    )
+                    self._fail_all("connection_token", exc, terminal=_is_terminal_token_error(exc))
                     if not self._owns_connection():
                         return
                     await asyncio.sleep(_backoff_delay(attempt))
@@ -734,9 +732,7 @@ class PrivateOrderStream:
             s.stale = False
             self._deliver(s, PrivateOrdersStale(stale=False))
 
-    def _on_snapshot_end(
-        self, ws: ClientConnection, s: _Subscription, end: pb.SnapshotEnd
-    ) -> None:
+    def _on_snapshot_end(self, ws: ClientConnection, s: _Subscription, end: pb.SnapshotEnd) -> None:
         staged = s.staged
         s.staged = None
         if staged is None or len(staged) != end.count:

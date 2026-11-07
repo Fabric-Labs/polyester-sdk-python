@@ -10,7 +10,7 @@ from polyester.codecs.bps import (
     validate_bps,
 )
 from polyester.codecs.correlation_id import required_client_id
-from polyester.codecs.scalars import id_to_int, tick_count
+from polyester.codecs.scalars import id_to_int, parse_account_id, tick_count
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
@@ -413,7 +413,7 @@ def create_trigger_to_proto(
 
     proto = triggers_pb2.CreateTriggerRequest(trigger=intent)
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     return proto
 
 
@@ -484,7 +484,7 @@ def modify_trigger_to_proto(
         symbol_id=int(symbol_id),
     )
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if trigger_price is not None:
         proto.trigger_price_ticks = resolve_price_ticks(
             trigger_price, "trigger_price", symbol=symbol

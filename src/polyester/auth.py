@@ -5,7 +5,9 @@ import hashlib
 import os
 import threading
 import time
+import weakref
 from dataclasses import dataclass, field
+from typing import Any, NoReturn
 from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -19,13 +21,45 @@ MAX_SIGNING_FUTURE_SKEW_MS = 5_000
 _MAX_SIGNING_BACKPRESSURE_SECONDS = 10.0
 
 
+_NOT_SERIALIZABLE = (
+    "ApiKeyCredentials holds an API private key and cannot be pickled, deep-copied, "
+    "or converted with dataclasses.asdict or astuple"
+)
+
+
+def _refuse_serialization() -> NoReturn:
+    raise TypeError(_NOT_SERIALIZABLE)
+
+
 class _SigningTimestampAllocator:
-    """Allocate distinct millisecond timestamps without exceeding clock skew."""
+    """Allocate distinct millisecond timestamps without exceeding clock skew.
+
+    One allocator serves every credentials object for an API key ID in this
+    process, because the server rejects a repeated (API key, signature) pair.
+    """
 
     def __init__(self) -> None:
         self._last_timestamp_ms = 0
         self._lock = threading.Lock()
-        self._async_lock = asyncio.Lock()
+        # An asyncio lock belongs to one event loop, and every sync client runs
+        # its own, so async waiters queue per loop. ``_lock`` orders all loops.
+        self._async_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
+            weakref.WeakKeyDictionary()
+        )
+
+    def __reduce_ex__(self, protocol: Any) -> NoReturn:
+        _refuse_serialization()
+
+    def __deepcopy__(self, memo: Any) -> NoReturn:
+        _refuse_serialization()
+
+    def _async_lock(self) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        with self._lock:
+            lock = self._async_locks.get(loop)
+            if lock is None:
+                lock = self._async_locks[loop] = asyncio.Lock()
+            return lock
 
     def next(self) -> int:
         """Allocate immediately or fail with retryable capacity backpressure.
@@ -39,7 +73,7 @@ class _SigningTimestampAllocator:
         """Allocate with bounded, cooperative backpressure."""
 
         async def allocate() -> int:
-            async with self._async_lock:
+            async with self._async_lock():
                 while True:
                     try:
                         return self._try_next()
@@ -73,18 +107,53 @@ class _SigningTimestampAllocator:
         )
 
 
+_ALLOCATORS: dict[str, _SigningTimestampAllocator] = {}
+_ALLOCATORS_LOCK = threading.Lock()
+
+
+def _allocator_for_key(key_id: str) -> _SigningTimestampAllocator:
+    with _ALLOCATORS_LOCK:
+        allocator = _ALLOCATORS.get(key_id)
+        if allocator is None:
+            allocator = _ALLOCATORS[key_id] = _SigningTimestampAllocator()
+        return allocator
+
+
 @dataclass(frozen=True, slots=True)
 class ApiKeyCredentials:
+    """API-key authentication material.
+
+    Credentials with the same ``key_id`` share timestamp allocation within this
+    process, so identical requests never share a signature. The signing
+    protocol has no cross-process nonce; use one API key per process.
+
+    ``repr`` and ``str`` redact the private key. Pickling, deep-copying and
+    ``dataclasses.asdict``/``astuple`` raise ``TypeError``; read
+    ``private_key`` explicitly when you need it.
+    """
+
     key_id: str
     private_key: bytes = field(repr=False)
     _timestamp_allocator: _SigningTimestampAllocator = field(
-        default_factory=_SigningTimestampAllocator,
+        init=False,
         repr=False,
         compare=False,
     )
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_timestamp_allocator", _allocator_for_key(self.key_id))
+
     def __repr__(self) -> str:
         return f"ApiKeyCredentials(key_id={self.key_id!r}, private_key='[REDACTED]')"
+
+    def __copy__(self) -> ApiKeyCredentials:
+        return self
+
+    def __deepcopy__(self, memo: Any) -> NoReturn:
+        _refuse_serialization()
+
+    def __reduce_ex__(self, protocol: Any) -> NoReturn:
+        _refuse_serialization()
 
     def sign_payload(self, payload: bytes) -> bytes:
         """Sign exact protocol-defined business-payload bytes with Ed25519."""
@@ -168,9 +237,7 @@ def canonical_signing_string(
 ) -> str:
     # The server verifies the decoded path. Keep percent-escaped bytes that are
     # not UTF-8 as surrogates, so signing turns them back into the same bytes.
-    pathname = unquote_to_bytes(_validated_url(url).path or "/").decode(
-        "utf-8", "surrogateescape"
-    )
+    pathname = unquote_to_bytes(_validated_url(url).path or "/").decode("utf-8", "surrogateescape")
     return "\n".join(
         [timestamp_ms, method.upper(), pathname, canonical_query(url), sha256_hex(body)]
     )

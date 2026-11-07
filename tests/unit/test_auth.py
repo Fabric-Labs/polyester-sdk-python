@@ -166,8 +166,9 @@ async def test_concurrent_identical_requests_get_unique_bounded_auth_tuples() ->
 
 
 def test_sync_signing_capacity_fails_immediately_without_sleeping() -> None:
+    # A key ID of its own: allocators are shared per key ID for the process.
     credentials = ApiKeyCredentials(
-        key_id="key_123",
+        key_id="key_capacity_exhausted",
         private_key=Ed25519PrivateKey.generate().private_bytes_raw(),
     )
     allocator = credentials._timestamp_allocator

@@ -191,11 +191,19 @@ account-scoped operations such as private realtime channels, bucket transfers, a
 some ledger writes.
 
 Automatic request signing gives concurrent identical calls distinct authentication tuples.
+Credentials with the same API key ID share one timestamp allocator in the process, including
+separate `AsyncPolyester` and `Polyester` clients and independently loaded `ApiKeyCredentials`.
+The signing protocol has no cross-process nonce, so assign one API key per process; sharing a key
+between processes can produce identical authentication tuples.
 Timestamps can lead the local clock by at most five seconds. The async client applies bounded,
 cooperative backpressure without blocking the event loop. The low-level synchronous
 `polyester.auth.sign_request` helper instead raises `PolyesterRateLimitError` immediately when
 capacity is exhausted; honor `retry_after`. Neither path reuses a signature or drifts outside the
 API's 10-second freshness window.
+
+`ApiKeyCredentials` redacts the private key in `repr`, `str` and logging. Pickling, deep-copying
+and `dataclasses.asdict`/`astuple` raise `TypeError`, also for a dataclass that holds the
+credentials; read `private_key` explicitly when you need it.
 
 Recognized retry-later Connect `resource_exhausted` and REST admission-limit responses raise `PolyesterRateLimitError`. When the
 server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under

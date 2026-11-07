@@ -20,7 +20,7 @@ from polyester.models.zipper import (
 def _token_config(address: str, decimals: int) -> ZipperTokenConfig:
     return ZipperTokenConfig(
         address=address or "",
-        decimals=int(decimals) if decimals else 18,
+        decimals=int(decimals),
     )
 
 

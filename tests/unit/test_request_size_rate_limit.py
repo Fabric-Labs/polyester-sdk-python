@@ -297,3 +297,40 @@ def test_request_size_and_wallet_predicates_read_only_their_codes() -> None:
     assert not is_request_too_large(PolyesterRateLimitError("x", code="REQUEST_TOO_LARGE"))
     assert not is_wallet_already_linked(PolyesterApiError("x", code="AUTH_WALLET_LOGIN_FAILED"))
     assert is_wallet_already_linked(PolyesterApiError("x", code="AUTH_WALLET_ALREADY_LINKED"))
+
+
+@pytest.mark.parametrize(
+    "retry_after_ms",
+    [
+        pytest.param("²", id="superscript two"),
+        pytest.param("٣", id="arabic-indic three"),
+        pytest.param("9" * 5000, id="5000 digits"),
+        pytest.param(str(1 << 64), id="above uint64"),
+        pytest.param("-1", id="negative"),
+        pytest.param("1.5", id="decimal"),
+    ],
+)
+async def test_rate_limit_problem_ignores_an_unreadable_integer(
+    httpserver: HTTPServer, retry_after_ms: str
+) -> None:
+    # Only ASCII digits within uint64 are an integer; anything else is absent,
+    # so the delay falls back to Retry-After.
+    error = await _rest_error(
+        httpserver,
+        429,
+        {
+            **RATE_LIMIT_PROBLEM,
+            "rate_limit": {
+                "reason": "QUOTA_EXCEEDED",
+                "scope": "CLIENT_IP",
+                "limit": retry_after_ms,
+                "retry_after_ms": retry_after_ms,
+            },
+        },
+        headers={"Retry-After": "2"},
+    )
+    assert isinstance(error, PolyesterRateLimitError), repr(error)
+    assert error.code == "ERROR_CODE_RATE_LIMIT_EXCEEDED"
+    assert error.detail == RateLimitDetail(reason="QUOTA_EXCEEDED", scope="CLIENT_IP")
+    assert error.retry_after == 2.0
+    assert is_retryable_error(error)

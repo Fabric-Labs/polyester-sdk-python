@@ -1374,10 +1374,21 @@ See [CHANGELOG.md](CHANGELOG.md).
 Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
 defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
 
-Some RPCs may return HTTP 404 on devnet. The SDK raises `PolyesterRouteNotFoundError`
-with a clearer message than `[unimplemented]: Not Found`. HTTP 501 and Connect
-`unimplemented` raise `PolyesterNotImplementedError`, the parent class of
-`PolyesterRouteNotFoundError`; neither is retryable.
+Some RPCs may return HTTP 404 on devnet. A bare 404 (no JSON body, or a router's
+own "not found" message) raises `PolyesterRouteNotFoundError` with a clearer message
+than `[unimplemented]: Not Found`. Connect `unimplemented` and a contract code at
+HTTP 501 raise `PolyesterNotImplementedError`, the parent class of
+`PolyesterRouteNotFoundError`; neither is retryable. A route error has an unknown
+mutation outcome, because whatever answered wasn't the service.
+
+An HTTP error with no code the contract defines can come from a gateway or an edge,
+so it doesn't prove a request was refused. Only a 401 or 403 is a refusal on its
+status alone (`PolyesterAuthError`). Every other status raises
+`PolyesterServerError` with `mutation_outcome_unknown(error)` true and
+`is_retryable_error(error)` false, and keeps any code it did send in `error.code`.
+Read back before sending a mutation again. Reads retry 429, 502, 503 and 504 for you.
+The one exception is a well-formed but unrecognised code at HTTP 429, which raises
+`PolyesterApiError`: known and not retryable.
 
 API-key rejections from the gateway carry a code. A request whose signed
 timestamp falls outside the server's skew window raises

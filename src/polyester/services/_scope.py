@@ -13,9 +13,12 @@ def _public_id(value: str | int, label: str) -> str:
 
     Downstream parsing reads an all-digit string as base58 when it round-trips,
     so ``str(42)`` would address ID 175. ``format_id`` validates the uint64
-    range and refuses ``bool``.
+    range and refuses ``bool``. 0 is refused: on the wire it means unset (the
+    main account), so it must not be sent as an explicit ID.
     """
     if isinstance(value, int):
+        if value == 0 and not isinstance(value, bool):
+            raise PolyesterValidationError(f"{label} must be a non-zero ID, not 0")
         try:
             return format_id(value)
         except PolyesterValidationError as exc:

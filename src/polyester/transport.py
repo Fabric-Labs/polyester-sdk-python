@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from base64 import b64decode
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -14,6 +16,7 @@ from connectrpc.code import Code
 from connectrpc.codec import proto_binary_codec
 from connectrpc.errors import ConnectError
 from connectrpc.interceptor import UnaryInterceptor
+from connectrpc.request import RequestContext
 from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
@@ -373,6 +376,40 @@ class _ConnectHTTPClient:
         return _raise_for_gateway_rejection(response)
 
 
+class _CancellationUnaryInterceptor(UnaryInterceptor):
+    """End a call the caller cancelled with ``CancelledError``, never an SDK error.
+
+    connectrpc reports a call cancelled in flight as ``ConnectError`` with code
+    ``canceled``, raised from the ``CancelledError``. On Python 3.11 its
+    ``asyncio.wait_for`` can also drop a cancellation that lands as the answer
+    arrives. Either way the task's ``cancelling()`` count shows the request, so
+    the call ends cancelled: ``asyncio.timeout`` then raises ``TimeoutError``
+    and a cancelled task stops. A ``canceled`` answer from the server, with no
+    cancellation of the caller, stays an error.
+    """
+
+    async def intercept_unary(
+        self,
+        call_next: Callable[[Message, RequestContext], Awaitable[Message]],
+        request: Message,
+        ctx: RequestContext,
+    ) -> Message:
+        task = asyncio.current_task()
+        cancelling = task.cancelling() if task is not None else 0
+        try:
+            response = await call_next(request, ctx)
+        except ConnectError as exc:
+            cancelled = exc.__cause__
+            if exc.code is Code.CANCELED and isinstance(cancelled, asyncio.CancelledError):
+                raise cancelled from None
+            if task is not None and task.cancelling() > cancelling:
+                raise asyncio.CancelledError() from exc
+            raise
+        if task is not None and task.cancelling() > cancelling:
+            raise asyncio.CancelledError()
+        return response
+
+
 def codec_for_config(config: TransportConfig):
     if config.wire_format == "json":
         return _PROTO_JSON_CODEC
@@ -410,8 +447,12 @@ class TransportFactory:
         )
         self._codec = codec_for_config(config)
         self._connect_http = _ConnectHTTPClient()
-        self._user_agent_interceptor = UserAgentUnaryInterceptor()
-        self._auth_interceptors: list[UnaryInterceptor] = [self._user_agent_interceptor]
+        # Outermost, so no other interceptor sees a cancellation as an error.
+        self._public_interceptors: list[UnaryInterceptor] = [
+            _CancellationUnaryInterceptor(),
+            UserAgentUnaryInterceptor(),
+        ]
+        self._auth_interceptors: list[UnaryInterceptor] = list(self._public_interceptors)
         if credentials is not None:
             self._auth_interceptors.append(
                 ApiKeyAuthUnaryInterceptor(
@@ -438,7 +479,7 @@ class TransportFactory:
     def create_public_client(self, client_cls: type):
         return client_cls(
             self.config.api_url,
-            interceptors=[self._user_agent_interceptor],
+            interceptors=self._public_interceptors,
             **self._client_kwargs(),
         )
 

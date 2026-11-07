@@ -7,7 +7,7 @@ from typing import Any
 
 import msgspec
 
-from polyester.codecs.scalars import format_qty_scaled
+from polyester.codecs.scalars import format_qty_scaled, format_scaled, validate_protocol_scale
 from polyester.models.order_key import OrderKey
 from polyester.models.ratelimit import RateLimitDetail
 from polyester.types.money import AssetAmount, Price, Quantity
@@ -97,10 +97,11 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         (``CatalogManager.base_quantity_scale_for_symbol_id``); it defaults to
         ``cum_qty.scale``. Zero without fills. Exactly the settled quote when
         ``base_quantity_scale`` is at most 9; above that it can exceed the
-        settled quote by less than 1e-18 per fill.
+        settled quote by less than 1e-18 per fill. ``base_quantity_scale``
+        must be from 0 to 36.
         """
         scale = self._require_base_scale(base_quantity_scale)
-        return Decimal(format_qty_scaled(int(self.cum_notional_scaled or 0), 9 + scale))
+        return Decimal(format_scaled(int(self.cum_notional_scaled or 0), 9 + scale))
 
     def _require_base_scale(self, base_quantity_scale: int | None) -> int:
         scale = self._base_scale(base_quantity_scale)
@@ -110,7 +111,7 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
             raise PolyesterValidationError(
                 "base_quantity_scale is required: pass the pair's base quantity scale"
             )
-        return scale
+        return validate_protocol_scale(scale, field_name="base_quantity_scale")
 
     def _quote_used_scaled(self, base_quantity_scale: int | None) -> tuple[int, int] | None:
         """``(amount, scale)`` of the quote the fills used, or ``None``."""
@@ -148,7 +149,7 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         used = self._quote_used_scaled(base_quantity_scale)
         if used is None:
             return None
-        return Decimal(format_qty_scaled(used[0], used[1]))
+        return Decimal(format_scaled(used[0], used[1]))
 
     def quote_unspent(
         self, *, quote_quantity_scale: int, base_quantity_scale: int | None = None
@@ -159,6 +160,7 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         ``quote_quantity_scale``) less :meth:`quote_used`. ``None`` for an
         order not sized by a quote amount, or while ``quote_used`` is ``None``.
         """
+        validate_protocol_scale(quote_quantity_scale, field_name="quote_quantity_scale")
         if not self.submitted_max_quote_debit_scaled:
             return None
         used = self._quote_used_scaled(base_quantity_scale)
@@ -167,7 +169,7 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         scale = max(used[1], quote_quantity_scale)
         budget = int(self.submitted_max_quote_debit_scaled) * 10 ** (scale - quote_quantity_scale)
         spent = used[0] * 10 ** (scale - used[1])
-        return Decimal(format_qty_scaled(budget - spent, scale))
+        return Decimal(format_scaled(budget - spent, scale))
 
 
 class OrderFeeTotal(msgspec.Struct, kw_only=True, omit_defaults=True):

@@ -109,7 +109,7 @@ class Section(_message.Message):
     def __init__(self, heading: _Optional[str] = ..., summary: _Optional[str] = ..., changes: _Optional[_Iterable[_Union[Change, _Mapping]]] = ..., surface: _Optional[_Union[Surface, str]] = ...) -> None: ...
 
 class PostSummary(_message.Message):
-    __slots__ = ("slug", "title", "introduction", "published_at", "coverage_cutoff", "change_count", "breaking_change_count", "action_required_count", "new_feature_count", "improvement_count", "bug_fix_count")
+    __slots__ = ("slug", "title", "introduction", "published_at", "coverage_cutoff", "change_count", "breaking_change_count", "action_required_count", "new_feature_count", "improvement_count", "bug_fix_count", "updated_at", "revision")
     SLUG_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     INTRODUCTION_FIELD_NUMBER: _ClassVar[int]
@@ -121,6 +121,8 @@ class PostSummary(_message.Message):
     NEW_FEATURE_COUNT_FIELD_NUMBER: _ClassVar[int]
     IMPROVEMENT_COUNT_FIELD_NUMBER: _ClassVar[int]
     BUG_FIX_COUNT_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     slug: str
     title: str
     introduction: str
@@ -132,7 +134,9 @@ class PostSummary(_message.Message):
     new_feature_count: int
     improvement_count: int
     bug_fix_count: int
-    def __init__(self, slug: _Optional[str] = ..., title: _Optional[str] = ..., introduction: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., coverage_cutoff: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., change_count: _Optional[int] = ..., breaking_change_count: _Optional[int] = ..., action_required_count: _Optional[int] = ..., new_feature_count: _Optional[int] = ..., improvement_count: _Optional[int] = ..., bug_fix_count: _Optional[int] = ...) -> None: ...
+    updated_at: _timestamp_pb2.Timestamp
+    revision: int
+    def __init__(self, slug: _Optional[str] = ..., title: _Optional[str] = ..., introduction: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., coverage_cutoff: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., change_count: _Optional[int] = ..., breaking_change_count: _Optional[int] = ..., action_required_count: _Optional[int] = ..., new_feature_count: _Optional[int] = ..., improvement_count: _Optional[int] = ..., bug_fix_count: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class Post(_message.Message):
     __slots__ = ("summary", "sections")

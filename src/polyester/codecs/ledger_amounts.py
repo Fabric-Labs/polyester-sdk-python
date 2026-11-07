@@ -10,21 +10,22 @@ LEDGER_SCALE = 18
 def format_ledger_u128(raw: str | int, *, scale: int = LEDGER_SCALE) -> str:
     """Format a ledger u128 wire value (decimal string or int) to a human decimal.
 
-    Validates ``scale`` against ``MAX_PROTOCOL_SCALE`` before any padding or
-    ``10**scale`` work so pathological catalog scales cannot DoS the process.
+    ``scale`` defaults to the 18-decimal ledger scale. Any other scale, including
+    0 (whole units), is used as given. It is validated against
+    ``MAX_PROTOCOL_SCALE`` before any padding or ``10**scale`` work so
+    pathological catalog scales cannot DoS the process.
     """
-    resolved = LEDGER_SCALE if scale == 0 else scale
-    validate_protocol_scale(resolved)
+    validate_protocol_scale(scale)
     if isinstance(raw, bool):
         raise PolyesterValidationError("ledger amount must be a decimal string or int")
     if isinstance(raw, int):
         if raw < 0:
             raise PolyesterValidationError("ledger amount must be non-negative")
-        return format_qty_scaled(raw, resolved)
+        return format_qty_scaled(raw, scale)
     text = str(raw or "0").strip()
     if not text or not text.isdecimal():
         raise PolyesterValidationError("ledger amount must be a non-negative decimal string")
-    return format_qty_scaled(int(text), resolved)
+    return format_qty_scaled(int(text), scale)
 
 
 __all__ = [

@@ -40,14 +40,14 @@ from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from polyester.models.trading import OrderFieldViolation
-from polyester.transport import GatewayProblemError
+from polyester.transport import (
+    AMBIGUOUS_CONNECT_CODES,
+    ROUTE_NOT_FOUND_MESSAGES,
+    GatewayProblemError,
+)
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
-_ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
 _EMPTY_ERROR_MESSAGE = "request failed without server error details"
-# connectrpc reports a bare (non-Connect) HTTP error by its status phrase; a
-# bare 501 arrives as code ``unknown`` with this message.
-_HTTP_501_PHRASE = "Not Implemented"
 _SERVICE_ERROR_ENUMS = {
     "orders.v1.ErrorDetail": orders_pb2.ErrorCode,
     "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorCode,
@@ -182,6 +182,8 @@ def _map_gateway_problem(exc: GatewayProblemError):
         return PolyesterServerError(
             message or "Gateway Timeout", code=exc.problem_code or None, status_code=504
         )
+    if code == "unimplemented" and exc.http_status == 501:
+        return PolyesterNotImplementedError(message, code=order_code)
     if exc.problem_code == AUTH_SESSION_KIND_NOT_ALLOWED:
         return PolyesterSessionRequiredError(
             exc.detail or "interactive session required", status_code=exc.http_status
@@ -192,14 +194,14 @@ def _map_gateway_problem(exc: GatewayProblemError):
         return PolyesterAuthError(
             message,
             status_code=exc.http_status,
-            code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code,
+            code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code or code,
         )
     if exc.http_status == 503 and order_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
         return PolyesterApiError(message, code=order_code)
     if code in ("unavailable", "internal"):
         return PolyesterServerError(
             message,
-            code=_order_error_code_from_rest(exc.problem_code),
+            code=_order_error_code_from_rest(exc.problem_code) or None,
             status_code=exc.http_status,
         )
     if code in ("resource_exhausted", "unknown"):
@@ -408,8 +410,10 @@ def _map_connect_error(exc: ConnectError):
     if code == "deadline_exceeded":
         return PolyesterTimeoutError(error_message)
     message = (exc.message or "").strip().lower()
-    if code == "unimplemented" and message in _ROUTE_NOT_FOUND_MESSAGES:
+    if code == "unimplemented" and message in ROUTE_NOT_FOUND_MESSAGES:
         return PolyesterRouteNotFoundError()
-    if code == "unimplemented" or (code == "unknown" and exc.message == _HTTP_501_PHRASE):
+    if code == "unimplemented":
         return PolyesterNotImplementedError(error_message)
+    if code in AMBIGUOUS_CONNECT_CODES:
+        return PolyesterServerError(error_message)
     return PolyesterApiError(error_message, code=code)

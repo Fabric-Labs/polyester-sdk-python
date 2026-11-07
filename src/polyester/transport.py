@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from base64 import b64decode
 from contextlib import suppress
 from dataclasses import dataclass
 from http import HTTPStatus
 from math import isfinite
-from typing import Literal
+from typing import Literal, NoReturn
 
 import httpx
 import pyqwest
@@ -17,6 +18,7 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
 
+from polyester._contract_codes import is_recognised_rest_code
 from polyester._problem import decode_http_problem
 from polyester.auth import ApiKeyCredentials
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
@@ -81,7 +83,7 @@ class _ConnectErrorWithRetryAfter(ConnectError):
 
 
 _CONNECT_CODES = frozenset(code.value for code in Code)
-# HTTP status -> Connect code for a non-Connect error body (Connect protocol table).
+# HTTP status -> Connect code for a REST problem whose code the contract defines.
 _HTTP_STATUS_TO_CODE = {
     # A REST problem body at 400 is a refused request (VALIDATION_ERROR,
     # QTY_STEP_SIZE, ...), not a server failure.
@@ -89,20 +91,24 @@ _HTTP_STATUS_TO_CODE = {
     401: Code.UNAUTHENTICATED,
     403: Code.PERMISSION_DENIED,
     404: Code.UNIMPLEMENTED,
+    409: Code.ABORTED,
     # REST answers a precondition refusal (for example
     # AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED) with 412, Connect with failed_precondition.
     412: Code.FAILED_PRECONDITION,
+    413: Code.INVALID_ARGUMENT,
     429: Code.UNAVAILABLE,
+    501: Code.UNIMPLEMENTED,
     502: Code.UNAVAILABLE,
     503: Code.UNAVAILABLE,
     504: Code.UNAVAILABLE,
 }
 
 
-# HTTP status -> Connect code for an unreadable JSON error body. Only a 401 or
-# 403 is a refusal on its status alone. The rest prove nothing about a mutation,
-# so they stay ambiguous; these unavailable statuses also let reads retry.
-_UNREADABLE_BODY_STATUS_TO_CODE = {
+# HTTP status -> Connect code for an answer with no recognised code. Only a 401
+# or 403 is a refusal on its status alone. The rest prove nothing about a
+# mutation, so they stay ambiguous; these unavailable statuses also let reads
+# retry. Every other status is Code.INTERNAL.
+_NO_RECOGNISED_CODE_STATUS_TO_CODE = {
     401: Code.UNAUTHENTICATED,
     403: Code.PERMISSION_DENIED,
     429: Code.UNAVAILABLE,
@@ -110,6 +116,31 @@ _UNREADABLE_BODY_STATUS_TO_CODE = {
     503: Code.UNAVAILABLE,
     504: Code.UNAVAILABLE,
 }
+
+# Statuses that refuse a request whatever their code says.
+_REFUSAL_STATUSES = frozenset({401, 403})
+# A REST problem code in the contract's form. A new one at 429 is a refusal this
+# SDK version can't name yet; anything else there isn't a code at all.
+_REST_CODE_FORM = re.compile(r"[A-Z][A-Z0-9_]*")
+_TYPE_URL_PREFIX = "type.googleapis.com/"
+
+# Connect codes the contract never uses. None of them says a request was refused.
+AMBIGUOUS_CONNECT_CODES = frozenset({"unknown", "data_loss", "canceled"})
+
+# A router's own answer for a path it doesn't know.
+ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
+
+# Detail types that carry a contract code; a body with one of these has a code.
+_SERVICE_DETAIL_TYPES = frozenset(
+    {
+        "auth.v1.AuthErrorDetail",
+        "orders.v1.ErrorDetail",
+        "chain.withdraw.v1.ErrorDetail",
+        "transfer.v1.ErrorDetail",
+        "ledger.read.v1.ErrorDetail",
+        "polyester.ratelimit.v1.RateLimitDetail",
+    }
+)
 
 
 def _connect_error_details(value: object) -> list[AnyMessage] | None:
@@ -135,19 +166,63 @@ def _connect_error_details(value: object) -> list[AnyMessage] | None:
             raw = b64decode(data + "===")
         except ValueError:
             return None
-        details.append(AnyMessage(type_url="type.googleapis.com/" + type_name, value=raw))
+        details.append(AnyMessage(type_url=_TYPE_URL_PREFIX + type_name, value=raw))
     return details
 
 
-def _unreadable_connect_error(status: int) -> ConnectError:
-    """Report a Connect body that can't be read by its HTTP status alone."""
+def _status_line(status: int) -> str:
     try:
         phrase = HTTPStatus(status).phrase
     except ValueError:
         phrase = ""
+    return f"{status} {phrase}".strip()
+
+
+def _unreadable_connect_error(status: int) -> ConnectError:
+    """Report a Connect body that can't be read by its HTTP status alone."""
     return ConnectError(
-        _UNREADABLE_BODY_STATUS_TO_CODE.get(status, Code.INTERNAL), f"{status} {phrase}".strip()
+        _NO_RECOGNISED_CODE_STATUS_TO_CODE.get(status, Code.INTERNAL), _status_line(status)
     )
+
+
+def _body_text(body: object, status: int) -> str:
+    """The body's own words for an error, or its status line."""
+    if isinstance(body, dict):
+        for key in ("message", "detail", "title"):
+            value = body.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return _status_line(status)
+
+
+def _is_bare_404(response: pyqwest.FullResponse, body: object, is_json: bool) -> bool:
+    """A 404 no service wrote: not JSON, empty, or a router's own message."""
+    if not is_json or not response.content:
+        return True
+    message = body.get("message") if isinstance(body, dict) else None
+    return isinstance(message, str) and message.strip().lower() in ROUTE_NOT_FOUND_MESSAGES
+
+
+def _no_recognised_code_error(
+    response: pyqwest.FullResponse, body: object, *, code: str = ""
+) -> ConnectError:
+    """Report an answer with no recognised code by its HTTP status.
+
+    A gateway or an edge can send any of these, so none of them proves that a
+    mutation was refused. ``code`` is kept for diagnosis only.
+    """
+    status = response.status
+    known = _NO_RECOGNISED_CODE_STATUS_TO_CODE.get(status)
+    message = _body_text(body, status)
+    if known is None or (code and status != 429):
+        return GatewayProblemError(
+            known or Code.INTERNAL,
+            code,
+            http_status=status,
+            detail=message,
+            problem=decode_http_problem(body, status),
+        )
+    return ConnectError(known, message)
 
 
 def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.FullResponse:
@@ -162,9 +237,9 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
     """
     if response.status == 200:
         return response
-    content_type = response.headers.get("content-type", "").lower()
+    is_json = "json" in response.headers.get("content-type", "").lower()
     body = None
-    if "json" in content_type:
+    if is_json:
         with suppress(Exception):
             body = response.json()
     code = body.get("code") if isinstance(body, dict) else None
@@ -179,31 +254,91 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             if isfinite(value) and value >= 0:
                 retry_after = value
                 break
+    status = response.status
     has_connect_code = isinstance(code, str) and code in _CONNECT_CODES
-    # A non-Connect 504 cannot prove that a mutation was refused, even if
-    # the gateway sent HTML, malformed JSON, or no structured code at all.
-    no_usable_code = response.status != 504 and (not isinstance(code, str) or not code)
-    if isinstance(body, dict) and (has_connect_code or no_usable_code):
+    has_no_code = not isinstance(code, str) or not code
+    details: list[AnyMessage] = []
+    if isinstance(body, dict) and (has_connect_code or has_no_code):
         # The Connect client decodes both of these bodies, and neither its
         # decoder nor the error mapping tolerates a malformed one.
-        details = _connect_error_details(body.get("details"))
+        decoded = _connect_error_details(body.get("details"))
         message = body.get("message")
-        if details is None or not isinstance(message, str | None):
-            raise _unreadable_connect_error(response.status)
+        if decoded is None or not isinstance(message, str | None):
+            raise _unreadable_connect_error(status)
+        details = decoded
         if code == "resource_exhausted" and retry_after is not None:
             # Preserve valid Connect details while carrying response backoff
             # through a ConnectError, whose upstream type has no metadata.
             raise _ConnectErrorWithRetryAfter(message or "", details, retry_after)
+    if has_connect_code:
+        # These say nothing a 401 or 403 doesn't already say better.
+        if (
+            code in AMBIGUOUS_CONNECT_CODES
+            and status in _REFUSAL_STATUSES
+            and not _has_service_detail(details)
+        ):
+            raise _no_recognised_code_error(response, body)
         return response
-    if no_usable_code:
+    if has_no_code:
+        return _answer_without_a_code(response, body, is_json, code, details)
+    assert isinstance(code, str)
+    if is_recognised_rest_code(code) or (status == 429 and _REST_CODE_FORM.fullmatch(code)):
+        fallback = Code.INTERNAL if status >= 500 else Code.FAILED_PRECONDITION
+        _raise_problem(
+            response, body, code, _HTTP_STATUS_TO_CODE.get(status, fallback), retry_after
+        )
+    if status in _REFUSAL_STATUSES:
+        _raise_problem(
+            response, body, code, _NO_RECOGNISED_CODE_STATUS_TO_CODE[status], retry_after
+        )
+    raise _no_recognised_code_error(response, body, code=code)
+
+
+def _has_service_detail(details: list[AnyMessage]) -> bool:
+    return any(d.type_url.removeprefix(_TYPE_URL_PREFIX) in _SERVICE_DETAIL_TYPES for d in details)
+
+
+def _answer_without_a_code(
+    response: pyqwest.FullResponse,
+    body: object,
+    is_json: bool,
+    code: object,
+    details: list[AnyMessage],
+) -> pyqwest.FullResponse:
+    """Let Connect read what its table gets right; report the rest by status."""
+    status = response.status
+    if status < 400:
         return response
+    if status == 504:
+        # A non-Connect 504 cannot prove that a mutation was refused, even if
+        # the gateway sent HTML, malformed JSON, or no structured code at all.
+        _raise_problem(response, body, "", Code.UNAVAILABLE, None)
+    if _has_service_detail(details):
+        return response
+    # Connect's status table agrees with these, unless a non-string code would
+    # stop its decoder.
+    if status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and (code is None or isinstance(code, str)):
+        return response
+    # Connect reads this as unimplemented, which the error mapping names a
+    # missing route.
+    if status == 404 and _is_bare_404(response, body, is_json):
+        return response
+    raise _no_recognised_code_error(response, body)
+
+
+def _raise_problem(
+    response: pyqwest.FullResponse,
+    body: object,
+    code: str,
+    connect_code: Code,
+    retry_after: float | None,
+) -> NoReturn:
     if not isinstance(body, dict):
         body = {}
-    code = code if isinstance(code, str) else ""
     detail = body.get("detail")
     violations = body.get("violations")
     raise GatewayProblemError(
-        _HTTP_STATUS_TO_CODE.get(response.status, Code.UNKNOWN),
+        connect_code,
         code,
         http_status=response.status,
         problem=decode_http_problem(body, response.status),

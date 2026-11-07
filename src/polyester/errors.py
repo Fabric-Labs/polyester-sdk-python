@@ -152,7 +152,12 @@ class PolyesterRateLimitError(PolyesterTransportError):
 
 
 class PolyesterServerError(PolyesterTransportError):
-    """Raised for server-side 5xx failures."""
+    """Raised for server-side failures and any HTTP error that can't prove a refusal.
+
+    That is a 5xx, or a 4xx other than 401 and 403 with no code the contract
+    defines: a gateway or an edge can send those too. ``code`` keeps an
+    unrecognised code for diagnosis, and ``status_code`` the HTTP status.
+    """
 
     def __init__(
         self,
@@ -373,15 +378,19 @@ def is_mfa_last_factor_required(err: BaseException) -> bool:
 
 
 class PolyesterNotImplementedError(PolyesterApiError):
-    """Raised for HTTP 501 or Connect ``unimplemented``: the server does not
-    offer this RPC or feature. Not retryable."""
+    """Raised for Connect ``unimplemented`` or a contract code at HTTP 501: the
+    server does not offer this RPC or feature. Not retryable."""
 
     def __init__(self, message: str, *, code: str | None = "unimplemented") -> None:
         super().__init__(message, code=code)
 
 
 class PolyesterRouteNotFoundError(PolyesterNotImplementedError):
-    """Raised when the gateway has no route for a Connect RPC (plain HTTP 404)."""
+    """Raised when the gateway has no route for a Connect RPC (plain HTTP 404).
+
+    Outcome unknown: whatever answered isn't the service, so it can't prove that
+    a mutation wasn't applied. Not retryable.
+    """
 
     def __init__(self, procedure: str | None = None) -> None:
         hint = (
@@ -504,14 +513,14 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
     """Return whether the server may have applied a failed mutation.
 
     True for ambiguous transport and server errors (excluding known admission
-    refusals, rate limits and timestamp skew), for
-    a malformed success response, and for an order or trigger create, cancel,
-    modify or control that was sent but not confirmed in time
-    (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or trigger back before
-    retrying.
+    refusals, rate limits and timestamp skew), for any HTTP error with no
+    recognised code except a 401 or 403, for a bare 404, for a malformed success
+    response, and for an order or trigger create, cancel, modify or control that
+    was sent but not confirmed in time (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read
+    the order or trigger back before retrying.
     """
     return (
-        isinstance(err, PolyesterResponseContractError)
+        isinstance(err, (PolyesterResponseContractError, PolyesterRouteNotFoundError))
         or _is_outcome_unknown_api_error(err)
         or (
             isinstance(err, (PolyesterTransportError, PolyesterServerError))

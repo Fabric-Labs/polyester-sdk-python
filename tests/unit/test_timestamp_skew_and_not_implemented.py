@@ -1,4 +1,4 @@
-"""TIMESTAMP_SKEW is a retryable error; 501 / unimplemented is NotImplemented."""
+"""TIMESTAMP_SKEW is a retryable error; Connect unimplemented is NotImplemented."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from polyester import (
     PolyesterAuthError,
     PolyesterNotImplementedError,
     PolyesterRouteNotFoundError,
+    PolyesterServerError,
     PolyesterTimestampSkewError,
     is_retryable_error,
     mutation_outcome_unknown,
@@ -135,12 +136,14 @@ def test_missing_route_stays_route_not_found_and_is_not_implemented() -> None:
 
 
 @pytest.mark.asyncio
-async def test_bare_http_501_is_not_implemented(httpserver: HTTPServer) -> None:
+async def test_bare_http_501_proves_nothing_about_a_mutation(httpserver: HTTPServer) -> None:
     httpserver.expect_request(SPOT_CONFIG_PATH, method="POST").respond_with_data(
         "not implemented", status=501, content_type="text/plain"
     )
 
     error = await _spot_config_error(httpserver)
 
-    assert isinstance(error, PolyesterNotImplementedError)
+    assert type(error) is PolyesterServerError
+    assert error.status_code == 501
     assert not is_retryable_error(error)
+    assert mutation_outcome_unknown(error)

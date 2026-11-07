@@ -20,15 +20,38 @@ DEPTH_TO_PROTO: dict[int, str] = {
 }
 
 
-def depth_to_connect_enum(depth: int) -> str:
-    if depth in DEPTH_TO_PROTO:
-        return DEPTH_TO_PROTO[depth]
-    closest = min(ORDERBOOK_SUPPORTED_DEPTHS, key=lambda value: abs(value - depth))
-    return DEPTH_TO_PROTO[closest]
+ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH = 50
 
 
 def _is_int(depth: object) -> bool:
     return isinstance(depth, int) and not isinstance(depth, bool)
+
+
+def orderbook_snapshot_depth(depth: int) -> int:
+    """Snapshot depth ``orderbook.get`` requests for ``depth``.
+
+    ``depth`` itself when it is a snapshot depth, else the smallest one covering it, so a
+    snapshot never holds fewer levels than asked; 0 is the default 50. A depth below 0 or
+    above the deepest snapshot depth, or not an integer, is refused.
+    """
+    if not _is_int(depth) or depth < 0:
+        raise PolyesterValidationError(
+            f"orderbook snapshot depth must be a non-negative integer, got {depth!r}"
+        )
+    if depth == 0:
+        return ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
+    for supported in ORDERBOOK_SUPPORTED_DEPTHS:
+        if supported >= depth:
+            return supported
+    raise PolyesterValidationError(
+        f"orderbook snapshot depth {depth} is above the deepest snapshot depth "
+        f"({ORDERBOOK_SUPPORTED_DEPTHS[-1]})"
+    )
+
+
+def depth_to_connect_enum(depth: int) -> str:
+    """Wire depth name for ``depth``, by the rule of :func:`orderbook_snapshot_depth`."""
+    return DEPTH_TO_PROTO[orderbook_snapshot_depth(depth)]
 
 
 def orderbook_stream_tier(depth: int) -> int:

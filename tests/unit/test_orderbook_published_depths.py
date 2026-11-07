@@ -473,21 +473,27 @@ async def test_coarse_bucket_above_the_price_shows_the_zero_bid_at_a_trimmed_dep
         await sub.aclose()
 
 
-async def test_zero_price_outside_the_trimmed_view_still_closes_the_stream() -> None:
+async def test_zero_price_outside_the_trimmed_view_resyncs_at_the_tier() -> None:
+    # Refused before it reaches the book: rebuilt from a fresh tier snapshot, still open.
     async with harness() as h:
         errors: list[Exception] = []
+        gaps: list[str] = []
         sub = await h.client.orderbook.create_subscription(
-            symbol="BTC-USDT", depth=10, on_error=errors.append
+            symbol="BTC-USDT",
+            depth=10,
+            on_error=errors.append,
+            on_sequence_gap=lambda: gaps.append("gap"),
         )
-        await next_view(sub, what="first view")
+        first = await next_view(sub, what="first view")
         await h.market.send(20, start=100, end=101, bids={0: 5})
-        rows = []
-        async with asyncio.timeout(WAIT):
-            async for row in sub:
-                rows.append(row)
-        assert rows == []
-        assert "invalid or missing price" in str(sub.last_error)
-        assert errors == [sub.last_error]
+        refreshed = await next_view(sub, what="view after the refused delta")
+        assert refreshed.book_seq == first.book_seq
+        assert bid_ticks(refreshed) == bid_ticks(first)
+        assert h.market.snapshot_requests == ["DEPTH_20", "DEPTH_20"]
+        assert gaps == ["gap"]
+        assert errors == []
+        assert sub.last_error is None
+        await sub.aclose()
 
 
 async def test_reconnect_stays_on_the_tier_and_refetches_at_it() -> None:

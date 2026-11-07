@@ -325,27 +325,25 @@ async def test_raw_zero_delta_never_becomes_a_display_bucket(monkeypatch, bucket
         delta = decode(wire.SerializeToString())
         assert list(getattr(delta, side)) == [("0", str(quantity))]
         await queue.put(delta)
+        view = await asyncio.wait_for(anext(sub), 3)
+        assert view.bids == initial.bids
+        assert view.asks == initial.asks
+        assert sub.last_error is None
+        assert errors == []
         if quantity:
-            with pytest.raises(StopAsyncIteration):
-                await asyncio.wait_for(anext(sub), 3)
-            assert sub.last_error is not None
-            assert "invalid or missing price" in str(sub.last_error)
-            assert len(errors) == 1
+            # Refused like any malformed delta: rebuilt from a fresh snapshot.
+            assert view.book_seq == "1"
+            assert fetch.await_count == 2
         else:
-            view = await asyncio.wait_for(anext(sub), 3)
             assert view.book_seq == "2"
-            assert view.bids == initial.bids
-            assert view.asks == initial.asks
-            assert sub.last_error is None
-            assert errors == []
-        fetch.assert_awaited_once()
+            fetch.assert_awaited_once()
         realtime.subscribe_proto.assert_awaited_once()
     finally:
         await sub.aclose()
 
 
 @pytest.mark.parametrize("bucket", [None, "0.001", "0.1"])
-async def test_raw_zero_bid_outside_the_requested_depth_still_fails_closed(monkeypatch, bucket):
+async def test_raw_zero_bid_outside_the_requested_depth_resyncs(monkeypatch, bucket):
     catalogs = CatalogManager()
     catalogs.hydrate_spot_config(
         {"pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]}
@@ -382,10 +380,12 @@ async def test_raw_zero_bid_outside_the_requested_depth_still_fails_closed(monke
                 asks=[],
             )
         )
-        with pytest.raises(StopAsyncIteration):
-            await asyncio.wait_for(anext(sub), 3)
-        assert "invalid or missing price" in str(sub.last_error)
-        assert len(errors) == 1
+        view = await asyncio.wait_for(anext(sub), 3)
+        assert view.book_seq == "1"
+        assert view.bids == initial.bids
+        assert fetch.await_count == 2
+        assert sub.last_error is None
+        assert errors == []
     finally:
         await sub.aclose()
 
@@ -722,9 +722,7 @@ async def test_sync_setup_waits_past_ten_seconds_for_a_slow_confirmation(monkeyp
         server.confirm_after = {42: 10.05}
         client = private_sync_client(server)
         try:
-            handle = await asyncio.to_thread(
-                client.orders.subscribe_sync, on_event=lambda _: None
-            )
+            handle = await asyncio.to_thread(client.orders.subscribe_sync, on_event=lambda _: None)
             assert len(server.subscribes) == 1
             assert client._active_sync_subscriptions == [handle]
             await asyncio.to_thread(handle.close)

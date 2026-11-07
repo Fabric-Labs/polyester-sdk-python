@@ -105,6 +105,7 @@ def side_to_levels(
     limit: int,
     quantity_scale: int,
     bucket_ticks: int | None = None,
+    symbol: str | None = None,
 ) -> list[OrderbookLevel]:
     view = bucket_side(book, bucket_ticks, asks=side == "asks")
     entries = list(view.items())
@@ -119,6 +120,7 @@ def side_to_levels(
             # A floor-rounded display boundary may be zero even for positive raw bids.
             allow_zero_price=side == "bids" and bucket_ticks is not None and bucket_ticks > 0,
             quantity_scale=quantity_scale,
+            symbol=symbol,
         )
         for price, qty in entries[:limit]
     ]
@@ -135,6 +137,9 @@ def build_orderbook_data(
     bucket_ticks: int | None = None,
     available: bool = True,
 ) -> OrderbookData:
+    """Render the book with up to ``depth`` levels per side; 0 renders none."""
+    if depth < 0:
+        raise PolyesterValidationError(f"orderbook depth must not be negative, got {depth}")
     return OrderbookData(
         symbol=symbol,
         depth=depth,
@@ -146,6 +151,7 @@ def build_orderbook_data(
             limit=depth,
             bucket_ticks=bucket_ticks,
             quantity_scale=quantity_scale,
+            symbol=symbol,
         ),
         asks=side_to_levels(
             asks,
@@ -153,6 +159,7 @@ def build_orderbook_data(
             limit=depth,
             bucket_ticks=bucket_ticks,
             quantity_scale=quantity_scale,
+            symbol=symbol,
         ),
     )
 
@@ -175,9 +182,11 @@ def apply_delta(
 ) -> tuple[int, bool]:
     """Apply one delta. Returns (new_book_seq, needs_snapshot_refresh)."""
     # Reject the whole update atomically. Skipping corrupt rows while advancing
-    # the sequence permanently leaves stale quantity in the local book.
-    pairs = [*delta.bids, *delta.asks]
-    if any(int(price) < 0 or int(qty) < 0 for price, qty in pairs):
+    # the sequence permanently leaves stale quantity in the local book. A
+    # positive quantity at price zero is a level bucket_side refuses to render,
+    # so it is as malformed as a negative row.
+    pairs = [(int(price), int(qty)) for price, qty in [*delta.bids, *delta.asks]]
+    if any(price < 0 or qty < 0 or (price == 0 and qty > 0) for price, qty in pairs):
         return current_book_seq, True
 
     try:

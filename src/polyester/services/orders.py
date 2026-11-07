@@ -573,6 +573,14 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         symbol: str,
         request_id: str | None = None,
     ) -> BatchReplaceOrdersResult:
+        """Replace several same-symbol orders and return after admission.
+
+        Reuse the same ``request_id`` when retrying the same logical batch: an
+        identical retry replays the admission for 60 seconds from acceptance.
+        Read the status with :meth:`get_batch_replace_status` within that
+        window; after it, reconcile the individual orders and never send an
+        accepted batch again.
+        """
         await self._ensure_catalogs()
         symbol_id = resolve_symbol_id(
             self._catalogs, symbol=symbol, symbol_id=None, label="batch_replace"
@@ -608,6 +616,29 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | None = None,
     ) -> BatchReplaceStatusResult:
+        """Read the execution status of one accepted batch replacement.
+
+        The status is retained for 60 seconds from the batch's acceptance and
+        is readable as soon as :meth:`batch_replace` returns; each item's phase
+        then advances asynchronously. ``batch_request_id`` is the exact 64-bit
+        ``batch_request_id`` that :meth:`batch_replace` returned.
+
+        - ``unavailable`` raises the retryable
+          :class:`~polyester.errors.PolyesterServerError`: the status can't be
+          established yet, so send the same request again within the window.
+        - ``not_found`` (:func:`~polyester.errors.is_not_found`) means the
+          account has no retained batch with this ID: none was accepted for
+          it, or the window ended. It never proves that a replacement was
+          rejected.
+
+        After the window, reconcile the individual orders with
+        :meth:`get`, by each item's old and replacement order IDs, and never
+        send an accepted batch again because its status is not found: a batch
+        sent after the window is admitted as a new one. An item's
+        ``updated_ts_ns`` is an observation time that can be a later recovery
+        time, so two reads may differ for the same refusal; don't use it to
+        identify the refusal.
+        """
         request = GetBatchReplaceStatusRequest(
             batch_request_id=id_to_int(batch_request_id, "batch_request_id")
         )
@@ -640,9 +671,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         ``error_code`` names the refusal as a single modify would raise it
         (for example ``ERROR_CODE_POST_ONLY_CROSS``).
 
-        Polls start 50 ms apart and back off to 500 ms. The status appears a
-        few seconds after admission, so ``not_found`` keeps polling, as do
-        ``unavailable``, other server errors and network errors. The server
+        Polls start 50 ms apart and back off to 500 ms. ``unavailable``, other
+        server errors and network errors keep polling. ``not_found`` keeps
+        polling too, because an older API could answer it for a few seconds
+        after admission; it never means the batch was rejected. The server
         keeps a batch's status for 60 seconds from acceptance, so the wait
         ends there, or after ``timeout`` seconds when that comes first, even
         during a read, with

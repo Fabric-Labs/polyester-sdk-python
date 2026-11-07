@@ -50,6 +50,8 @@ def changelog_post_summary_from_proto(msg: changelog_pb2.PostSummary) -> Changel
         title=msg.title,
         introduction=msg.introduction,
         published_at=_timestamp(msg.published_at) if has_field(msg, "published_at") else None,
+        updated_at=_timestamp(msg.updated_at) if has_field(msg, "updated_at") else None,
+        revision=int(msg.revision),
         coverage_cutoff=_timestamp(msg.coverage_cutoff)
         if has_field(msg, "coverage_cutoff")
         else None,

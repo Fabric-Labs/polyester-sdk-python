@@ -6,11 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from polyester.catalogs import CatalogManager
 from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.orders.v1 import orders_pb2
-from polyester.models import OrderId
+from polyester.models import CreateOrderRequest, OrderId
 from polyester.services._scope import (
     ScopedSubAccountMixin,
     resolve_account_id,
@@ -105,3 +106,105 @@ async def test_balances_subscribe_uses_the_int_account_channel(value: int) -> No
     await service.subscribe(account_id=value)
     channel = realtime.subscribe_proto.await_args.args[0]
     assert channel == f"private:ledger:balances:{format_id(value)}:proto"
+
+
+# Sub-account 0 is not a sub-account: on the wire 0 means unset (the main
+# account). An explicit int 0 is refused before any request is sent.
+ZERO = "not 0"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "scope",
+    [
+        {"sub_account_id": 0},
+        {"account": {"subaccountId": 0}},
+        {"account": {"sub_account_id": 0}},
+    ],
+)
+async def test_balances_list_refuses_sub_account_zero(scope: dict) -> None:
+    capture = CaptureUnary(ledger_read_pb2.GetBalancesResponse())
+    service = AsyncBalancesService(MagicMock(), default_sub_account_id="ignored")
+    with (
+        patch("polyester.services.balances.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match=ZERO),
+    ):
+        await service.list(**scope)
+    assert capture.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_order_write_refuses_sub_account_zero() -> None:
+    capture = CaptureUnary(orders_pb2.BatchCancelOrdersResponse())
+    service = AsyncOrdersService(MagicMock(), MagicMock(), None)
+    with (
+        patch("polyester.services.orders.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match=ZERO),
+    ):
+        await service.batch_cancel(sub_account_id=0, items=[{"key": OrderId(7)}])  # type: ignore[arg-type]
+    assert capture.calls == 0
+
+
+def _catalogs() -> CatalogManager:
+    catalogs = CatalogManager()
+    catalogs.hydrate_spot_config(
+        {
+            "pairs": [
+                {
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 1,
+                    "base_quantity_scale": 8,
+                    "quote_quantity_scale": 6,
+                }
+            ]
+        }
+    )
+    return catalogs
+
+
+@pytest.mark.asyncio
+async def test_order_request_object_refuses_sub_account_zero() -> None:
+    capture = CaptureUnary(orders_pb2.CreateOrderResponse(order_id=42))
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+
+    def request(sub_account_id: int) -> CreateOrderRequest:
+        return CreateOrderRequest(
+            symbol="BTC-USDT",
+            side="buy",
+            order_type="market",
+            qty="0.01",
+            sub_account_id=sub_account_id,  # type: ignore[arg-type]
+        )
+
+    with patch("polyester.services.orders.unary_auth_decoded", capture):
+        await service.create(request(42))
+        assert capture.calls == 1
+        assert capture.request.subaccount_id == 42
+        with pytest.raises(PolyesterValidationError, match=ZERO):
+            await service.create(request(0))
+    assert capture.calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("key", ["sub_account_id", "subaccount_id", "subaccountId"])
+async def test_batch_item_sub_account_zero_is_refused(key: str) -> None:
+    capture = CaptureUnary(orders_pb2.BatchCancelOrdersResponse())
+    service = AsyncOrdersService(MagicMock(), MagicMock(), None)
+    with (
+        patch("polyester.services.orders.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError),
+    ):
+        await service.batch_cancel(items=[{"key": OrderId(7), key: 0}])
+    assert capture.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_balances_subscribe_refuses_account_zero() -> None:
+    realtime = MagicMock()
+    realtime.subscribe_proto = AsyncMock(return_value=object())
+    service = AsyncBalancesService(MagicMock(), realtime=realtime)
+    with pytest.raises(PolyesterValidationError, match=ZERO):
+        await service.subscribe(account_id=0)
+    realtime.subscribe_proto.assert_not_awaited()
+    with pytest.raises(PolyesterValidationError, match=ZERO):
+        resolve_account_id(None, 0)

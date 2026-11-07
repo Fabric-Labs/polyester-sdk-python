@@ -202,7 +202,7 @@ async def test_available_snapshot_cancels_pending_request(monkeypatch) -> None:
 
 
 async def test_reconnect_with_an_available_snapshot_cancels_pending_request(monkeypatch) -> None:
-    channel = "public:spot:orderbook:deltas:depth:10:1:proto"
+    channel = "public:spot:orderbook:deltas:depth:20:1:proto"
     async with CentrifugoServer() as server:
         rt = AsyncRealtimeClient(server.url)
         service, calls = _book_service(
@@ -292,7 +292,7 @@ async def test_close_stops_requests_for_an_unavailable_book(monkeypatch) -> None
 
 
 async def test_managed_book_the_server_ends_releases_consumers(monkeypatch) -> None:
-    channel = "public:spot:orderbook:deltas:depth:10:1:proto"
+    channel = "public:spot:orderbook:deltas:depth:20:1:proto"
     async with CentrifugoServer() as server:
         rt = AsyncRealtimeClient(server.url)
         service, _ = _book_service(rt, lambda _n: _book(10, available=True), monkeypatch)

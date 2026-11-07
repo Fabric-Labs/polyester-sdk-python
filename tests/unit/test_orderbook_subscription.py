@@ -125,7 +125,7 @@ async def test_create_subscription_requires_symbol_id_when_unknown() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_subscription_uses_capped_depth_channel(monkeypatch) -> None:
+async def test_create_subscription_uses_top_tier_channel(monkeypatch) -> None:
     transport = MagicMock()
     realtime = MagicMock()
     catalogs = CatalogManager()
@@ -179,7 +179,7 @@ async def test_create_subscription_uses_capped_depth_channel(monkeypatch) -> Non
     subscription = await service.create_subscription(
         symbol="BTC-USDT",
         symbol_id=101,
-        depth=1000,
+        depth=500,
     )
     await subscription.aclose()
 

@@ -23,6 +23,8 @@ from polyester.codecs.correlation_id import (
 from polyester.codecs.scalars import (
     FractionalDigitsError,
     id_to_int,
+    market_id,
+    market_ids,
     omit_none,
     refuse_item_scope,
     tick_count,
@@ -1041,7 +1043,7 @@ def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelIt
     proto = orders_pb2.BatchCancelItem()
     set_order_key(proto, key, op="each batch cancel item")
     if symbol_id is not None:
-        proto.symbol_id = int(symbol_id)
+        proto.symbol_id = market_id(symbol_id, "each batch cancel item symbol_id")
     return proto
 
 
@@ -1076,8 +1078,9 @@ def cancel_all_after_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
-    if symbol_id:
-        proto.symbol_id = int(symbol_id)
+    if symbol_id is not None:
+        # 0 means every market, as when omitted.
+        proto.symbol_id = market_id(symbol_id, "cancel_all_after symbol_id")
     if side:
         key = side.lower()
         if key not in ORDER_SIDE_TO_PROTO:
@@ -1146,7 +1149,9 @@ def modify_order_to_proto(
     if new_price is not None:
         with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
             proto.new_price_ticks = resolve_price_ticks(
-                new_price, "new_price", symbol=symbol  # type: ignore[arg-type]
+                new_price,  # type: ignore[arg-type]
+                "new_price",
+                symbol=symbol,
             )
     if new_qty is not None:
         proto.new_qty_scaled = resolve_qty_scaled(
@@ -1189,14 +1194,14 @@ def cancel_all_orders_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if symbol_id and symbol_ids:
-        raise PolyesterValidationError(
-            "cancel_all accepts only one of symbol_id or symbol_ids"
-        )
+        raise PolyesterValidationError("cancel_all accepts only one of symbol_id or symbol_ids")
     resolved_ids: list[int] = []
-    if symbol_ids:
-        resolved_ids = [int(value) for value in symbol_ids]
-    elif symbol_id:
-        resolved_ids = [int(symbol_id)]
+    if symbol_ids is not None:
+        resolved_ids = market_ids(symbol_ids, "cancel_all symbol_ids")
+    if not resolved_ids and symbol_id is not None:
+        # 0 means every market, as when omitted.
+        single = market_id(symbol_id, "cancel_all symbol_id")
+        resolved_ids = [single] if single else []
     seen: set[int] = set()
     unique_ids: list[int] = []
     for value in resolved_ids:

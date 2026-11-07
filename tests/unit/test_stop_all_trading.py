@@ -52,6 +52,7 @@ class _Exchange:
         list_refused: bool = False,
         repeat_token: bool = False,
         cancel_all_refused: bool = False,
+        tokens: list[str] | None = None,
     ) -> None:
         self.calls: list[tuple[str, object]] = []
         self.ended = ended or set()
@@ -59,6 +60,9 @@ class _Exchange:
         self.list_refused = list_refused
         self.repeat_token = repeat_token
         self.cancel_all_refused = cancel_all_refused
+        # When set, the next page token of each successive listing; the
+        # fixture refuses a twelfth listing so a missed cycle cannot hang.
+        self.tokens = tokens
 
     def __call__(self, request: Request) -> Response:
         if request.path == LIST_PATH:
@@ -66,6 +70,21 @@ class _Exchange:
             self.calls.append(("list", (list(req.status), req.limit, req.page_token)))
             if self.list_refused:
                 return _refusal("permission_denied", 403)
+            if self.tokens is not None:
+                listed = sum(1 for call in self.calls if call[0] == "list")
+                if listed > 11:
+                    return _refusal("aborted", 409)
+                token = self.tokens[listed - 1] if listed <= len(self.tokens) else ""
+                return _proto(
+                    triggers_pb2.ListTriggersResponse(
+                        triggers=[
+                            triggers_pb2.Trigger(
+                                trigger_id=100 + listed, status=triggers_pb2.STATUS_ARMED
+                            )
+                        ],
+                        next_page_token=token,
+                    )
+                )
             if not req.page_token:
                 return _proto(
                     triggers_pb2.ListTriggersResponse(
@@ -228,3 +247,29 @@ async def test_a_cancel_all_error_is_raised(httpserver: HTTPServer) -> None:
         await _run(httpserver, exchange)
 
     assert exchange.calls[-1] == ("cancel_all", None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tokens",
+    [["A", "B"] * 8, ["A", "B", "C"] * 6, ["A", "B", "C", "D"] + ["B", "C", "D"] * 5],
+    ids=["A,B,A", "A,B,C,A", "A,B,C,D,B"],
+)
+async def test_a_page_token_cycle_is_raised_before_anything_is_canceled(
+    httpserver: HTTPServer, tokens: list[str]
+) -> None:
+    exchange = _Exchange(tokens=tokens)
+    with pytest.raises(PolyesterResponseContractError, match="repeats an earlier page"):
+        await _run(httpserver, exchange)
+
+    first_repeat = next(i for i, token in enumerate(tokens) if token in tokens[:i])
+    assert [c[0] for c in exchange.calls] == ["list"] * (first_repeat + 1)
+
+
+@pytest.mark.asyncio
+async def test_a_finite_listing_cancels_everything_once(httpserver: HTTPServer) -> None:
+    exchange = _Exchange(tokens=["A", "B"])
+    result = await _run(httpserver, exchange)
+
+    assert [c[0] for c in exchange.calls] == ["list"] * 3 + ["cancel_trigger"] * 3 + ["cancel_all"]
+    assert len(result.canceled_trigger_ids) == 3

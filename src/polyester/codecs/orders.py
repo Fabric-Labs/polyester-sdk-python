@@ -34,6 +34,7 @@ from polyester.codecs.triggers import (
     trigger_price_source_to_proto,
 )
 from polyester.errors import PolyesterValidationError
+from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
@@ -57,7 +58,20 @@ MODIFY_BEHAVIOR_TO_PROTO = {
     "amend_only": "AMEND_ONLY",
     "replace_only": "REPLACE_ONLY",
 }
-MAX_BATCH_ITEMS = 20
+
+
+def _contract_max_items(request: Any) -> int:
+    """Return the ``items`` limit the public contract sets on a batch request."""
+    options = request.DESCRIPTOR.fields_by_name["items"].GetOptions()
+    return int(options.Extensions[validate_pb2.field].repeated.max_items)
+
+
+# Items each batch operation accepts, from the contract's validation rules.
+BATCH_MAX_ITEMS: dict[str, int] = {
+    "batch_create": _contract_max_items(orders_pb2.BatchCreateOrdersRequest),
+    "batch_cancel": _contract_max_items(orders_pb2.BatchCancelOrdersRequest),
+    "batch_replace": _contract_max_items(orders_pb2.BatchReplaceOrdersRequest),
+}
 
 QTY_STEP_SIZE = "ERROR_CODE_QTY_STEP_SIZE"
 PRICE_TICK_SIZE = "ERROR_CODE_PRICE_TICK_SIZE"
@@ -128,9 +142,10 @@ def parse_gtd_expire_at(
 def validate_batch_size(operation: str, length: int) -> None:
     if length == 0:
         raise PolyesterValidationError(f"{operation} requires at least one item")
-    if length > MAX_BATCH_ITEMS:
+    limit = BATCH_MAX_ITEMS[operation]
+    if length > limit:
         raise PolyesterValidationError(
-            f"{operation} accepts at most {MAX_BATCH_ITEMS} items; received {length}"
+            f"{operation} accepts at most {limit} items; received {length}"
         )
 
 
@@ -955,6 +970,14 @@ def risk_policy_from_dict(
     return risk
 
 
+# Fields a batch item dictionary may carry. Account scope and order_id /
+# client_order_id keys are refused earlier with their own messages.
+_BATCH_REPLACE_ITEM_KEYS = frozenset(
+    {"key", "new_price", "new_qty", "new_client_order_id", "new_attached_risk"}
+)
+_BATCH_CANCEL_ITEM_KEYS = frozenset({"key", "symbol_id"})
+
+
 def batch_replace_item_to_proto(
     item: BatchReplaceItem | dict[str, Any],
     *,
@@ -968,13 +991,18 @@ def batch_replace_item_to_proto(
             "new_price": item.new_price,
             "new_qty": item.new_qty,
             "new_client_order_id": item.new_client_order_id,
+            "new_attached_risk": item.new_attached_risk,
         }
     refuse_item_scope(item, "batch_replace")
     key = _item_order_key(item, label="each batch replace item")
+    _reject_unknown_keys(item, _BATCH_REPLACE_ITEM_KEYS, field_name="batch_replace item")
     new_price = item.get("new_price")
     new_qty = item.get("new_qty")
-    if new_price is None and new_qty is None:
-        raise PolyesterValidationError("each batch item requires new_price and/or new_qty")
+    new_attached_risk = item.get("new_attached_risk")
+    if new_price is None and new_qty is None and new_attached_risk is None:
+        raise PolyesterValidationError(
+            "each batch item requires new_price, new_qty, and/or new_attached_risk"
+        )
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
@@ -987,6 +1015,11 @@ def batch_replace_item_to_proto(
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
         )
+    # The item carries no side: the server applies the side rule to a trailing
+    # stop's maximum and answers ERROR_CODE_BAD_PRICE.
+    risk = risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
+    if risk is not None:
+        proto.new_attached_risk.CopyFrom(risk)
     return proto
 
 
@@ -1039,6 +1072,7 @@ def batch_create_orders_to_proto(
 def batch_cancel_item_to_proto(item: dict[str, Any]) -> orders_pb2.BatchCancelItem:
     refuse_item_scope(item, "batch_cancel")
     key = _item_order_key(item, label="each batch cancel item")
+    _reject_unknown_keys(item, _BATCH_CANCEL_ITEM_KEYS, field_name="batch_cancel item")
     symbol_id = item.get("symbol_id")
     proto = orders_pb2.BatchCancelItem()
     set_order_key(proto, key, op="each batch cancel item")

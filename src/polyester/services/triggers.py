@@ -116,9 +116,12 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             request.subaccount_id = parsed_sub
         if symbol:
             await self._ensure_catalogs()
-            request.symbol_id = resolve_optional_symbol_id(
-                self._catalogs, symbol=symbol, label="triggers.list symbol"
-            ) or 0
+            request.symbol_id = (
+                resolve_optional_symbol_id(
+                    self._catalogs, symbol=symbol, label="triggers.list symbol"
+                )
+                or 0
+            )
         if status is not None:
             labels = [status] if isinstance(status, str) else list(status)
             request.status.extend(trigger_status_from_label(label) for label in labels)
@@ -284,10 +287,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         symbol: str | None = None,
         symbol_id: int | None = None,
         sub_account_id: str | None = None,
-        trigger_price: str | None = None,
+        trigger_price: str | Decimal | Price | None = None,
         trailing_distance_ticks: int | None = None,
         trailing_distance_bps: int | None = None,
-        activation_price: str | None = None,
+        activation_price: str | Decimal | Price | None = None,
         max_slippage_ticks: int | None = None,
         max_slippage_bps: int | None = None,
     ) -> TriggerMutationResult:
@@ -295,15 +298,28 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
 
         Without ``symbol``/``symbol_id`` the trigger's own market is used; when
         given, it must be that market, and an API key limited to specific
-        markets must give it. A child's limit price is fixed at creation:
-        cancel the trigger and create a new one to change it.
-        ``max_slippage_bps`` is 1 to 9999; ``0`` clears a cap (ticks or bps)
-        and a market child falls back to the pair's default slippage.
+        markets must give it. A ``Price`` bound to another market is refused
+        when ``symbol`` or ``symbol_id`` is given. A child's limit price is
+        fixed at creation: cancel the trigger and create a new one to change
+        it. ``max_slippage_bps`` is 1 to 9999; ``0`` clears a cap (ticks or
+        bps) and a market child falls back to the pair's default slippage.
         """
+        resolved_symbol_id = await self._optional_control_symbol_id(
+            symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
+        )
+        if resolved_symbol_id and any(
+            isinstance(price, Price) and price.symbol is not None
+            for price in (trigger_price, activation_price)
+        ):
+            # The market name is needed to check a bound price.
+            await self._ensure_catalogs()
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
-            symbol_id=await self._optional_control_symbol_id(
-                symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
+            symbol_id=resolved_symbol_id,
+            symbol=(
+                self._catalogs.symbol_for_symbol_id(resolved_symbol_id)
+                if self._catalogs is not None
+                else None
             ),
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             trigger_price=trigger_price,

@@ -246,7 +246,11 @@ def create_trigger_to_proto(
     intent = triggers_pb2.TriggerIntent(
         symbol_id=symbol_id,
         qty_scaled=resolve_qty_scaled(
-            qty, quantity_scale, "qty", symbol=symbol, symbol_id=symbol_id  # type: ignore[arg-type]
+            qty,  # type: ignore[arg-type]
+            quantity_scale,
+            "qty",
+            symbol=symbol,
+            symbol_id=symbol_id,
         ),
     )
     # The contract requires an ID. A blank one is a caller's mistake: replacing
@@ -433,6 +437,7 @@ def modify_trigger_to_proto(
     *,
     trigger_id: str | int,
     symbol_id: int = 0,
+    symbol: str | None = None,
     sub_account_id: str | int | None = None,
     trigger_price: Any | None = None,
     trailing_distance_ticks: int | None = None,
@@ -444,9 +449,10 @@ def modify_trigger_to_proto(
     """Encode a trigger patch.
 
     ``symbol_id`` ``0`` targets the trigger's own market; when set, it must be
-    that market (an API key limited to specific markets must set it). A child's
-    limit price is fixed at creation: cancel the trigger and create a new one
-    to change it. The patch does not say what it modifies, so
+    that market (an API key limited to specific markets must set it).
+    ``symbol`` is that market's name: a ``Price`` bound to another market is
+    refused. A child's limit price is fixed at creation: cancel the trigger
+    and create a new one to change it. The patch does not say what it modifies, so
     ``max_slippage_bps`` takes the cap shared by trailing stops and sells,
     1 to 9999; ``0`` clears it.
     """
@@ -472,9 +478,7 @@ def modify_trigger_to_proto(
             "set at most one of trailing_distance_ticks or trailing_distance_bps"
         )
     if max_slippage_ticks is not None and max_slippage_bps is not None:
-        raise PolyesterValidationError(
-            "set at most one of max_slippage_ticks or max_slippage_bps"
-        )
+        raise PolyesterValidationError("set at most one of max_slippage_ticks or max_slippage_bps")
     proto = triggers_pb2.ModifyTriggerRequest(
         trigger_id=id_to_int(trigger_id, "trigger_id"),
         symbol_id=int(symbol_id),
@@ -482,7 +486,9 @@ def modify_trigger_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
     if trigger_price is not None:
-        proto.trigger_price_ticks = resolve_price_ticks(trigger_price, "trigger_price")  # type: ignore[arg-type]
+        proto.trigger_price_ticks = resolve_price_ticks(
+            trigger_price, "trigger_price", symbol=symbol
+        )
     if trailing_distance_ticks is not None:
         proto.trailing_distance_ticks = tick_count(
             trailing_distance_ticks, "trailing_distance_ticks"
@@ -494,7 +500,9 @@ def modify_trigger_to_proto(
             allow_clear=True,
         )
     if activation_price is not None:
-        proto.activation_price_ticks = resolve_price_ticks(activation_price, "activation_price")  # type: ignore[arg-type]
+        proto.activation_price_ticks = resolve_price_ticks(
+            activation_price, "activation_price", symbol=symbol
+        )
     if max_slippage_ticks is not None:
         # Zero clears the cap.
         proto.max_slippage_ticks = tick_count(

@@ -292,7 +292,8 @@ id, the rejection carries it: `PolyesterApiError.existing_order_id` on a
 single create, `BatchCreateResultItem.existing_order_id` on a batch create
 item (empty otherwise).
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
-`-`. Batch create, cancel, and replace accept at most 20 items. `batch_create`
+`-`. Batch create accepts at most 20 items; batch cancel and replace accept at
+most 50, and refuse an item field they don't support. `batch_create`
 always sends `request_id` (caller value or a generated `batch-create-*` key);
 that batch-level id is the idempotency boundary, so per-item `client_order_id`
 may be omitted. Treat a cancel

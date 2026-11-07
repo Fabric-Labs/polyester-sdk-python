@@ -88,8 +88,12 @@ for row in view.balances.balances if view.balances else []:
 
 Private streams require an Account ID and the corresponding API-key permission.
 A successful subscribe call means the token exchange and realtime handshake
-completed. Treat a structured permission denial as non-transient and update the
-API-key policy before retrying.
+completed. The connection and subscription tokens are renewed on the same
+connection before they expire; a renewal the API or the server refuses is
+reported through `set_on_error(...)`, and the subscription then resubscribes
+when the server ends it. The live order stream renews its own tokens. Treat a
+structured permission denial as non-transient and update the API-key policy
+before retrying.
 
 ## Install
 
@@ -1163,7 +1167,11 @@ the list; a root key cannot subscribe to a sub-account's channels.
   order. An event that fails to decode is reported through `set_on_error(...)`
   without dropping the rest of its batch. Both legs of a ledger transfer share
   `LedgerTransfer.transfer_id`; with `account_code` it identifies a leg, and
-  a repeated leg replaces the earlier copy. A trigger event is identified by
+  a repeated leg replaces the earlier copy. `LedgerTransfer.balance_after` is
+  the account bucket's balance after the transfer, an exact integer at the
+  18-decimal ledger scale like `amount`, or `None` when the server sends none.
+  `LedgerTransfer.link_id` is the decimal correlation ID of related legs, empty
+  when there is none. A trigger event is identified by
   `(trigger_id, event_type, child_seq, ts_ns)`. For your own batched channel,
   use `realtime.subscribe_proto_batch(channel, decode_batch=...)`.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises

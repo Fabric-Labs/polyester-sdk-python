@@ -582,6 +582,12 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     # Unsigned 128-bit decimal shared by both legs of one transfer; with
     # ``account_code`` it identifies a leg, so a repeated leg replaces the earlier copy.
     transfer_id: str = ""
+    # The account bucket's balance after this transfer, an exact integer at the
+    # fixed 18-decimal ledger scale like ``amount``. None when the server sent
+    # none; a zero balance is "0".
+    balance_after: str | None = None
+    # Decimal correlation ID that groups related transfer legs; empty when none.
+    link_id: str = ""
 
 
 class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):

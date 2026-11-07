@@ -30,6 +30,7 @@ from polyester.realtime.protocol import (
     pong_command,
     subscribe_command,
 )
+from polyester.realtime.renewal import RenewalKind, TokenRenewer
 from polyester.realtime.resubscribe import (
     SUBACCOUNTS_CHANNEL_PREFIX,
     ResubscribeAttempt,
@@ -240,6 +241,8 @@ class AsyncRealtimeClient:
         self._active_subs: set[AsyncSubscription[Any]] = set()
         self._private_orders: PrivateOrderStream | None = None
         self._closed = False
+        # Seconds per Centrifugo token TTL unit; tests shorten it.
+        self._renewal_unit = 1.0
 
     async def aclose(self) -> None:
         self._access.close()
@@ -400,6 +403,7 @@ class AsyncRealtimeClient:
                             close=close,
                             on_ready=on_ready,
                             on_member_error=sub._notify_error,
+                            on_renewal_error=sub._notify_error,
                         )
                     except asyncio.CancelledError:
                         if not ready.done():
@@ -514,6 +518,7 @@ class AsyncRealtimeClient:
         close: asyncio.Event,
         on_ready: Callable[[], None] | None = None,
         on_member_error: Callable[[BaseException], None] | None = None,
+        on_renewal_error: Callable[[BaseException], None] | None = None,
     ) -> None:
         async with websockets.connect(
             self._ws_url,
@@ -526,6 +531,7 @@ class AsyncRealtimeClient:
                     "server did not negotiate centrifuge-protobuf websocket subprotocol"
                 )
             pending: deque[Ping | Publication | Reply | Unsubscribe] = deque()
+            renewer: TokenRenewer | None = None
             if is_private_channel(channel):
                 http = self._require_http()
                 credentials = self._require_credentials()
@@ -535,50 +541,106 @@ class AsyncRealtimeClient:
                     credentials,
                     api_url=api_url,
                 )
-                await self._centrifugo_connect(ws, token=connection_token, pending=pending)
+                connected = await self._centrifugo_connect(
+                    ws, token=connection_token, pending=pending
+                )
+                # The connection token's TTL runs from here, through the rest of setup.
+                connected_at = time.monotonic()
                 subscription_token = await fetch_subscription_token(
                     http,
                     credentials,
                     api_url=api_url,
                     channel=channel,
                 )
-                await self._centrifugo_subscribe(
+                subscribed = await self._centrifugo_subscribe(
                     ws,
                     channel,
                     token=subscription_token,
                     pending=pending,
                 )
+                subscribed_at = time.monotonic()
+
+                async def fetch_renewal_token(kind: RenewalKind) -> str:
+                    if kind == "connection":
+                        return await fetch_connection_token(http, credentials, api_url=api_url)
+                    return await fetch_subscription_token(
+                        http, credentials, api_url=api_url, channel=channel
+                    )
+
+                renewer = TokenRenewer(
+                    ws,
+                    channel,
+                    unit=self._renewal_unit,
+                    first_id=3,
+                    fetch=fetch_renewal_token,
+                    report=on_renewal_error or (lambda _exc: None),
+                )
+                renewer.schedule("connection", connected_at, connected.expires, connected.ttl)
+                renewer.schedule("subscription", subscribed_at, subscribed.expires, subscribed.ttl)
             else:
                 await self._centrifugo_connect(ws, pending=pending)
                 await self._centrifugo_subscribe(ws, channel, pending=pending)
-            if on_ready is not None:
-                on_ready()
-            subaccounts_channel = channel.startswith(SUBACCOUNTS_CHANNEL_PREFIX)
-            while not close.is_set():
-                if pending:
-                    incoming_messages = list(pending)
-                    pending.clear()
-                else:
-                    incoming_messages = await self._read_live_frame(ws)
-                for incoming in incoming_messages:
-                    if isinstance(incoming, Ping):
-                        await ws.send(pong_command())
-                    elif isinstance(incoming, Publication):
-                        if subaccounts_channel:
-                            self._access.note_update(incoming.data)
-                        members = decode_batch(incoming.data)
-                        if close.is_set():
-                            return
-                        for member in members:
-                            if isinstance(member, BaseException):
-                                if on_member_error is not None:
-                                    on_member_error(member)
-                                continue
-                            enqueue_or_overflow(queue, member, close=close)
-                    elif isinstance(incoming, Unsubscribe):
-                        if incoming.channel in ("", channel):
-                            raise ServerUnsubscribedError(incoming.code, incoming.reason)
-                    elif isinstance(incoming, Reply) and incoming.error is not None:
+            try:
+                await self._read_subscription(
+                    ws,
+                    channel=channel,
+                    decode_batch=decode_batch,
+                    queue=queue,
+                    close=close,
+                    pending=pending,
+                    renewer=renewer,
+                    on_ready=on_ready,
+                    on_member_error=on_member_error,
+                )
+            finally:
+                if renewer is not None:
+                    await renewer.stop()
+
+    async def _read_subscription(
+        self,
+        ws: ClientConnection,
+        *,
+        channel: str,
+        decode_batch: Callable[[bytes], Sequence[T | BaseException]],
+        queue: asyncio.Queue[Any],
+        close: asyncio.Event,
+        pending: deque[Ping | Publication | Reply | Unsubscribe],
+        renewer: TokenRenewer | None,
+        on_ready: Callable[[], None] | None,
+        on_member_error: Callable[[BaseException], None] | None,
+    ) -> None:
+        if on_ready is not None:
+            on_ready()
+        subaccounts_channel = channel.startswith(SUBACCOUNTS_CHANNEL_PREFIX)
+        send = renewer.send if renewer is not None else ws.send
+        while not close.is_set():
+            if pending:
+                incoming_messages = list(pending)
+                pending.clear()
+            else:
+                incoming_messages = await self._read_live_frame(ws)
+            for incoming in incoming_messages:
+                if isinstance(incoming, Ping):
+                    await send(pong_command())
+                elif isinstance(incoming, Publication):
+                    if subaccounts_channel:
+                        self._access.note_update(incoming.data)
+                    members = decode_batch(incoming.data)
+                    if close.is_set():
+                        return
+                    for member in members:
+                        if isinstance(member, BaseException):
+                            if on_member_error is not None:
+                                on_member_error(member)
+                            continue
+                        enqueue_or_overflow(queue, member, close=close)
+                elif isinstance(incoming, Unsubscribe):
+                    if incoming.channel in ("", channel):
+                        raise ServerUnsubscribedError(incoming.code, incoming.reason)
+                elif isinstance(incoming, Reply):
+                    if renewer is not None and renewer.handle_reply(incoming):
+                        continue
+                    if incoming.error is not None:
                         raise self._protocol_error(incoming)
 
     async def _read_live_frame(
@@ -632,9 +694,9 @@ class AsyncRealtimeClient:
         *,
         token: str | None = None,
         pending: deque[Ping | Publication | Reply | Unsubscribe] | None = None,
-    ) -> None:
+    ) -> Reply:
         await ws.send(connect_command(1, token))
-        await self._read_centrifugo_reply(ws, expected_id=1, pending=pending)
+        return await self._read_centrifugo_reply(ws, expected_id=1, pending=pending)
 
     async def _centrifugo_subscribe(
         self,
@@ -643,9 +705,9 @@ class AsyncRealtimeClient:
         *,
         token: str | None = None,
         pending: deque[Ping | Publication | Reply | Unsubscribe] | None = None,
-    ) -> None:
+    ) -> Reply:
         await ws.send(subscribe_command(2, channel, token))
-        await self._read_centrifugo_reply(ws, expected_id=2, pending=pending)
+        return await self._read_centrifugo_reply(ws, expected_id=2, pending=pending)
 
     async def _read_centrifugo_reply(
         self,
@@ -653,27 +715,28 @@ class AsyncRealtimeClient:
         *,
         expected_id: int,
         pending: deque[Ping | Publication | Reply | Unsubscribe] | None = None,
-    ) -> None:
+    ) -> Reply:
+        """Return the reply to ``expected_id``, holding back anything that arrives first."""
         deadline = time.monotonic() + CENTRIFUGO_REPLY_DEADLINE
         while True:
             remaining = deadline - time.monotonic()
             raw = await asyncio.wait_for(ws.recv(), timeout=min(10, remaining))
             if not isinstance(raw, bytes):
                 raise PolyesterRealtimeError("received JSON text reply on protobuf websocket")
-            matched = False
+            matched: Reply | None = None
             for incoming in decode_replies(raw):
                 if isinstance(incoming, Ping):
                     await ws.send(pong_command())
                 elif isinstance(incoming, Reply) and incoming.id == expected_id:
                     if incoming.error is not None:
                         raise self._protocol_error(incoming)
-                    matched = True
+                    matched = incoming
                 elif pending is not None:
                     if len(pending) >= 200:
                         raise PolyesterRealtimeOverflowError("realtime setup buffer full")
                     pending.append(incoming)
-            if matched:
-                return
+            if matched is not None:
+                return matched
 
     @staticmethod
     def _protocol_error(reply: Reply) -> PolyesterRealtimeError:

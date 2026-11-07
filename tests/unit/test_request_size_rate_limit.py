@@ -11,10 +11,14 @@ from pytest_httpserver import HTTPServer
 from werkzeug import Request, Response
 
 from polyester import (
+    AUTH_WALLET_ALREADY_LINKED,
+    REQUEST_TOO_LARGE,
     PolyesterApiError,
     PolyesterRateLimitError,
     auth_error_code,
+    is_request_too_large,
     is_retryable_error,
+    is_wallet_already_linked,
     mutation_outcome_unknown,
 )
 from polyester.gen.auth.v1 import auth_pb2
@@ -24,7 +28,7 @@ from polyester.services.changelog import AsyncChangelogService
 from polyester.transport import TransportConfig, TransportFactory
 from tests.unit.test_auth_error_codes import _rest_error
 
-REQUEST_TOO_LARGE = {
+REQUEST_TOO_LARGE_PROBLEM = {
     "type": "https://polyester.dev/problems/request-too-large",
     "title": "Request Entity Too Large",
     "status": 413,
@@ -35,7 +39,7 @@ GET_POST_PATH = "/changelog.v1.ChangelogService/GetPost"
 
 
 def _too_large_handler(chunked: bool):
-    body = json.dumps(REQUEST_TOO_LARGE).encode()
+    body = json.dumps(REQUEST_TOO_LARGE_PROBLEM).encode()
 
     def handle(_request: Request) -> Response:
         # The refusal precedes reading the body, as the API's does.
@@ -53,7 +57,8 @@ def _too_large_handler(chunked: bool):
 def _assert_request_too_large(error: BaseException) -> None:
     assert isinstance(error, PolyesterApiError), repr(error)
     assert not isinstance(error, PolyesterRateLimitError)
-    assert error.code == "REQUEST_TOO_LARGE"
+    assert error.code == REQUEST_TOO_LARGE
+    assert is_request_too_large(error)
     assert error.problem is not None
     assert error.problem.status == 413
     assert error.problem.code == "REQUEST_TOO_LARGE"
@@ -280,7 +285,15 @@ async def test_wallet_already_linked_is_a_terminal_auth_refusal(
         }
         content_type = "application/problem+json"
     error = await _rest_error(httpserver, 409, body, content_type=content_type)
-    assert auth_error_code(error) == "AUTH_WALLET_ALREADY_LINKED", repr(error)
+    assert auth_error_code(error) == AUTH_WALLET_ALREADY_LINKED, repr(error)
+    assert is_wallet_already_linked(error)
     assert str(error) == WALLET_LINKED_MESSAGE
     assert not is_retryable_error(error)
     assert not mutation_outcome_unknown(error)
+
+
+def test_request_size_and_wallet_predicates_read_only_their_codes() -> None:
+    assert not is_request_too_large(PolyesterApiError("x", code="PAYLOAD_TOO_LARGE"))
+    assert not is_request_too_large(PolyesterRateLimitError("x", code="REQUEST_TOO_LARGE"))
+    assert not is_wallet_already_linked(PolyesterApiError("x", code="AUTH_WALLET_LOGIN_FAILED"))
+    assert is_wallet_already_linked(PolyesterApiError("x", code="AUTH_WALLET_ALREADY_LINKED"))

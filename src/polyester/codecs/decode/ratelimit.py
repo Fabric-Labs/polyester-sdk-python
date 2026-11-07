@@ -39,3 +39,45 @@ def retry_after_seconds_from_detail(detail: RateLimitDetail | None) -> float | N
     if detail is None or detail.retry_after_ms is None:
         return None
     return float(detail.retry_after_ms) / 1000.0
+
+
+def rate_limit_detail_from_json(value: object) -> RateLimitDetail | None:
+    """Read the ``rate_limit`` object of a REST rate-limit problem.
+
+    Every field is optional: the gateway's own refusal sends only ``reason``
+    and ``scope``. Integers arrive as JSON strings or numbers; enum names are
+    kept as sent, including ones newer than this SDK. Anything that is not an
+    object reads as no detail, and a field of the wrong type reads as absent.
+    """
+    if not isinstance(value, dict):
+        return None
+
+    def field(snake: str, camel: str) -> object:
+        return value[snake] if snake in value else value.get(camel)
+
+    def text(snake: str, camel: str = "") -> str:
+        item = field(snake, camel or snake)
+        return item if isinstance(item, str) else ""
+
+    def integer(snake: str, camel: str = "") -> int | None:
+        item = field(snake, camel or snake)
+        if isinstance(item, bool):
+            return None
+        if isinstance(item, int):
+            return item if 0 <= item < 1 << 64 else None
+        if isinstance(item, str) and item.strip().isdigit():
+            parsed = int(item.strip())
+            return parsed if parsed < 1 << 64 else None
+        return None
+
+    return RateLimitDetail(
+        reason=text("reason"),
+        limit=integer("limit"),
+        remaining=integer("remaining"),
+        retry_after_ms=integer("retry_after_ms", "retryAfterMs"),
+        policy_version=integer("policy_version", "policyVersion"),
+        operation_id=text("operation_id", "operationId"),
+        policy_class=text("policy_class", "policyClass"),
+        scope=text("scope"),
+        refill_model=text("refill_model", "refillModel"),
+    )

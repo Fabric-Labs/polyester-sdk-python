@@ -62,8 +62,8 @@ class GatewayProblemError(ConnectError):
     """A gateway answer that is not a Connect error, as a ``ConnectError``.
 
     ``message`` is the problem ``code`` (``TIMESTAMP_SKEW``), as before.
-    ``problem_code``, ``detail``, ``http_status`` and ``violations`` keep the
-    rest of the problem body for the error mapping.
+    ``problem_code``, ``detail``, ``http_status``, ``violations`` and
+    ``rate_limit`` keep the rest of the problem body for the error mapping.
     """
 
     def __init__(
@@ -76,10 +76,13 @@ class GatewayProblemError(ConnectError):
         violations: list[dict[str, object]] | None = None,
         problem=None,
         retry_after: float | None = None,
+        rate_limit: object | None = None,
     ) -> None:
         super().__init__(code, problem_code)
         self.problem = problem
         self.retry_after = retry_after
+        # The problem's ``rate_limit`` object, as sent.
+        self.rate_limit = rate_limit
         self.problem_code = problem_code
         self.http_status = http_status
         self.detail = detail
@@ -352,6 +355,7 @@ def _raise_problem(
         http_status=response.status,
         problem=decode_http_problem(body, response.status),
         retry_after=retry_after,
+        rate_limit=body.get("rate_limit"),
         detail=detail if isinstance(detail, str) else "",
         violations=(
             [item for item in violations if isinstance(item, dict)]

@@ -158,7 +158,46 @@ class AsyncChangelogService(BaseService):
         page_token: str | None = None,
     ) -> AsyncIterator[ChangelogChangeEntry]:
         """Every change matching the filters of ``list_changes``, fetching
-        pages as needed."""
+        pages as needed.
+
+        When a post is republished during the walk, the next page restarts at
+        that post's first change, so changes already yielded can come again.
+        Each change ``id`` is yielded once per walk, as first received; read
+        the post with ``get_post`` for its current wording.
+        """
+        seen: set[str] = set()
+        async for change in self._walk_changes(
+            categories=categories,
+            action_required=action_required,
+            surfaces=surfaces,
+            audiences=audiences,
+            start_time=start_time,
+            end_time=end_time,
+            post_slug=post_slug,
+            sort=sort,
+            limit=limit,
+            page_token=page_token,
+        ):
+            if change.change.id in seen:
+                continue
+            seen.add(change.change.id)
+            yield change
+
+    async def _walk_changes(
+        self,
+        *,
+        categories: Sequence[str] | None = None,
+        action_required: bool | None = None,
+        surfaces: Sequence[str] | None = None,
+        audiences: Sequence[str] | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        post_slug: str | None = None,
+        sort: Literal["asc", "desc"] | None = None,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> AsyncIterator[ChangelogChangeEntry]:
+        """Every ``list_changes`` entry of one walk, repeats included."""
 
         async def fetch(token: str | None) -> tuple[list[ChangelogChangeEntry], str]:
             page = await self.list_changes(
@@ -180,27 +219,51 @@ class AsyncChangelogService(BaseService):
 
     async def breaking_changes_since(self, since: datetime) -> list[ChangelogChangeEntry]:
         """Every breaking change published at or after ``since``, newest post
-        first."""
-        return [
-            change
-            async for change in self.iter_changes(
+        first.
+
+        It filters on the post's first publication time, which a
+        republication does not move, so an edit to an older post is not
+        reported: compare the ``revision`` of ``list_posts`` summaries to find
+        edited posts. A change met again because its post was republished
+        during the call is returned once, at its first position, with the
+        wording last received.
+        """
+        return await _collect_changes(
+            self._walk_changes(
                 categories=[CHANGELOG_CATEGORY_BREAKING_CHANGE],
                 start_time=since,
                 limit=_SINCE_PAGE_SIZE,
             )
-        ]
+        )
 
     async def action_required_since(self, since: datetime) -> list[ChangelogChangeEntry]:
         """Every change that requires integrator action published at or after
-        ``since``, newest post first."""
-        return [
-            change
-            async for change in self.iter_changes(
+        ``since``, newest post first. Republished posts are handled as in
+        ``breaking_changes_since``."""
+        return await _collect_changes(
+            self._walk_changes(
                 action_required=True,
                 start_time=since,
                 limit=_SINCE_PAGE_SIZE,
             )
-        ]
+        )
+
+
+async def _collect_changes(
+    walk: AsyncIterator[ChangelogChangeEntry],
+) -> list[ChangelogChangeEntry]:
+    """Collect one walk, keeping one entry per change ``id``: a repeat replaces
+    the earlier entry in place, so the latest revision's wording wins."""
+    changes: list[ChangelogChangeEntry] = []
+    index: dict[str, int] = {}
+    async for change in walk:
+        position = index.get(change.change.id)
+        if position is not None:
+            changes[position] = change
+            continue
+        index[change.change.id] = len(changes)
+        changes.append(change)
+    return changes
 
 
 async def _paginate(

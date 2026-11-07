@@ -208,8 +208,23 @@ credentials; read `private_key` explicitly when you need it.
 Recognized retry-later Connect `resource_exhausted` and REST admission-limit responses raise `PolyesterRateLimitError`. When the
 server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), inspect `error.detail` for `policy_class`, `scope`,
-`operation_id`, and presence-aware quota fields. `retry_after` prefers `detail.retry_after_ms`,
-then `Retry-After` / `Retry-After-Ms` / `Grpc-Retry-Pushback-Ms` headers on HTTP paths. Preview
+`operation_id`, and presence-aware quota fields. A REST `RATE_LIMIT_EXCEEDED` problem raises the
+same `PolyesterRateLimitError`, whichever side refused, with its `rate_limit` object in
+`error.detail`; every field is optional. The gateway's own refusal names only `reason` and `scope`
+(`CLIENT_IP`, no `operation_id`); a service's also names the operation, the policy class and the
+remaining quota. The gateway's Connect refusal (`resource_exhausted`, "rate limit exceeded, retry
+later") has no detail at all. `retry_after` prefers `detail.retry_after_ms`, then `Retry-After` /
+`Retry-After-Ms` / `Grpc-Retry-Pushback-Ms` headers on HTTP paths, and is `None` when the server
+gave no hint, as for a refusal of too many concurrent requests: back off on your own schedule
+then. A 429 problem with another code, such as `AUTH_RESOURCE_EXHAUSTED` (no new account can be
+created), raises `PolyesterApiError`, which waiting does not resolve.
+
+A request body over an endpoint's size limit is refused with HTTP 413 and the problem
+`REQUEST_TOO_LARGE` on every service, before the request is authenticated. It raises
+`PolyesterApiError` with `code` `REQUEST_TOO_LARGE` and the problem in `error.problem`;
+`is_request_too_large(err)` reports it. Nothing changed and the same body is refused again: reduce
+it to fit the limit. A ConnectRPC message over the limit once decoded keeps its Connect
+`resource_exhausted` answer and maps as before. Preview
 and batch rejections expose the same payload on `OrderErrorDetail.rate_limit` / batch item
 `rate_limit`. That error payload is distinct from `client.rate_limits`
 (`ratelimit.v1.RateLimitService`), which returns the public trading quota catalog and
@@ -486,9 +501,16 @@ keeps its previous price and quantity, and no successor exists. So the
 receipt's `replacement_order_id` is a planned ID, not proof of an order.
 `orders.wait_batch_replace(batch_request_id=...)` polls
 `get_batch_replace_status` with a short backoff until no item is `admitted`,
-and returns that status. The status appears a few seconds after admission, so
-the wait polls through `not_found`, `unavailable` and other server or network
-errors; a rate limit or any other error is raised. A `rejected` item's `error_code` names the refusal as a
+and returns that status. The status is retained for 60 seconds from
+acceptance and is readable as soon as `batch_replace` returns.
+`get_batch_replace_status` raises the retryable `PolyesterServerError` for
+`unavailable` (send the same read again within the window), and `not_found`
+means no retained batch with that ID, never a rejected replacement. The wait
+polls through `unavailable`, other server or network errors, and `not_found`,
+because an older API could answer it for a few seconds after admission; a rate
+limit or any other error is raised. After the window, reconcile the individual
+orders with `orders.get` and never send an accepted batch again. An item's
+`updated_ts_ns` is an observation time, not the refusal's identity. A `rejected` item's `error_code` names the refusal as a
 single modify raises it (`ERROR_CODE_POST_ONLY_CROSS`; `code` is the raw
 `POST_ONLY_CROSS`), and its `replacement_order_id` is empty. The server keeps
 a batch's status for 60 seconds from acceptance, so the wait stops there (or
@@ -706,22 +728,30 @@ needs no API key, and the server rate-limits it per client address.
 
 - `list_posts(limit=, page_token=)` returns one page of post summaries, newest
   first, with change counts by kind. `iter_posts(...)` yields every post
-  across pages.
+  across pages. A published post can be republished, for example to correct
+  its copy or withdraw a change: its `slug`, `published_at` and change ids stay
+  the same, `revision` (from 1) increases and `updated_at` is when the current
+  revision was published. To follow edits, read a post again when its
+  `revision` differs from the one you hold, and drop a post that is no longer
+  listed.
 - `get_post(slug)` returns one full post with its sections and changes. A slug
   is the post's coverage cutoff date, `YYYY-MM-DD`; a second or third post on
   the same day gets `-2` or `-3`. An unknown slug raises `PolyesterApiError`
   with code `not_found` (`is_not_found(err)` is true).
 - `list_changes(...)` returns one page of changes across posts, each with its
-  post slug, publication time and section heading. It filters by
+  post slug, first publication time and section heading. It filters by
   `categories`, `action_required`, `surfaces`, `audiences`, `start_time`
   (inclusive), `end_time` (exclusive), `post_slug` and `sort` (`"desc"`, the
   default, or `"asc"`). Filters on different fields combine with AND; values
   within one field combine with OR. `iter_changes(...)` yields every match
-  across pages. An `end_time` not after `start_time` raises `PolyesterApiError`
+  across pages, each change id once: when a post is republished during the
+  walk, paging restarts at that post's first change. An `end_time` not after `start_time` raises `PolyesterApiError`
   with code `invalid_argument`.
 - `breaking_changes_since(t)` and `action_required_since(t)` return every
   breaking or action-required change published at or after `t`, newest post
-  first.
+  first, each change once with the wording last received. They filter on first
+  publication, so they don't report an edit to an older post; compare
+  `revision` for that.
 
 Categories (`breaking_change`, `new_feature`, `improvement`, `bug_fix`),
 audiences (`all_users`, `traders`, `market_makers`, `developers`) and surfaces
@@ -1471,7 +1501,11 @@ with no or an invalid session token (REST `UNAUTHENTICATED`). It returns
 `None` for an error without an auth code. `AUTH_TIMESTAMP_SKEW` raises
 `PolyesterTimestampSkewError` on both transports, the one retryable reason:
 fix the clock offset and the retry signs again. The others raise
-`PolyesterAuthError` and need a change by the caller.
+`PolyesterAuthError` and need a change by the caller. `AUTH_WALLET_ALREADY_LINKED`
+(ConnectRPC `already_exists`, REST 409) refuses a wallet login whose wallet is
+already linked to another account; it is terminal, and
+`is_wallet_already_linked(err)` reports it. Log in with the account address the
+wallet already uses.
 
 ```python
 from polyester import AUTH_IP_NOT_ALLOWED, auth_error_code

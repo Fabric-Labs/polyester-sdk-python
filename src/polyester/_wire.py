@@ -15,6 +15,7 @@ from polyester._contract_codes import (
     is_placeholder_detail,
 )
 from polyester.codecs.decode.ratelimit import (
+    rate_limit_detail_from_json,
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
 )
@@ -182,7 +183,16 @@ def _map_gateway_problem(exc: GatewayProblemError):
         )
     order_code = _order_error_code_from_rest(exc.problem_code)
     if order_code in _RETRYABLE_RESOURCE_CODES:
-        return PolyesterRateLimitError(message, retry_after=exc.retry_after, code=order_code)
+        # A rate-limit problem's ``rate_limit`` object, whichever side refused;
+        # its retry_after_ms comes before the response headers.
+        detail = rate_limit_detail_from_json(exc.rate_limit)
+        retry_after = retry_after_seconds_from_detail(detail)
+        return PolyesterRateLimitError(
+            message,
+            retry_after=exc.retry_after if retry_after is None else retry_after,
+            detail=detail,
+            code=order_code,
+        )
     if exc.http_status == 429:
         return PolyesterApiError(message, code=order_code)
     if exc.http_status == 504:

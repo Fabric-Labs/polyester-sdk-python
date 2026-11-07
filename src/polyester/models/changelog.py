@@ -55,12 +55,23 @@ class ChangelogPostSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
 
     ``slug`` is the post's coverage cutoff date, ``YYYY-MM-DD``, with a ``-2``
     or ``-3`` suffix for a later post on the same day.
+
+    A published post can be republished, for example to correct its copy or
+    withdraw a change. Its ``slug``, ``published_at`` (the time of first
+    publication) and its changes' ``id`` values stay the same. ``revision``
+    starts at 1 and increases with each republication, and ``updated_at`` is
+    when the current revision was published, equal to ``published_at`` for
+    revision 1. A server that predates revisions sends neither: ``revision``
+    reads 0 and ``updated_at`` ``None``. To follow edits, read a post again
+    when its ``revision`` differs from the one you hold.
     """
 
     slug: str = ""
     title: str = ""
     introduction: str = ""
     published_at: datetime | None = None
+    updated_at: datetime | None = None
+    revision: int = 0
     coverage_cutoff: datetime | None = None
     change_count: int = 0
     breaking_change_count: int = 0
@@ -71,7 +82,7 @@ class ChangelogPostSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class ChangelogPost(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """One full changelog post."""
+    """One full changelog post at its current revision."""
 
     summary: ChangelogPostSummary
     sections: list[ChangelogSection] = msgspec.field(default_factory=list)

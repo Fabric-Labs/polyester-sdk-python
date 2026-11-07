@@ -47,6 +47,19 @@ API_KEY_AUTH_ERROR_CODES = frozenset(
     }
 )
 
+# A valid signed wallet login named an account address no account uses, and
+# the signing wallet is already linked to another account (ConnectRPC
+# ``already_exists``, REST 409). Wallets are not moved between accounts and
+# nothing changed. Terminal: the same request is refused again. Log in with
+# the account address the wallet already uses.
+AUTH_WALLET_ALREADY_LINKED = "AUTH_WALLET_ALREADY_LINKED"
+
+# Code of a PolyesterApiError for a request body over the endpoint's size
+# limit (REST problem ``REQUEST_TOO_LARGE``, HTTP 413). The API refuses it
+# before reading or authenticating the request, so nothing changed, and the
+# same body is refused again: reduce it to fit the limit.
+REQUEST_TOO_LARGE = "REQUEST_TOO_LARGE"
+
 # Gateway code for an API-key request whose signed timestamp is outside the
 # allowed skew window.
 TIMESTAMP_SKEW = "TIMESTAMP_SKEW"
@@ -133,8 +146,15 @@ class PolyesterRateLimitError(PolyesterTransportError):
     detail has no service code.
 
     ``detail`` is the structured ``polyester.ratelimit.v1.RateLimitDetail``
-    payload when the server attached it. ``retry_after`` prefers
-    ``detail.retry_after_ms``, then response headers when available.
+    payload when the server attached it: ConnectRPC details, an in-band order
+    rejection, or the ``rate_limit`` object of a REST ``RATE_LIMIT_EXCEEDED``
+    problem, whose fields are all optional. The gateway's own refusal names
+    only ``reason`` and ``scope`` (``CLIENT_IP``, no ``operation_id``); a
+    service's also names the operation, the policy class and the remaining
+    quota. ``retry_after`` prefers ``detail.retry_after_ms``, then the
+    ``Retry-After`` header; it is ``None`` when the server gave no hint, as for
+    a refusal of too many concurrent requests, so back off on your own
+    schedule then.
     """
 
     def __init__(
@@ -344,6 +364,19 @@ def is_session_required(err: BaseException) -> bool:
     """True when a session-only method refused an API key
     (``AUTH_SESSION_KIND_NOT_ALLOWED``); see :class:`PolyesterSessionRequiredError`."""
     return auth_error_code(err) == AUTH_SESSION_KIND_NOT_ALLOWED
+
+
+def is_wallet_already_linked(err: BaseException) -> bool:
+    """True when a wallet login was refused because the wallet is already
+    linked to another account (``AUTH_WALLET_ALREADY_LINKED``). It is terminal:
+    log in with the account address the wallet already uses."""
+    return auth_error_code(err) == AUTH_WALLET_ALREADY_LINKED
+
+
+def is_request_too_large(err: BaseException) -> bool:
+    """True when a request body over the endpoint's size limit was refused
+    (``REQUEST_TOO_LARGE``, HTTP 413). Nothing changed; reduce the body."""
+    return isinstance(err, PolyesterApiError) and err.code == REQUEST_TOO_LARGE
 
 
 def is_order_already_terminal(err: BaseException) -> bool:

@@ -46,6 +46,10 @@ def ledger_transfer_from_proto(msg: ledger_read_pb2.TransferRow) -> LedgerTransf
             msg.destination if msg.HasField("destination") else None
         ),
         transfer_id=msg.transfer_id,
+        balance_after=(
+            u128_from_proto(msg.balance_after_e18) if msg.HasField("balance_after_e18") else None
+        ),
+        link_id=str(msg.link_id) if msg.link_id else "",
     )
 
 

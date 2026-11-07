@@ -18,6 +18,10 @@ class ProtocolError:
 class Reply:
     id: int
     error: ProtocolError | None
+    # A connect, subscribe or renewal result's token lifetime: the token must
+    # be renewed within ``ttl`` seconds when ``expires`` is set.
+    expires: bool = False
+    ttl: int = 0
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,17 @@ def subscribe_command(command_id: int, channel: str, token: str | None = None) -
     return _command(command_id, 5, request)
 
 
+def refresh_command(command_id: int, token: str) -> bytes:
+    """Renew the connection token: Command.refresh = 14, RefreshRequest { token = 1 }."""
+    return _command(command_id, 14, _string_field(1, token))
+
+
+def sub_refresh_command(command_id: int, channel: str, token: str) -> bytes:
+    """Renew a subscription token: Command.sub_refresh = 15,
+    SubRefreshRequest { channel = 1, token = 2 }."""
+    return _command(command_id, 15, _string_field(1, channel) + _string_field(2, token))
+
+
 def pong_command() -> bytes:
     return b"\x00"
 
@@ -76,6 +91,8 @@ def _decode_reply(data: bytes, incoming: list[Incoming]) -> None:
     cursor = _Cursor(data)
     reply_id = 0
     error: ProtocolError | None = None
+    expires = False
+    ttl = 0
     saw_push = False
     while cursor.remaining:
         field, wire = cursor.key()
@@ -86,10 +103,35 @@ def _decode_reply(data: bytes, incoming: list[Incoming]) -> None:
         elif (field, wire) == (4, 2):
             saw_push = True
             _decode_push(cursor.length_delimited(), incoming)
+        elif field in _EXPIRY_FIELDS and wire == 2:
+            expires, ttl = _decode_expiry(cursor.length_delimited(), _EXPIRY_FIELDS[field])
         else:
             cursor.skip(wire)
     if reply_id or error is not None or not saw_push:
-        incoming.append(Reply(reply_id, error))
+        incoming.append(Reply(reply_id, error, expires, ttl))
+
+
+# Reply result fields and their (expires, ttl) fields: ConnectResult (5) and
+# RefreshResult (14) carry expires = 3, ttl = 4; SubscribeResult (6) and
+# SubRefreshResult (15) carry expires = 1, ttl = 2.
+_EXPIRY_FIELDS = {5: (3, 4), 14: (3, 4), 6: (1, 2), 15: (1, 2)}
+
+
+def _decode_expiry(data: bytes, fields: tuple[int, int]) -> tuple[bool, int]:
+    cursor = _Cursor(data)
+    expires = False
+    ttl = 0
+    while cursor.remaining:
+        field, wire = cursor.key()
+        if (field, wire) == (fields[0], 0):
+            expires = bool(cursor.varint())
+        elif (field, wire) == (fields[1], 0):
+            ttl = cursor.varint()
+            if ttl > 0xFFFFFFFF:
+                raise PolyesterRealtimeError("Centrifugo token ttl exceeds uint32")
+        else:
+            cursor.skip(wire)
+    return expires, ttl
 
 
 def _decode_error(data: bytes) -> ProtocolError:

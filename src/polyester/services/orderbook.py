@@ -6,7 +6,11 @@ from collections.abc import Callable
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
-from polyester.codecs.orderbook import depth_to_connect_enum
+from polyester.codecs.orderbook import (
+    depth_to_connect_enum,
+    orderbook_stream_tier,
+    require_published_stream_depth,
+)
 from polyester.codecs.realtime_decode import decode_orderbook_delta_bytes
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orderbook.v1.orderbook_connect import OrderbookServiceClient
@@ -83,8 +87,9 @@ class AsyncOrderbookService(BaseService):
         symbol_id: int,
         depth: int = 50,
     ) -> AsyncSubscription[OrderBookDeltaUpdate]:
-        ws_depth = min(500, max(1, int(depth)))
-        channel = f"public:spot:orderbook:deltas:depth:{ws_depth}:{symbol_id}:proto"
+        """Raw deltas of one published tier, ``ORDERBOOK_STREAM_DEPTHS``; any other is refused."""
+        stream_depth = require_published_stream_depth(depth)
+        channel = f"public:spot:orderbook:deltas:depth:{stream_depth}:{symbol_id}:proto"
         return await subscribe_public_proto(
             self._realtime,
             channel=channel,
@@ -106,7 +111,13 @@ class AsyncOrderbookService(BaseService):
         on_reconnect: Callable[[], None] | None = None,
         on_snapshot_refresh: Callable[[], None] | None = None,
     ) -> OrderbookSubscription:
-        """Snapshot + sequence-checked delta stream with optional price bucketing."""
+        """Snapshot + sequence-checked delta stream with optional price bucketing.
+
+        ``depth`` is any level count from 1 to the deepest published stream tier. The book
+        rides the smallest tier covering it, snapshot included, and each view is trimmed to
+        ``depth``; a depth no tier covers is refused before connecting.
+        """
+        stream_depth = orderbook_stream_tier(depth)
         realtime = require_realtime(self._realtime)
         resolved_symbol_id = symbol_id
         if resolved_symbol_id is None:
@@ -123,8 +134,7 @@ class AsyncOrderbookService(BaseService):
             )
 
         self._require_quantity_scale(symbol)
-        ws_depth = min(500, max(1, int(depth)))
-        channel = f"public:spot:orderbook:deltas:depth:{ws_depth}:{resolved_symbol_id}:proto"
+        channel = f"public:spot:orderbook:deltas:depth:{stream_depth}:{resolved_symbol_id}:proto"
 
         bids_map: dict[int, int] = {}
         asks_map: dict[int, int] = {}
@@ -147,7 +157,7 @@ class AsyncOrderbookService(BaseService):
             last_view_unavailable = not book_available
             data = build_orderbook_data(
                 symbol=symbol,
-                depth=ws_depth,
+                depth=depth,
                 book_seq=current_book_seq,
                 bids=bids_map,
                 asks=asks_map,
@@ -182,7 +192,9 @@ class AsyncOrderbookService(BaseService):
         async def fetch_snapshot():
             from polyester.gen.orderbook.v1 import orderbook_pb2
 
-            depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(ws_depth))
+            # At the tier, not the requested depth: deltas diff the tier's whole view, and a
+            # level promoted into a trimmed view must already be known.
+            depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(stream_depth))
             request = GetOrderBookRequest(symbol_id=resolved_symbol_id, depth=depth_enum)
             return await unary_public_decoded(
                 self._transport,

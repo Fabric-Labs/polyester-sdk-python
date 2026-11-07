@@ -1086,6 +1086,23 @@ if not book.available:
     ...  # unknown book: retry later instead of quoting into an empty side
 ```
 
+`orderbook.get` takes the snapshot depths 1, 5, 10, 20, 50, 100, 200, 500 and 1000.
+The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
+(`polyester.codecs.orderbook.ORDERBOOK_STREAM_DEPTHS`), and the server accepts a
+subscribe at any other depth and then sends nothing on it, so the SDK does not
+subscribe there:
+
+- `orderbook.create_subscription(symbol=..., depth=10)` takes any depth from 1 to
+  500. It rides the smallest published depth that covers it, 20 here, with its
+  snapshot, and trims each view to 10 levels. Its update rate is that of the depth
+  it rides, and each published update adds a view, also when only levels outside
+  yours changed. With `bucket`, levels are aggregated first and the depth then counts
+  buckets. A depth above 500, or below 1, raises `PolyesterValidationError` before
+  connecting; for more than 500 levels, read a snapshot with `orderbook.get`.
+- `orderbook.subscribe_deltas(symbol_id=..., depth=...)` delivers raw deltas, which
+  can't be trimmed, so it takes only a published depth and raises
+  `PolyesterValidationError` for any other.
+
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its
 column response oldest-first within each page; continuation pages go toward

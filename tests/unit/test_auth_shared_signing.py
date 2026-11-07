@@ -9,11 +9,13 @@ that key draws timestamps from one allocator.
 from __future__ import annotations
 
 import asyncio
+import gc
 import os
 import random
 import threading
 import types
 import uuid
+import weakref
 
 import pytest
 
@@ -146,6 +148,34 @@ def test_backpressured_clients_on_separate_event_loops_share_one_key(clock: Fake
     assert not errors, errors
     assert len(results) == 6
     assert len({headers["X-API-SIGNATURE"] for headers in results}) == 6
+
+
+def test_closed_event_loop_is_not_retained_after_backpressure(clock: FakeClock) -> None:
+    """The process-wide allocator must not keep a finished event loop alive."""
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    for _ in range(MAX_SIGNING_FUTURE_SKEW_MS + 1):
+        sign_request(creds, method="GET", url=URL, body=b"")
+
+    async def contend(signer: ApiKeyCredentials) -> list[dict[str, str]]:
+        # Two waiters contend for the loop's lock while capacity is exhausted.
+        tasks = [
+            asyncio.ensure_future(sign_request_async(signer, method="POST", url=URL, body=b"{}"))
+            for _ in range(2)
+        ]
+        await asyncio.sleep(0.01)
+        clock.advance(5)
+        return await asyncio.gather(*tasks)
+
+    loop = asyncio.new_event_loop()
+    try:
+        signed = loop.run_until_complete(contend(creds))
+    finally:
+        loop.close()
+    assert len({headers["X-API-SIGNATURE"] for headers in signed}) == 2
+    loop_ref = weakref.ref(loop)
+    del loop, creds
+    gc.collect()
+    assert loop_ref() is None, "a closed event loop is still referenced by the signing allocator"
 
 
 def _seed_range() -> range:

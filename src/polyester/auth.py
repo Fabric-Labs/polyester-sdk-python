@@ -5,7 +5,6 @@ import hashlib
 import os
 import threading
 import time
-import weakref
 from dataclasses import dataclass, field
 from typing import Any, NoReturn
 from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
@@ -31,6 +30,16 @@ def _refuse_serialization() -> NoReturn:
     raise TypeError(_NOT_SERIALIZABLE)
 
 
+class _LoopGate:
+    """FIFO queue for one event loop's async signers, counted by its users."""
+
+    __slots__ = ("lock", "users")
+
+    def __init__(self) -> None:
+        self.lock = asyncio.Lock()
+        self.users = 0
+
+
 class _SigningTimestampAllocator:
     """Allocate distinct millisecond timestamps without exceeding clock skew.
 
@@ -42,10 +51,11 @@ class _SigningTimestampAllocator:
         self._last_timestamp_ms = 0
         self._lock = threading.Lock()
         # An asyncio lock belongs to one event loop, and every sync client runs
-        # its own, so async waiters queue per loop. ``_lock`` orders all loops.
-        self._async_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
-            weakref.WeakKeyDictionary()
-        )
+        # its own, so async waiters queue on a gate per loop; ``_lock`` orders
+        # all loops. A gate exists only while a coroutine on its loop waits:
+        # its lock references the loop, and this allocator lives as long as
+        # the process, so a kept gate would keep a closed loop alive.
+        self._async_gates: dict[asyncio.AbstractEventLoop, _LoopGate] = {}
 
     def __reduce_ex__(self, protocol: Any) -> NoReturn:
         _refuse_serialization()
@@ -53,13 +63,19 @@ class _SigningTimestampAllocator:
     def __deepcopy__(self, memo: Any) -> NoReturn:
         _refuse_serialization()
 
-    def _async_lock(self) -> asyncio.Lock:
-        loop = asyncio.get_running_loop()
+    def _enter_async_gate(self, loop: asyncio.AbstractEventLoop) -> _LoopGate:
         with self._lock:
-            lock = self._async_locks.get(loop)
-            if lock is None:
-                lock = self._async_locks[loop] = asyncio.Lock()
-            return lock
+            gate = self._async_gates.get(loop)
+            if gate is None:
+                gate = self._async_gates[loop] = _LoopGate()
+            gate.users += 1
+            return gate
+
+    def _leave_async_gate(self, loop: asyncio.AbstractEventLoop, gate: _LoopGate) -> None:
+        with self._lock:
+            gate.users -= 1
+            if gate.users == 0:
+                del self._async_gates[loop]
 
     def next(self) -> int:
         """Allocate immediately or fail with retryable capacity backpressure.
@@ -73,12 +89,17 @@ class _SigningTimestampAllocator:
         """Allocate with bounded, cooperative backpressure."""
 
         async def allocate() -> int:
-            async with self._async_lock():
-                while True:
-                    try:
-                        return self._try_next()
-                    except PolyesterRateLimitError as exc:
-                        await asyncio.sleep(exc.retry_after or 0.001)
+            loop = asyncio.get_running_loop()
+            gate = self._enter_async_gate(loop)
+            try:
+                async with gate.lock:
+                    while True:
+                        try:
+                            return self._try_next()
+                        except PolyesterRateLimitError as exc:
+                            await asyncio.sleep(exc.retry_after or 0.001)
+            finally:
+                self._leave_async_gate(loop, gate)
 
         try:
             return await asyncio.wait_for(

@@ -9,6 +9,7 @@ that key draws timestamps from one allocator.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import gc
 import os
 import random
@@ -160,11 +161,16 @@ def test_closed_event_loop_is_not_retained_after_backpressure(clock: FakeClock) 
         # Two waiters contend for the loop's lock while capacity is exhausted.
         tasks = [
             asyncio.ensure_future(sign_request_async(signer, method="POST", url=URL, body=b"{}"))
-            for _ in range(2)
+            for _ in range(3)
         ]
         await asyncio.sleep(0.01)
+        # A cancelled waiter must release the gate too.
+        tasks[2].cancel()
         clock.advance(5)
-        return await asyncio.gather(*tasks)
+        signed = await asyncio.gather(*tasks[:2])
+        with contextlib.suppress(asyncio.CancelledError):
+            await tasks[2]
+        return signed
 
     loop = asyncio.new_event_loop()
     try:

@@ -870,10 +870,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         read's ``executions_complete``.
 
         ``timeout`` (seconds) bounds the whole wait, page reads included: a read
-        still in flight when it passes is abandoned and
-        ``PolyesterTransportError`` is raised; a timeout of 0 or less times out
-        before any read. A ``next_page_token`` that repeats a page token of the
-        same poll raises ``PolyesterResponseContractError``.
+        still in flight when it passes is abandoned, a read that finishes after
+        it is no success, and ``PolyesterTransportError`` is raised; a timeout
+        of 0 or less times out before any read. A ``next_page_token`` that
+        repeats a page token of the same poll raises
+        ``PolyesterResponseContractError``.
         """
         return await wait_for_order_trades_complete(
             self,
@@ -924,6 +925,11 @@ async def wait_for_order_trades_complete(
             if budget.expired():
                 raise timed_out() from exc
             raise
+        # A read answered in time can finish after the deadline, for example
+        # while it decodes: the timeout callback cannot run during that, so
+        # check the clock before accepting the read.
+        if budget.expired() or loop.time() >= deadline:
+            raise timed_out()
         if _order_trades_projection_complete(last):
             return last
         remaining = deadline - loop.time()

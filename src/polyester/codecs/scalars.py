@@ -89,7 +89,44 @@ def validate_protocol_scale(scale: int, *, field_name: str = "scale") -> int:
     return scale
 
 
-def _decimal_string_from_input(raw: str | Decimal, field_name: str) -> str:
+# Most digits a scaled value can have and still fit the widest wire field,
+# 2**128 - 1, once rescaled down from MAX_PROTOCOL_SCALE.
+_MAX_SCALED_DIGITS = len(str(2**128 - 1)) + MAX_PROTOCOL_SCALE
+# Longest rejected value an error message repeats.
+_MAX_ERROR_VALUE_CHARS = 64
+
+
+def _error_value(text: str) -> str:
+    if len(text) <= _MAX_ERROR_VALUE_CHARS:
+        return text
+    return f"{text[:_MAX_ERROR_VALUE_CHARS]}... ({len(text)} characters)"
+
+
+def _check_decimal_size(raw: Decimal, scale: int, field_name: str) -> None:
+    """Refuse a Decimal too precise or too large for ``scale`` before expanding it.
+
+    ``format(raw, "f")`` writes every digit an exponent implies, so a short
+    ``Decimal("1E-1000000")`` would otherwise allocate a million characters.
+    """
+    _, digits, exponent = raw.as_tuple()
+    assert isinstance(exponent, int)  # finite
+    significant = len(digits)
+    while significant > 1 and digits[significant - 1] == 0 and exponent < 0:
+        significant -= 1
+        exponent += 1
+    # Repeat the value as plain digits when that is short, else as written.
+    shown = str(raw)
+    if significant + abs(exponent) <= _MAX_ERROR_VALUE_CHARS:
+        shown = _trim_trailing_frac_zeros(format(raw, "f"))
+    if -exponent > scale:
+        raise FractionalDigitsError(
+            f"{field_name} supports at most {scale} decimal places: {_error_value(shown)}"
+        )
+    if significant + exponent + scale > _MAX_SCALED_DIGITS:
+        raise PolyesterValidationError(f"{field_name} is too large: {_error_value(shown)}")
+
+
+def _decimal_string_from_input(raw: str | Decimal, field_name: str, scale: int) -> str:
     if isinstance(raw, (bool, float)):
         raise PolyesterValidationError(f"{field_name} must be a decimal string or Decimal")
     if isinstance(raw, Decimal):
@@ -97,6 +134,9 @@ def _decimal_string_from_input(raw: str | Decimal, field_name: str) -> str:
             raise PolyesterValidationError(f"{field_name} must be a finite decimal")
         if raw < 0:
             raise PolyesterValidationError(f"{field_name} must be non-negative")
+        if raw.is_zero():
+            return "0"
+        _check_decimal_size(raw, scale, field_name)
         text = format(raw, "f")
         if "." in text:
             text = text.rstrip("0").rstrip(".")
@@ -143,12 +183,12 @@ def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, s
 
 def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
     validate_protocol_scale(scale, field_name=f"{field_name} scale")
-    text = _decimal_string_from_input(raw, field_name)
+    text = _decimal_string_from_input(raw, field_name, scale)
     ok, scaled, reason = try_decimal_to_scaled(text, scale)
     if not ok or scaled is None:
         if reason == "precision":
             raise FractionalDigitsError(
-                f"{field_name} supports at most {scale} decimal places: {text}"
+                f"{field_name} supports at most {scale} decimal places: {_error_value(text)}"
             )
         if reason == "scale":
             raise PolyesterValidationError(
@@ -206,10 +246,19 @@ def format_qty_scaled(qty_scaled: int, scale: int) -> str:
     Raises PolyesterValidationError when ``scale`` exceeds ``MAX_PROTOCOL_SCALE``.
     """
     validate_protocol_scale(scale)
+    return format_scaled(qty_scaled, scale)
+
+
+def format_scaled(value: int, scale: int) -> str:
+    """Convert ``value / 10**scale`` to a decimal string, for a non-negative scale.
+
+    Unlike :func:`format_qty_scaled` it does not cap ``scale``: use it for a
+    scale derived from validated ones, such as a notional at base scale + 9.
+    """
     if scale <= 0:
-        return str(int(qty_scaled))
-    neg = qty_scaled < 0
-    digits = str(abs(int(qty_scaled)))
+        return str(int(value))
+    neg = value < 0
+    digits = str(abs(int(value)))
     padded = digits.zfill(scale + 1)
     head = padded[:-scale]
     tail = padded[-scale:]

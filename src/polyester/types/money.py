@@ -316,7 +316,7 @@ def resolve_qty_scaled(
             f"{field_name} must be a decimal string, Decimal, or Quantity "
             "(use Quantity.from_scaled for scaled ints)"
         )
-    return parse_qty_scaled(value, scale, field_name)
+    return _parse_order_qty_scaled(value, scale, field_name)
 
 
 def resolve_quote_qty_scaled(
@@ -352,7 +352,18 @@ def resolve_quote_qty_scaled(
             f"{field_name} must be a decimal string, Decimal, or Quantity "
             "(use Quantity.from_quote_scaled for scaled ints)"
         )
-    return parse_qty_scaled(value, scale, field_name)
+    return _parse_order_qty_scaled(value, scale, field_name)
+
+
+def _parse_order_qty_scaled(value: str | Decimal, scale: int, field_name: str) -> int:
+    """Parse a decimal order quantity for an int64 wire field.
+
+    ``parse_qty_scaled`` allows wider values at scale 18 for ledger amounts.
+    """
+    scaled = parse_qty_scaled(value, scale, field_name)
+    if scaled > INT64_MAX:
+        raise PolyesterValidationError(f"{field_name} exceeds int64 range")
+    return scaled
 
 
 def resolve_asset_amount_scaled(

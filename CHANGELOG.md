@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** A decimal order quantity that doesn't fit the signed 64-bit wire field now raises `PolyesterValidationError` ("qty exceeds int64 range") before anything is sent. On a market with base quantity scale 18, a quantity of 10 scales to 10000000000000000000, which raised protobuf's `ValueError` ("Value out of range") instead; nothing was sent. Affected: `orders.create`, `orders.preview_order`, `orders.batch_create`, `orders.modify`, `orders.batch_replace` and `triggers.create`, for `qty`, `new_qty` and `max_quote_debit`, and `polyester.types.resolve_qty_scaled` and `resolve_quote_qty_scaled`. `parse_qty_scaled` still allows wider values at scale 18. Migration: catch `PolyesterValidationError` instead of `ValueError`, and keep the scaled quantity at or below 9223372036854775807, which is 9.223372036854775807 at scale 18.
+- A `Decimal` quantity, price or amount is checked against its scale and size before it is written out in full. `Decimal("1e-1000000")` used to build a million-digit string and a 1,000,041-character error, and `Decimal("1e+1000000")` a million-digit integer, before being refused; both are now refused at once with a short error. This applies to every write that takes a `Decimal`, including `orders.create`, `orders.preview_order` and `orders.batch_create`. The value an error repeats is cut to 64 characters. Values that could be accepted before still are.
+- **Breaking:** `Order.cum_quote`, `Order.quote_used` and `Order.quote_unspent` now work at every base quantity scale the catalog accepts, 0 to 36. At base scales 28 to 36 the amount is at 37 to 45 decimals, which `format_qty_scaled` refused, so they raised `PolyesterValidationError`. They now raise `PolyesterValidationError` for a `base_quantity_scale` or `quote_quantity_scale` below 0 or above 36, which used to give an amount at the wrong scale. Migration: pass the pair's scales from the catalog, `CatalogManager.base_quantity_scale_for_symbol_id` and `CatalogManager.quote_quantity_scale_for_symbol`.
+
 ## 0.10.0
 
 Git tag: `v0.10.0`. Released 2026-11-07. Built on public contract `748066a`.

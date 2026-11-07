@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
+
+Git tag: `v0.9.0`. Released 2026-11-07. Built on public contract `748066a`.
 
 - `orderbook.create_subscription` at a depth the server doesn't publish no longer goes silent after its first view. Depths 5, 10, 25 and 100, for example, were accepted by the server and got no updates, with no error. Any depth from 1 to 500 now subscribes to the smallest published depth that covers it (1, 20, 50, 200 or 500), takes its snapshot there, and trims each view to the depth you asked for. Sequence-gap, availability and bucket behaviour are unchanged, and a view can update when only levels outside it changed.
-- **Breaking:** `orderbook.create_subscription` raises `PolyesterValidationError` before connecting for a depth above 500, which used to be clamped to 500 and report that depth, and for a depth below 1 or that isn't an integer, which used to be clamped or truncated. Migration: pass a depth from 1 to 500, or read a snapshot of up to 1000 levels with `orderbook.get`, which is unchanged.
-- **Breaking:** `orderbook.subscribe_deltas` raises `PolyesterValidationError` before connecting for any depth other than 1, 20, 50, 200 or 500, instead of subscribing to a stream that sends nothing or clamping to 1 or 500. Raw deltas can't be trimmed. Migration: pass a published depth, or use `orderbook.create_subscription` for a book at any depth up to 500.
+- **Breaking:** `orderbook.create_subscription` raises `PolyesterValidationError` before connecting for a depth above 500, which used to be clamped to 500 and report that depth, and for a depth below 1 or that isn't an `int`, which used to be clamped or converted with `int()`. That now refuses `20.0`, `"10"`, `True` and NumPy integers such as `np.int64(10)`. Migration: pass a depth from 1 to 500 as an `int`, using `int(depth)` for a NumPy value, or read a snapshot of up to 1000 levels with `orderbook.get`, which is unchanged.
+- **Breaking:** `orderbook.subscribe_deltas` raises `PolyesterValidationError` before connecting for any depth other than 1, 20, 50, 200 or 500, or for a value that isn't an `int`, instead of subscribing to a stream that sends nothing or clamping to 1 or 500. Raw deltas can't be trimmed. Migration: pass a published depth as an `int`, or use `orderbook.create_subscription` for a book at any depth up to 500.
+- Added `ORDERBOOK_STREAM_DEPTHS`, `orderbook_stream_tier` and `require_published_stream_depth` in `polyester.codecs.orderbook`, the published stream depths and the checks the client uses.
 
 ## 0.8.0
 

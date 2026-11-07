@@ -1386,7 +1386,7 @@ so it doesn't prove a request was refused. Only a 401 or 403 is a refusal on its
 status alone (`PolyesterAuthError`). Every other status raises
 `PolyesterServerError` with `mutation_outcome_unknown(error)` true and
 `is_retryable_error(error)` false, and keeps any code it did send in `error.code`.
-Read back before sending a mutation again. Reads retry 429, 502, 503 and 504 for you.
+Read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to.
 The one exception is a well-formed but unrecognised code at HTTP 429, which raises
 `PolyesterApiError`: known and not retryable.
 

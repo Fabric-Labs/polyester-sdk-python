@@ -54,7 +54,11 @@ class Page:
 class TradesServer:
     cum: int
     polls: list[list[Page]]
+    # The order's status on each poll, the last one repeating; FILLED when empty.
+    statuses: list[int] = field(default_factory=list)
     poll: int = 0
+    # Polls started after the first.
+    reads: int = 0
     started: bool = False
     arrivals: list[float] = field(default_factory=list)
     served: list[float] = field(default_factory=list)
@@ -70,10 +74,17 @@ class TradesServer:
         self.arrivals.append(time.monotonic())
         token = request.page_token
         if not token:
-            if self.started and self.poll < len(self.polls) - 1:
-                self.poll += 1
+            if self.started:
+                self.reads += 1
+                if self.poll < len(self.polls) - 1:
+                    self.poll += 1
             self.started = True
         pages = self.polls[self.poll]
+        status = (
+            self.statuses[min(self.reads, len(self.statuses) - 1)]
+            if self.statuses
+            else orders_read_pb2.FILLED
+        )
         index = int(token.removeprefix("t")) if token else 0
         page = pages[index]
         if page.hang:
@@ -82,7 +93,9 @@ class TradesServer:
             await asyncio.sleep(page.delay)
         self.served.append(time.monotonic())
         response = orders_read_pb2.GetOrderResponse(
-            order=orders_read_pb2.Order(order_id=1, symbol_id=1, cum_qty_scaled=self.cum),
+            order=orders_read_pb2.Order(
+                order_id=1, symbol_id=1, status=status, cum_qty_scaled=self.cum
+            ),
             next_page_token=page.next,
             executions_complete=page.complete,
             trades=[
@@ -159,6 +172,61 @@ async def test_wait_keeps_the_final_reads_executions_complete(
         result = await wait_trades(client, 2.0)
     assert sum(trade_qtys(result)) == 100
     assert result.executions_complete is want
+
+
+WORKING = orders_read_pb2.WORKING
+FILLED = orders_read_pb2.FILLED
+CANCELED = orders_read_pb2.CANCELED
+REJECTED = orders_read_pb2.REJECTED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("cum", "trades", "statuses", "want_status"),
+    [
+        pytest.param(100, [60, 40], [FILLED], "filled", id="terminal fully filled order"),
+        pytest.param(
+            40, [40], [CANCELED], "canceled", id="terminal canceled order with partial fills"
+        ),
+        pytest.param(0, [], [REJECTED], "rejected", id="terminal order with no fills"),
+        pytest.param(
+            40,
+            [40],
+            [WORKING, WORKING, CANCELED],
+            "canceled",
+            id="partially filled order canceled on a later poll",
+        ),
+    ],
+)
+async def test_wait_completes_on_a_terminal_order(
+    cum: int, trades: list[int], statuses: list[int], want_status: str
+) -> None:
+    """The wait reports completion only for a terminal order (filled, canceled
+    or rejected) whose recorded trades add up to its cum_qty. The Go and Rust
+    SDKs run the same cases."""
+    server = TradesServer(cum=cum, polls=[[Page(trades, complete=True)]], statuses=statuses)
+    async with trades_client(server) as client:
+        result = await wait_trades(client, 0.5)
+    assert result.order is not None
+    assert result.order.status == want_status
+    assert trade_qtys(result) == trades
+    assert result.executions_complete is True
+
+
+@pytest.mark.asyncio
+async def test_wait_keeps_polling_a_partially_filled_working_order() -> None:
+    """executions_complete is also true for a working order whose fills so far
+    are all recorded: that is no completion, so the wait times out."""
+    server = TradesServer(cum=40, polls=[[Page([40], complete=True)]], statuses=[WORKING])
+    async with trades_client(server) as client:
+        try:
+            result = await wait_trades(client, 0.5)
+        except PolyesterTransportError as exc:
+            assert TIMEOUT_MESSAGE in str(exc)
+        else:
+            assert result.order is not None
+            pytest.fail(f"wait reported a {result.order.status} order complete")
+    assert server.reads >= 1
 
 
 @pytest.mark.asyncio

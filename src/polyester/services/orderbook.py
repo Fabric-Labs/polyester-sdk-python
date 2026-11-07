@@ -8,6 +8,7 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.orderbook import (
     depth_to_connect_enum,
+    orderbook_snapshot_depth,
     orderbook_stream_tier,
     require_published_stream_depth,
 )
@@ -61,6 +62,8 @@ class AsyncOrderbookService(BaseService):
         from polyester.gen.orderbook.v1 import orderbook_pb2
         from polyester.services._symbols import resolve_symbol_id
 
+        # Report the depth requested on the wire, not the one passed.
+        depth = orderbook_snapshot_depth(depth)
         depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(depth))
         request = GetOrderBookRequest(
             symbol_id=resolve_symbol_id(

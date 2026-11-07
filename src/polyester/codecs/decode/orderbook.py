@@ -9,11 +9,13 @@ def orderbook_level_from_proto(
     msg: orderbook_pb2.PriceLevel,
     *,
     quantity_scale: int,
+    symbol: str | None = None,
 ) -> OrderbookLevel:
     return format_orderbook_level(
         price_ticks=int(msg.price_ticks),
         qty_scaled=int(msg.qty_scaled),
         quantity_scale=quantity_scale,
+        symbol=symbol,
     )
 
 
@@ -28,7 +30,13 @@ def orderbook_from_proto(
         symbol=symbol,
         depth=depth,
         book_seq=str(msg.book_seq),
-        bids=[orderbook_level_from_proto(item, quantity_scale=quantity_scale) for item in msg.bids],
-        asks=[orderbook_level_from_proto(item, quantity_scale=quantity_scale) for item in msg.asks],
+        bids=[
+            orderbook_level_from_proto(item, quantity_scale=quantity_scale, symbol=symbol)
+            for item in msg.bids
+        ],
+        asks=[
+            orderbook_level_from_proto(item, quantity_scale=quantity_scale, symbol=symbol)
+            for item in msg.asks
+        ],
         available=bool(msg.available),
     )

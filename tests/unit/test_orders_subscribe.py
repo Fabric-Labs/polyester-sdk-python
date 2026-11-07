@@ -16,14 +16,14 @@ async def test_orders_subscribe_uses_the_private_order_socket() -> None:
         transport=MagicMock(),
         catalogs=MagicMock(),
         default_sub_account_id=None,
-        default_account_id="acct_test",
+        default_account_id="j",
         realtime=realtime,
     )
 
     result = await service.subscribe()
 
     assert result == "subscription"
-    realtime.subscribe_private_orders.assert_awaited_once_with("acct_test")
+    realtime.subscribe_private_orders.assert_awaited_once_with("j")
     realtime.subscribe_proto.assert_not_called()
 
 

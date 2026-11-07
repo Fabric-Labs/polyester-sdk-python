@@ -26,6 +26,7 @@ from polyester.codecs.scalars import (
     market_id,
     market_ids,
     omit_none,
+    parse_account_id,
     refuse_item_scope,
     tick_count,
 )
@@ -423,8 +424,8 @@ def create_order_to_proto(
             quote_quantity_scale=quote_quantity_scale,
         )
     )
-    if request.sub_account_id:
-        proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
+    if request.sub_account_id is not None and request.sub_account_id != "":
+        proto.subaccount_id = parse_account_id(request.sub_account_id, "sub_account_id")
     return proto
 
 
@@ -446,8 +447,8 @@ def preview_order_to_proto(
             quote_quantity_scale=quote_quantity_scale,
         )
     )
-    if request.sub_account_id:
-        proto.subaccount_id = id_to_int(request.sub_account_id, "sub_account_id")
+    if request.sub_account_id is not None and request.sub_account_id != "":
+        proto.subaccount_id = parse_account_id(request.sub_account_id, "sub_account_id")
     return proto
 
 
@@ -1039,7 +1040,7 @@ def batch_create_orders_to_proto(
         request_id=optional_request_id(request_id) or f"batch-create-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if item_scales is not None and len(item_scales) != len(items):
         raise PolyesterValidationError("batch_create requires scales for every item")
     seen_client_order_ids: set[str] = set()
@@ -1092,7 +1093,7 @@ def batch_cancel_orders_to_proto(
         request_id=optional_request_id(request_id) or f"batch-cancel-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     for item in items:
         proto.items.append(batch_cancel_item_to_proto(item))
     return proto
@@ -1111,7 +1112,7 @@ def cancel_all_after_to_proto(
         timeout_sec=timeout_sec,
     )
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if symbol_id is not None:
         # 0 means every market, as when omitted.
         proto.symbol_id = market_id(symbol_id, "cancel_all_after symbol_id")
@@ -1140,7 +1141,7 @@ def batch_replace_orders_to_proto(
         request_id=optional_request_id(request_id) or f"batch-replace-{uuid.uuid4().hex[:12]}",
     )
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     for item in items:
         new_qty = item.new_qty if isinstance(item, BatchReplaceItem) else item.get("new_qty")
         item_scale = _codec_quantity_scale(new_qty, quantity_scale) if new_qty is not None else 0
@@ -1179,7 +1180,7 @@ def modify_order_to_proto(
     )
     set_order_key(proto, key, op="modify")
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if new_price is not None:
         with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
             proto.new_price_ticks = resolve_price_ticks(
@@ -1226,7 +1227,7 @@ def cancel_all_orders_to_proto(
         dry_run=dry_run,
     )
     if sub_account_id is not None:
-        proto.subaccount_id = id_to_int(sub_account_id, "sub_account_id")
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if symbol_id and symbol_ids:
         raise PolyesterValidationError("cancel_all accepts only one of symbol_id or symbol_ids")
     resolved_ids: list[int] = []
@@ -1335,4 +1336,4 @@ def resolve_quote_quantity_scale(
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:
     if value is None or value == "":
         return None
-    return id_to_int(value, "sub_account_id")
+    return parse_account_id(value, "sub_account_id")

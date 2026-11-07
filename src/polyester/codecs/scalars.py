@@ -336,6 +336,20 @@ def id_to_int(value: str | int, label: str = "id") -> int:
     return parsed
 
 
+def parse_account_id(value: str | int, label: str) -> int:
+    """Decode an account or sub-account ID as ``id_to_int`` does, refusing 0.
+
+    On the wire 0 is unset: a sub-account ID of 0 is the main account, and an
+    account ID of 0 names no account. So ``"1"`` (``format_id(0)``), ``"0"``,
+    ``"00"`` or ``0`` would address another account than the one named. Omit
+    a sub-account ID to address the main account.
+    """
+    parsed = id_to_int(value, label)
+    if parsed == 0:
+        raise PolyesterValidationError(f"{label} must be a non-zero ID, not 0")
+    return parsed
+
+
 def format_id(value: str | int) -> str:
     return _encode_id(id_to_int(value))
 

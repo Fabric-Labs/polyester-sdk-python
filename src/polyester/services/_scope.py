@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from polyester.codecs.scalars import format_id
+from polyester.codecs.scalars import format_id, parse_account_id
 from polyester.errors import PolyesterValidationError
 
 AccountScope = Literal["main", "active"] | str | dict[str, str] | dict[str, int]
@@ -74,10 +74,16 @@ def resolve_sub_account_from_scope(
 
 
 def resolve_account_id(value: str | int | None, default: str | int | None) -> str:
-    if value is not None and value != "":
-        return _public_id(value, "account_id")
-    if default is not None and default != "":
-        return _public_id(default, "account_id")
+    """Resolve the public account ID from ``value``, or else ``default``.
+
+    An ID that decodes to 0, such as ``"1"``, ``"0"`` or ``"00"``, is refused:
+    it would name the channel of account 0.
+    """
+    for candidate in (value, default):
+        if candidate is not None and candidate != "":
+            resolved = _public_id(candidate, "account_id")
+            parse_account_id(resolved, "account_id")
+            return resolved
     raise PolyesterValidationError(
         "account_id is required; set POLYESTER_ACCOUNT_ID or pass account_id explicitly"
     )

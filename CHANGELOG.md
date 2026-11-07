@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.11.0
+
+Git tag: `v0.11.0`. Released 2026-11-07. Built on public contract `748066a`.
 
 - **Breaking:** `orders.wait_for_order_trades_complete` (and the module-level `wait_for_order_trades_complete`) now reports completion only once the order has ended (`filled`, `canceled` or `rejected`) and its trades add up to `cum_qty`, the rule the Go and Rust SDKs follow. It returned as soon as the trades recorded so far added up to `cum_qty`, so a partially filled order that was still working, or a working order with no fills yet, could be reported complete while more fills were still to come. Such an order now keeps the wait polling until it ends or the timeout passes, which raises `PolyesterTransportError`. Migration: call the wait once the order is expected to end (an IOC or FOK order, or after a cancel), and to check the trades recorded so far on an order that is still working, read it with `orders.get` and compare its trades to `cum_qty`.
 - **Breaking:** A decimal order quantity that doesn't fit the signed 64-bit wire field now raises `PolyesterValidationError` ("qty exceeds int64 range") before anything is sent. On a market with base quantity scale 18, a quantity of 10 scales to 10000000000000000000, which raised protobuf's `ValueError` ("Value out of range") instead; nothing was sent. Affected: `orders.create`, `orders.preview_order`, `orders.batch_create`, `orders.modify`, `orders.batch_replace` and `triggers.create`, for `qty`, `new_qty` and `max_quote_debit`, and `polyester.types.resolve_qty_scaled` and `resolve_quote_qty_scaled`. `parse_qty_scaled` still allows wider values at scale 18. Migration: catch `PolyesterValidationError` instead of `ValueError`, and keep the scaled quantity at or below 9223372036854775807, which is 9.223372036854775807 at scale 18.

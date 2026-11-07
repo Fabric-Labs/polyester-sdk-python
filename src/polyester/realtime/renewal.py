@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import Awaitable, Callable
 from typing import Literal
 
@@ -52,14 +53,20 @@ class TokenRenewer:
         async with self._send_lock:
             await self._ws.send(frame)
 
-    def schedule(self, kind: RenewalKind, expires: bool, ttl: int) -> None:
-        """Renew ``kind``'s token ``ttl`` units from now when the server said it expires."""
+    def schedule(self, kind: RenewalKind, answered: float, expires: bool, ttl: int) -> None:
+        """Renew ``kind``'s token ``ttl`` units after ``answered`` when the server said it expires.
+
+        ``answered`` is the ``time.monotonic()`` at which the reply carrying the
+        TTL arrived; time spent since then, such as the rest of setup, counts
+        against the TTL.
+        """
         if not expires or self._stopped:
             return
         previous = self._timers.pop(kind, None)
         if previous is not None:
             previous.cancel()
-        self._timers[kind] = asyncio.create_task(self._renew_after(kind, ttl * self._unit))
+        delay = max(answered + ttl * self._unit - time.monotonic(), 0.0)
+        self._timers[kind] = asyncio.create_task(self._renew_after(kind, delay))
 
     async def _renew_after(self, kind: RenewalKind, delay: float) -> None:
         await asyncio.sleep(delay)
@@ -93,7 +100,7 @@ class TokenRenewer:
             # The server ends what it no longer accepts; that drives recovery.
             self._report(_renewal_refused(kind, reply.error))
             return True
-        self.schedule(kind, reply.expires, reply.ttl)
+        self.schedule(kind, time.monotonic(), reply.expires, reply.ttl)
         return True
 
     async def stop(self) -> None:

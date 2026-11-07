@@ -544,6 +544,8 @@ class AsyncRealtimeClient:
                 connected = await self._centrifugo_connect(
                     ws, token=connection_token, pending=pending
                 )
+                # The connection token's TTL runs from here, through the rest of setup.
+                connected_at = time.monotonic()
                 subscription_token = await fetch_subscription_token(
                     http,
                     credentials,
@@ -556,6 +558,7 @@ class AsyncRealtimeClient:
                     token=subscription_token,
                     pending=pending,
                 )
+                subscribed_at = time.monotonic()
 
                 async def fetch_renewal_token(kind: RenewalKind) -> str:
                     if kind == "connection":
@@ -572,8 +575,8 @@ class AsyncRealtimeClient:
                     fetch=fetch_renewal_token,
                     report=on_renewal_error or (lambda _exc: None),
                 )
-                renewer.schedule("connection", connected.expires, connected.ttl)
-                renewer.schedule("subscription", subscribed.expires, subscribed.ttl)
+                renewer.schedule("connection", connected_at, connected.expires, connected.ttl)
+                renewer.schedule("subscription", subscribed_at, subscribed.expires, subscribed.ttl)
             else:
                 await self._centrifugo_connect(ws, pending=pending)
                 await self._centrifugo_subscribe(ws, channel, pending=pending)

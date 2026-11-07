@@ -127,6 +127,36 @@ async def test_renewal_continues_after_disconnect() -> None:
         assert server.reused + server.stale == 0
 
 
+async def test_connection_renewal_counts_from_connect_reply() -> None:
+    # The connection token's lifetime runs from the connect reply, not from the
+    # end of setup: a slow subscription token must not push the first
+    # connection renewal past the server's expiry.
+    unit = 0.2
+    sub_calls = 0
+
+    async def hook(kind: str) -> int:
+        nonlocal sub_calls
+        if kind == "sub":
+            sub_calls += 1
+            # Only the setup's subscription token is slow, by more than the grace.
+            if sub_calls == 1:
+                await asyncio.sleep(0.15)
+        return 200
+
+    async with RenewalServer(unit=unit, conn_ttl=2, grace=0.06) as server:
+        server.token_hook = hook
+        async with _transfers(server, unit) as (_rt, sub, _errors):
+            await asyncio.sleep(8 * unit)
+            counts = (
+                f"expiries={server.conn_expiries} connections={server.accepted} "
+                f"renewals={server.refreshes}"
+            )
+            assert server.conn_expiries == 0, counts
+            assert server.accepted == 1, counts
+            assert server.refreshes >= 3, counts
+            assert sub.resubscribed == 0
+
+
 async def test_token_renewal_interleaves_with_reconnects() -> None:
     # Renewals race reconnects: token fetches and renewal answers take random
     # time and the server drops the connection at random moments, so a drop

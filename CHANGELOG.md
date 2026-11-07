@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.10.0
+
+Git tag: `v0.10.0`. Released 2026-11-07. Built on public contract `748066a`.
 
 - **Breaking:** A zipped-asset supply at a quantity scale of 0 now reads as whole units. `get_deposit_withdraw_config` and `subscribe_zipped_asset_supply` reported a BONK supply of 3582802 as `0.000000000003582802`, because `format_ledger_u128` treated `scale=0` as 18. It now formats at the scale you pass, including 0; leaving `scale` out still means 18. A zipped asset that isn't in the hydrated catalog is still refused. Migration: leave `scale` out, or pass `LEDGER_SCALE`, for 18-decimal balances.
 - **Breaking:** `get_deposit_withdraw_config` now reports a token's `decimals` as 0 when the API says 0, instead of 18, matching the Go and Rust SDKs. Migration: treat 0 as a real decimals value.

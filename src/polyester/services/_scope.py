@@ -5,7 +5,22 @@ from typing import Any, Literal
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterValidationError
 
-AccountScope = Literal["main", "active"] | str | dict[str, str]
+AccountScope = Literal["main", "active"] | str | dict[str, str] | dict[str, int]
+
+
+def _public_id(value: str | int, label: str) -> str:
+    """Keep an int ID numeric: return its canonical public string.
+
+    Downstream parsing reads an all-digit string as base58 when it round-trips,
+    so ``str(42)`` would address ID 175. ``format_id`` validates the uint64
+    range and refuses ``bool``.
+    """
+    if isinstance(value, int):
+        try:
+            return format_id(value)
+        except PolyesterValidationError as exc:
+            raise PolyesterValidationError(f"{label} must be a uint64") from exc
+    return value
 
 
 def resolve_sub_account_id(value: str | None, default: str | None) -> str | None:
@@ -18,7 +33,7 @@ def resolve_sub_account_id(value: str | None, default: str | None) -> str | None
 def scoped_sub_account_id(
     *,
     account: AccountScope | None = None,
-    sub_account_id: str | None = None,
+    sub_account_id: str | int | None = None,
     default: str | None = None,
 ) -> str | None:
     """Resolve sub-account scope from TS-style ``account`` or legacy ``sub_account_id``."""
@@ -32,17 +47,21 @@ def scoped_sub_account_id(
 def resolve_sub_account_from_scope(
     *,
     account: AccountScope | None = None,
-    sub_account_id: str | None = None,
+    sub_account_id: str | int | None = None,
     default: str | None = None,
 ) -> str | None:
     if sub_account_id is not None and account is not None:
         raise PolyesterValidationError("Pass account or sub_account_id, not both")
     if sub_account_id is not None:
-        return resolve_sub_account_id(sub_account_id, default)
+        return resolve_sub_account_id(_public_id(sub_account_id, "sub_account_id"), default)
     if account is None or account == "active" or account == "main":
         return resolve_sub_account_id(None, default)
     if isinstance(account, dict):
-        scoped = account.get("subaccountId") or account.get("sub_account_id")
+        scoped = account.get("subaccountId")
+        if scoped is None or scoped == "":
+            scoped = account.get("sub_account_id")
+        if isinstance(scoped, int):
+            return _public_id(scoped, "account subaccountId")
         if not scoped:
             raise PolyesterValidationError("account dict requires subaccountId or sub_account_id")
         return str(scoped)
@@ -53,9 +72,9 @@ def resolve_sub_account_from_scope(
 
 def resolve_account_id(value: str | int | None, default: str | int | None) -> str:
     if value is not None and value != "":
-        return str(value)
+        return _public_id(value, "account_id")
     if default is not None and default != "":
-        return str(default)
+        return _public_id(default, "account_id")
     raise PolyesterValidationError(
         "account_id is required; set POLYESTER_ACCOUNT_ID or pass account_id explicitly"
     )
@@ -83,9 +102,8 @@ class ScopedSubAccountMixin:
         *,
         account: AccountScope | None = None,
     ) -> str | None:
-        scoped = sub_account_id if sub_account_id is None else str(sub_account_id)
         return scoped_sub_account_id(
             account=account,
-            sub_account_id=scoped,
+            sub_account_id=sub_account_id,
             default=self._default_sub_account_id,
         )

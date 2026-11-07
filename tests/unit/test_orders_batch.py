@@ -95,7 +95,7 @@ def test_batch_create_requires_items() -> None:
         batch_create_orders_to_proto(items=[])
 
 
-def test_batch_size_guard_rejects_more_than_twenty() -> None:
+def test_batch_size_guard_follows_each_operation_limit() -> None:
     validate_batch_size("batch_create", 1)
     validate_batch_size("batch_create", 20)
     with pytest.raises(PolyesterValidationError, match="at least one"):
@@ -113,13 +113,11 @@ def test_batch_size_guard_rejects_more_than_twenty() -> None:
     }
     with pytest.raises(PolyesterValidationError, match="at most 20"):
         batch_create_orders_to_proto(items=[item] * 21, quantity_scale=8)
-    with pytest.raises(PolyesterValidationError, match="at most 20"):
-        batch_cancel_orders_to_proto(items=[{"key": OrderId("1")}] * 21)
-    with pytest.raises(PolyesterValidationError, match="at most 20"):
+    with pytest.raises(PolyesterValidationError, match="at most 50"):
+        batch_cancel_orders_to_proto(items=[{"key": OrderId("1")}] * 51)
+    with pytest.raises(PolyesterValidationError, match="at most 50"):
         batch_replace_orders_to_proto(
-            items=[
-                BatchReplaceItem(key=OrderId("1"), new_qty="0.1") for _ in range(21)
-            ],
+            items=[BatchReplaceItem(key=OrderId("1"), new_qty="0.1") for _ in range(51)],
             symbol_id=1,
             quantity_scale=8,
         )
@@ -262,7 +260,9 @@ def test_batch_cancel_from_proto() -> None:
 
 def test_batch_cancel_rejects_count_mismatch_and_unknown_status() -> None:
     mismatch = orders_pb2.BatchCancelOrdersResponse(
-        results=[orders_pb2.BatchCancelResultItem(status=orders_pb2.BatchCancelResultItem.ACCEPTED)],
+        results=[
+            orders_pb2.BatchCancelResultItem(status=orders_pb2.BatchCancelResultItem.ACCEPTED)
+        ],
         rejected_count=1,
     )
     with pytest.raises(PolyesterResponseContractError, match="counts do not match"):

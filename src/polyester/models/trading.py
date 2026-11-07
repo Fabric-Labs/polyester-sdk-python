@@ -734,10 +734,19 @@ class TransferDestinationsList(msgspec.Struct, kw_only=True, omit_defaults=True)
 
 
 class BatchReplaceItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One item of ``orders.batch_replace``.
+
+    ``new_attached_risk`` replaces the order's attached risk, as on
+    ``orders.modify``. A trailing stop's ``limit_price`` is sent as given: the
+    request does not carry the order's side, so the server applies the side
+    rule and answers ``ERROR_CODE_BAD_PRICE`` when it is broken.
+    """
+
     key: OrderKey
     new_price: Any | None = None
     new_qty: Any | None = None
     new_client_order_id: str | None = None
+    new_attached_risk: AttachedRisk | dict[str, Any] | None = None
 
 
 class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True):

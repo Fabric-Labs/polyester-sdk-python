@@ -194,3 +194,20 @@ def test_decimal_size_bound_keeps_amounts_that_rescale_into_range():
     assert resolve_asset_amount_scaled_with_input_scale(Decimal("1E+3"), 36, 18) == 10**21
     with pytest.raises(PolyesterValidationError, match="too large"):
         resolve_asset_amount_scaled_with_input_scale(Decimal("1E+1000000"), 36, 18)
+
+
+def test_decimal_size_bound_is_75_scaled_digits():
+    from polyester.codecs.scalars import decimal_to_scaled, parse_qty_scaled
+    from polyester.types.money import resolve_asset_amount_scaled
+
+    assert decimal_to_scaled(Decimal("1e56"), 18, "qty") == 10**74
+    assert decimal_to_scaled("1" + "0" * 60, 18, "qty") == 10**78  # strings are unchanged
+    for helper in (
+        lambda v: decimal_to_scaled(v, 18, "qty"),
+        lambda v: parse_qty_scaled(v, 18),
+        lambda v: resolve_asset_amount_scaled(v, 18),
+    ):
+        with pytest.raises(PolyesterValidationError, match="too large"):
+            helper(Decimal("1e57"))
+        with pytest.raises(PolyesterValidationError, match="too large"):
+            helper(Decimal("1e60"))

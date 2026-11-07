@@ -1301,6 +1301,7 @@ async def test_l2_wait_for_order_trades_complete_via_get_order_sequence() -> Non
         order = orders_read_pb2.Order(
             order_id=1,
             symbol_id=1,
+            status=orders_read_pb2.FILLED,
             cum_qty_scaled=100,
             orig_qty_scaled=100,
             leaves_qty_scaled=0,

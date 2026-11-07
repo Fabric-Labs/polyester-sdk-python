@@ -9,7 +9,10 @@ import pytest
 from polyester.errors import PolyesterTransportError
 from polyester.models import OrderId
 from polyester.models.trading import GetOrderResult, Order, UserTrade
-from polyester.services.orders import wait_for_order_trades_complete
+from polyester.services.orders import (
+    _order_trades_projection_complete,
+    wait_for_order_trades_complete,
+)
 from polyester.types.money import Quantity
 
 
@@ -26,6 +29,7 @@ async def test_wait_for_order_trades_complete_resolves_when_sum_matches() -> Non
         order = Order(
             order_id="1",
             symbol_id=1,
+            status="filled",
             cum_qty=_qty(100),
         )
         if calls["n"] == 1:
@@ -57,6 +61,7 @@ async def test_wait_for_order_trades_complete_times_out() -> None:
     order = Order(
         order_id="1",
         symbol_id=1,
+        status="filled",
         cum_qty=_qty(100),
     )
     orders = AsyncMock()
@@ -73,7 +78,7 @@ async def test_wait_for_order_trades_complete_times_out() -> None:
 @pytest.mark.asyncio
 async def test_wait_for_order_trades_complete_pages_execution_history() -> None:
     calls: list[dict] = []
-    order = Order(order_id="11", symbol_id=1, cum_qty=_qty(100))
+    order = Order(order_id="11", symbol_id=1, status="filled", cum_qty=_qty(100))
 
     async def fake_get(**kwargs):
         calls.append(kwargs)
@@ -100,3 +105,17 @@ async def test_wait_for_order_trades_complete_pages_execution_history() -> None:
     assert all(call.get("include_execution_history") is True for call in calls)
     assert sum(t.qty.scaled for t in result.trades if t.qty) == 100
     assert result.next_page_token == ""
+
+
+@pytest.mark.parametrize("status", ["", "pending", "working", "pending_cancel"])
+def test_projection_is_incomplete_while_the_order_can_still_fill(status: str) -> None:
+    order = Order(order_id="1", symbol_id=1, status=status, cum_qty=_qty(40))
+    result = GetOrderResult(order=order, trades=[UserTrade(symbol_id=1, qty=_qty(40))])
+    assert not _order_trades_projection_complete(result)
+
+
+@pytest.mark.parametrize("status", ["filled", "canceled", "rejected"])
+def test_projection_is_complete_for_an_ended_order(status: str) -> None:
+    order = Order(order_id="1", symbol_id=1, status=status, cum_qty=_qty(40))
+    result = GetOrderResult(order=order, trades=[UserTrade(symbol_id=1, qty=_qty(40))])
+    assert _order_trades_projection_complete(result)

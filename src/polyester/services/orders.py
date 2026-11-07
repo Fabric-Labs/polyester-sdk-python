@@ -861,10 +861,17 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         timeout: float = 10.0,
         poll_interval: float = 0.1,
     ) -> GetOrderResult:
-        """Poll ``get`` until projected trade qtys sum to order ``cum_qty`` or timeout.
+        """Poll ``get`` until the order is terminal and its trade qtys sum to
+        ``cum_qty``, or until ``timeout``.
 
+        Terminal means ``status`` ``filled``, ``canceled`` or ``rejected``.
         GetOrder can report lineage-cumulative ``cum_qty`` before every fill is
-        visible on the trades list (eventual consistency). This helper pages
+        visible on the trades list (eventual consistency). ``executions_complete``
+        alone is not completion: it is also true for a working order whose
+        fills so far are all recorded, for example after a partial fill, so such
+        an order keeps the wait polling until it ends or the timeout passes. To
+        check the trades recorded so far on a working order, read it with
+        ``get`` and compare its trades to ``cum_qty``. This helper pages
         execution history and does not treat an empty page as a watermark.
         The result holds the last poll's order, trades and transfers, with that
         read's ``executions_complete``.
@@ -895,7 +902,8 @@ async def wait_for_order_trades_complete(
     timeout: float = 10.0,
     poll_interval: float = 0.1,
 ) -> GetOrderResult:
-    """Poll until ``sum(trade.qty) == order.cum_qty`` or ``timeout`` elapses.
+    """Poll until the order is terminal and ``sum(trade.qty) == order.cum_qty``,
+    or ``timeout`` elapses.
 
     One deadline bounds every page read and every sleep between polls.
     """
@@ -983,9 +991,16 @@ async def _get_order_execution_pages(
         page_token = page.next_page_token
 
 
+_TERMINAL_ORDER_STATUSES = frozenset({"filled", "canceled", "rejected"})
+
+
 def _order_trades_projection_complete(result: GetOrderResult) -> bool:
+    """An order that has ended and whose trades add up to its ``cum_qty``: no
+    further fill can follow."""
     order = result.order
     if order is None or order.cum_qty is None:
+        return False
+    if order.status not in _TERMINAL_ORDER_STATUSES:
         return False
     cum = order.cum_qty.scaled
     if cum == 0:

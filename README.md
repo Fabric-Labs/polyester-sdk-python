@@ -561,6 +561,25 @@ used = order.quote_used(base_scale)
 unspent = order.quote_unspent(quote_quantity_scale=quote_scale, base_quantity_scale=base_scale)
 ```
 
+### Waiting for an order's trades
+
+An order shows a fill as soon as it executes; its trades are recorded shortly
+after. `orders.wait_for_order_trades_complete(key=...)` polls `orders.get`,
+every execution page included, until the order has ended (`status`
+`filled`, `canceled` or `rejected`) and its trades add up to `cum_qty`, then
+returns that read. It reports completion at the same point as the Go and Rust
+SDKs. `executions_complete` alone is not completion: it is also true for a
+working order whose fills so far are all recorded, for example after a partial
+fill. A working order keeps the wait polling until it ends or `timeout`
+(seconds) passes, which raises `PolyesterTransportError`. To check the trades
+recorded so far on an order that is still working, read it with `orders.get`
+and compare its trades to `cum_qty`.
+
+```python
+detail = await client.orders.wait_for_order_trades_complete(key=OrderId(order_id), timeout=20.0)
+print(detail.order.status, len(detail.trades), "trades")
+```
+
 A cancel of an order that has already ended, a repeat of the cancel that ended
 it included, raises `PolyesterApiError` `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
 `is_order_already_terminal(err)` tells it apart. Treat it as "already done"

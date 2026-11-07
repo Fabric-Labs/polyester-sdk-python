@@ -8,6 +8,7 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError, Message
 
+from polyester._contract_codes import is_placeholder_code, is_placeholder_detail
 from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
@@ -242,9 +243,21 @@ def _map_connect_error(exc: ConnectError):
         if mapped is not None:
             return mapped
     error_message = exc.message or _EMPTY_ERROR_MESSAGE
+    # A detail with no code says nothing about the outcome, but its field
+    # violations still name what to fix on a recognised Connect code.
+    placeholder_violations: list[OrderFieldViolation] = []
     if exc.details:
-        unpacked_details = [
+        decoded_details = [
             d for detail in exc.details if (d := _unpack_error_detail(detail)) is not None
+        ]
+        unpacked_details = [d for d in decoded_details if not is_placeholder_detail(d)]
+        placeholder_violations = [
+            OrderFieldViolation(
+                field_path=item.field_path, rule_id=item.rule_id, message=item.message
+            )
+            for d in decoded_details
+            if is_placeholder_detail(d) and d.DESCRIPTOR.full_name == "orders.v1.ErrorDetail"
+            for item in d.violations
         ]
         unpacked_details.sort(key=_error_detail_priority)
         if error_message.strip().endswith("_OUTCOME_UNKNOWN") and (
@@ -373,6 +386,8 @@ def _map_connect_error(exc: ConnectError):
                 return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value
     message_code = (exc.message or "").strip()
+    if is_placeholder_code(message_code):
+        message_code = ""
     if message_code.endswith("_OUTCOME_UNKNOWN"):
         return PolyesterApiError(error_message, code=_order_error_code_from_rest(message_code))
     order_code = _order_error_code_from_rest(message_code)
@@ -416,4 +431,4 @@ def _map_connect_error(exc: ConnectError):
         return PolyesterNotImplementedError(error_message)
     if code in AMBIGUOUS_CONNECT_CODES:
         return PolyesterServerError(error_message)
-    return PolyesterApiError(error_message, code=code)
+    return PolyesterApiError(error_message, code=code, violations=placeholder_violations)

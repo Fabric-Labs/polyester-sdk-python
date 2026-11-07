@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from google.protobuf.message import DecodeError, Message
+
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 
 _ENUM_CODES = frozenset(
@@ -48,12 +51,57 @@ _REST_ONLY_CODES = frozenset(
 )
 
 
+# An enum's zero value: "no code was provided", never a code of its own.
+_PLACEHOLDER_CODES = frozenset({"UNSPECIFIED", "ERROR_CODE_UNSPECIFIED", "AUTH_UNSPECIFIED"})
+
+_CODED_DETAILS: dict[str, type[Message]] = {
+    "auth.v1.AuthErrorDetail": auth_pb2.AuthErrorDetail,
+    "orders.v1.ErrorDetail": orders_pb2.ErrorDetail,
+    "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorDetail,
+    "transfer.v1.ErrorDetail": transfer_pb2.ErrorDetail,
+    "ledger.read.v1.ErrorDetail": ledger_read_pb2.ErrorDetail,
+    "polyester.ratelimit.v1.RateLimitDetail": ratelimit_pb2.RateLimitDetail,
+}
+
+
+def is_placeholder_code(code: object) -> bool:
+    """Whether a code is an enum's zero value, which names nothing."""
+    return isinstance(code, str) and code in _PLACEHOLDER_CODES
+
+
+def is_placeholder_detail(detail: Message) -> bool:
+    """Whether a decoded service detail says nothing: no code and no backoff."""
+    name = detail.DESCRIPTOR.full_name
+    if name not in _CODED_DETAILS:
+        return False
+    if name == "polyester.ratelimit.v1.RateLimitDetail":
+        return detail.ByteSize() == 0
+    if name == "orders.v1.ErrorDetail" and detail.rate_limit.ByteSize() > 0:
+        return False
+    return detail.code == 0
+
+
+def carries_contract_code(detail_type: str, value: bytes) -> bool:
+    """Whether an encoded detail is a service detail that says something."""
+    message_type = _CODED_DETAILS.get(detail_type)
+    if message_type is None:
+        return False
+    detail = message_type()
+    try:
+        detail.ParseFromString(value)
+    except DecodeError:
+        return False
+    return not is_placeholder_detail(detail)
+
+
 def is_recognised_rest_code(code: str) -> bool:
     """Whether the contract defines this REST problem ``code``.
 
     A mutation's unknown outcome is recognised by its suffix, including one
     added to the contract after this SDK was generated.
     """
+    if code in _PLACEHOLDER_CODES:
+        return False
     return (
         code in _REST_ONLY_CODES
         or code in _ENUM_CODES

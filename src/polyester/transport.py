@@ -18,7 +18,11 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
 
-from polyester._contract_codes import is_recognised_rest_code
+from polyester._contract_codes import (
+    carries_contract_code,
+    is_placeholder_code,
+    is_recognised_rest_code,
+)
 from polyester._problem import decode_http_problem
 from polyester.auth import ApiKeyCredentials
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
@@ -129,18 +133,6 @@ AMBIGUOUS_CONNECT_CODES = frozenset({"unknown", "data_loss", "canceled"})
 
 # A router's own answer for a path it doesn't know.
 ROUTE_NOT_FOUND_MESSAGES = frozenset({"not found", "404 page not found", "404 not found"})
-
-# Detail types that carry a contract code; a body with one of these has a code.
-_SERVICE_DETAIL_TYPES = frozenset(
-    {
-        "auth.v1.AuthErrorDetail",
-        "orders.v1.ErrorDetail",
-        "chain.withdraw.v1.ErrorDetail",
-        "transfer.v1.ErrorDetail",
-        "ledger.read.v1.ErrorDetail",
-        "polyester.ratelimit.v1.RateLimitDetail",
-    }
-)
 
 
 def _connect_error_details(value: object) -> list[AnyMessage] | None:
@@ -256,7 +248,7 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
                 break
     status = response.status
     has_connect_code = isinstance(code, str) and code in _CONNECT_CODES
-    has_no_code = not isinstance(code, str) or not code
+    has_no_code = not isinstance(code, str) or not code or is_placeholder_code(code)
     details: list[AnyMessage] = []
     if isinstance(body, dict) and (has_connect_code or has_no_code):
         # The Connect client decodes both of these bodies, and neither its
@@ -295,7 +287,9 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
 
 
 def _has_service_detail(details: list[AnyMessage]) -> bool:
-    return any(d.type_url.removeprefix(_TYPE_URL_PREFIX) in _SERVICE_DETAIL_TYPES for d in details)
+    return any(
+        carries_contract_code(d.type_url.removeprefix(_TYPE_URL_PREFIX), d.value) for d in details
+    )
 
 
 def _answer_without_a_code(
@@ -315,9 +309,9 @@ def _answer_without_a_code(
         _raise_problem(response, body, "", Code.UNAVAILABLE, None)
     if _has_service_detail(details):
         return response
-    # Connect's status table agrees with these, unless a non-string code would
+    # Connect's status table agrees with these, unless a code it can't read would
     # stop its decoder.
-    if status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and (code is None or isinstance(code, str)):
+    if status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and code in (None, ""):
         return response
     # Connect reads this as unimplemented, which the error mapping names a
     # missing route.

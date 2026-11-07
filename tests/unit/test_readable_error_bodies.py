@@ -7,6 +7,7 @@ one request, so a case that never reached the server fails.
 
 from __future__ import annotations
 
+import base64
 import gzip
 import json
 from pathlib import Path
@@ -19,12 +20,15 @@ from polyester.errors import (
     PolyesterAuthError,
     PolyesterError,
     PolyesterNotImplementedError,
+    PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
     is_not_found,
     is_retryable_error,
     mutation_outcome_unknown,
 )
+from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.triggers.v1 import triggers_pb2 as triggers
 from tests.hardening_support import (
     HttpScript,
@@ -265,6 +269,216 @@ async def test_trigger_not_found_keeps_its_typed_error(op: str, code: str) -> No
     assert type(error) is PolyesterApiError, repr(error)
     assert is_not_found(error)
     _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
+PLACEHOLDER_CODES = ["UNSPECIFIED", "ERROR_CODE_UNSPECIFIED", "AUTH_UNSPECIFIED"]
+DETAIL_TYPES = [
+    "orders.v1.ErrorDetail",
+    "auth.v1.AuthErrorDetail",
+    "chain.withdraw.v1.ErrorDetail",
+    "transfer.v1.ErrorDetail",
+    "ledger.read.v1.ErrorDetail",
+    "polyester.ratelimit.v1.RateLimitDetail",
+]
+
+
+def _detail_body(detail_type: str, value: bytes = b"", code: str | None = None) -> str:
+    body: dict[str, object] = {
+        "message": "m",
+        "details": [{"type": detail_type, "value": base64.b64encode(value).decode()}],
+    }
+    if code is not None:
+        body["code"] = code
+    return json.dumps(body)
+
+
+@pytest.mark.parametrize("op", ["read", "write"])
+@pytest.mark.parametrize("code", PLACEHOLDER_CODES)
+@pytest.mark.parametrize("status", [*INTERNAL_STATUSES, 404])
+async def test_placeholder_code_is_no_code(op: str, code: str, status: int) -> None:
+    body = json.dumps({"code": code, "detail": "d"})
+    error, calls = await _call(op, status, PROBLEM, body)
+    assert type(error) is PolyesterServerError, repr(error)
+    assert error.code is None
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("code", PLACEHOLDER_CODES)
+@pytest.mark.parametrize("status", [401, 403])
+async def test_placeholder_code_keeps_a_definite_auth_refusal(code: str, status: int) -> None:
+    error, calls = await _call("write", status, PROBLEM, json.dumps({"code": code}))
+    assert type(error) is PolyesterAuthError, repr(error)
+    assert error.status_code == status
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("code", PLACEHOLDER_CODES)
+@pytest.mark.parametrize("status", UNAVAILABLE_STATUSES)
+async def test_placeholder_code_at_unavailable_statuses(code: str, status: int) -> None:
+    body = json.dumps({"code": code})
+    error, calls = await _call("write", status, PROBLEM, body)
+    assert type(error) is PolyesterServerError, repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+    error, calls = await _call("read", status, PROBLEM, body, fail_for=2)
+    assert error is None, repr(error)
+    assert calls == 3
+
+
+@pytest.mark.parametrize("op", ["read", "write"])
+@pytest.mark.parametrize("detail_type", DETAIL_TYPES)
+@pytest.mark.parametrize("status", [*INTERNAL_STATUSES, 404])
+async def test_empty_detail_is_no_code(op: str, detail_type: str, status: int) -> None:
+    error, calls = await _call(op, status, JSON, _detail_body(detail_type))
+    assert type(error) is PolyesterServerError, repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("op", ["read", "write"])
+@pytest.mark.parametrize("detail_type", DETAIL_TYPES)
+@pytest.mark.parametrize("status", [400, 404, 409, 500])
+async def test_undecodable_detail_is_no_code(op: str, detail_type: str, status: int) -> None:
+    body = _detail_body(detail_type, b"\x00")
+    error, calls = await _call(op, status, JSON, body)
+    assert type(error) is PolyesterServerError, repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", DETAIL_TYPES)
+@pytest.mark.parametrize("status", [401, 403])
+async def test_empty_detail_keeps_a_definite_auth_refusal(detail_type: str, status: int) -> None:
+    error, calls = await _call("write", status, JSON, _detail_body(detail_type))
+    assert type(error) is PolyesterAuthError, repr(error)
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", DETAIL_TYPES)
+@pytest.mark.parametrize("status", UNAVAILABLE_STATUSES)
+async def test_empty_detail_at_unavailable_statuses(detail_type: str, status: int) -> None:
+    error, calls = await _call("write", status, JSON, _detail_body(detail_type))
+    assert type(error) is PolyesterServerError, repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", DETAIL_TYPES)
+@pytest.mark.parametrize(
+    ("status", "connect_code"),
+    [(500, "internal"), (500, "unknown"), (500, "data_loss"), (503, "unavailable")],
+)
+async def test_empty_detail_does_not_turn_a_server_failure_into_a_refusal(
+    detail_type: str, status: int, connect_code: str
+) -> None:
+    error, calls = await _call("write", status, JSON, _detail_body(detail_type, code=connect_code))
+    assert type(error) is PolyesterServerError, repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("detail_type", DETAIL_TYPES)
+@pytest.mark.parametrize(
+    ("status", "connect_code"),
+    [(400, "invalid_argument"), (404, "not_found"), (409, "already_exists")],
+)
+async def test_recognised_connect_code_stands_without_its_empty_detail(
+    detail_type: str, status: int, connect_code: str
+) -> None:
+    error, calls = await _call("write", status, JSON, _detail_body(detail_type, code=connect_code))
+    assert type(error) is PolyesterApiError, repr(error)
+    assert error.code == connect_code
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _detail_body("orders.v1.ErrorDetail", code="resource_exhausted"),
+        json.dumps({"code": "resource_exhausted", "message": "ERROR_CODE_UNSPECIFIED"}),
+        json.dumps({"code": "resource_exhausted", "message": "UNSPECIFIED"}),
+    ],
+)
+async def test_placeholder_does_not_name_a_resource_refusal(body: str) -> None:
+    error, calls = await _call("write", 429, JSON, body)
+    assert type(error) is PolyesterRateLimitError, repr(error)
+    assert error.code is None
+    assert calls == 1
+
+
+@pytest.mark.parametrize("status", [400, 500])
+async def test_real_typed_detail_is_still_a_code_control(status: int) -> None:
+    detail = orders_pb2.ErrorDetail(code=orders_pb2.ERROR_CODE_BAD_PRICE)
+    body = _detail_body("orders.v1.ErrorDetail", detail.SerializeToString())
+    error, calls = await _call("write", status, JSON, body)
+    assert type(error) is PolyesterApiError, repr(error)
+    assert error.code == "ERROR_CODE_BAD_PRICE"
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
+async def test_connect_refusal_code_at_500_stays_known_control() -> None:
+    error, calls = await _call("write", 500, JSON, '{"code":"invalid_argument","message":"m"}')
+    assert type(error) is PolyesterApiError, repr(error)
+    assert error.code == "invalid_argument"
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+
+
+async def test_backoff_detail_without_a_code_stays_a_rate_limit_control() -> None:
+    backoff = ratelimit_pb2.RateLimitDetail(retry_after_ms=1250)
+    for body in (
+        _detail_body(
+            "orders.v1.ErrorDetail",
+            orders_pb2.ErrorDetail(rate_limit=backoff).SerializeToString(),
+            code="resource_exhausted",
+        ),
+        _detail_body(
+            "polyester.ratelimit.v1.RateLimitDetail",
+            backoff.SerializeToString(),
+            code="resource_exhausted",
+        ),
+    ):
+        error, calls = await _call("write", 429, JSON, body)
+        assert type(error) is PolyesterRateLimitError, repr(error)
+        assert error.retry_after == 1.25
+        _assert_flags(error, retryable=True, unknown=False)
+        assert calls == 1
+
+
+async def test_placeholder_detail_keeps_field_violations_on_a_recognised_code() -> None:
+    detail = orders_pb2.ErrorDetail(
+        violations=[orders_pb2.FieldViolation(field_path="x", rule_id="r", message="v")]
+    )
+    raw = detail.SerializeToString()
+    error, calls = await _call(
+        "write", 400, JSON, _detail_body("orders.v1.ErrorDetail", raw, code="invalid_argument")
+    )
+    assert type(error) is PolyesterApiError, repr(error)
+    assert error.code == "invalid_argument"
+    assert [item.field_path for item in error.violations] == ["x"]
+    _assert_flags(error, retryable=False, unknown=False)
+    assert calls == 1
+    error, calls = await _call("write", 500, JSON, _detail_body("orders.v1.ErrorDetail", raw))
+    assert type(error) is PolyesterServerError, repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
+    assert calls == 1
+
+
+@pytest.mark.parametrize("encoding", ["br", "zstd"])
+@pytest.mark.parametrize("status", [400, 404, 409, 429, 500, 503, 504])
+async def test_body_the_client_cannot_decode_is_not_a_known_failure(
+    encoding: str, status: int
+) -> None:
+    body = '{"code":"BAD_PRICE"}'
+    error, calls = await _call("write", status, PROBLEM, body, encoding=encoding)
+    assert isinstance(error, PolyesterServerError | PolyesterRouteNotFoundError), repr(error)
+    _assert_flags(error, retryable=False, unknown=True)
     assert calls == 1
 
 

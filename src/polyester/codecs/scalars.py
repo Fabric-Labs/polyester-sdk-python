@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import operator
 import re
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -31,6 +33,39 @@ class FractionalDigitsError(PolyesterValidationError):
 
 
 _ITEM_SCOPE_KEYS = ("sub_account_id", "subaccount_id", "subaccountId", "account")
+
+
+def market_id(value: object, label: str) -> int:
+    """Return a market (``symbol_id``) as the integer the wire carries.
+
+    Only an integer from 0 to 2**32 - 1 is a market ID. A bool, float,
+    Decimal, str or bytes is refused instead of cast, so ``8.9`` or ``True``
+    cannot select market 8 or 1.
+    """
+    if isinstance(value, bool):
+        raise PolyesterValidationError(f"{label} must be an integer market ID, not bool")
+    try:
+        parsed = operator.index(value)  # type: ignore[arg-type]
+    except TypeError:
+        raise PolyesterValidationError(
+            f"{label} must be an integer market ID, not {type(value).__name__}"
+        ) from None
+    if parsed < 0 or parsed > UINT32_MAX:
+        raise PolyesterValidationError(f"{label} {parsed} is outside 0..{UINT32_MAX}")
+    return parsed
+
+
+def market_ids(values: object, label: str) -> list[int]:
+    """Return a list of markets, each checked by :func:`market_id`.
+
+    A str or bytes is refused rather than iterated, so ``"12"`` cannot select
+    markets 1 and 2; a mapping is refused rather than read for its keys.
+    """
+    if isinstance(values, str | bytes | bytearray | Mapping) or not isinstance(values, Iterable):
+        raise PolyesterValidationError(
+            f"{label} must be a list of integer market IDs, not {type(values).__name__}"
+        )
+    return [market_id(value, label) for value in values]
 
 
 def refuse_item_scope(item: Any, label: str) -> None:

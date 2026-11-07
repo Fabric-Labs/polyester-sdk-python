@@ -13,6 +13,7 @@ from polyester.codecs.decode.market_overview import (
     spot_volume_history_from_proto,
 )
 from polyester.codecs.realtime_decode import decode_market_overview_batch_bytes
+from polyester.codecs.scalars import market_ids
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketoverview.v1.marketoverview_connect import MarketOverviewServiceClient
 from polyester.gen.marketoverview.v1.marketoverview_pb2 import (
@@ -96,16 +97,20 @@ class AsyncMarketOverviewService(BaseService):
         Omit both filters to select every configured pair. Send at most 2,000
         distinct positive pair IDs. Do not sum the overlapping samples.
         """
-        if symbols and symbol_ids:
+        ids = (
+            market_ids(symbol_ids, "market_overview.get_spot_volume_history symbol_ids")
+            if symbol_ids is not None
+            else []
+        )
+        if symbols and ids:
             raise PolyesterValidationError(
                 "market_overview.get_spot_volume_history accepts only one of symbols or symbol_ids"
             )
         request = GetSpotVolumeHistoryRequest()
         resolved: list[int] = []
-        if symbol_ids:
+        if ids:
             seen: set[int] = set()
-            for value in symbol_ids:
-                sid = int(value)
+            for sid in ids:
                 if sid <= 0:
                     raise PolyesterValidationError(
                         "market_overview.get_spot_volume_history symbol_ids must be positive"

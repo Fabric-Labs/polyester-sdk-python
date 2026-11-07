@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.scalars import market_id, market_ids
 from polyester.errors import PolyesterValidationError
 
 
@@ -12,11 +13,12 @@ def resolve_symbol_id(
     label: str = "request",
 ) -> int:
     if symbol_id is not None:
-        if int(symbol_id) == 0:
+        explicit = market_id(symbol_id, f"{label} symbol_id")
+        if explicit == 0:
             raise PolyesterValidationError(
                 f"{label} symbol_id must be non-zero when explicitly supplied"
             )
-        return int(symbol_id)
+        return explicit
     if symbol and catalogs is not None:
         resolved = catalogs.symbol_id_for_symbol(symbol)
         if resolved is not None:
@@ -82,9 +84,7 @@ def resolve_symbol_ids(
 ) -> list[int]:
     resolved: list[int] = []
     for symbol in normalize_raw_symbol_filters(symbols, label=label):
-        resolved.append(
-            resolve_symbol_id(catalogs, symbol=symbol, symbol_id=None, label=label)
-        )
+        resolved.append(resolve_symbol_id(catalogs, symbol=symbol, symbol_id=None, label=label))
     return resolved
 
 
@@ -142,10 +142,8 @@ def resolve_cancel_all_symbol_ids(
     """
     normalized_symbol = normalize_raw_symbol_filter(symbol, label=f"{label} symbol")
     normalized_symbols = normalize_raw_symbol_filters(symbols, label=f"{label} symbols")
-    raw_ids = [int(value) for value in symbol_ids] if symbol_ids else []
-    selected = sum(
-        1 for group in (normalized_symbol, normalized_symbols, raw_ids) if group
-    )
+    raw_ids = market_ids(symbol_ids, f"{label} symbol_ids") if symbol_ids is not None else []
+    selected = sum(1 for group in (normalized_symbol, normalized_symbols, raw_ids) if group)
     if selected > 1:
         raise PolyesterValidationError(
             f"{label} accepts only one of symbol, symbols, or symbol_ids"
@@ -155,9 +153,7 @@ def resolve_cancel_all_symbol_ids(
     if raw_ids:
         for value in raw_ids:
             if value <= 0:
-                raise PolyesterValidationError(
-                    f"{label} symbol_ids must be positive"
-                )
+                raise PolyesterValidationError(f"{label} symbol_ids must be positive")
             resolved.append(value)
     elif normalized_symbol is not None:
         resolved.append(
@@ -169,9 +165,7 @@ def resolve_cancel_all_symbol_ids(
             )
         )
     elif normalized_symbols:
-        resolved.extend(
-            resolve_symbol_ids(catalogs, normalized_symbols, label=f"{label} symbols")
-        )
+        resolved.extend(resolve_symbol_ids(catalogs, normalized_symbols, label=f"{label} symbols"))
 
     unique: list[int] = []
     seen: set[int] = set()

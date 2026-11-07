@@ -6,6 +6,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Any, NoReturn
 from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -19,13 +20,62 @@ MAX_SIGNING_FUTURE_SKEW_MS = 5_000
 _MAX_SIGNING_BACKPRESSURE_SECONDS = 10.0
 
 
+_NOT_SERIALIZABLE = (
+    "ApiKeyCredentials holds an API private key and cannot be pickled, deep-copied, "
+    "or converted with dataclasses.asdict or astuple"
+)
+
+
+def _refuse_serialization() -> NoReturn:
+    raise TypeError(_NOT_SERIALIZABLE)
+
+
+class _LoopGate:
+    """FIFO queue for one event loop's async signers, counted by its users."""
+
+    __slots__ = ("lock", "users")
+
+    def __init__(self) -> None:
+        self.lock = asyncio.Lock()
+        self.users = 0
+
+
 class _SigningTimestampAllocator:
-    """Allocate distinct millisecond timestamps without exceeding clock skew."""
+    """Allocate distinct millisecond timestamps without exceeding clock skew.
+
+    One allocator serves every credentials object for an API key ID in this
+    process, because the server rejects a repeated (API key, signature) pair.
+    """
 
     def __init__(self) -> None:
         self._last_timestamp_ms = 0
         self._lock = threading.Lock()
-        self._async_lock = asyncio.Lock()
+        # An asyncio lock belongs to one event loop, and every sync client runs
+        # its own, so async waiters queue on a gate per loop; ``_lock`` orders
+        # all loops. A gate exists only while a coroutine on its loop waits:
+        # its lock references the loop, and this allocator lives as long as
+        # the process, so a kept gate would keep a closed loop alive.
+        self._async_gates: dict[asyncio.AbstractEventLoop, _LoopGate] = {}
+
+    def __reduce_ex__(self, protocol: Any) -> NoReturn:
+        _refuse_serialization()
+
+    def __deepcopy__(self, memo: Any) -> NoReturn:
+        _refuse_serialization()
+
+    def _enter_async_gate(self, loop: asyncio.AbstractEventLoop) -> _LoopGate:
+        with self._lock:
+            gate = self._async_gates.get(loop)
+            if gate is None:
+                gate = self._async_gates[loop] = _LoopGate()
+            gate.users += 1
+            return gate
+
+    def _leave_async_gate(self, loop: asyncio.AbstractEventLoop, gate: _LoopGate) -> None:
+        with self._lock:
+            gate.users -= 1
+            if gate.users == 0:
+                del self._async_gates[loop]
 
     def next(self) -> int:
         """Allocate immediately or fail with retryable capacity backpressure.
@@ -39,12 +89,17 @@ class _SigningTimestampAllocator:
         """Allocate with bounded, cooperative backpressure."""
 
         async def allocate() -> int:
-            async with self._async_lock:
-                while True:
-                    try:
-                        return self._try_next()
-                    except PolyesterRateLimitError as exc:
-                        await asyncio.sleep(exc.retry_after or 0.001)
+            loop = asyncio.get_running_loop()
+            gate = self._enter_async_gate(loop)
+            try:
+                async with gate.lock:
+                    while True:
+                        try:
+                            return self._try_next()
+                        except PolyesterRateLimitError as exc:
+                            await asyncio.sleep(exc.retry_after or 0.001)
+            finally:
+                self._leave_async_gate(loop, gate)
 
         try:
             return await asyncio.wait_for(
@@ -73,18 +128,53 @@ class _SigningTimestampAllocator:
         )
 
 
+_ALLOCATORS: dict[str, _SigningTimestampAllocator] = {}
+_ALLOCATORS_LOCK = threading.Lock()
+
+
+def _allocator_for_key(key_id: str) -> _SigningTimestampAllocator:
+    with _ALLOCATORS_LOCK:
+        allocator = _ALLOCATORS.get(key_id)
+        if allocator is None:
+            allocator = _ALLOCATORS[key_id] = _SigningTimestampAllocator()
+        return allocator
+
+
 @dataclass(frozen=True, slots=True)
 class ApiKeyCredentials:
+    """API-key authentication material.
+
+    Credentials with the same ``key_id`` share timestamp allocation within this
+    process, so identical requests never share a signature. The signing
+    protocol has no cross-process nonce; use one API key per process.
+
+    ``repr`` and ``str`` redact the private key. Pickling, deep-copying and
+    ``dataclasses.asdict``/``astuple`` raise ``TypeError``; read
+    ``private_key`` explicitly when you need it.
+    """
+
     key_id: str
     private_key: bytes = field(repr=False)
     _timestamp_allocator: _SigningTimestampAllocator = field(
-        default_factory=_SigningTimestampAllocator,
+        init=False,
         repr=False,
         compare=False,
     )
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_timestamp_allocator", _allocator_for_key(self.key_id))
+
     def __repr__(self) -> str:
         return f"ApiKeyCredentials(key_id={self.key_id!r}, private_key='[REDACTED]')"
+
+    def __copy__(self) -> ApiKeyCredentials:
+        return self
+
+    def __deepcopy__(self, memo: Any) -> NoReturn:
+        _refuse_serialization()
+
+    def __reduce_ex__(self, protocol: Any) -> NoReturn:
+        _refuse_serialization()
 
     def sign_payload(self, payload: bytes) -> bytes:
         """Sign exact protocol-defined business-payload bytes with Ed25519."""
@@ -168,9 +258,7 @@ def canonical_signing_string(
 ) -> str:
     # The server verifies the decoded path. Keep percent-escaped bytes that are
     # not UTF-8 as surrogates, so signing turns them back into the same bytes.
-    pathname = unquote_to_bytes(_validated_url(url).path or "/").decode(
-        "utf-8", "surrogateescape"
-    )
+    pathname = unquote_to_bytes(_validated_url(url).path or "/").decode("utf-8", "surrogateescape")
     return "\n".join(
         [timestamp_ms, method.upper(), pathname, canonical_query(url), sha256_hex(body)]
     )

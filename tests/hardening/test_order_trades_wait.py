@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
+import polyester.services.orders as orders_service
 from polyester import AsyncPolyester
 from polyester.errors import PolyesterResponseContractError, PolyesterTransportError
 from polyester.gen.orders.v1 import orders_read_pb2
@@ -204,6 +205,30 @@ async def test_wait_abandons_a_page_at_its_timeout() -> None:
         elapsed = time.monotonic() - started
     assert elapsed < 1.1, f"wait with a 100 ms timeout returned after {elapsed:.2f} s"
     assert TIMEOUT_MESSAGE in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_wait_refuses_a_success_finished_after_its_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A complete page answered in time whose decoding ends after the timeout
+    is no success. The decoder runs synchronously, so the timeout's callback
+    cannot run before the read hands back its result."""
+    timeout = 0.05
+    decode = orders_service.get_order_from_proto
+
+    def late_decode(msg: orders_read_pb2.GetOrderResponse) -> GetOrderResult:
+        result = decode(msg)
+        time.sleep(timeout + 0.03)  # holds the event loop past the deadline
+        return result
+
+    server = TradesServer(cum=100, polls=[[Page([100], complete=True)]])
+    async with trades_client(server) as client:
+        await client.orders.get(key=OrderId(WARMUP_ORDER_ID))
+        monkeypatch.setattr(orders_service, "get_order_from_proto", late_decode)
+        with pytest.raises(PolyesterTransportError, match=TIMEOUT_MESSAGE):
+            await wait_trades(client, timeout)
+    assert len(server.arrivals) == 1
 
 
 @pytest.mark.asyncio

@@ -30,7 +30,14 @@ class Ping:
     pass
 
 
-Incoming = Reply | Publication | Ping
+@dataclass(frozen=True)
+class Unsubscribe:
+    channel: str
+    code: int
+    reason: str
+
+
+Incoming = Reply | Publication | Ping | Unsubscribe
 
 
 def connect_command(command_id: int, token: str | None = None) -> bytes:
@@ -108,12 +115,35 @@ def _decode_error(data: bytes) -> ProtocolError:
 
 def _decode_push(data: bytes, incoming: list[Incoming]) -> None:
     cursor = _Cursor(data)
+    channel = ""
+    unsubscribe: tuple[int, str] | None = None
     while cursor.remaining:
         field, wire = cursor.key()
-        if (field, wire) == (4, 2):
+        if (field, wire) == (2, 2):
+            channel = cursor.length_delimited().decode("utf-8", errors="replace")
+        elif (field, wire) == (4, 2):
             _decode_publication(cursor.length_delimited(), incoming)
+        elif (field, wire) == (7, 2):
+            unsubscribe = _decode_unsubscribe(cursor.length_delimited())
         else:
             cursor.skip(wire)
+    if unsubscribe is not None:
+        incoming.append(Unsubscribe(channel, unsubscribe[0], unsubscribe[1]))
+
+
+def _decode_unsubscribe(data: bytes) -> tuple[int, str]:
+    cursor = _Cursor(data)
+    code = 0
+    reason = ""
+    while cursor.remaining:
+        field, wire = cursor.key()
+        if (field, wire) == (2, 0):
+            code = cursor.varint()
+        elif (field, wire) == (3, 2):
+            reason = cursor.length_delimited().decode("utf-8", errors="replace")
+        else:
+            cursor.skip(wire)
+    return code, reason
 
 
 def _decode_publication(data: bytes, incoming: list[Incoming]) -> None:

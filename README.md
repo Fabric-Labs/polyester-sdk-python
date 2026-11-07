@@ -1073,7 +1073,12 @@ while True:
 unknown, not empty, so do not read the empty sides as no liquidity; request
 the snapshot again later. Only a snapshot carries `available`: books from
 `orderbook.create_subscription(...)` report the value of the last snapshot the
-subscription applied, and deltas, resets included, do not change it.
+subscription applied, and deltas, resets included, do not change it. A managed
+subscription requests an unavailable snapshot again by itself, after 1 s doubling
+to 8 s, until the book is available or the subscription stops; repeated
+unavailable answers add no view. A market whose book stays unavailable keeps being
+requested once every 8 s, so a bot recovers by itself when the book comes back;
+close the subscription to stop.
 
 ```python
 book = await client.orderbook.get(symbol="BTC-USDT", depth=10)
@@ -1100,6 +1105,27 @@ async with sub:
         print(len(markets), "rows")
         break
 ```
+
+### Subscriptions the server ends
+
+When the server ends a realtime subscription, the iterator yields what is queued
+and raises `PolyesterSubscriptionEndedError`, also reported through `error` and
+the error callback. It names the channel, the server's code and text
+(`unsubscribe_code`, `server_reason`), and `reason`. Managed order books and
+market overviews finish their iterator and report the same error through
+`last_error` and `on_error`.
+
+The exception is a sub-account's balances, transfers, trades, triggers or
+lifecycle channel: the server can end one of those after access was granted
+again, so the SDK reads `ListSubaccounts` and, while the sub-account is listed
+with a role, subscribes again with a fresh token. `take_resubscribed()` reports
+the gap. It stops, with the reason, when a `removed` update for that sub-account
+arrived on this client, when the list no longer has it, when the list or the
+token is refused (`__cause__` holds the refusal), or after 6 attempts that did
+not stay up for a minute. Requests are paced across the client, so many
+subscriptions ending together share one list read per second and at most five
+attempts per second. An API key bound to a sub-account sees that sub-account in
+the list; a root key cannot subscribe to a sub-account's channels.
 
 ### Realtime delivery contract
 

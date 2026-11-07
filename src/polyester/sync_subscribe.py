@@ -93,16 +93,19 @@ def subscribe_sync(
                 raise
 
     async def _close() -> None:
-        task = holder.get("task")
-        if isinstance(task, asyncio.Task):
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-        sub = holder.get("sub")
-        if sub is not None:
-            aclose = getattr(sub, "aclose", None)
-            if callable(aclose):
-                await aclose()
+        try:
+            task = holder.get("task")
+            if isinstance(task, asyncio.Task):
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+        finally:
+            # An iteration failure raised above must not leave the stream open.
+            sub = holder.get("sub")
+            if sub is not None:
+                aclose = getattr(sub, "aclose", None)
+                if callable(aclose):
+                    await aclose()
 
     async def _start() -> None:
         sub = None

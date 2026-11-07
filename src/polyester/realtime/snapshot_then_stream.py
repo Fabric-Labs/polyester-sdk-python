@@ -6,7 +6,11 @@ import threading
 from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
-from polyester.errors import PolyesterRealtimeError, PolyesterRealtimeOverflowError
+from polyester.errors import (
+    PolyesterRealtimeError,
+    PolyesterRealtimeOverflowError,
+    PolyesterSubscriptionEndedError,
+)
 from polyester.realtime.client import (
     AsyncRealtimeClient,
     AsyncSubscription,
@@ -18,6 +22,11 @@ TSnapshot = TypeVar("TSnapshot")
 TPublication = TypeVar("TPublication")
 
 _RECONNECT_SNAPSHOT_RETRIES = 1
+_TERMINAL_STREAM_ERRORS = (
+    _TerminalRealtimeError,
+    PolyesterRealtimeOverflowError,
+    PolyesterSubscriptionEndedError,
+)
 _REQUEST_REFRESH_MAX_ATTEMPTS = 4
 _REQUEST_REFRESH_INITIAL_BACKOFF = 0.05
 _REQUEST_REFRESH_MAX_BACKOFF = 0.4
@@ -321,7 +330,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     self._handle_publication(message)
                     if self._disposed:
                         break
-                if isinstance(sub.error, (_TerminalRealtimeError, PolyesterRealtimeOverflowError)):
+                if isinstance(sub.error, _TERMINAL_STREAM_ERRORS):
                     self._fail_closed(sub.error)
                 elif sub.error is not None:
                     self._last_error = sub.error
@@ -332,7 +341,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     )
             except asyncio.CancelledError:
                 break
-            except (_TerminalRealtimeError, PolyesterRealtimeOverflowError) as exc:
+            except _TERMINAL_STREAM_ERRORS as exc:
                 self._fail_closed(exc)
             except Exception as exc:
                 if not self._disposed:

@@ -124,13 +124,15 @@ def _auth_http_error(
     return error
 
 
-async def fetch_rt_token(
+async def signed_get(
     http: httpx.AsyncClient,
     credentials: ApiKeyCredentials,
     *,
     url: str,
     label: str,
-) -> str:
+    max_bytes: int,
+) -> bytes:
+    """One API-key-signed GET; 401 and 403 raise ``PolyesterAuthError``."""
     headers = await sign_request_async(credentials, method="GET", url=url, body=b"")
     # One absolute wall-clock deadline covers request headers + bounded body.
     # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
@@ -140,7 +142,7 @@ async def fetch_rt_token(
         async with asyncio.timeout(timeout):
             async with http.stream("GET", url, headers=headers) as response:
                 try:
-                    raw = await _read_limited(response, MAX_TOKEN_RESPONSE_BYTES, label=label)
+                    raw = await _read_limited(response, max_bytes, label=label)
                 except asyncio.CancelledError:
                     # Ensure the streamed peer is aborted promptly on cancel (E6).
                     await response.aclose()
@@ -164,6 +166,19 @@ async def fetch_rt_token(
         raise PolyesterRealtimeError(f"{label}: timed out") from exc
     except httpx.TimeoutException as exc:
         raise PolyesterRealtimeError(f"{label}: timed out") from exc
+    return raw
+
+
+async def fetch_rt_token(
+    http: httpx.AsyncClient,
+    credentials: ApiKeyCredentials,
+    *,
+    url: str,
+    label: str,
+) -> str:
+    raw = await signed_get(
+        http, credentials, url=url, label=label, max_bytes=MAX_TOKEN_RESPONSE_BYTES
+    )
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:

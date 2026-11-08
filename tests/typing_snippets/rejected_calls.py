@@ -42,6 +42,13 @@ async def misspelt_keywords(client: AsyncPolyester) -> None:
         destination_chain_id=1,
         destination_adress="0x0",
     )
+    await client.withdraw.create_api_key_to_external(  # E: "destination_adress"
+        asset_id=1,
+        quantity="1",
+        idempotency_key="k",
+        destination_chain_id=1,
+        destination_adress="0x0",
+    )
 
 
 async def wrong_shapes(client: AsyncPolyester) -> None:

@@ -108,6 +108,7 @@ from polyester.models.private_orders import (
     PrivateOrdersUnit,
 )
 from polyester.models.ratelimit import RateLimitDetail
+from polyester.models.secret import Secret
 from polyester.models.sub_accounts import (
     CreateSubaccountResult,
     GetSubaccountResult,
@@ -330,6 +331,7 @@ __all__ = [
     "ResolvedAccountsList",
     "RiskLeg",
     "RotateGuardSignerWalletResult",
+    "Secret",
     "PairOrderLimits",
     "SpotConfig",
     "SpotFeeRate",

@@ -70,6 +70,7 @@ from polyester.errors import (
     is_wallet_already_linked,
     mutation_outcome_unknown,
 )
+from polyester.models.secret import Secret
 from polyester.patch import UNSET
 from polyester.services.orders import is_batch_replace_settled, wait_for_order_trades_complete
 from polyester.services.withdraw import PreparedTradingWithdraw
@@ -114,6 +115,7 @@ __all__ = [
     "PolyesterEnvironment",
     "PolyesterApiError",
     "SafeDeploymentConfig",
+    "Secret",
     "create_polyester_environment",
     "environment_from_name",
     "PolyesterAuthError",

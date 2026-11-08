@@ -19,6 +19,7 @@ from polyester.codecs.decode.guard_signer import export_wallet_from_proto
 from polyester.gen.chain.guard.v1 import guard_signer_pb2
 from polyester.models.auth import Ed25519Keypair
 from polyester.models.guard_signer import ExportGuardSignerWalletResult
+from polyester.models.secret import Secret
 
 # Obviously fake key material.
 FAKE_EXPORTED_KEY = "fake-exported-guard-key-marker"
@@ -26,11 +27,11 @@ FAKE_SEED = bytes(range(0xA0, 0xC0))
 
 
 def _secret(value: Any) -> Any:
-    return value
+    return Secret(value)
 
 
 def _reveal(value: Any) -> Any:
-    return value
+    return value.reveal()
 
 
 def _export_result() -> ExportGuardSignerWalletResult:

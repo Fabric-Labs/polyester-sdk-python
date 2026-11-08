@@ -13,6 +13,19 @@ def _u128_scaled(msg) -> int:
     return (int(getattr(msg, "hi", 0) or 0) << 64) + int(getattr(msg, "lo", 0) or 0)
 
 
+_INTERNAL_TRANSFER_STATUS_LABELS = {
+    internal_transfer_pb2.INTERNAL_TRANSFER_STATUS_UNSPECIFIED: "",
+    internal_transfer_pb2.INTERNAL_TRANSFER_STATUS_ACCEPTED: "accepted",
+    internal_transfer_pb2.INTERNAL_TRANSFER_STATUS_REJECTED: "rejected",
+    internal_transfer_pb2.INTERNAL_TRANSFER_STATUS_FAILED: "failed",
+}
+
+
+def _internal_transfer_status_label(value: int) -> str:
+    label = _INTERNAL_TRANSFER_STATUS_LABELS.get(value)  # type: ignore[call-overload]
+    return f"UNKNOWN({value})" if label is None else label
+
+
 def internal_transfer_from_proto(
     msg: internal_transfer_pb2.CreateInternalTransferResponse,
 ) -> InternalTransferResult:
@@ -31,4 +44,5 @@ def internal_transfer_from_proto(
             domain=QuantityDomain.LEDGER_E18,
             asset_id=int(msg.asset_id),
         ),
+        status=_internal_transfer_status_label(int(msg.status)),
     )

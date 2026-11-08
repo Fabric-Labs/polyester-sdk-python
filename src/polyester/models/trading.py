@@ -630,11 +630,21 @@ class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class InternalTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The receipt of an internal transfer request.
+
+    ``status`` is how the service answered the request: ``"accepted"``,
+    ``"rejected"`` or ``"failed"``; empty when the response names none, and
+    ``"UNKNOWN(n)"`` for a status this SDK version does not know.
+    ``"accepted"`` means the transfer has a durable transfer ID, not that it
+    has settled.
+    """
+
     request_id: str = ""
     transfer_id: str = ""
     asset_id: int = 0
     asset_code: str = ""
     quantity: AssetAmount | None = None
+    status: str = ""
 
 
 class DepositAddress(msgspec.Struct, kw_only=True, omit_defaults=True):

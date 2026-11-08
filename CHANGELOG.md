@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `InternalTransferResult`, returned by `AsyncInternalTransfersService.create` (`AsyncPolyester.internal_transfers.create`, and `Polyester.internal_transfers.create`), gains `status`: `"accepted"`, `"rejected"` or `"failed"`, as the service answered the request; empty when the response names none, and `"UNKNOWN(n)"` for a status this version does not know. Receipts that differed only in their status read the same before. `"accepted"` means the transfer has a durable transfer ID, not that it has settled.
+
 ## 0.13.0
 
 Git tag: `v0.13.0`. Released 2026-11-08. Built on public contract `1bf038e`.

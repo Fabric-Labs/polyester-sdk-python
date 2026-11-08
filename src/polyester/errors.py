@@ -59,10 +59,10 @@ API_KEY_AUTH_ERROR_CODES = frozenset(
 # ConnectRPC ``resource_exhausted`` with ``AuthErrorDetail``). It raises
 # :class:`PolyesterRateLimitError` with this ``code``, not an authentication
 # error: the credentials are valid, the request was not processed, and the
-# share frees as earlier windows end, within at most 60 seconds. It is
-# retryable. It carries no ``Retry-After``, so ``retry_after`` is ``None``
-# unless the response named one: back off briefly and send again, which signs
-# again with a fresh timestamp. A shorter ``recv_window_ms`` makes room sooner.
+# share frees as earlier windows end. It is retryable. It carries no
+# ``Retry-After``, so ``retry_after`` is ``None`` unless the response named
+# one: back off briefly and send again, which signs again with a fresh
+# timestamp. A shorter ``recv_window_ms`` makes room sooner.
 AUTH_REPLAY_CAPACITY_EXHAUSTED = "AUTH_REPLAY_CAPACITY_EXHAUSTED"
 
 # orders.v1.ErrorCode of an order or trigger write whose receive window ended

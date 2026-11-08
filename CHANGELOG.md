@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.13.0
+
+Git tag: `v0.13.0`. Released 2026-11-08. Built on public contract `1bf038e`.
 
 - **Breaking:** `orders.create` and `orders.preview_order` type their keyword arguments, so a type checker such as mypy refuses a misspelt or unknown keyword such as `qyt=`, a call without `side` or `order_type`, and a `CreateOrderRequest` passed together with keywords. Both took `**kwargs: Any`, so such calls type-checked, and only the client refused them at runtime. It still does, naming the keyword, before anything is sent. The keywords are the fields of `CreateOrderRequest`, given by the new `polyester.models.CreateOrderParams` `TypedDict`. Their `account=` now takes the selectors every other method takes, where it was typed as only a string or a `dict[str, str]`. Migration: correct the keyword the type checker names. To build the keywords before the call, annotate the dict as `CreateOrderParams`, or pass a `CreateOrderRequest`; unpacking a `dict[str, Any]` still type-checks.
 - **Breaking:** `orders.batch_create` types `items` as `Sequence[CreateOrderRequest | CreateOrderItem]`, where it was `list[CreateOrderRequest | dict[str, Any]]`. A type checker now refuses a dict item with an unknown key or with its own `sub_account_id`, which the client refuses at runtime, as before. The new `polyester.models.CreateOrderItem` `TypedDict` has the fields of `CreateOrderRequest` except `sub_account_id`: the batch's own `sub_account_id` or `account` scopes every item. A `list[dict[str, Any]]` no longer type-checks, and a `list[CreateOrderRequest]` now does. Migration: annotate the items as `list[CreateOrderItem]`, or build `CreateOrderRequest` objects.

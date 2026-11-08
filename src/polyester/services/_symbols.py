@@ -12,12 +12,27 @@ def resolve_symbol_id(
     symbol_id: int | None,
     label: str = "request",
 ) -> int:
+    """Resolve a market from its name, its numeric ID, or both.
+
+    Given both, they must name one market: a name that is not the catalog's
+    name for the ID, or that the catalog maps to another ID, is refused.
+    """
     if symbol_id is not None:
         explicit = market_id(symbol_id, f"{label} symbol_id")
         if explicit == 0:
             raise PolyesterValidationError(
                 f"{label} symbol_id must be non-zero when explicitly supplied"
             )
+        if symbol and catalogs is not None:
+            canonical = catalogs.symbol_for_symbol_id(explicit)
+            named = catalogs.symbol_id_for_symbol(symbol)
+            if (canonical is not None and symbol != canonical) or (
+                named is not None and named != explicit
+            ):
+                raise PolyesterValidationError(
+                    f"{label} symbol mismatch: {symbol!r} does not match "
+                    f"symbol_id {explicit}" + (f" ({canonical})" if canonical else "")
+                )
         return explicit
     if symbol and catalogs is not None:
         resolved = catalogs.symbol_id_for_symbol(symbol)

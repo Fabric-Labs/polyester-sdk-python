@@ -88,7 +88,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         kind: str | None = None,
         limit: int = 50,
         page_token: str | None = None,
@@ -115,7 +115,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         direction: str | None = None,
         kind: str | None = None,
         limit: int = 50,
@@ -142,7 +142,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         kind: str = "internal_account",
         limit: int = 50,
         page_token: str | None = None,
@@ -170,7 +170,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         limit: int = 50,
         page_token: str | None = None,
     ) -> InternalTransferWhitelistEntriesList:
@@ -194,7 +194,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> WithdrawWhitelistView | None:
         request = GetWithdrawWhitelistViewRequest()
         parsed_sub = parse_optional_subaccount_id(
@@ -214,7 +214,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         limit: int = 50,
         minimum_view_revision: int = 0,
     ) -> AddressBookView:
@@ -258,7 +258,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         tag_ids: list[str | int] | None = None,
         new_tags: list[AddressBookTagInput | Mapping[str, Any]] | None = None,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> AddressBookEntry:
         request = create_entry_to_proto(
             subaccount_id=parse_optional_subaccount_id(
@@ -324,7 +324,7 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         name: str,
         color: str = "",
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> AddressBookTag:
         request = CreateAddressBookTagRequest(name=name, color=color)
         parsed_sub = parse_optional_subaccount_id(

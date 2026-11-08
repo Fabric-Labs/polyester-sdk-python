@@ -48,7 +48,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> CreateGuardSignerWalletResult:
         request = CreateGuardSignerWalletRequest()
         parsed_sub = parse_optional_subaccount_id(
@@ -68,7 +68,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> GuardSignerStatus | None:
         request = GetGuardSignerStatusRequest()
         parsed_sub = parse_optional_subaccount_id(
@@ -89,7 +89,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         *,
         action: str,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         external_polychain_chain_id: int | None = None,
         external_addresses: list[str] | None = None,
         internal_addresses: list[str] | None = None,
@@ -122,7 +122,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         *,
         actions: list[dict[str, Any]],
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> BatchSignProtectedActionsResult:
         items = []
         for item in actions:
@@ -156,7 +156,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> RotateGuardSignerWalletResult:
         request = RotateGuardSignerWalletRequest()
         parsed_sub = parse_optional_subaccount_id(
@@ -176,7 +176,7 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> ExportGuardSignerWalletResult:
         request = ExportGuardSignerWalletRequest()
         parsed_sub = parse_optional_subaccount_id(

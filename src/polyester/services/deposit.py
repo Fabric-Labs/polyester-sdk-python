@@ -26,7 +26,7 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         *,
         chain_id: int,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> DepositAddressesList:
         request = ListDepositAddressesRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(
@@ -47,7 +47,7 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         *,
         chain_id: int,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> DepositAddress:
         request = CreateDepositAddressRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(

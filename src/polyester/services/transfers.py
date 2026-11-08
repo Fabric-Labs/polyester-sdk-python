@@ -33,7 +33,7 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         limit: int = 50,
         reversed: bool = False,
         since: int | None = None,

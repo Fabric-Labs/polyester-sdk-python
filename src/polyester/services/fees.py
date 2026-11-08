@@ -29,7 +29,7 @@ class AsyncFeeService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol_id: int | Sequence[int] | None = None,
     ) -> SpotFeeRatesList:
         request = GetSpotFeeRatesRequest()

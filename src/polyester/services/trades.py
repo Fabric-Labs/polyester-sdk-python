@@ -38,7 +38,7 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         symbol_id: int | None = None,
         after_match_id: int | None = None,

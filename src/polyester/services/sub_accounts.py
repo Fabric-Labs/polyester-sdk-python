@@ -66,7 +66,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         include_api_keys: bool = False,
         include_members: bool = False,
         include_invites: bool = False,
@@ -112,7 +112,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> SubAccountMembersList:
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -140,7 +140,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         limit: int = 50,
         page_token: str | None = None,
     ) -> SubAccountActivityList:

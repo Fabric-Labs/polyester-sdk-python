@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from polyester.codecs.orderbook import DEPTH_TO_PROTO, covering_snapshot_depth
+from polyester.errors import PolyesterValidationError
+from polyester.gen.marketdata.v1 import heatmap_pb2
+
 ORDERBOOK_SUPPORTED_DEPTHS = (1, 5, 10, 20, 50, 100, 200, 500, 1000)
 
 INTERVAL_ALIASES: dict[str, str] = {
@@ -9,17 +13,8 @@ INTERVAL_ALIASES: dict[str, str] = {
     "1h": "INTERVAL_1H",
 }
 
-DEPTH_TO_PROTO: dict[int, str] = {
-    1: "DEPTH_1",
-    5: "DEPTH_5",
-    10: "DEPTH_10",
-    20: "DEPTH_20",
-    50: "DEPTH_50",
-    100: "DEPTH_100",
-    200: "DEPTH_200",
-    500: "DEPTH_500",
-    1000: "DEPTH_1000",
-}
+# Interval segments the server publishes live heatmap buckets on.
+INTERVAL_CHANNEL_LABELS: dict[str, str] = {name: alias for alias, name in INTERVAL_ALIASES.items()}
 
 QTY_MODE_ALIASES: dict[str, str] = {
     "close": "CLOSE",
@@ -27,8 +22,42 @@ QTY_MODE_ALIASES: dict[str, str] = {
 }
 
 
+def resolve_heatmap_interval(interval: str) -> heatmap_pb2.HeatmapInterval:
+    """``HeatmapInterval`` value for an alias (``"1m"``) or an interval name (``"INTERVAL_1M"``).
+
+    Only names of ``HeatmapInterval`` are accepted: a quantity mode or any other value is refused.
+    """
+    name = INTERVAL_ALIASES.get(interval, interval.upper()) if isinstance(interval, str) else ""
+    if name not in INTERVAL_CHANNEL_LABELS:
+        raise PolyesterValidationError(
+            f"Unknown heatmap interval {interval!r}; use '1s', '1m', '5m', or '1h'"
+        )
+    return heatmap_pb2.HeatmapInterval.Value(name)
+
+
+def heatmap_interval_channel_label(interval: str) -> str:
+    """Interval segment of the live heatmap channel: ``"1s"``, ``"1m"``, ``"5m"`` or ``"1h"``."""
+    name = heatmap_pb2.HeatmapInterval.Name(resolve_heatmap_interval(interval))
+    return INTERVAL_CHANNEL_LABELS[name]
+
+
+def resolve_heatmap_quantity_mode(quantity_mode: str) -> heatmap_pb2.HeatmapQuantityMode:
+    """``HeatmapQuantityMode`` value for ``"close"`` or ``"peak"`` (any case); nothing else."""
+    name = QTY_MODE_ALIASES.get(quantity_mode.lower(), "") if isinstance(quantity_mode, str) else ""
+    if not name:
+        raise PolyesterValidationError("quantity_mode must be 'close' or 'peak'")
+    return heatmap_pb2.HeatmapQuantityMode.Value(name)
+
+
+def heatmap_depth(depth: int) -> int:
+    """Depth ``heatmap.get`` requests for ``depth``, by the rule of ``orderbook_snapshot_depth``.
+
+    ``depth`` itself when it is a supported depth, else the smallest one covering it; 0 is the
+    default 50. A depth below 0 or above 1000, or not an integer, is refused.
+    """
+    return covering_snapshot_depth(depth, "heatmap depth")
+
+
 def depth_to_proto_name(depth: int) -> str:
-    if depth in DEPTH_TO_PROTO:
-        return DEPTH_TO_PROTO[depth]
-    closest = min(ORDERBOOK_SUPPORTED_DEPTHS, key=lambda value: abs(value - depth))
-    return DEPTH_TO_PROTO[closest]
+    """Wire depth name for ``depth``, by the rule of :func:`heatmap_depth`."""
+    return DEPTH_TO_PROTO[heatmap_depth(depth)]

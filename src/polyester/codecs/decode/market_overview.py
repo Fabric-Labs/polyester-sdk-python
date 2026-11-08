@@ -12,6 +12,7 @@ from polyester.models.market import (
     FiatConversionSnapshot,
     MarketOverviewEntry,
     MarketOverviewList,
+    MarketOverviewSparkline,
     SpotPairVolumeSeries,
     SpotVolumeHistory,
     StablecoinConversionRate,
@@ -37,6 +38,17 @@ def _decoded_base_volume(
     return format_qty_scaled(int(msg.volume_24h_base_scaled), scale)
 
 
+def market_overview_sparkline_from_proto(
+    msg: marketoverview_pb2.Sparkline, symbol: str | None = None
+) -> MarketOverviewSparkline:
+    return MarketOverviewSparkline(
+        interval=marketoverview_pb2.SparklineInterval.Name(msg.interval)
+        if msg.interval in marketoverview_pb2.SparklineInterval.values()
+        else str(msg.interval),
+        close_prices=[Price.from_ticks(int(ticks), symbol=symbol) for ticks in msg.close_ticks],
+    )
+
+
 def market_overview_entry_from_proto(
     msg: marketoverview_pb2.MarketOverview,
     catalogs: CatalogManager | None = None,
@@ -58,6 +70,9 @@ def market_overview_entry_from_proto(
         volume_24h_base=_decoded_base_volume(msg, catalogs),
         volume_24h_quote_scaled=_optional_scaled(msg, "volume_24h_quote_scaled"),
         volume_24h_usd_scaled=_optional_scaled(msg, "volume_24h_usd_scaled"),
+        sparklines=[
+            market_overview_sparkline_from_proto(item, symbol or None) for item in msg.sparklines
+        ],
     )
 
 
@@ -133,11 +148,7 @@ def fiat_conversion_snapshot_from_proto(
 def currency_conversion_rates_from_proto(
     msg: marketoverview_pb2.GetCurrencyConversionRatesResponse,
 ) -> CurrencyConversionRates:
-    fiat = (
-        fiat_conversion_snapshot_from_proto(msg.fiat)
-        if has_field(msg, "fiat")
-        else None
-    )
+    fiat = fiat_conversion_snapshot_from_proto(msg.fiat) if has_field(msg, "fiat") else None
     return CurrencyConversionRates(
         fiat=fiat,
         stablecoins=[

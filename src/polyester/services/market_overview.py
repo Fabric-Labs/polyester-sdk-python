@@ -5,6 +5,8 @@ import builtins
 import contextlib
 from collections.abc import Awaitable, Callable
 
+import msgspec
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.market_overview import (
     currency_conversion_config_from_proto,
@@ -107,23 +109,22 @@ class AsyncMarketOverviewService(BaseService):
                 "market_overview.get_spot_volume_history accepts only one of symbols or symbol_ids"
             )
         request = GetSpotVolumeHistoryRequest()
-        resolved: list[int] = []
+        selected: list[int] = []
         if ids:
-            seen: set[int] = set()
             for sid in ids:
                 if sid <= 0:
                     raise PolyesterValidationError(
                         "market_overview.get_spot_volume_history symbol_ids must be positive"
                     )
-                if sid in seen:
-                    continue
-                seen.add(sid)
-                resolved.append(sid)
+            selected = ids
         elif symbols:
             await self._ensure_catalogs()
-            resolved = resolve_symbol_ids(
+            selected = resolve_symbol_ids(
                 self._catalogs, symbols, label="market_overview.get_spot_volume_history symbols"
             )
+        # Each pair is sent once, however it was named: the server refuses repeated IDs and
+        # the 2,000 limit counts distinct pairs.
+        resolved = list(dict.fromkeys(selected))
         if len(resolved) > 2_000:
             raise PolyesterValidationError(
                 "market_overview.get_spot_volume_history accepts at most 2000 symbol_ids"
@@ -234,6 +235,10 @@ class AsyncMarketOverviewService(BaseService):
         def apply_rows(rows: list[MarketOverviewEntry]) -> None:
             for row in rows:
                 if matches_symbol(row):
+                    previous = by_symbol_id.get(row.symbol_id)
+                    # Live publications carry no sparklines: keep the snapshot's.
+                    if not row.sparklines and previous is not None and previous.sparklines:
+                        row = msgspec.structs.replace(row, sparklines=previous.sparklines)
                     by_symbol_id[row.symbol_id] = row
 
         async def fetch_snapshot() -> MarketOverviewList:

@@ -15,6 +15,7 @@ from polyester.models.market import (
     CandlesResult,
     MarketOverviewEntry,
     MarketOverviewList,
+    MarketOverviewSparkline,
     MarketTrade,
 )
 from polyester.models.trading import (
@@ -316,7 +317,12 @@ def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
         index_price=Price.from_ticks(int(index_ticks), symbol=symbol or None)
         if int(index_ticks)
         else None,
-        change_24h_bp=str(_field(data, "change24hBp", "change_24h_bp", default="") or ""),
+        change_24h_bp=str(
+            _field(
+                data, "change24hBps", "change_24h_bps", "change24hBp", "change_24h_bp", default=0
+            )
+            or 0
+        ),
         volume_24h_base_scaled=_optional_scaled_field(
             data, "volume24hBaseScaled", "volume_24h_base_scaled"
         ),
@@ -326,6 +332,27 @@ def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
         volume_24h_usd_scaled=_optional_scaled_field(
             data, "volume24hUsdScaled", "volume_24h_usd_scaled"
         ),
+        sparklines=[
+            _decode_market_overview_sparkline(item, symbol or None)
+            for item in _field(data, "sparklines", default=[]) or []
+            if isinstance(item, dict)
+        ],
+    )
+
+
+def _decode_market_overview_sparkline(
+    data: dict[str, Any], symbol: str | None
+) -> MarketOverviewSparkline:
+    from polyester.gen.marketoverview.v1 import marketoverview_pb2
+    from polyester.types.money import Price
+
+    interval = _field(data, "interval", default=0) or 0
+    if isinstance(interval, int) and interval in marketoverview_pb2.SparklineInterval.values():
+        interval = marketoverview_pb2.SparklineInterval.Name(interval)
+    ticks = _field(data, "closeTicks", "close_ticks", default=[]) or []
+    return MarketOverviewSparkline(
+        interval=str(interval),
+        close_prices=[Price.from_ticks(int(tick), symbol=symbol) for tick in ticks],
     )
 
 
@@ -338,7 +365,7 @@ def decode_market_overview_list(data: dict[str, Any]) -> MarketOverviewList:
     return MarketOverviewList(
         markets=markets,
         next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
-        total=int(_field(data, "total", default=0) or 0),
+        total=len(markets),
     )
 
 
@@ -499,12 +526,8 @@ def decode_trigger(data: dict[str, Any]) -> Trigger:
         client_trigger_id=str(
             _field(data, "clientTriggerId", "client_trigger_id", default="") or ""
         ),
-        cancel_reason=str(
-            _field(data, "cancelReason", "cancel_reason", default="") or ""
-        ),
-        failure_reason=str(
-            _field(data, "failureReason", "failure_reason", default="") or ""
-        ),
+        cancel_reason=str(_field(data, "cancelReason", "cancel_reason", default="") or ""),
+        failure_reason=str(_field(data, "failureReason", "failure_reason", default="") or ""),
     )
 
 
@@ -627,12 +650,8 @@ def decode_trigger_event(data: dict[str, Any]) -> TriggerEvent:
         child_seq=int(_field(data, "childSeq", "child_seq", default=0) or 0),
         child_order_id=_id_str(child_order_raw) if int(child_order_raw) else "",
         fire_price=Price.from_ticks(int(fire_raw)) if int(fire_raw) else None,
-        cancel_reason=str(
-            _field(data, "cancelReason", "cancel_reason", default="") or ""
-        ),
-        failure_reason=str(
-            _field(data, "failureReason", "failure_reason", default="") or ""
-        ),
+        cancel_reason=str(_field(data, "cancelReason", "cancel_reason", default="") or ""),
+        failure_reason=str(_field(data, "failureReason", "failure_reason", default="") or ""),
         # ConnectRPC JSON names the reason in full, REST without its prefix.
         fire_refusal_reason=str(
             _field(data, "fireRefusalReason", "fire_refusal_reason", default="") or ""
@@ -739,9 +758,7 @@ def decode_equity_history(data: dict[str, Any]) -> EquityHistory:
         quote_asset=str(_field(data, "quoteAsset", "quote_asset", default="") or ""),
         points=int(_field(data, "points", default=0) or 0),
         series=series,
-        btc_prices_q=[
-            int(v) for v in _field(data, "btcPricesQ", "btc_prices_q", default=[]) or []
-        ],
+        btc_prices_q=[int(v) for v in _field(data, "btcPricesQ", "btc_prices_q", default=[]) or []],
     )
 
 

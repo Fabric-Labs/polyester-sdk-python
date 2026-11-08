@@ -114,9 +114,7 @@ async def test_volume_history_still_refuses_more_than_2000_distinct_pairs() -> N
     client = AsyncPolyester(api_url="http://127.0.0.1:9", hydrate_catalogs=False)
     try:
         with pytest.raises(PolyesterValidationError, match="at most 2000"):
-            await client.market_overview.get_spot_volume_history(
-                symbol_ids=list(range(1, 2_002))
-            )
+            await client.market_overview.get_spot_volume_history(symbol_ids=list(range(1, 2_002)))
     finally:
         await client.aclose()
 
@@ -168,8 +166,12 @@ async def test_list_exposes_the_sparklines_it_requested() -> None:
     async def handler(req: ParsedRequest) -> HttpScript:
         message = mo.ListMarketOverviewRequest.FromString(req.body)
         requests.append(message)
-        response = _sparkline_response() if message.include_sparklines else mo.ListMarketOverviewResponse(
-            markets=[mo.MarketOverview(symbol_id=1, last_price_ticks=101)]
+        response = (
+            _sparkline_response()
+            if message.include_sparklines
+            else mo.ListMarketOverviewResponse(
+                markets=[mo.MarketOverview(symbol_id=1, last_price_ticks=101)]
+            )
         )
         return connect_proto_response(response.SerializeToString())
 
@@ -252,4 +254,3 @@ def test_live_overview_rows_are_enriched_from_the_catalog() -> None:
     )
     assert batch.markets[0].symbol == "BTC-USDT"
     assert batch.markets[0].volume_24h_base == "0.0000025"
-

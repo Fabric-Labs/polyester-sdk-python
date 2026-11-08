@@ -61,6 +61,14 @@ class CandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     next_page_token: str = ""
 
 
+class MarketOverviewSparkline(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A market's recent closing prices over ``interval``, oldest first."""
+
+    interval: str = ""
+    """``SPARKLINE_1H``, ``SPARKLINE_24H``, ``SPARKLINE_1W`` or ``SPARKLINE_1M``."""
+    close_prices: list[Price] = []
+
+
 class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     symbol_id: int
     symbol: str = ""
@@ -71,6 +79,8 @@ class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     volume_24h_base: str | None = None
     volume_24h_quote_scaled: str | None = None
     volume_24h_usd_scaled: str | None = None
+    sparklines: list[MarketOverviewSparkline] = []
+    """Sparklines the server sent, only when ``include_sparklines`` was requested."""
 
 
 class MarketOverviewList(msgspec.Struct, kw_only=True, omit_defaults=True):

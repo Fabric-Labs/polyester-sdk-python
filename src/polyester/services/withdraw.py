@@ -213,12 +213,54 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
             raise TypeError("prepared must be PreparedTradingWithdraw")
         return await self._create_trading_withdraw(prepared._request())
 
-    async def create_api_key_to_funding(self, **kwargs) -> WithdrawIntentResult:
-        return await self.submit_prepared(self.prepare_api_key_to_funding(**kwargs))
-
-    async def create_api_key_to_external_chain(self, **kwargs) -> WithdrawIntentResult:
+    async def create_api_key_to_funding(
+        self,
+        *,
+        asset_id: int,
+        quantity: str | AssetAmount,
+        idempotency_key: str,
+        destination_address: str = "",
+        amount_scale: int | None = None,
+        deadline_ts_sec: int | None = None,
+        nonce: str | int | None = None,
+    ) -> WithdrawIntentResult:
+        """Prepare with :meth:`prepare_api_key_to_funding`, then submit it."""
         return await self.submit_prepared(
-            self.prepare_api_key_to_external_chain(**kwargs)
+            self.prepare_api_key_to_funding(
+                asset_id=asset_id,
+                quantity=quantity,
+                idempotency_key=idempotency_key,
+                destination_address=destination_address,
+                amount_scale=amount_scale,
+                deadline_ts_sec=deadline_ts_sec,
+                nonce=nonce,
+            )
+        )
+
+    async def create_api_key_to_external_chain(
+        self,
+        *,
+        asset_id: int,
+        quantity: str | AssetAmount,
+        destination_chain_id: int,
+        destination_address: str,
+        idempotency_key: str,
+        amount_scale: int | None = None,
+        deadline_ts_sec: int | None = None,
+        nonce: str | int | None = None,
+    ) -> WithdrawIntentResult:
+        """Prepare with :meth:`prepare_api_key_to_external_chain`, then submit it."""
+        return await self.submit_prepared(
+            self.prepare_api_key_to_external_chain(
+                asset_id=asset_id,
+                quantity=quantity,
+                destination_chain_id=destination_chain_id,
+                destination_address=destination_address,
+                idempotency_key=idempotency_key,
+                amount_scale=amount_scale,
+                deadline_ts_sec=deadline_ts_sec,
+                nonce=nonce,
+            )
         )
 
     create_api_key_to_external = create_api_key_to_external_chain
@@ -259,7 +301,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         idempotency_key: str,
         nonce: str | int,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         destination_address: str = "",
         amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
@@ -303,7 +345,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         idempotency_key: str,
         nonce: str | int,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         amount_scale: int | None = None,
         deadline_ts_sec: int | None = None,
     ) -> WithdrawIntentResult:
@@ -338,7 +380,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
 
     @staticmethod
     def _validate_api_key_scope(
-        account: AccountScope | None, sub_account_id: str | None
+        account: AccountScope | None, sub_account_id: str | int | None
     ) -> None:
         if account is not None or sub_account_id is not None:
             raise PolyesterValidationError(
@@ -358,7 +400,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         payload_signature: bytes,
         signer_wallet: str,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         destination_chain_id: int = 0,
         deadline_ts_sec: int | None = None,
         nonce: str | int,

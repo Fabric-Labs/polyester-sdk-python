@@ -43,6 +43,8 @@ from polyester.models.changelog import (
 )
 from polyester.models.common import (
     ApiData,
+    CreateOrderItem,
+    CreateOrderParams,
     CreateOrderRequest,
     CreateOrderResult,
     OpenOrdersResult,
@@ -251,6 +253,8 @@ __all__ = [
     "Candle",
     "ClientOrderId",
     "CreateGuardSignerWalletResult",
+    "CreateOrderItem",
+    "CreateOrderParams",
     "CreateOrderRequest",
     "CreateOrderResult",
     "CreateSubaccountResult",

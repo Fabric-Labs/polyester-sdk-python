@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Unpack, overload
 
 import msgspec
 
@@ -65,6 +65,8 @@ from polyester.models import (
     BatchReplaceStatusResult,
     CancelAllAfterResult,
     CancelAllOrdersResult,
+    CreateOrderItem,
+    CreateOrderParams,
     CreateOrderRequest,
     GetOrderResult,
     ModifyOrderResult,
@@ -132,7 +134,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         page_token: str | None = None,
         limit: int | None = None,
         include_attached_risk: bool = False,
@@ -172,7 +174,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         symbol_id: int | None = None,
         page_token: str | None = None,
@@ -221,7 +223,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         key: OrderKey,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         include_attached_risk: bool = False,
         include_attached_risk_state: bool = False,
         include_execution_history: bool | None = None,
@@ -267,14 +269,28 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             get_order_from_proto,
         )
 
+    @overload
+    async def create(
+        self, request: CreateOrderRequest, *, account: AccountScope | None = None
+    ) -> OrderMutationResult: ...
+
+    @overload
+    async def create(
+        self, *, account: AccountScope | None = None, **kwargs: Unpack[CreateOrderParams]
+    ) -> OrderMutationResult: ...
+
     async def create(
         self,
         request: CreateOrderRequest | None = None,
         *,
-        account: str | dict[str, str] | None = None,
+        account: AccountScope | None = None,
         **kwargs: Any,
     ) -> OrderMutationResult:
         """Create an order.
+
+        Pass a :class:`CreateOrderRequest`, or its fields as keyword arguments
+        (:class:`CreateOrderParams`), not both. An unknown keyword raises
+        ``PolyesterValidationError`` before sending.
 
         ``client_order_id`` is optional. Set a stable non-empty value so you
         can reconcile after an ambiguous failure. Look up that id before
@@ -315,18 +331,29 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             lambda response: order_mutation_from_proto(response, quantity_scale=quantity_scale),
         )
 
+    @overload
+    async def preview_order(
+        self, request: CreateOrderRequest, *, account: AccountScope | None = None
+    ) -> PreviewOrderResult: ...
+
+    @overload
+    async def preview_order(
+        self, *, account: AccountScope | None = None, **kwargs: Unpack[CreateOrderParams]
+    ) -> PreviewOrderResult: ...
+
     async def preview_order(
         self,
         request: CreateOrderRequest | None = None,
         *,
-        account: str | dict[str, str] | None = None,
+        account: AccountScope | None = None,
         **kwargs: Any,
     ) -> PreviewOrderResult:
         """Check current order admissibility without creating an order.
 
         Returns resolved base size and protected price bound when available.
         Does not return fee or quote-debit estimates. Accepts the same public
-        create shape; the wire request wraps an ``OrderIntent``.
+        create shape as :meth:`create`, a request or its keyword arguments;
+        the wire request wraps an ``OrderIntent``.
         """
         normalized = normalize_create_order_request(request, **kwargs)
         normalized = msgspec.structs.replace(
@@ -383,7 +410,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         symbol: str | None = None,
         symbol_id: int | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> OrderMutationResult:
         """Cancel one order.
 
@@ -429,7 +456,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         key: OrderKey,
         symbol: str,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         request_id: str | None = None,
         new_price: object | None = None,
         new_qty: object | None = None,
@@ -466,7 +493,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         symbols: list[str] | None = None,
         symbol_ids: list[int] | None = None,
@@ -501,7 +528,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         request_id: str | None = None,
     ) -> StopAllTradingResult:
@@ -569,7 +596,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         items: list[BatchReplaceItem | dict],
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str,
         request_id: str | None = None,
     ) -> BatchReplaceOrdersResult:
@@ -614,7 +641,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         batch_request_id: str,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> BatchReplaceStatusResult:
         """Read the execution status of one accepted batch replacement.
 
@@ -660,7 +687,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         batch_request_id: str,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         timeout: float | None = None,
     ) -> BatchReplaceStatusResult:
         """Poll :meth:`get_batch_replace_status` until no item is ``admitted``.
@@ -755,8 +782,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        items: list[CreateOrderRequest | dict[str, Any]],
-        sub_account_id: str | None = None,
+        items: Sequence[CreateOrderRequest | CreateOrderItem],
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         request_id: str | None = None,
         allow_partial: bool = False,
@@ -816,7 +843,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         items: list[dict],
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         request_id: str | None = None,
     ) -> BatchCancelOrdersResult:
         proto_request = batch_cancel_orders_to_proto(
@@ -837,7 +864,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         timeout_sec: int,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         side: str | None = None,
         request_id: str | None = None,
@@ -889,7 +916,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         key: OrderKey,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         timeout: float = 10.0,
         poll_interval: float = 0.1,
     ) -> GetOrderResult:
@@ -930,7 +957,7 @@ async def wait_for_order_trades_complete(
     *,
     key: OrderKey,
     account: AccountScope | None = None,
-    sub_account_id: str | None = None,
+    sub_account_id: str | int | None = None,
     timeout: float = 10.0,
     poll_interval: float = 0.1,
 ) -> GetOrderResult:
@@ -983,7 +1010,7 @@ async def _get_order_execution_pages(
     *,
     key: OrderKey,
     account: AccountScope | None = None,
-    sub_account_id: str | None = None,
+    sub_account_id: str | int | None = None,
 ) -> GetOrderResult:
     """Read one order with every page of its execution history: the order, the
     trades and transfers of all pages, and the final page's

@@ -9,12 +9,13 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import msgspec
 import pytest
 
 from polyester.catalogs import CatalogManager
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
-from polyester.models import CreateOrderRequest
+from polyester.models import CreateOrderItem, CreateOrderParams, CreateOrderRequest
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.withdraw import AsyncWithdrawService
 from tests.unit.support import CaptureUnary
@@ -103,3 +104,11 @@ async def test_withdraw_create_helpers_refuse_an_unknown_keyword(
     transport.assert_not_called()
     transport.credentials.sign_payload.assert_not_called()
 
+
+def test_keyword_forms_name_every_request_field() -> None:
+    fields = {field.name for field in msgspec.structs.fields(CreateOrderRequest)}
+    params = CreateOrderParams.__required_keys__ | CreateOrderParams.__optional_keys__
+    item = CreateOrderItem.__required_keys__ | CreateOrderItem.__optional_keys__
+    assert params == fields
+    # A batch has one scope: an item sub_account_id is refused at runtime.
+    assert item == fields - {"sub_account_id"}

@@ -92,7 +92,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         symbol: str | None = None,
         status: str | Sequence[str] | None = None,
         limit: int = 50,
@@ -140,7 +140,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         trigger_id: str | int,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> Trigger | None:
         """Read one trigger.
 
@@ -178,7 +178,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         limit_price: str | Decimal | Price | None = None,
         trigger_price_source: str | None = None,
         tif: str = "gtc",
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         client_trigger_id: str | None = None,
         post_only: bool = False,
         fee_asset: str | None = None,
@@ -264,7 +264,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         trigger_id: str | int,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> TriggerMutationResult:
         request = CancelTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
@@ -287,7 +287,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         symbol: str | None = None,
         symbol_id: int | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         trigger_price: str | Decimal | Price | None = None,
         trailing_distance_ticks: int | None = None,
         trailing_distance_bps: int | None = None,
@@ -351,7 +351,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         trigger_id: str | int,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> TriggerMutationResult:
         request = PauseTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
@@ -374,7 +374,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         symbol: str | None = None,
         symbol_id: int | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> TriggerMutationResult:
         """Resume a paused trigger; ``symbol`` is optional as for :meth:`modify`."""
         request = ResumeTriggerRequest(
@@ -401,7 +401,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         trigger_id: str | int,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         limit: int = 50,
         event_type: str | None = None,
         page_token: str | None = None,

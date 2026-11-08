@@ -254,8 +254,11 @@ def format_scaled(value: int, scale: int) -> str:
 
     Unlike :func:`format_qty_scaled` it does not cap ``scale``: use it for a
     scale derived from validated ones, such as a notional at base scale + 9.
+    A negative scale raises :class:`PolyesterValidationError`.
     """
-    if scale <= 0:
+    if scale < 0:
+        raise PolyesterValidationError("scale must be non-negative")
+    if scale == 0:
         return str(int(value))
     neg = value < 0
     digits = str(abs(int(value)))

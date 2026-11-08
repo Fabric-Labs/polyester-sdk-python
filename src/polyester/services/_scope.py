@@ -5,7 +5,11 @@ from typing import Any, Literal
 from polyester.codecs.scalars import format_id, parse_account_id
 from polyester.errors import PolyesterValidationError
 
-AccountScope = Literal["main", "active"] | str | dict[str, str] | dict[str, int]
+# A dict selector names the sub-account under "subaccountId" or "sub_account_id",
+# as a public ID string or the numeric ID.
+AccountScope = (
+    Literal["main", "active"] | str | dict[str, str] | dict[str, int] | dict[str, str | int]
+)
 
 
 def _public_id(value: str | int, label: str) -> str:

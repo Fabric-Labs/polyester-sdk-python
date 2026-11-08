@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, Required, TypedDict
 
 import msgspec
 
@@ -96,7 +96,8 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     # same catalog scale (Quantity.from_quote_scaled / from_quote_decimal).
     max_quote_debit: Any | None = None
     price: Any | None = None
-    sub_account_id: str | None = None
+    # A public ID string, or the numeric ID as an int; 0 is refused.
+    sub_account_id: str | int | None = None
     # Optional. Set a stable non-empty value so you can reconcile after an
     # ambiguous failure. Look up that id before creating again; a second
     # create with the same id is always a conflict if the first attempt admitted.
@@ -119,7 +120,41 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     self_trade_prevention_mode: str | None = None
 
 
+class CreateOrderItem(TypedDict, total=False):
+    """An ``orders.batch_create`` item as a dict: the fields of
+    :class:`CreateOrderRequest` but ``sub_account_id``, since a batch has one
+    scope, its own ``sub_account_id`` or ``account``. A type checker refuses
+    any other key, as the client does at runtime."""
+
+    symbol: str | None
+    symbol_id: int | None
+    side: Required[str]
+    order_type: Required[str]
+    tif: str | None
+    qty: Any | None
+    max_quote_debit: Any | None
+    price: Any | None
+    client_order_id: str | None
+    post_only: bool
+    expires_at: str | None
+    attached_risk: Any | None
+    market_client_ref_price: Any | None
+    fee_asset: str | None
+    max_slippage_ticks: int | None
+    max_slippage_bps: int | None
+    self_trade_prevention_mode: str | None
+
+
+class CreateOrderParams(CreateOrderItem, total=False):
+    """The keyword arguments of ``orders.create`` and ``orders.preview_order``:
+    the fields of :class:`CreateOrderRequest`."""
+
+    sub_account_id: str | int | None
+
+
 __all__ = [
+    "CreateOrderItem",
+    "CreateOrderParams",
     "CreateOrderRequest",
     "CreateOrderResult",
     "OpenOrdersResult",

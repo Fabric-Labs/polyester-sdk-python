@@ -34,7 +34,7 @@ class AsyncRateLimitService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
     ) -> TradingRateLimits:
         request = GetTradingRateLimitsRequest()
         parsed_sub = parse_optional_subaccount_id(

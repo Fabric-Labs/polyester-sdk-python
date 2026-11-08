@@ -41,14 +41,14 @@ def test_int_sub_account_id_keeps_its_value(value: int) -> None:
 @pytest.mark.parametrize("value", IDS)
 @pytest.mark.parametrize("key", ["subaccountId", "sub_account_id"])
 def test_int_account_selector_keeps_its_value(value: int, key: str) -> None:
-    resolved = _Scoped()._resolve_sub_account_id(account={key: value})  # type: ignore[dict-item]
+    resolved = _Scoped()._resolve_sub_account_id(account={key: value})
     assert resolved is not None
     assert id_to_int(resolved) == value
 
 
 @pytest.mark.parametrize("value", IDS)
 def test_int_scope_overrides_a_default(value: int) -> None:
-    resolved = resolve_sub_account_from_scope(sub_account_id=value, default="ignored")  # type: ignore[arg-type]
+    resolved = resolve_sub_account_from_scope(sub_account_id=value, default="ignored")
     assert resolved is not None
     assert id_to_int(resolved) == value
 
@@ -65,7 +65,7 @@ def test_invalid_int_scope_is_refused(value: int) -> None:
     with pytest.raises(PolyesterValidationError):
         _Scoped()._resolve_sub_account_id(value)
     with pytest.raises(PolyesterValidationError):
-        _Scoped()._resolve_sub_account_id(account={"subaccountId": value})  # type: ignore[dict-item]
+        _Scoped()._resolve_sub_account_id(account={"subaccountId": value})
 
 
 @pytest.mark.parametrize("value", IDS)
@@ -82,7 +82,7 @@ async def test_balances_list_sends_the_int_sub_account(value: int) -> None:
     with patch("polyester.services.balances.unary_auth_decoded", capture):
         await service.list(sub_account_id=value)
         assert capture.request.subaccount_id == value
-        await service.list(account={"subaccountId": value})  # type: ignore[dict-item]
+        await service.list(account={"subaccountId": value})
         assert capture.request.subaccount_id == value
         await service.list(sub_account_id=format_id(value))
         assert capture.request.subaccount_id == value
@@ -93,7 +93,7 @@ async def test_order_write_sends_the_int_sub_account() -> None:
     capture = CaptureUnary(orders_pb2.BatchCancelOrdersResponse())
     service = AsyncOrdersService(MagicMock(), MagicMock(), None)
     with patch("polyester.services.orders.unary_auth_decoded", capture):
-        await service.batch_cancel(sub_account_id=42, items=[{"key": OrderId(7)}])  # type: ignore[arg-type]
+        await service.batch_cancel(sub_account_id=42, items=[{"key": OrderId(7)}])
     assert capture.request.subaccount_id == 42
 
 
@@ -141,7 +141,7 @@ async def test_order_write_refuses_sub_account_zero() -> None:
         patch("polyester.services.orders.unary_auth_decoded", capture),
         pytest.raises(PolyesterValidationError, match=ZERO),
     ):
-        await service.batch_cancel(sub_account_id=0, items=[{"key": OrderId(7)}])  # type: ignore[arg-type]
+        await service.batch_cancel(sub_account_id=0, items=[{"key": OrderId(7)}])
     assert capture.calls == 0
 
 
@@ -173,7 +173,7 @@ async def test_order_request_object_refuses_sub_account_zero() -> None:
             side="buy",
             order_type="market",
             qty="0.01",
-            sub_account_id=sub_account_id,  # type: ignore[arg-type]
+            sub_account_id=sub_account_id,
         )
 
     with patch("polyester.services.orders.unary_auth_decoded", capture):

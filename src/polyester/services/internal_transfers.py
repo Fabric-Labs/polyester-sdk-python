@@ -33,7 +33,7 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         quantity: str | AssetAmount,
         idempotency_key: str,
         account: AccountScope | None = None,
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         destination_account_id: str | int | None = None,
         destination_subaccount_id: str | int | None = None,
         destination_smart_account_address: str | None = None,

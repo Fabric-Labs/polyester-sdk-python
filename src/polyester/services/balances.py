@@ -71,7 +71,7 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         range: str = "7d",
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         ledger: int = 0,
         account_codes: builtins.list[int] | None = None,
     ) -> BalanceHistory:
@@ -99,7 +99,7 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         *,
         account: AccountScope | None = None,
         range: str = "7d",
-        sub_account_id: str | None = None,
+        sub_account_id: str | int | None = None,
         account_codes: builtins.list[int] | None = None,
         group_by: str = "account",
     ) -> EquityHistory:

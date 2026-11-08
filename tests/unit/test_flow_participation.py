@@ -93,3 +93,23 @@ async def test_unknown_participation_is_refused_before_sending(httpserver: HTTPS
     finally:
         await transport.aclose()
     assert len(httpserver.log) == 0
+
+
+def test_transaction_lookup_rows_carry_the_flow_addresses() -> None:
+    from polyester.codecs.decode.lifecycle import flows_by_tx_list_from_proto
+
+    page = flows_by_tx_list_from_proto(
+        lifecycle_read_pb2.ListFlowsByTxResponse(
+            matches=[
+                lifecycle_read_pb2.FlowTxMatchView(
+                    flow_id="f",
+                    source_address="0x00000000000000000000000000000000000000c3",
+                    destination_address=_SELF,
+                )
+            ]
+        )
+    )
+    (row,) = page.flows
+    assert row.source_address == "0x00000000000000000000000000000000000000c3"
+    assert row.destination_address == _SELF
+    assert row.participation == ""

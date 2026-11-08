@@ -117,6 +117,8 @@ def flow_tx_match_from_proto(msg: FlowTxMatchView) -> LifecycleFlowSummary:
         smart_account_address=account_fields.get("smart_account_address", ""),
         lifecycle_reason=lifecycle_reason_from_code(int(msg.lifecycle_reason)),
         zipper_reason=_zipper_reason_if_present(msg),
+        source_address=str(msg.source_address or ""),
+        destination_address=str(msg.destination_address or ""),
     )
 
 

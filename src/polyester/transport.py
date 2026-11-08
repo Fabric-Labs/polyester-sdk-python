@@ -30,6 +30,7 @@ from polyester._contract_codes import (
     is_recognised_rest_code,
 )
 from polyester._problem import decode_http_problem
+from polyester._redact import url_without_userinfo
 from polyester.auth import ApiKeyCredentials
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
 from polyester.errors import PolyesterAuthError, PolyesterTransportError
@@ -366,17 +367,23 @@ def _raise_problem(
 
 
 class _ConnectHTTPClient:
-    """pyqwest client for generated Connect clients; see ``_raise_for_gateway_rejection``."""
+    """pyqwest client for generated Connect clients; see ``_raise_for_gateway_rejection``.
+
+    It drops URL userinfo before sending. pyqwest never sends it, and its
+    connection errors would quote it, password included.
+    """
 
     def __init__(self, inner: pyqwest.Client | None = None) -> None:
         self._inner = inner or pyqwest.Client()
 
     async def post(self, url: str, headers=None, content=None, **kwargs) -> pyqwest.FullResponse:
-        response = await self._inner.post(url=url, headers=headers, content=content, **kwargs)
+        response = await self._inner.post(
+            url=url_without_userinfo(url), headers=headers, content=content, **kwargs
+        )
         return _raise_for_gateway_rejection(response)
 
     async def get(self, url: str, headers=None, **kwargs) -> pyqwest.FullResponse:
-        response = await self._inner.get(url=url, headers=headers, **kwargs)
+        response = await self._inner.get(url=url_without_userinfo(url), headers=headers, **kwargs)
         return _raise_for_gateway_rejection(response)
 
 
@@ -428,7 +435,8 @@ class TransportConfig:
 
     def __repr__(self) -> str:
         return (
-            f"TransportConfig(api_url={self.api_url!r}, timeout={self.timeout!r}, "
+            f"TransportConfig(api_url={url_without_userinfo(self.api_url)!r}, "
+            f"timeout={self.timeout!r}, "
             f"wire_format={self.wire_format!r})"
         )
 

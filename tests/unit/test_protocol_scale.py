@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from polyester import MAX_PROTOCOL_SCALE, Quantity, format_ledger_u128
-from polyester.codecs.scalars import format_qty_scaled, parse_qty_scaled, validate_protocol_scale
+from polyester.codecs.scalars import (
+    format_qty_scaled,
+    format_scaled,
+    parse_qty_scaled,
+    validate_protocol_scale,
+)
 from polyester.errors import PolyesterValidationError
 
 _BAD_SCALES = (37, 65534, 65535, 65536, 2**32 - 1)
@@ -55,3 +62,16 @@ def test_parse_qty_scaled_rejects_over_max(scale: int) -> None:
 def test_validate_protocol_scale_rejects_bool() -> None:
     with pytest.raises(PolyesterValidationError):
         validate_protocol_scale(True)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("scale", [-1, -2, -36])
+def test_format_scaled_refuses_a_negative_scale(scale: int) -> None:
+    with pytest.raises(PolyesterValidationError, match="scale must be non-negative"):
+        format_scaled(12345, scale)
+
+
+@pytest.mark.parametrize(
+    "value,scale,want", [(12345, 0, "12345"), (12345, 2, "123.45"), (-5, 45, "-5e-45")]
+)
+def test_format_scaled_formats_a_non_negative_scale(value: int, scale: int, want: str) -> None:
+    assert Decimal(format_scaled(value, scale)) == Decimal(want)

@@ -208,3 +208,52 @@ async def test_balances_subscribe_refuses_account_zero() -> None:
     realtime.subscribe_proto.assert_not_awaited()
     with pytest.raises(PolyesterValidationError, match=ZERO):
         resolve_account_id(None, 0)
+
+
+def _order_keywords() -> dict[str, str]:
+    return {"symbol": "BTC-USDT", "side": "buy", "order_type": "market", "qty": "0.01"}
+
+
+ORDER_KEYWORD_HELPERS = {
+    "create": orders_pb2.CreateOrderResponse(order_id=42),
+    "preview_order": orders_pb2.PreviewOrderResponse(evaluated_at={"seconds": 1}),
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("helper", sorted(ORDER_KEYWORD_HELPERS))
+@pytest.mark.parametrize("value", IDS)
+async def test_order_keywords_send_the_int_sub_account(helper: str, value: int) -> None:
+    capture = CaptureUnary(ORDER_KEYWORD_HELPERS[helper])
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with patch("polyester.services.orders.unary_auth_decoded", capture):
+        await getattr(service, helper)(**_order_keywords(), sub_account_id=value)
+    assert capture.calls == 1
+    assert capture.request.subaccount_id == value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("helper", sorted(ORDER_KEYWORD_HELPERS))
+async def test_order_keywords_refuse_sub_account_zero(helper: str) -> None:
+    capture = CaptureUnary(ORDER_KEYWORD_HELPERS[helper])
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with (
+        patch("polyester.services.orders.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match=ZERO),
+    ):
+        await getattr(service, helper)(**_order_keywords(), sub_account_id=0)
+    assert capture.calls == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("helper", sorted(ORDER_KEYWORD_HELPERS))
+@pytest.mark.parametrize("value", [True, -1, 2**64])
+async def test_order_keywords_refuse_an_invalid_int_sub_account(helper: str, value: int) -> None:
+    capture = CaptureUnary(ORDER_KEYWORD_HELPERS[helper])
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with (
+        patch("polyester.services.orders.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError),
+    ):
+        await getattr(service, helper)(**_order_keywords(), sub_account_id=value)
+    assert capture.calls == 0

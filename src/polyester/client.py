@@ -7,6 +7,7 @@ import os
 import threading
 from typing import Any, Literal, cast
 
+from polyester._sync_bridge import run_on_loop
 from polyester.auth import (
     ACCOUNT_ID_ENV,
     API_KEY_ID_ENV,
@@ -219,9 +220,7 @@ class AsyncPolyester:
             self._transport, self.catalogs, default_sub_account_id
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
-        self.fees = AsyncFeeService(
-            self._transport, default_sub_account_id, catalogs=self.catalogs
-        )
+        self.fees = AsyncFeeService(self._transport, default_sub_account_id, catalogs=self.catalogs)
         self.api_keys = AsyncApiKeysService(
             self._transport,
             default_sub_account_id,
@@ -343,7 +342,7 @@ class Polyester:
                 await client.wait_for_catalogs()
             return client
 
-        self._client = asyncio.run_coroutine_threadsafe(_bootstrap(), self._loop).result(timeout=60)
+        self._client = run_on_loop(self._loop, _bootstrap)
         self.catalogs = self._client.catalogs
         self.catalog = self.catalogs
         self.realtime = _SyncService(self._loop, self._client.realtime)
@@ -510,8 +509,7 @@ class _SyncService:
         if asyncio.iscoroutinefunction(attr):
 
             def async_call(*args, **kwargs):
-                future = asyncio.run_coroutine_threadsafe(attr(*args, **kwargs), self._loop)
-                return future.result(timeout=60)
+                return run_on_loop(self._loop, lambda: attr(*args, **kwargs))
 
             return async_call
 
@@ -520,8 +518,7 @@ class _SyncService:
             def call(*args, **kwargs):
                 result = attr(*args, **kwargs)
                 if asyncio.iscoroutine(result):
-                    future = asyncio.run_coroutine_threadsafe(result, self._loop)
-                    return future.result(timeout=60)
+                    return run_on_loop(self._loop, lambda: result)
                 return result
 
             return call
@@ -541,14 +538,13 @@ class _SyncService:
             agen = attr(*args, **kwargs)
             try:
                 while True:
-                    has_item, item = asyncio.run_coroutine_threadsafe(
-                        step(agen), self._loop
-                    ).result(timeout=60)
+                    has_item, item = run_on_loop(self._loop, lambda: step(agen))
                     if not has_item:
                         return
                     yield item
             finally:
-                asyncio.run_coroutine_threadsafe(agen.aclose(), self._loop).result(timeout=10)
+                if self._loop.is_running():
+                    run_on_loop(self._loop, agen.aclose)
 
         return iterate
 

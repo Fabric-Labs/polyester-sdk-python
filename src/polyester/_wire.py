@@ -154,26 +154,34 @@ def _rate_limit_error(
     )
 
 
+_ORDER_ERROR_CODE_NAMES = frozenset(orders_pb2.ErrorCode.DESCRIPTOR.values_by_name)
 _SERVICE_ERROR_CODE_NAMES = frozenset(
     name
     for descriptor in (
-        orders_pb2.ErrorCode.DESCRIPTOR,
         withdraw_pb2.ErrorCode.DESCRIPTOR,
         transfer_pb2.ErrorCode.DESCRIPTOR,
         ledger_read_pb2.ErrorCode.DESCRIPTOR,
     )
     for name in descriptor.values_by_name
 )
+_AUTH_ERROR_CODE_NAMES = frozenset(auth_pb2.AuthErrorCode.DESCRIPTOR.values_by_name)
 
 
 def _error_code_from_rest(code: str) -> str:
     """``SAME_SOURCE_DESTINATION`` -> ``ERROR_CODE_SAME_SOURCE_DESTINATION``.
 
     A code of any service's ``ErrorCode`` reads as its typed ConnectRPC detail
-    does; unknown codes stay as sent.
+    does. A non-order code the auth service also names, such as
+    ``INVALID_REQUEST``, can't be told apart over REST and stays as sent, so
+    :func:`~polyester.errors.auth_error_code` still reads it. Unknown codes
+    stay as sent.
     """
     prefixed = code if code.startswith("ERROR_CODE_") else f"ERROR_CODE_{code}"
-    return prefixed if prefixed in _SERVICE_ERROR_CODE_NAMES else code
+    if prefixed in _ORDER_ERROR_CODE_NAMES:
+        return prefixed
+    if prefixed in _SERVICE_ERROR_CODE_NAMES and f"AUTH_{code}" not in _AUTH_ERROR_CODE_NAMES:
+        return prefixed
+    return code
 
 
 def _rest_violations(items: list[dict[str, object]]) -> list[OrderFieldViolation]:

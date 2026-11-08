@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from polyester.errors import PolyesterApiError
+from polyester.errors import PolyesterApiError, auth_error_code
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.orders.v1 import orders_pb2
@@ -60,3 +60,11 @@ async def test_refusal_code_is_the_same_over_rest_and_connect(
     assert isinstance(rest, PolyesterApiError)
     assert typed.code == "ERROR_CODE_" + name
     assert rest.code == "ERROR_CODE_" + name
+
+
+async def test_rest_code_the_auth_service_also_names_stays_as_sent(httpserver: Any) -> None:
+    # INVALID_REQUEST is an auth, transfer and withdraw code; REST can't say which.
+    rest = await _rest_error(httpserver, 400, {"code": "INVALID_REQUEST", "detail": "refused"})
+    assert isinstance(rest, PolyesterApiError)
+    assert rest.code == "INVALID_REQUEST"
+    assert auth_error_code(rest) == "AUTH_INVALID_REQUEST"

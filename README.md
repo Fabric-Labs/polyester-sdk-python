@@ -205,6 +205,11 @@ API's 10-second freshness window.
 and `dataclasses.asdict`/`astuple` raise `TypeError`, also for a dataclass that holds the
 credentials; read `private_key` explicitly when you need it.
 
+`api_keys.generate_keypair()` and `guard_signer.export_wallet()` return the private key as a
+`polyester.Secret`: `repr`, `str`, logging and Rich print `[REDACTED]`, pickling raises
+`TypeError` and msgspec refuses to encode it. Read it with `keypair.secret_key_hex.reveal()`,
+`keypair.secret_key.reveal()` or `result.private_key.reveal()`.
+
 Recognized retry-later Connect `resource_exhausted` and REST admission-limit responses raise `PolyesterRateLimitError`. When the
 server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), inspect `error.detail` for `policy_class`, `scope`,

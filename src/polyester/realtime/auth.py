@@ -7,6 +7,7 @@ from urllib.parse import quote
 import httpx
 
 from polyester._problem import decode_http_problem
+from polyester._redact import url_without_userinfo
 from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import (
     TIMESTAMP_SKEW,
@@ -124,6 +125,21 @@ def _auth_http_error(
     return error
 
 
+def _userinfo_auth(http: httpx.AsyncClient, url: str) -> httpx.Auth | None:
+    """The Basic auth httpx would derive from ``url``'s userinfo, or ``None``.
+
+    httpx logs a request's URL and keeps it on its errors, password included,
+    so the SDK gives it the URL without userinfo and sends this auth instead.
+    httpx prefers the client's own auth, and so does this.
+    """
+    if http.auth is not None:
+        return None
+    parsed = httpx.URL(url)
+    if not (parsed.username or parsed.password):
+        return None
+    return httpx.BasicAuth(parsed.username, parsed.password)
+
+
 async def signed_get(
     http: httpx.AsyncClient,
     credentials: ApiKeyCredentials,
@@ -133,14 +149,24 @@ async def signed_get(
     max_bytes: int,
 ) -> bytes:
     """One API-key-signed GET; 401 and 403 raise ``PolyesterAuthError``."""
-    headers = await sign_request_async(credentials, method="GET", url=url, body=b"")
+    # Drop userinfo before anything can quote the URL: signing refuses a
+    # malformed URL by naming it, and httpx logs the URL it requests. Only the
+    # path and query are signed, so the signature is the same.
+    target = url_without_userinfo(url)
+    headers = await sign_request_async(credentials, method="GET", url=target, body=b"")
+    auth = _userinfo_auth(http, url) if target != url else None
     # One absolute wall-clock deadline covers request headers + bounded body.
     # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
     # arrive within the read timeout while the total exceeds the SDK budget.
     timeout = _client_timeout_seconds(http)
     try:
         async with asyncio.timeout(timeout):
-            async with http.stream("GET", url, headers=headers) as response:
+            stream = (
+                http.stream("GET", target, headers=headers)
+                if auth is None
+                else http.stream("GET", target, headers=headers, auth=auth)
+            )
+            async with stream as response:
                 try:
                     raw = await _read_limited(response, max_bytes, label=label)
                 except asyncio.CancelledError:
@@ -155,7 +181,7 @@ async def signed_get(
                     raise _auth_http_error(
                         status_code=response.status_code,
                         label=label,
-                        endpoint=url,
+                        endpoint=url_without_userinfo(url),
                         body=raw,
                     )
                 if response.status_code >= 400:

@@ -10,6 +10,7 @@ from polyester.models.guard_signer import (
     GuardSignerStatus,
     RotateGuardSignerWalletResult,
 )
+from polyester.models.secret import Secret
 
 
 def guard_approval_from_proto(msg: guard_signer_pb2.GuardApproval) -> GuardApproval:
@@ -75,4 +76,4 @@ def rotate_wallet_from_proto(
 def export_wallet_from_proto(
     msg: guard_signer_pb2.ExportGuardSignerWalletResponse,
 ) -> ExportGuardSignerWalletResult:
-    return ExportGuardSignerWalletResult(private_key=msg.private_key)
+    return ExportGuardSignerWalletResult(private_key=Secret(msg.private_key))

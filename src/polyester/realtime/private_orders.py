@@ -43,6 +43,7 @@ from polyester.models.private_orders import (
     PrivateOrdersStale,
 )
 from polyester.models.trading import Order
+from polyester.realtime._ws_uri import checked_ws_uri
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncSubscription
 
 PRIVATE_WS_PATH = "/v1/ws/private"
@@ -344,7 +345,7 @@ class PrivateOrderStream:
                     return
                 try:
                     ws = await connect(
-                        self._url,
+                        checked_ws_uri(self._url),
                         subprotocols=[PRIVATE_WS_SUBPROTOCOL],
                         open_timeout=OPEN_TIMEOUT,
                         max_size=WS_MAX_MESSAGE_BYTES,

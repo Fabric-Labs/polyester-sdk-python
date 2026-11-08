@@ -14,6 +14,7 @@ from polyester.gen.auth.v1.api_keys_pb2 import (
 )
 from polyester.models import ApiKeysList, ApiKeySummary
 from polyester.models.auth import Ed25519Keypair
+from polyester.models.secret import Secret
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
@@ -70,8 +71,8 @@ class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
         return Ed25519Keypair(
             public_key_hex=public_key.hex(),
             public_key=public_key,
-            secret_key_hex=secret_key.hex(),
-            secret_key=secret_key,
+            secret_key_hex=Secret(secret_key.hex()),
+            secret_key=Secret(secret_key),
         )
 
     async def subscribe(

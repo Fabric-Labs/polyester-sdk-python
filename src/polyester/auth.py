@@ -327,5 +327,6 @@ def _sign_request_at_timestamp(
 def _validated_url(url: str):
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise PolyesterAuthError(f"Cannot sign malformed absolute HTTP URL: {url!r}")
+        # Never quote the URL: it can carry a password in its userinfo.
+        raise PolyesterAuthError("Cannot sign malformed absolute HTTP URL")
     return parsed

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import msgspec
 
+from polyester.models.secret import Secret, as_secret
+
 
 class GuardSignerStatus(msgspec.Struct, kw_only=True, omit_defaults=True):
     signer_address: str = ""
@@ -27,10 +29,14 @@ class RotateGuardSignerWalletResult(msgspec.Struct, kw_only=True, omit_defaults=
 
 
 class ExportGuardSignerWalletResult(msgspec.Struct, kw_only=True, omit_defaults=True):
-    private_key: str = ""
+    """``private_key`` is the exported private key as a ``Secret``; read it with
+    ``result.private_key.reveal()``. Printing, Rich, pickling and msgspec
+    encoding never reveal it. A plain ``str`` passed in is wrapped."""
 
-    def __repr__(self) -> str:
-        return "ExportGuardSignerWalletResult(private_key='[REDACTED]')"
+    private_key: Secret[str] = Secret("")
+
+    def __post_init__(self) -> None:
+        self.private_key = as_secret(self.private_key)
 
 
 class BatchSignProtectedActionsResult(msgspec.Struct, kw_only=True, omit_defaults=True):

@@ -10,14 +10,15 @@ INVALID_URL = "[REDACTED INVALID URL]"
 def url_without_userinfo(url: str) -> str:
     """Return ``url`` without its userinfo (user name and password).
 
-    A URL that does not parse becomes ``[REDACTED INVALID URL]``, since its
-    userinfo cannot be told apart from the rest of it.
+    A URL that does not parse, or has an ``@`` but no authority (such as
+    ``https:user:password@host``), becomes ``[REDACTED INVALID URL]``, since
+    its userinfo cannot be told apart from the rest of it.
     """
     try:
         parts = urlsplit(url)
     except ValueError:
         return INVALID_URL
     if "@" not in parts.netloc:
-        return url
+        return INVALID_URL if not parts.netloc and "@" in url else url
     host = parts.netloc.rpartition("@")[2]
     return urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))

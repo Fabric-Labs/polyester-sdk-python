@@ -19,6 +19,7 @@ from polyester.errors import (
     PolyesterRealtimeOverflowError,
     PolyesterSubscriptionEndedError,
 )
+from polyester.realtime._ws_uri import checked_ws_uri
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
 from polyester.realtime.protocol import (
     Ping,
@@ -521,7 +522,7 @@ class AsyncRealtimeClient:
         on_renewal_error: Callable[[BaseException], None] | None = None,
     ) -> None:
         async with websockets.connect(
-            self._ws_url,
+            checked_ws_uri(self._ws_url),
             open_timeout=10,
             max_size=WS_MAX_MESSAGE_BYTES,
             subprotocols=[CENTRIFUGO_PROTOBUF_SUBPROTOCOL],

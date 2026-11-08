@@ -125,19 +125,19 @@ def _auth_http_error(
     return error
 
 
-def _without_userinfo(http: httpx.AsyncClient, url: str) -> tuple[httpx.URL, httpx.Auth | None]:
-    """``url`` without userinfo, and the Basic auth httpx would derive from it.
+def _userinfo_auth(http: httpx.AsyncClient, url: str) -> httpx.Auth | None:
+    """The Basic auth httpx would derive from ``url``'s userinfo, or ``None``.
 
-    httpx logs a request's URL and keeps it on its errors, password included.
-    It turns URL userinfo into Basic auth unless the client has its own auth,
-    so send that Basic auth explicitly and leave the userinfo out of the URL.
-    ``None`` means keep the client's default.
+    httpx logs a request's URL and keeps it on its errors, password included,
+    so the SDK gives it the URL without userinfo and sends this auth instead.
+    httpx prefers the client's own auth, and so does this.
     """
-    target = httpx.URL(url)
-    if not (target.username or target.password):
-        return target, None
-    auth = httpx.BasicAuth(target.username, target.password) if http.auth is None else None
-    return target.copy_with(userinfo=b""), auth
+    if http.auth is not None:
+        return None
+    parsed = httpx.URL(url)
+    if not (parsed.username or parsed.password):
+        return None
+    return httpx.BasicAuth(parsed.username, parsed.password)
 
 
 async def signed_get(
@@ -149,14 +149,18 @@ async def signed_get(
     max_bytes: int,
 ) -> bytes:
     """One API-key-signed GET; 401 and 403 raise ``PolyesterAuthError``."""
-    headers = await sign_request_async(credentials, method="GET", url=url, body=b"")
+    # Drop userinfo before anything can quote the URL: signing refuses a
+    # malformed URL by naming it, and httpx logs the URL it requests. Only the
+    # path and query are signed, so the signature is the same.
+    target = url_without_userinfo(url)
+    headers = await sign_request_async(credentials, method="GET", url=target, body=b"")
+    auth = _userinfo_auth(http, url) if target != url else None
     # One absolute wall-clock deadline covers request headers + bounded body.
     # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
     # arrive within the read timeout while the total exceeds the SDK budget.
     timeout = _client_timeout_seconds(http)
     try:
         async with asyncio.timeout(timeout):
-            target, auth = _without_userinfo(http, url)
             stream = (
                 http.stream("GET", target, headers=headers)
                 if auth is None

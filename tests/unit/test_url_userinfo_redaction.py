@@ -233,13 +233,18 @@ def _assert_chain_has_no_userinfo(label: str, err: BaseException | None) -> None
 @pytest.mark.asyncio
 @pytest.mark.parametrize("path", TOKEN_PATHS)
 @pytest.mark.parametrize("api_url", MALFORMED_API_URLS)
-async def test_malformed_api_url_token_errors_redact_userinfo(path: str, api_url: str) -> None:
+async def test_malformed_api_url_token_errors_redact_userinfo(
+    path: str, api_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
     seen: list[httpx.Request] = []
-    async with _scripted_http("success", seen) as http:
-        with pytest.raises(PolyesterAuthError) as caught:
-            await _fetch(http, path, api_url)
+    with caplog.at_level(logging.DEBUG):
+        async with _scripted_http("success", seen) as http:
+            with pytest.raises(PolyesterAuthError) as caught:
+                await _fetch(http, path, api_url)
     assert not seen, "a malformed URL must be refused before any request"
-    assert "Cannot sign malformed absolute HTTP URL" in str(caught.value)
+    assert str(caught.value) == "Cannot sign malformed absolute HTTP URL"
+    for record in caplog.records:
+        _assert_nothing_carries_userinfo(f"{path} log", record.getMessage())
     _assert_chain_has_no_userinfo(f"{path} {api_url.split(':')[0]}", caught.value)
 
 

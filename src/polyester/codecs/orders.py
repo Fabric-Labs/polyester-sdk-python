@@ -905,6 +905,10 @@ def risk_policy_from_dict(
     on a selling order ``ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT`` /
     ``buy_required``; below the activation price ``ERROR_CODE_BAD_PRICE`` /
     ``buy_at_least_activation``.
+
+    ``oco`` needs ``take_profit`` and one stop leg: a one-leg OCO policy
+    raises :class:`PolyesterValidationError` with the contract's
+    ``risk_policy.oco_requires_tp_and_one_stop`` violation at ``risk_field``.
     """
     if data is None:
         return None
@@ -933,6 +937,20 @@ def risk_policy_from_dict(
         oco = data.get("oco")
         if not isinstance(oco, bool):
             raise PolyesterValidationError("attached_risk.oco must be a boolean")
+        if oco and (take_profit is None or (stop_loss is None and trailing_stop is None)):
+            message = (
+                "oco requires take_profit and exactly one stop leg (stop_loss or trailing_stop)"
+            )
+            raise PolyesterValidationError(
+                message,
+                violations=[
+                    OrderFieldViolation(
+                        field_path=risk_field,
+                        rule_id="risk_policy.oco_requires_tp_and_one_stop",
+                        message=message,
+                    )
+                ],
+            )
         risk.oco = oco
     if take_profit is not None:
         tp = _risk_leg_from_dict(

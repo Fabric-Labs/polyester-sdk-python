@@ -332,7 +332,14 @@ class Polyester:
             name="polyester-sync-loop",
             daemon=True,
         )
+        # The loop runs this first, so once it is set the loop is running.
+        loop_started = threading.Event()
+        self._loop.call_soon(loop_started.set)
         self._loop_thread.start()
+        while not loop_started.wait(0.05):
+            if not self._loop_thread.is_alive():
+                self._loop.close()
+                raise PolyesterError("the client's event loop did not start")
         hydrate = config.get("hydrate_catalogs", True)
         self._active_sync_subscriptions: list[SyncSubscription] = []
 
@@ -342,7 +349,12 @@ class Polyester:
                 await client.wait_for_catalogs()
             return client
 
-        self._client = run_on_loop(self._loop, _bootstrap)
+        try:
+            self._client = run_on_loop(self._loop, _bootstrap)
+        except BaseException:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            self._loop_thread.join(timeout=5)
+            raise
         self.catalogs = self._client.catalogs
         self.catalog = self.catalogs
         self.realtime = _SyncService(self._loop, self._client.realtime)

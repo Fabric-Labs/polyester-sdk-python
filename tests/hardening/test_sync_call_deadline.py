@@ -198,3 +198,64 @@ def test_interrupted_sync_mutation_stops_before_the_caller_resumes() -> None:
     base = _seed()
     for offset in range(_interleavings()):
         _interrupted_schedule((base + offset) % 2**32)
+
+
+class _LateLoop(asyncio.SelectorEventLoop):
+    """A loop whose thread enters ``run_forever`` only once released."""
+
+    def __init__(self, release: threading.Event, *, fail: bool = False) -> None:
+        super().__init__()
+        self._release = release
+        self._fail = fail
+
+    def run_forever(self) -> None:
+        self._release.wait()
+        if self._fail:
+            raise RuntimeError("loop failed to start")
+        super().run_forever()
+
+
+def _late_client(monkeypatch: pytest.MonkeyPatch, *, fail: bool = False) -> Polyester:
+    release = threading.Event()
+    loops: list[asyncio.AbstractEventLoop] = []
+
+    def new_event_loop() -> asyncio.AbstractEventLoop:
+        loop = _LateLoop(release, fail=fail)
+        loops.append(loop)
+        return loop
+
+    monkeypatch.setattr(asyncio, "new_event_loop", new_event_loop)
+    threading.Timer(0.05, release.set).start()
+    creds = make_test_credentials()
+    try:
+        return Polyester(
+            api_url="http://127.0.0.1:9",
+            api_key_id=creds.key_id,
+            api_private_key=creds.private_key,
+            hydrate_catalogs=False,
+        )
+    finally:
+        monkeypatch.undo()
+        for loop in loops:
+            if not loop.is_running() and not loop.is_closed():
+                loop.close()
+
+
+def test_sync_client_waits_for_its_loop_thread_to_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _late_client(monkeypatch)
+    try:
+        assert client._loop.is_running()
+        assert client._client is not None
+    finally:
+        client.close()
+    assert not client._loop_thread.is_alive()
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_sync_client_whose_loop_never_starts_fails_without_hanging(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = time.monotonic()
+    with pytest.raises(PolyesterError, match="event loop"):
+        _late_client(monkeypatch, fail=True)
+    assert time.monotonic() - started < 5.0

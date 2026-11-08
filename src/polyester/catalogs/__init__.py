@@ -402,9 +402,7 @@ class CatalogManager:
             code = asset.get("asset")
             if code != base:
                 continue
-            return _optional_int(
-                asset, "market_data_volume_scale", "marketDataVolumeScale"
-            )
+            return _optional_int(asset, "market_data_volume_scale", "marketDataVolumeScale")
         return None
 
     def order_limits_for_symbol(self, symbol: str) -> PairOrderLimits | None:
@@ -460,9 +458,10 @@ class CatalogManager:
             return []
         result: list[str] = []
         for value in buckets:
+            if isinstance(value, bool):
+                continue
             if isinstance(value, (int, float)):
-                text = format(value, "f").rstrip("0").rstrip(".") or "0"
-                result.append(text)
+                result.append(_plain_decimal(value))
             elif value is not None:
                 result.append(str(value))
         return result
@@ -562,3 +561,14 @@ __all__ = [
     "CatalogManager",
     "msgspec_to_dict",
 ]
+
+
+def _plain_decimal(value: int | float) -> str:
+    """``value`` as plain decimal text, with every digit of its shortest round-trip form.
+
+    A float like ``1e-09`` reads as ``"0.000000001"``, not as a fixed number of places.
+    """
+    text = format(Decimal(repr(value)), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"

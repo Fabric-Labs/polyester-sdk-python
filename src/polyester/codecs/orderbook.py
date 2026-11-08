@@ -34,18 +34,20 @@ def orderbook_snapshot_depth(depth: int) -> int:
     snapshot never holds fewer levels than asked; 0 is the default 50. A depth below 0 or
     above the deepest snapshot depth, or not an integer, is refused.
     """
+    return covering_snapshot_depth(depth, "orderbook snapshot depth")
+
+
+def covering_snapshot_depth(depth: int, what: str) -> int:
+    """``depth`` when it is a snapshot depth, else the smallest one covering it; 0 is 50."""
     if not _is_int(depth) or depth < 0:
-        raise PolyesterValidationError(
-            f"orderbook snapshot depth must be a non-negative integer, got {depth!r}"
-        )
+        raise PolyesterValidationError(f"{what} must be a non-negative integer, got {depth!r}")
     if depth == 0:
         return ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
     for supported in ORDERBOOK_SUPPORTED_DEPTHS:
         if supported >= depth:
             return supported
     raise PolyesterValidationError(
-        f"orderbook snapshot depth {depth} is above the deepest snapshot depth "
-        f"({ORDERBOOK_SUPPORTED_DEPTHS[-1]})"
+        f"{what} {depth} is above the deepest snapshot depth ({ORDERBOOK_SUPPORTED_DEPTHS[-1]})"
     )
 
 

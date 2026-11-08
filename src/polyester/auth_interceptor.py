@@ -33,10 +33,12 @@ class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
         *,
         base_url: str,
         codec: Codec,
+        recv_window_ms: int | None = None,
     ) -> None:
         self._credentials = credentials
         self._base_url = base_url.rstrip("/")
         self._codec = codec
+        self._recv_window_ms = recv_window_ms
 
     async def intercept_unary(
         self,
@@ -52,6 +54,7 @@ class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
             method=ctx.http_method(),
             url=url,
             body=body,
+            recv_window_ms=self._recv_window_ms,
         )
         ctx.request_headers().update(headers)
         return await call_next(request, ctx)

@@ -73,6 +73,19 @@ def _summary_from_detail(msg: FlowDetailView) -> FlowSummaryView:
     raise PolyesterTransportError("flow detail response is missing summary")
 
 
+_PARTICIPATION_LABELS = {
+    int(lifecycle_read_pb2.PARTICIPATION_UNSPECIFIED): "unspecified",
+    int(lifecycle_read_pb2.PARTICIPATION_OWNER): "owner",
+    int(lifecycle_read_pb2.PARTICIPATION_RECIPIENT): "recipient",
+}
+
+
+def flow_participation_label(code: int) -> str:
+    """Name a ``FlowParticipation`` the way REST spells it, lowercased. A value
+    newer than this SDK reads ``unknown_participation_<n>``, never unspecified."""
+    return _PARTICIPATION_LABELS.get(int(code), f"unknown_participation_{int(code)}")
+
+
 def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> LifecycleFlowSummary:
     account_fields = lifecycle_account_fields(msg)
     return LifecycleFlowSummary(
@@ -86,6 +99,9 @@ def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> Lifecycl
         lifecycle_reason=lifecycle_reason_from_code(int(msg.lifecycle_reason)),
         zipper_reason=_zipper_reason_if_present(msg),
         is_delayed=bool(msg.is_delayed),
+        participation=flow_participation_label(msg.participation),
+        source_address=str(msg.source_address or ""),
+        destination_address=str(msg.destination_address or ""),
     )
 
 
@@ -101,6 +117,8 @@ def flow_tx_match_from_proto(msg: FlowTxMatchView) -> LifecycleFlowSummary:
         smart_account_address=account_fields.get("smart_account_address", ""),
         lifecycle_reason=lifecycle_reason_from_code(int(msg.lifecycle_reason)),
         zipper_reason=_zipper_reason_if_present(msg),
+        source_address=str(msg.source_address or ""),
+        destination_address=str(msg.destination_address or ""),
     )
 
 

@@ -109,7 +109,18 @@ class AsyncPolyester:
         timeout: float = 10.0,
         wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
+        recv_window_ms: int | None = None,
     ) -> None:
+        """``recv_window_ms`` is the receive window of every signed API request,
+        sent as the signed ``X-API-RECV-WINDOW`` header: the server processes a
+        request only until its signing timestamp plus that many milliseconds,
+        and refuses it after that, having changed nothing, as the retryable
+        :class:`PolyesterTimestampSkewError`, or ``REQUEST_DEADLINE_EXCEEDED``
+        once authenticated. It must be an ``int`` from 1 to 60000; any other
+        value raises :class:`PolyesterValidationError` here. ``None``, the
+        default, sends no header, and the server applies 10000. Realtime token
+        requests always use the default.
+        """
         resolved = parse_polyester_environment(environment or POLYESTER_DEVNET_ENVIRONMENT)
         self.environment = resolved
         self.api_url = api_url if api_url is not None else resolved.api_url
@@ -127,6 +138,7 @@ class AsyncPolyester:
                 api_url=self.api_url,
                 timeout=timeout,
                 wire_format=wire_format,
+                recv_window_ms=recv_window_ms,
             ),
             credentials=credentials,
         )
@@ -514,7 +526,6 @@ class _SyncService:
 
             return call
         return attr
-
 
     def _sync_iterator(self, attr):
         """Drive an async generator method on the client loop, one item per

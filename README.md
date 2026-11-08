@@ -210,6 +210,17 @@ credentials; read `private_key` explicitly when you need it.
 `TypeError` and msgspec refuses to encode it. Read it with `keypair.secret_key_hex.reveal()`,
 `keypair.secret_key.reveal()` or `result.private_key.reveal()`.
 
+`recv_window_ms` on `AsyncPolyester` / `Polyester` sets the receive window of every signed API
+request: the server processes a request only until its signing timestamp plus that many
+milliseconds, sent as the signed `X-API-RECV-WINDOW` header. It must be an `int` from 1 to 60000,
+and any other value raises `PolyesterValidationError` before anything is sent. `None`, the default,
+sends no header, and the server applies 10000. A request that arrives after its window raises the
+retryable `PolyesterTimestampSkewError`; one that waited past it before admission raises
+`PolyesterApiError` with `code` `REQUEST_DEADLINE_EXCEEDED`, also retryable. Both changed nothing,
+and a retry signs again with a fresh timestamp. Realtime token requests always use the default
+window. `polyester.auth.sign_request` and `canonical_signing_string` take the same
+`recv_window_ms` for requests you sign yourself; the window's line follows the timestamp line.
+
 Recognized retry-later Connect `resource_exhausted` and REST admission-limit responses raise `PolyesterRateLimitError`. When the
 server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), inspect `error.detail` for `policy_class`, `scope`,
@@ -1438,6 +1449,27 @@ python3 examples/05_public_orderbook_stream.py
 
 Then bump the version, update `CHANGELOG.md`, build, and publish to PyPI. Install from the new wheel (not editable) and rerun `smoke_realtime.sh` once to confirm the published artifact.
 
+## Lifecycle flow lists
+
+A flow list that selects an account (`owner_account_id` or
+`smart_account_address`) returns the flows it owns and the transfers other
+accounts sent to it, such as a transfer from another user or sub-account, or a
+reward payout. Each row's `participation` says which: `"owner"` (its deposit,
+withdrawal, or a transfer it sent, including a move between its own Funding
+and Trading balances) or `"recipient"`. For a transfer, the counterparty is
+`destination_address` when the account sent it and `source_address` (with
+`owner_account_id`) when it received it. `participation=` narrows the list to
+one side; the server refuses it without an account.
+
+```python
+page = await client.lifecycle.list_flows(
+    owner_account_id="YOUR_ACCOUNT_ID", participation="recipient", limit=20
+)
+```
+
+A page token is bound to the request it was returned for: continue with the
+same account, participation, scope and order; only `limit` may change.
+
 ## Lifecycle transaction lookups
 
 One chain transaction can reference multiple lifecycle flows when operations
@@ -1500,13 +1532,26 @@ API-key call over ConnectRPC with `unauthenticated` and an
 problem `code`, without the `AUTH_` prefix. `auth_error_code(err)` reads both
 the same way and returns the `AuthErrorCode` name: `AUTH_SIGNATURE_INVALID`,
 `AUTH_TIMESTAMP_SKEW`, `AUTH_MISSING_HEADERS`, `AUTH_KEY_EXPIRED`,
-`AUTH_KEY_DISABLED`, `AUTH_IP_NOT_ALLOWED`, `AUTH_API_KEY_NOT_ACCEPTED`
-(exported as constants), and `AUTH_AUTHENTICATION_REQUIRED` for a request
+`AUTH_KEY_DISABLED`, `AUTH_IP_NOT_ALLOWED`, `AUTH_API_KEY_NOT_ACCEPTED`,
+`AUTH_RECV_WINDOW_INVALID` (exported as constants), and
+`AUTH_AUTHENTICATION_REQUIRED` for a request
 with no or an invalid session token (REST `UNAUTHENTICATED`). It returns
 `None` for an error without an auth code. `AUTH_TIMESTAMP_SKEW` raises
 `PolyesterTimestampSkewError` on both transports, the one retryable reason:
 fix the clock offset and the retry signs again. The others raise
-`PolyesterAuthError` and need a change by the caller. `AUTH_WALLET_ALREADY_LINKED`
+`PolyesterAuthError` and need a change by the caller;
+`is_recv_window_invalid(err)` reports `AUTH_RECV_WINDOW_INVALID` (REST 401
+`RECV_WINDOW_INVALID`), an `X-API-RECV-WINDOW` header that is not one whole
+number from 1 to 60000. `AUTH_REPLAY_CAPACITY_EXHAUSTED` (REST 429
+`REPLAY_CAPACITY_EXHAUSTED`, ConnectRPC `resource_exhausted`) is not a
+credentials refusal: the server remembers every signed request until its
+receive window ends, so it cannot be replayed, and the key or its account
+holds its full share of that record. The request was not processed and the
+share frees as earlier windows end, so it raises `PolyesterRateLimitError`
+with that `code`; `is_retryable_error(err)` and
+`is_replay_capacity_exhausted(err)` report true. It carries no `Retry-After`:
+back off briefly and send again, which signs again. A shorter
+`recv_window_ms` makes room sooner. `AUTH_WALLET_ALREADY_LINKED`
 (ConnectRPC `already_exists`, REST 409) refuses a wallet login whose wallet is
 already linked to another account; it is terminal, and
 `is_wallet_already_linked(err)` reports it. Log in with the account address the

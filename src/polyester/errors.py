@@ -35,6 +35,11 @@ AUTH_KEY_EXPIRED = "AUTH_KEY_EXPIRED"
 AUTH_KEY_DISABLED = "AUTH_KEY_DISABLED"
 AUTH_IP_NOT_ALLOWED = "AUTH_IP_NOT_ALLOWED"
 AUTH_API_KEY_NOT_ACCEPTED = "AUTH_API_KEY_NOT_ACCEPTED"
+# The ``X-API-RECV-WINDOW`` header is not one whole number of milliseconds from
+# 1 to 60000, is empty, or is repeated (REST ``RECV_WINDOW_INVALID``, HTTP 401;
+# ConnectRPC ``unauthenticated``). The request was not processed, and the same
+# header is refused again: fix ``recv_window_ms``.
+AUTH_RECV_WINDOW_INVALID = "AUTH_RECV_WINDOW_INVALID"
 API_KEY_AUTH_ERROR_CODES = frozenset(
     {
         AUTH_SIGNATURE_INVALID,
@@ -44,8 +49,28 @@ API_KEY_AUTH_ERROR_CODES = frozenset(
         AUTH_KEY_DISABLED,
         AUTH_IP_NOT_ALLOWED,
         AUTH_API_KEY_NOT_ACCEPTED,
+        AUTH_RECV_WINDOW_INVALID,
     }
 )
+
+# A signed API-key request was refused because the key, or its account, holds
+# its full share of the record that keeps signed requests from being replayed
+# until their receive windows end (REST ``REPLAY_CAPACITY_EXHAUSTED``, HTTP 429;
+# ConnectRPC ``resource_exhausted`` with ``AuthErrorDetail``). It raises
+# :class:`PolyesterRateLimitError` with this ``code``, not an authentication
+# error: the credentials are valid, the request was not processed, and the
+# share frees as earlier windows end. It is retryable. It carries no
+# ``Retry-After``, so ``retry_after`` is ``None`` unless the response named
+# one: back off briefly and send again, which signs again with a fresh
+# timestamp. A shorter ``recv_window_ms`` makes room sooner.
+AUTH_REPLAY_CAPACITY_EXHAUSTED = "AUTH_REPLAY_CAPACITY_EXHAUSTED"
+
+# orders.v1.ErrorCode of an order or trigger write whose receive window ended
+# before it was sent on for admission (308; REST 400 ``REQUEST_DEADLINE_EXCEEDED``,
+# ConnectRPC ``failed_precondition``). It passed authentication, but nothing
+# changed and it is never an unknown outcome: it is retryable, and sending it
+# again signs it with a fresh timestamp.
+REQUEST_DEADLINE_EXCEEDED = "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED"
 
 # A valid signed wallet login named an account address no account uses, and
 # the signing wallet is already linked to another account (ConnectRPC
@@ -357,6 +382,8 @@ def auth_error_code(err: BaseException) -> str | None:
         return AUTH_TIMESTAMP_SKEW
     if isinstance(err, (PolyesterApiError, PolyesterAuthError)) and err.code:
         return auth_error_code_from_rest(err.code)
+    if isinstance(err, PolyesterRateLimitError) and (err.code or "").startswith("AUTH_"):
+        return err.code
     return None
 
 
@@ -371,6 +398,24 @@ def is_wallet_already_linked(err: BaseException) -> bool:
     linked to another account (``AUTH_WALLET_ALREADY_LINKED``). It is terminal:
     log in with the account address the wallet already uses."""
     return auth_error_code(err) == AUTH_WALLET_ALREADY_LINKED
+
+
+def is_recv_window_invalid(err: BaseException) -> bool:
+    """True when the request's ``X-API-RECV-WINDOW`` header was refused
+    (``AUTH_RECV_WINDOW_INVALID``). Not retryable without fixing the window."""
+    return auth_error_code(err) == AUTH_RECV_WINDOW_INVALID
+
+
+def is_replay_capacity_exhausted(err: BaseException) -> bool:
+    """True when the API key's or account's share of the replay record is full
+    (``AUTH_REPLAY_CAPACITY_EXHAUSTED``). Retryable after a short backoff."""
+    return auth_error_code(err) == AUTH_REPLAY_CAPACITY_EXHAUSTED
+
+
+def is_request_deadline_exceeded(err: BaseException) -> bool:
+    """True when a write's receive window ended before admission
+    (``ERROR_CODE_REQUEST_DEADLINE_EXCEEDED``). Nothing changed; retryable."""
+    return isinstance(err, PolyesterApiError) and err.code == REQUEST_DEADLINE_EXCEEDED
 
 
 def is_request_too_large(err: BaseException) -> bool:
@@ -534,6 +579,7 @@ def is_retryable_error(err: BaseException) -> bool:
     if isinstance(err, PolyesterApiError) and err.code in (
         AUTH_TEMPORARILY_UNAVAILABLE,
         "ERROR_CODE_ACCOUNT_REPAIRING",
+        REQUEST_DEADLINE_EXCEEDED,
     ):
         return True
     return isinstance(

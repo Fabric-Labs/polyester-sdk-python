@@ -31,7 +31,7 @@ from polyester._contract_codes import (
 )
 from polyester._problem import decode_http_problem
 from polyester._redact import url_without_userinfo
-from polyester.auth import ApiKeyCredentials
+from polyester.auth import ApiKeyCredentials, validate_recv_window_ms
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
 from polyester.errors import PolyesterAuthError, PolyesterTransportError
 from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
@@ -432,12 +432,19 @@ class TransportConfig:
     api_url: str
     timeout: float = 10.0
     wire_format: WireFormat = "binary"
+    # Receive window of every signed ConnectRPC request, in milliseconds (1 to
+    # 60000), sent as the signed X-API-RECV-WINDOW header. None sends none, and
+    # the server applies 10000.
+    recv_window_ms: int | None = None
+
+    def __post_init__(self) -> None:
+        validate_recv_window_ms(self.recv_window_ms)
 
     def __repr__(self) -> str:
         return (
             f"TransportConfig(api_url={url_without_userinfo(self.api_url)!r}, "
             f"timeout={self.timeout!r}, "
-            f"wire_format={self.wire_format!r})"
+            f"wire_format={self.wire_format!r}, recv_window_ms={self.recv_window_ms!r})"
         )
 
 
@@ -471,6 +478,7 @@ class TransportFactory:
                     credentials,
                     base_url=config.api_url,
                     codec=self._codec,
+                    recv_window_ms=config.recv_window_ms,
                 )
             )
 

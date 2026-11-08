@@ -22,6 +22,7 @@ from polyester.codecs.decode.ratelimit import (
 from polyester.codecs.proto_helpers import error_code_name, format_uint64_id
 from polyester.errors import (
     API_KEY_AUTH_ERROR_CODES,
+    AUTH_REPLAY_CAPACITY_EXHAUSTED,
     AUTH_SESSION_KIND_NOT_ALLOWED,
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
     AUTH_TIMESTAMP_SKEW,
@@ -193,6 +194,12 @@ def _map_gateway_problem(exc: GatewayProblemError):
             detail=detail,
             code=order_code,
         )
+    if exc.problem_code in ("REPLAY_CAPACITY_EXHAUSTED", AUTH_REPLAY_CAPACITY_EXHAUSTED):
+        # Valid credentials, not processed: a retryable rate refusal that
+        # takes Retry-After only when the response names one.
+        return PolyesterRateLimitError(
+            message, retry_after=exc.retry_after, code=AUTH_REPLAY_CAPACITY_EXHAUSTED
+        )
     if exc.http_status == 429:
         return PolyesterApiError(message, code=order_code)
     if exc.http_status == 504:
@@ -334,6 +341,9 @@ def _map_connect_error(exc: ConnectError):
                         message,
                         status_code=401 if exc.code.value == "unauthenticated" else None,
                     )
+                if code_name == AUTH_REPLAY_CAPACITY_EXHAUSTED:
+                    # Valid credentials, not processed: a retryable rate refusal.
+                    return PolyesterRateLimitError(message, code=code_name)
                 if code_name == AUTH_SESSION_KIND_NOT_ALLOWED:
                     return PolyesterSessionRequiredError(
                         message,

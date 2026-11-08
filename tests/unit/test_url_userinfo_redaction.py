@@ -193,6 +193,10 @@ async def test_token_requests_keep_basic_auth_from_userinfo(
         "Basic " + base64.b64encode(expected.encode()).decode()
     )
     assert "x-api-signature" in {name.lower() for name in request.headers}
+    assert request.url.host == HOST
+    assert request.url.raw_path == (
+        b"/v1/rt/token" if path == "connection" else b"/v1/rt/subscribe?channel=orders%3A1"
+    )
 
 
 @pytest.mark.asyncio

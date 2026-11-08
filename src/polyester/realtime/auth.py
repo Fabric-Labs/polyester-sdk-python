@@ -125,6 +125,21 @@ def _auth_http_error(
     return error
 
 
+def _without_userinfo(http: httpx.AsyncClient, url: str) -> tuple[httpx.URL, httpx.Auth | None]:
+    """``url`` without userinfo, and the Basic auth httpx would derive from it.
+
+    httpx logs a request's URL and keeps it on its errors, password included.
+    It turns URL userinfo into Basic auth unless the client has its own auth,
+    so send that Basic auth explicitly and leave the userinfo out of the URL.
+    ``None`` means keep the client's default.
+    """
+    target = httpx.URL(url)
+    if not (target.username or target.password):
+        return target, None
+    auth = httpx.BasicAuth(target.username, target.password) if http.auth is None else None
+    return target.copy_with(userinfo=b""), auth
+
+
 async def signed_get(
     http: httpx.AsyncClient,
     credentials: ApiKeyCredentials,
@@ -141,7 +156,13 @@ async def signed_get(
     timeout = _client_timeout_seconds(http)
     try:
         async with asyncio.timeout(timeout):
-            async with http.stream("GET", url, headers=headers) as response:
+            target, auth = _without_userinfo(http, url)
+            stream = (
+                http.stream("GET", target, headers=headers)
+                if auth is None
+                else http.stream("GET", target, headers=headers, auth=auth)
+            )
+            async with stream as response:
                 try:
                     raw = await _read_limited(response, max_bytes, label=label)
                 except asyncio.CancelledError:

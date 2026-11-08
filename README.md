@@ -1594,8 +1594,9 @@ paths are proto field names (`order.base_qty_scaled`,
 `order.limit_gtc.price_ticks`, `items[1].new_attached_risk...`); REST paths
 are the REST request fields (`order.baseQty`). Branch on `code`, then on
 `rule_id`; messages are for people. A REST problem body at HTTP 400 raises
-`PolyesterApiError` with the `ERROR_CODE_` code (`ERROR_CODE_QTY_STEP_SIZE`),
-not a retryable server error.
+`PolyesterApiError` with the `ERROR_CODE_` code (`ERROR_CODE_QTY_STEP_SIZE`, or
+`ERROR_CODE_SAME_SOURCE_DESTINATION` for a transfer), as the typed ConnectRPC
+detail of any service reads, not a retryable server error.
 
 A request whose deadline expires raises `PolyesterTimeoutError`, a
 `PolyesterTransportError`: non-retryable with outcome unknown. Read back first

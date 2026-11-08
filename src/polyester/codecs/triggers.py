@@ -312,6 +312,10 @@ def create_trigger_to_proto(
             trailing.limit_price_ticks = resolve_price_ticks(
                 limit_price, "limit_price", symbol=symbol
             )  # type: ignore[arg-type]
+            if trailing.limit_price_ticks <= 0:
+                raise PolyesterValidationError(
+                    "trailing_stop with side=buy: limit_price must be positive (the maximum price)"
+                )
         elif limit_price is not None:
             raise PolyesterValidationError(
                 "trailing_stop with side=sell does not take limit_price; "

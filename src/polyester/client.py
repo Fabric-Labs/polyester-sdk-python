@@ -7,6 +7,7 @@ import os
 import threading
 from typing import Any, Literal, cast
 
+from polyester._sync_bridge import run_on_loop
 from polyester.auth import (
     ACCOUNT_ID_ENV,
     API_KEY_ID_ENV,
@@ -219,9 +220,7 @@ class AsyncPolyester:
             self._transport, self.catalogs, default_sub_account_id
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
-        self.fees = AsyncFeeService(
-            self._transport, default_sub_account_id, catalogs=self.catalogs
-        )
+        self.fees = AsyncFeeService(self._transport, default_sub_account_id, catalogs=self.catalogs)
         self.api_keys = AsyncApiKeysService(
             self._transport,
             default_sub_account_id,
@@ -333,7 +332,14 @@ class Polyester:
             name="polyester-sync-loop",
             daemon=True,
         )
+        # The loop runs this first, so once it is set the loop is running.
+        loop_started = threading.Event()
+        self._loop.call_soon(loop_started.set)
         self._loop_thread.start()
+        while not loop_started.wait(0.05):
+            if not self._loop_thread.is_alive():
+                self._loop.close()
+                raise PolyesterError("the client's event loop did not start")
         hydrate = config.get("hydrate_catalogs", True)
         self._active_sync_subscriptions: list[SyncSubscription] = []
 
@@ -343,7 +349,12 @@ class Polyester:
                 await client.wait_for_catalogs()
             return client
 
-        self._client = asyncio.run_coroutine_threadsafe(_bootstrap(), self._loop).result(timeout=60)
+        try:
+            self._client = run_on_loop(self._loop, _bootstrap)
+        except BaseException:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            self._loop_thread.join(timeout=5)
+            raise
         self.catalogs = self._client.catalogs
         self.catalog = self.catalogs
         self.realtime = _SyncService(self._loop, self._client.realtime)
@@ -510,8 +521,7 @@ class _SyncService:
         if asyncio.iscoroutinefunction(attr):
 
             def async_call(*args, **kwargs):
-                future = asyncio.run_coroutine_threadsafe(attr(*args, **kwargs), self._loop)
-                return future.result(timeout=60)
+                return run_on_loop(self._loop, lambda: attr(*args, **kwargs))
 
             return async_call
 
@@ -520,8 +530,7 @@ class _SyncService:
             def call(*args, **kwargs):
                 result = attr(*args, **kwargs)
                 if asyncio.iscoroutine(result):
-                    future = asyncio.run_coroutine_threadsafe(result, self._loop)
-                    return future.result(timeout=60)
+                    return run_on_loop(self._loop, lambda: result)
                 return result
 
             return call
@@ -541,14 +550,13 @@ class _SyncService:
             agen = attr(*args, **kwargs)
             try:
                 while True:
-                    has_item, item = asyncio.run_coroutine_threadsafe(
-                        step(agen), self._loop
-                    ).result(timeout=60)
+                    has_item, item = run_on_loop(self._loop, lambda: step(agen))
                     if not has_item:
                         return
                     yield item
             finally:
-                asyncio.run_coroutine_threadsafe(agen.aclose(), self._loop).result(timeout=10)
+                if self._loop.is_running():
+                    run_on_loop(self._loop, agen.aclose)
 
         return iterate
 

@@ -905,6 +905,10 @@ def risk_policy_from_dict(
     on a selling order ``ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT`` /
     ``buy_required``; below the activation price ``ERROR_CODE_BAD_PRICE`` /
     ``buy_at_least_activation``.
+
+    ``oco`` needs ``take_profit`` and one stop leg: a one-leg OCO policy
+    raises :class:`PolyesterValidationError` with the contract's
+    ``risk_policy.oco_requires_tp_and_one_stop`` violation at ``risk_field``.
     """
     if data is None:
         return None
@@ -933,6 +937,20 @@ def risk_policy_from_dict(
         oco = data.get("oco")
         if not isinstance(oco, bool):
             raise PolyesterValidationError("attached_risk.oco must be a boolean")
+        if oco and (take_profit is None or (stop_loss is None and trailing_stop is None)):
+            message = (
+                "oco requires take_profit and exactly one stop leg (stop_loss or trailing_stop)"
+            )
+            raise PolyesterValidationError(
+                message,
+                violations=[
+                    OrderFieldViolation(
+                        field_path=risk_field,
+                        rule_id="risk_policy.oco_requires_tp_and_one_stop",
+                        message=message,
+                    )
+                ],
+            )
         risk.oco = oco
     if take_profit is not None:
         tp = _risk_leg_from_dict(
@@ -1007,11 +1025,13 @@ def batch_replace_item_to_proto(
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
-        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price", symbol=symbol)
+        with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
+            proto.new_price_ticks = resolve_price_ticks(new_price, "new_price", symbol=symbol)
     if new_qty is not None:
-        proto.new_qty_scaled = resolve_qty_scaled(
-            new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
-        )
+        with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
+            proto.new_qty_scaled = resolve_qty_scaled(
+                new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
+            )
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
@@ -1189,13 +1209,14 @@ def modify_order_to_proto(
                 symbol=symbol,
             )
     if new_qty is not None:
-        proto.new_qty_scaled = resolve_qty_scaled(
-            new_qty,  # type: ignore[arg-type]
-            _codec_quantity_scale(new_qty, quantity_scale),
-            "new_qty",
-            symbol=symbol,
-            symbol_id=symbol_id,
-        )
+        with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
+            proto.new_qty_scaled = resolve_qty_scaled(
+                new_qty,  # type: ignore[arg-type]
+                _codec_quantity_scale(new_qty, quantity_scale),
+                "new_qty",
+                symbol=symbol,
+                symbol_id=symbol_id,
+            )
     if behavior:
         behavior_key = behavior.lower()
         if behavior_key not in MODIFY_BEHAVIOR_TO_PROTO:

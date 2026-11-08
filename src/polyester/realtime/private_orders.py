@@ -98,6 +98,8 @@ class _Consumer:
     queue: asyncio.Queue[PrivateOrdersEvent | None]
     subscription: AsyncSubscription[PrivateOrdersEvent]
     ready: asyncio.Future[None]
+    # Joined a running subscription: the cached view follows its Connected.
+    catch_up: bool = False
 
 
 @dataclass(eq=False)
@@ -228,9 +230,16 @@ class PrivateOrderStream:
         return _Consumer(queue=queue, subscription=subscription, ready=ready)
 
     def _catch_up(self, s: _Subscription, consumer: _Consumer) -> None:
-        """Give a consumer that joined a running subscription what the others know."""
+        """Give a consumer that joined a running subscription what the others know.
+
+        ``Connected`` comes first, then the cached view. A consumer joining
+        while the subscription is not connected gets both once it reconnects.
+        """
+        consumer.catch_up = True
         if s.state == "connected":
             self._deliver_to(s, consumer, PrivateOrdersConnected())
+
+    def _deliver_cached(self, s: _Subscription, consumer: _Consumer) -> None:
         if s.orders is not None:
             self._deliver_to(s, consumer, PrivateOrdersSnapshot(orders=list(s.orders.values())))
         if s.ready:
@@ -259,8 +268,12 @@ class PrivateOrderStream:
             if not s.consumers:
                 self._teardown(s)
             return
-        if isinstance(event, PrivateOrdersConnected) and not consumer.ready.done():
-            consumer.ready.set_result(None)
+        if isinstance(event, PrivateOrdersConnected):
+            if not consumer.ready.done():
+                consumer.ready.set_result(None)
+            if consumer.catch_up:
+                consumer.catch_up = False
+                self._deliver_cached(s, consumer)
 
     def _end_consumer(self, consumer: _Consumer, error: BaseException | None) -> None:
         subscription = consumer.subscription

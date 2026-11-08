@@ -140,3 +140,15 @@ def test_sell_trailing_stop_read_stays_a_market_child() -> None:
     assert trigger.details is not None and trigger.details.trailing is not None
     assert trigger.details.trailing.peak_price is not None
     assert trigger.details.trailing.peak_price.format() == "85000"
+
+
+@pytest.mark.parametrize(
+    "limit_price",
+    ["0", "0.000", Decimal("0"), Price.from_ticks(0)],
+    ids=["str", "str_zeros", "decimal", "ticks"],
+)
+def test_buy_trailing_stop_refuses_a_zero_maximum_price(limit_price: object) -> None:
+    with pytest.raises(PolyesterValidationError, match="limit_price must be positive"):
+        _trailing(limit_price=limit_price)
+    with pytest.raises(PolyesterValidationError, match="limit_price must be positive"):
+        _trailing(limit_price=limit_price, activation_price="0.000000001")

@@ -154,10 +154,34 @@ def _rate_limit_error(
     )
 
 
-def _order_error_code_from_rest(code: str) -> str:
-    """``QTY_STEP_SIZE`` -> ``ERROR_CODE_QTY_STEP_SIZE``; unknown codes stay as sent."""
+_ORDER_ERROR_CODE_NAMES = frozenset(orders_pb2.ErrorCode.DESCRIPTOR.values_by_name)
+_SERVICE_ERROR_CODE_NAMES = frozenset(
+    name
+    for descriptor in (
+        withdraw_pb2.ErrorCode.DESCRIPTOR,
+        transfer_pb2.ErrorCode.DESCRIPTOR,
+        ledger_read_pb2.ErrorCode.DESCRIPTOR,
+    )
+    for name in descriptor.values_by_name
+)
+_AUTH_ERROR_CODE_NAMES = frozenset(auth_pb2.AuthErrorCode.DESCRIPTOR.values_by_name)
+
+
+def _error_code_from_rest(code: str) -> str:
+    """``SAME_SOURCE_DESTINATION`` -> ``ERROR_CODE_SAME_SOURCE_DESTINATION``.
+
+    A code of any service's ``ErrorCode`` reads as its typed ConnectRPC detail
+    does. A non-order code the auth service also names, such as
+    ``INVALID_REQUEST``, can't be told apart over REST and stays as sent, so
+    :func:`~polyester.errors.auth_error_code` still reads it. Unknown codes
+    stay as sent.
+    """
     prefixed = code if code.startswith("ERROR_CODE_") else f"ERROR_CODE_{code}"
-    return prefixed if prefixed in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else code
+    if prefixed in _ORDER_ERROR_CODE_NAMES:
+        return prefixed
+    if prefixed in _SERVICE_ERROR_CODE_NAMES and f"AUTH_{code}" not in _AUTH_ERROR_CODE_NAMES:
+        return prefixed
+    return code
 
 
 def _rest_violations(items: list[dict[str, object]]) -> list[OrderFieldViolation]:
@@ -179,10 +203,10 @@ def _map_gateway_problem(exc: GatewayProblemError):
         # The business outcome takes precedence over the HTTP failure code.
         return PolyesterApiError(
             message,
-            code=_order_error_code_from_rest(exc.problem_code),
+            code=_error_code_from_rest(exc.problem_code),
             violations=_rest_violations(exc.violations),
         )
-    order_code = _order_error_code_from_rest(exc.problem_code)
+    order_code = _error_code_from_rest(exc.problem_code)
     if order_code in _RETRYABLE_RESOURCE_CODES:
         # A rate-limit problem's ``rate_limit`` object, whichever side refused;
         # its retry_after_ms comes before the response headers.
@@ -225,14 +249,14 @@ def _map_gateway_problem(exc: GatewayProblemError):
     if code in ("unavailable", "internal"):
         return PolyesterServerError(
             message,
-            code=_order_error_code_from_rest(exc.problem_code) or None,
+            code=_error_code_from_rest(exc.problem_code) or None,
             status_code=exc.http_status,
         )
     if code in ("resource_exhausted", "unknown"):
         return None
     return PolyesterApiError(
         message,
-        code=_order_error_code_from_rest(exc.problem_code),
+        code=_error_code_from_rest(exc.problem_code),
         violations=_rest_violations(exc.violations),
     )
 
@@ -298,7 +322,7 @@ def _map_connect_error(exc: ConnectError):
             not unpacked_details or _error_detail_priority(unpacked_details[0]) != 0
         ):
             return PolyesterApiError(
-                error_message, code=_order_error_code_from_rest(error_message.strip())
+                error_message, code=_error_code_from_rest(error_message.strip())
             )
         for unpacked in unpacked_details:
             full_name = unpacked.DESCRIPTOR.full_name
@@ -426,8 +450,8 @@ def _map_connect_error(exc: ConnectError):
     if is_placeholder_code(message_code):
         message_code = ""
     if message_code.endswith("_OUTCOME_UNKNOWN"):
-        return PolyesterApiError(error_message, code=_order_error_code_from_rest(message_code))
-    order_code = _order_error_code_from_rest(message_code)
+        return PolyesterApiError(error_message, code=_error_code_from_rest(message_code))
+    order_code = _error_code_from_rest(message_code)
     if code == "unavailable" and order_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
         return PolyesterApiError(error_message, code=order_code)
     if code == "unavailable" and _is_known_admission_refusal(order_code):
@@ -454,7 +478,7 @@ def _map_connect_error(exc: ConnectError):
     if code == "resource_exhausted":
         # A structured detail supplies the delay first; response headers
         # provide its fallback in map_connect_error.
-        order_code = _order_error_code_from_rest(message_code)
+        order_code = _error_code_from_rest(message_code)
         service_code = (
             order_code if order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else None
         )

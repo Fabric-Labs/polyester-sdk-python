@@ -111,8 +111,8 @@ async def test_rest_unavailable_preserves_service_code(httpserver, module, name)
     known = name in KNOWN_REFUSALS and name != "ERROR_CODE_UNAVAILABLE"
     assert is_retryable_error(mapped) is known
     assert mutation_outcome_unknown(mapped) is (not known)
-    expected_code = name if name in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name else code
-    assert mapped.code == expected_code
+    # The same code as the typed ConnectRPC detail, whichever service names it.
+    assert mapped.code == name
     assert mapped.status_code == status
     assert mapped.problem.code == code
     assert mapped.problem.status == status

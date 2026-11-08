@@ -11,7 +11,12 @@ from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from polyester.errors import PolyesterAuthError, PolyesterRateLimitError, PolyesterTransportError
+from polyester.errors import (
+    PolyesterAuthError,
+    PolyesterRateLimitError,
+    PolyesterTransportError,
+    PolyesterValidationError,
+)
 
 API_KEY_ID_ENV = "POLYESTER_API_KEY_ID"
 API_PRIVATE_KEY_ENV = "POLYESTER_API_PRIVATE_KEY"
@@ -249,19 +254,54 @@ def canonical_query(url: str) -> str:
     )
 
 
+# Bounds of an API-key request's receive window (``X-API-RECV-WINDOW``), in
+# milliseconds. Without the header the server applies 10000.
+MIN_RECV_WINDOW_MS = 1
+MAX_RECV_WINDOW_MS = 60_000
+
+
+def validate_recv_window_ms(recv_window_ms: int | None) -> int | None:
+    """Check a receive window before anything is signed.
+
+    ``None`` means no window header; any other value must be an ``int`` from
+    :data:`MIN_RECV_WINDOW_MS` to :data:`MAX_RECV_WINDOW_MS`. The server refuses
+    a header outside that range as ``AUTH_RECV_WINDOW_INVALID``.
+    """
+    if recv_window_ms is None:
+        return None
+    if (
+        isinstance(recv_window_ms, bool)
+        or not isinstance(recv_window_ms, int)
+        or not MIN_RECV_WINDOW_MS <= recv_window_ms <= MAX_RECV_WINDOW_MS
+    ):
+        raise PolyesterValidationError(
+            "recv_window_ms must be a whole number of milliseconds from 1 to 60000, or None"
+        )
+    return recv_window_ms
+
+
 def canonical_signing_string(
     *,
     timestamp_ms: str,
     method: str,
     url: str,
     body: bytes,
+    recv_window_ms: int | None = None,
 ) -> str:
+    """Build the API-key signing payload.
+
+    With ``recv_window_ms``, for a request that sends ``X-API-RECV-WINDOW``, the
+    window's decimal string is its own line right after the timestamp.
+    """
+    window = validate_recv_window_ms(recv_window_ms)
     # The server verifies the decoded path. Keep percent-escaped bytes that are
     # not UTF-8 as surrogates, so signing turns them back into the same bytes.
     pathname = unquote_to_bytes(_validated_url(url).path or "/").decode("utf-8", "surrogateescape")
-    return "\n".join(
-        [timestamp_ms, method.upper(), pathname, canonical_query(url), sha256_hex(body)]
-    )
+    lines = [timestamp_ms]
+    if window is not None:
+        lines.append(str(window))
+    lines += [method.upper(), pathname, canonical_query(url), sha256_hex(body)]
+    return "\n".join(lines)
 
 
 def sign_request(
@@ -271,7 +311,16 @@ def sign_request(
     url: str,
     body: bytes = b"",
     timestamp_ms: str | None = None,
+    recv_window_ms: int | None = None,
 ) -> dict[str, str]:
+    """Return API-key headers for a request.
+
+    With ``recv_window_ms`` the server processes the request only until its
+    timestamp plus that many milliseconds; the headers then include the signed
+    ``X-API-RECV-WINDOW``. A value outside 1 to 60000 raises
+    :class:`PolyesterValidationError` before anything is signed.
+    """
+    validate_recv_window_ms(recv_window_ms)
     timestamp = timestamp_ms or str(credentials._timestamp_allocator.next())
     return _sign_request_at_timestamp(
         credentials,
@@ -279,6 +328,7 @@ def sign_request(
         url=url,
         body=body,
         timestamp=timestamp,
+        recv_window_ms=recv_window_ms,
     )
 
 
@@ -289,8 +339,13 @@ async def sign_request_async(
     url: str,
     body: bytes = b"",
     timestamp_ms: str | None = None,
+    recv_window_ms: int | None = None,
 ) -> dict[str, str]:
-    """Sign without blocking an async runtime while timestamp capacity recovers."""
+    """Sign without blocking an async runtime while timestamp capacity recovers.
+
+    ``recv_window_ms`` works as for :func:`sign_request`.
+    """
+    validate_recv_window_ms(recv_window_ms)
     timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async())
     return _sign_request_at_timestamp(
         credentials,
@@ -298,6 +353,7 @@ async def sign_request_async(
         url=url,
         body=body,
         timestamp=timestamp,
+        recv_window_ms=recv_window_ms,
     )
 
 
@@ -308,20 +364,25 @@ def _sign_request_at_timestamp(
     url: str,
     body: bytes,
     timestamp: str,
+    recv_window_ms: int | None = None,
 ) -> dict[str, str]:
     canonical = canonical_signing_string(
         timestamp_ms=timestamp,
         method=method,
         url=url,
         body=body,
+        recv_window_ms=recv_window_ms,
     )
     key = Ed25519PrivateKey.from_private_bytes(credentials.private_key)
     signature = key.sign(canonical.encode("utf-8", "surrogateescape")).hex()
-    return {
+    headers = {
         "X-API-KEY-ID": credentials.key_id,
         "X-API-TIMESTAMP": timestamp,
         "X-API-SIGNATURE": signature,
     }
+    if recv_window_ms is not None:
+        headers["X-API-RECV-WINDOW"] = str(recv_window_ms)
+    return headers
 
 
 def _validated_url(url: str):

@@ -9,10 +9,16 @@ import pytest
 from pytest_httpserver import HTTPServer
 
 from polyester import (
+    AUTH_RECV_WINDOW_INVALID,
+    AUTH_REPLAY_CAPACITY_EXHAUSTED,
+    REQUEST_DEADLINE_EXCEEDED,
     PolyesterApiError,
     PolyesterAuthError,
     PolyesterRateLimitError,
     auth_error_code,
+    is_recv_window_invalid,
+    is_replay_capacity_exhausted,
+    is_request_deadline_exceeded,
     is_retryable_error,
     mutation_outcome_unknown,
 )
@@ -62,7 +68,8 @@ async def test_replay_capacity_exhausted_is_a_retryable_rate_refusal(
     assert isinstance(error, PolyesterRateLimitError), repr(error)
     assert not isinstance(error, PolyesterAuthError)
     assert error.code == "AUTH_REPLAY_CAPACITY_EXHAUSTED"
-    assert auth_error_code(error) == "AUTH_REPLAY_CAPACITY_EXHAUSTED"
+    assert auth_error_code(error) == AUTH_REPLAY_CAPACITY_EXHAUSTED
+    assert is_replay_capacity_exhausted(error)
     assert error.retry_after == retry_after
     assert is_retryable_error(error)
     assert not mutation_outcome_unknown(error)
@@ -89,7 +96,9 @@ async def test_recv_window_invalid_is_a_terminal_auth_refusal(
     error = await _rest_error(httpserver, 401, body, content_type=content_type)
     assert isinstance(error, PolyesterAuthError), repr(error)
     assert error.status_code == 401
-    assert auth_error_code(error) == "AUTH_RECV_WINDOW_INVALID"
+    assert auth_error_code(error) == AUTH_RECV_WINDOW_INVALID
+    assert is_recv_window_invalid(error)
+    assert not is_replay_capacity_exhausted(error)
     assert not is_retryable_error(error)
     assert not mutation_outcome_unknown(error)
 
@@ -116,6 +125,7 @@ async def test_request_deadline_exceeded_is_retryable_and_known(
         content_type = "application/problem+json"
     error = await _rest_error(httpserver, 400, body, content_type=content_type)
     assert isinstance(error, PolyesterApiError), repr(error)
-    assert error.code == "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED"
+    assert error.code == REQUEST_DEADLINE_EXCEEDED
+    assert is_request_deadline_exceeded(error)
     assert is_retryable_error(error)
     assert not mutation_outcome_unknown(error)

@@ -36,10 +36,29 @@ class AsyncLifecycleService(BaseService):
         owner_account_id: str | int | None = None,
         smart_account_address: str | None = None,
         reversed: bool = False,
+        participation: str | None = None,
     ) -> LifecycleFlowsList:
+        """List lifecycle flows, newest first unless ``reversed``.
+
+        A list that selects an account (``owner_account_id`` or
+        ``smart_account_address``) returns the flows it owns and the transfers
+        other accounts sent to it; each row's ``participation`` says which.
+        ``participation`` (``"owner"`` or ``"recipient"``) narrows it to one
+        side; ``None`` or ``""`` returns both, and the server refuses it
+        without an account. A ``page_token`` is bound to the request it was
+        returned for: keep the same account, participation, scope and order;
+        only ``limit`` may change.
+        """
         from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
 
         request = ListFlowsRequest(limit=validate_limit(limit))
+        if participation and participation.strip():
+            name = participation.strip().upper().removeprefix("PARTICIPATION_")
+            if name not in ("OWNER", "RECIPIENT"):
+                raise PolyesterValidationError(
+                    "participation must be one of 'owner' or 'recipient'"
+                )
+            request.participation = getattr(lifecycle_read_pb2, f"PARTICIPATION_{name}")
         if reversed:
             request.sort = lifecycle_read_pb2.SORT_OLDEST
         else:

@@ -409,6 +409,17 @@ class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     # True when an open flow has made no progress for well beyond its expected
     # step time. Always false for terminal flows and transaction lookups.
     is_delayed: bool = False
+    # How the selected account takes part in the flow, on a list_flows row of a
+    # list that selects an account: "owner" (its deposit, withdrawal or a
+    # transfer it sent, including a move between its own balances) or
+    # "recipient" (a transfer another account sent to it). "unspecified" on an
+    # unscoped list, a flow detail and a realtime update; empty on a
+    # transaction lookup.
+    participation: str = ""
+    # For a transfer, the counterparty is destination_address when the account
+    # sent it and source_address (with owner_account_id) when it received it.
+    source_address: str = ""
+    destination_address: str = ""
 
 
 class LifecycleFlowsList(msgspec.Struct, kw_only=True, omit_defaults=True):

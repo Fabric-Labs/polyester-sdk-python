@@ -1025,11 +1025,13 @@ def batch_replace_item_to_proto(
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
-        proto.new_price_ticks = resolve_price_ticks(new_price, "new_price", symbol=symbol)
+        with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
+            proto.new_price_ticks = resolve_price_ticks(new_price, "new_price", symbol=symbol)
     if new_qty is not None:
-        proto.new_qty_scaled = resolve_qty_scaled(
-            new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
-        )
+        with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
+            proto.new_qty_scaled = resolve_qty_scaled(
+                new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
+            )
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
@@ -1207,13 +1209,14 @@ def modify_order_to_proto(
                 symbol=symbol,
             )
     if new_qty is not None:
-        proto.new_qty_scaled = resolve_qty_scaled(
-            new_qty,  # type: ignore[arg-type]
-            _codec_quantity_scale(new_qty, quantity_scale),
-            "new_qty",
-            symbol=symbol,
-            symbol_id=symbol_id,
-        )
+        with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
+            proto.new_qty_scaled = resolve_qty_scaled(
+                new_qty,  # type: ignore[arg-type]
+                _codec_quantity_scale(new_qty, quantity_scale),
+                "new_qty",
+                symbol=symbol,
+                symbol_id=symbol_id,
+            )
     if behavior:
         behavior_key = behavior.lower()
         if behavior_key not in MODIFY_BEHAVIOR_TO_PROTO:

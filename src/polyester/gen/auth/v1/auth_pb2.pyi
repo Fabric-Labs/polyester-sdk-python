@@ -77,6 +77,8 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_IP_NOT_ALLOWED: _ClassVar[AuthErrorCode]
     AUTH_API_KEY_NOT_ACCEPTED: _ClassVar[AuthErrorCode]
     AUTH_WALLET_ALREADY_LINKED: _ClassVar[AuthErrorCode]
+    AUTH_RECV_WINDOW_INVALID: _ClassVar[AuthErrorCode]
+    AUTH_REPLAY_CAPACITY_EXHAUSTED: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -134,6 +136,8 @@ AUTH_KEY_DISABLED: AuthErrorCode
 AUTH_IP_NOT_ALLOWED: AuthErrorCode
 AUTH_API_KEY_NOT_ACCEPTED: AuthErrorCode
 AUTH_WALLET_ALREADY_LINKED: AuthErrorCode
+AUTH_RECV_WINDOW_INVALID: AuthErrorCode
+AUTH_REPLAY_CAPACITY_EXHAUSTED: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

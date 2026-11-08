@@ -62,7 +62,7 @@ class CandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class MarketOverviewSparkline(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """A market's recent closing prices over ``interval``, oldest first."""
+    """A market's recent closing prices over ``interval``, newest first."""
 
     interval: str = ""
     """``SPARKLINE_1H``, ``SPARKLINE_24H``, ``SPARKLINE_1W`` or ``SPARKLINE_1M``."""

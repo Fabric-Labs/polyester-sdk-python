@@ -15,6 +15,12 @@ FAKE_PASSWORD = "fake-password-marker"
         ("wss://fake-user@ws.example.test/c?x=1", "wss://ws.example.test/c?x=1"),
         (f"http://fake-user:{FAKE_PASSWORD}@127.0.0.1:8080/p", "http://127.0.0.1:8080/p"),
         (f"http://fake-user:{FAKE_PASSWORD}@[::1/p", INVALID_URL),
+        (f"ftp://fake-user:{FAKE_PASSWORD}@api.example.test", "ftp://api.example.test"),
+        (f"https:fake-user:{FAKE_PASSWORD}@api.example.test", INVALID_URL),
+        (f"fake-user:{FAKE_PASSWORD}@api.example.test", INVALID_URL),
+        (f"mailto:fake-user:{FAKE_PASSWORD}@api.example.test", INVALID_URL),
+        ("https:api.example.test/no-userinfo", "https:api.example.test/no-userinfo"),
+        ("", ""),
     ],
 )
 def test_url_without_userinfo(url: str, expected: str) -> None:

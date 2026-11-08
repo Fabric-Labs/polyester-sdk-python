@@ -11,9 +11,10 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from polyester import AsyncPolyester
-from polyester.auth import ApiKeyCredentials
+from polyester.auth import ApiKeyCredentials, sign_request
 from polyester.errors import PolyesterAuthError, PolyesterError
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
+from polyester.realtime.client import AsyncRealtimeClient
 from polyester.transport import TransportConfig, TransportFactory
 
 # An obviously fake password placed in URL userinfo.
@@ -209,3 +210,58 @@ async def test_client_auth_still_wins_over_url_userinfo(path: str) -> None:
     assert (
         request.headers["authorization"] == "Basic " + base64.b64encode(b"fake-client:x").decode()
     )
+
+
+MALFORMED_API_URLS = [
+    f"ftp://fake-user:{FAKE_URL_PASSWORD}@{HOST}",
+    f"https:fake-user:{FAKE_URL_PASSWORD}@{HOST}",
+]
+
+
+def _assert_chain_has_no_userinfo(label: str, err: BaseException | None) -> None:
+    chained = err
+    while chained is not None:
+        name = type(chained).__name__
+        _assert_nothing_carries_userinfo(f"{label} {name}", str(chained))
+        _assert_nothing_carries_userinfo(f"{label} {name}", repr(chained))
+        _assert_nothing_carries_userinfo(
+            f"{label} {name} vars", repr(getattr(chained, "__dict__", {}))
+        )
+        chained = chained.__cause__ or chained.__context__
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", TOKEN_PATHS)
+@pytest.mark.parametrize("api_url", MALFORMED_API_URLS)
+async def test_malformed_api_url_token_errors_redact_userinfo(path: str, api_url: str) -> None:
+    seen: list[httpx.Request] = []
+    async with _scripted_http("success", seen) as http:
+        with pytest.raises(PolyesterAuthError) as caught:
+            await _fetch(http, path, api_url)
+    assert not seen, "a malformed URL must be refused before any request"
+    assert "Cannot sign malformed absolute HTTP URL" in str(caught.value)
+    _assert_chain_has_no_userinfo(f"{path} {api_url.split(':')[0]}", caught.value)
+
+
+@pytest.mark.parametrize("url", [*MALFORMED_API_URLS, f"fake-user:{FAKE_URL_PASSWORD}@{HOST}/p"])
+def test_signing_malformed_url_error_redacts_userinfo(url: str) -> None:
+    with pytest.raises(PolyesterAuthError) as caught:
+        sign_request(_credentials(), method="GET", url=url, body=b"")
+    _assert_chain_has_no_userinfo("sign_request", caught.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "ws_url",
+    [
+        f"http://fake-user:{FAKE_URL_PASSWORD}@127.0.0.1:1/ws",
+        f"ftp://fake-user:{FAKE_URL_PASSWORD}@127.0.0.1/ws",
+        f"wss:fake-user:{FAKE_URL_PASSWORD}@{HOST}/ws",
+        f"fake-user:{FAKE_URL_PASSWORD}@{HOST}/ws",
+    ],
+)
+async def test_malformed_ws_url_dial_errors_redact_userinfo(ws_url: str) -> None:
+    client = AsyncRealtimeClient(ws_url)
+    with pytest.raises(Exception) as caught:  # noqa: PT011 - websockets' own URI error
+        await client.subscribe_proto("trades:BTC-USDT", decode=lambda b: b, auto_reconnect=False)
+    _assert_chain_has_no_userinfo(f"dial {ws_url.split(':')[0]}", caught.value)

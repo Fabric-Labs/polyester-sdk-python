@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.14.0
+
+Git tag: `v0.14.0`. Released 2026-11-08. Built on public contract `c8d9827`.
 
 Built on public contract `c8d9827`. Its changes (received transfers in flow lists, receive windows, and the replay-capacity, receive-window and request-deadline refusals) are available on devnet with its next deployment, and on testnet with its next release.
 - `InternalTransferResult`, returned by `AsyncInternalTransfersService.create` (`AsyncPolyester.internal_transfers.create`, and `Polyester.internal_transfers.create`), gains `status`: `"accepted"`, `"rejected"` or `"failed"`, as the service answered the request; empty when the response names none, and `"UNKNOWN(n)"` for a status this version does not know. Receipts that differed only in their status read the same before. `"accepted"` means the transfer has a durable transfer ID, not that it has settled.

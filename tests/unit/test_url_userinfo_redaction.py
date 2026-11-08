@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import logging
 import socket
 
 import httpx
@@ -102,3 +104,104 @@ def test_transport_config_repr_redacts_url_userinfo() -> None:
     for rendered in (repr(config), str(config), repr(factory)):
         assert FAKE_URL_PASSWORD not in rendered
         assert f"https://{HOST}" in rendered
+
+
+TOKEN_PATHS = ["connection", "subscription"]
+
+
+async def _fetch(http: httpx.AsyncClient, path: str, api_url: str) -> str:
+    if path == "connection":
+        return await fetch_connection_token(http, _credentials(), api_url=api_url)
+    return await fetch_subscription_token(http, _credentials(), api_url=api_url, channel="orders:1")
+
+
+def _scripted_http(
+    outcome: str, seen: list[httpx.Request], *, auth: httpx.Auth | None = None
+) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if outcome == "transport":
+            raise httpx.ConnectError("connection failed", request=request)
+        if outcome == "timeout":
+            raise httpx.ReadTimeout("read timed out", request=request)
+        if outcome == "refusal":
+            return httpx.Response(403, json={"code": "permission_denied", "message": "refused"})
+        return httpx.Response(200, json={"token": "fake-token"})
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler), auth=auth)
+
+
+def _assert_nothing_carries_userinfo(path: str, rendered: str) -> None:
+    assert FAKE_URL_PASSWORD not in rendered, f"{path} leaked URL userinfo: {rendered}"
+    assert "fake-user" not in rendered, f"{path} leaked URL userinfo: {rendered}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", TOKEN_PATHS)
+@pytest.mark.parametrize("outcome", ["success", "refusal", "transport", "timeout"])
+async def test_token_requests_keep_userinfo_out_of_logs_and_errors(
+    path: str, outcome: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    api_url = f"https://fake-user:{FAKE_URL_PASSWORD}@{HOST}"
+    seen: list[httpx.Request] = []
+    caught: BaseException | None = None
+    with caplog.at_level(logging.DEBUG):
+        async with _scripted_http(outcome, seen) as http:
+            try:
+                assert await _fetch(http, path, api_url) == "fake-token"
+            except Exception as exc:  # noqa: BLE001 - every outcome but success raises
+                caught = exc
+    assert (caught is None) == (outcome == "success")
+    label = f"{path} {outcome}"
+    for record in caplog.records:
+        _assert_nothing_carries_userinfo(f"{label} log", record.getMessage())
+    for request in seen:
+        _assert_nothing_carries_userinfo(f"{label} request URL", str(request.url))
+    chained = caught
+    while chained is not None:
+        _assert_nothing_carries_userinfo(f"{label} {type(chained).__name__}", str(chained))
+        _assert_nothing_carries_userinfo(f"{label} {type(chained).__name__}", repr(chained))
+        _assert_nothing_carries_userinfo(
+            f"{label} {type(chained).__name__} vars", repr(getattr(chained, "__dict__", {}))
+        )
+        request = getattr(chained, "_request", None)
+        if request is not None:
+            _assert_nothing_carries_userinfo(f"{label} error request", repr(request))
+            _assert_nothing_carries_userinfo(f"{label} error request URL", str(request.url))
+        chained = chained.__cause__ or chained.__context__
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", TOKEN_PATHS)
+@pytest.mark.parametrize(
+    ("userinfo", "expected"),
+    [
+        ("fake-user:fake-pass", "fake-user:fake-pass"),
+        ("fake%3Auser%40x:p%2Bw%3A%40+x", "fake:user@x:p+w:@+x"),
+        ("fake-user", "fake-user:"),
+        (":fake-pass", ":fake-pass"),
+    ],
+)
+async def test_token_requests_keep_basic_auth_from_userinfo(
+    path: str, userinfo: str, expected: str
+) -> None:
+    seen: list[httpx.Request] = []
+    async with _scripted_http("success", seen) as http:
+        await _fetch(http, path, f"https://{userinfo}@{HOST}")
+    (request,) = seen
+    assert request.headers["authorization"] == (
+        "Basic " + base64.b64encode(expected.encode()).decode()
+    )
+    assert "x-api-signature" in {name.lower() for name in request.headers}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", TOKEN_PATHS)
+async def test_client_auth_still_wins_over_url_userinfo(path: str) -> None:
+    seen: list[httpx.Request] = []
+    async with _scripted_http("success", seen, auth=httpx.BasicAuth("fake-client", "x")) as http:
+        await _fetch(http, path, f"https://fake-user:{FAKE_URL_PASSWORD}@{HOST}")
+    (request,) = seen
+    assert (
+        request.headers["authorization"] == "Basic " + base64.b64encode(b"fake-client:x").decode()
+    )

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.15.0
+
+Git tag: `v0.15.0`. Released 2026-11-09. Built on public contract `c8d9827`.
 
 - **Breaking:** `BatchCreateResultItem`, `BatchCancelResultItem` and `BatchReplaceAdmissionItem` gain `violations`, the field violations (`OrderFieldViolation`: `field_path`, `rule_id`, `message`) a rejected item carries, in the order the server sent them, as `orders.preview` already reports them. A batch create item refused for `error_code_price_tick_size` now names `order.attached_risk.take_profit.trigger_price_ticks` and rule `tick_size`, for example. They were dropped, so a caller could not tell which field to fix. `violations` is empty for an accepted item and for a rejection that names no field. Affected: `AsyncOrdersService.batch_create`, `batch_cancel` and `batch_replace` (`AsyncPolyester.orders` and `Polyester.orders`), and `polyester.codecs.decode.orders.batch_create_from_proto`, `batch_cancel_from_proto` and `batch_replace_from_proto`. Migration: equality and serialization of these items now include `violations` when the server names a field; compare or store the fields you need instead of the whole item.
 - **Breaking:** `AsyncTriggersService.create` (`AsyncPolyester.triggers.create` and `Polyester.triggers.create`) refuses a sell TWAP with `order_type="market"` and `max_slippage_bps=10000` with `PolyesterValidationError` (`max_slippage_bps must be between 1 and 9999`), before anything is sent. The server refuses it with `MAX_SLIPPAGE_INVALID`, since a 100% cap leaves a sell no positive price; a sell stop-loss or take-profit market child was already refused the same way. A buy TWAP keeps 1 to 10000. `polyester.codecs.triggers.create_trigger_to_proto` applies the same rule. Migration: cap a sell TWAP at 9999 bps or less, or set `max_slippage_ticks` instead.

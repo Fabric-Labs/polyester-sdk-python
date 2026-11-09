@@ -377,8 +377,11 @@ def create_trigger_to_proto(
                     max_slippage_ticks, "max_slippage_ticks"
                 )
             elif max_slippage_bps is not None:
+                # A slice that sells takes at most 9999 bps.
                 twap.market_ioc.max_slippage_bps = validate_bps(
-                    max_slippage_bps, "max_slippage_bps"
+                    max_slippage_bps,
+                    "max_slippage_bps",
+                    max_value=max_slippage_bps_for_side(side_key),
                 )
             else:
                 twap.market_ioc.SetInParent()

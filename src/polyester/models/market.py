@@ -81,6 +81,24 @@ class MarketOverviewEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
     volume_24h_usd_scaled: str | None = None
     sparklines: list[MarketOverviewSparkline] = []
     """Sparklines the server sent, only when ``include_sparklines`` was requested."""
+    high_24h: Price | None = None
+    """Highest trade price over the last 24 hours; ``None`` when the server sent none."""
+    low_24h: Price | None = None
+    """Lowest trade price over the last 24 hours; ``None`` when the server sent none."""
+    best_bid: Price | None = None
+    """Best bid price; ``None`` when the bid side of the book is empty."""
+    best_bid_qty: Quantity | None = None
+    """Base quantity at the best bid, at the pair's base quantity scale when the
+    catalogs know it; ``None`` when the bid side is empty."""
+    best_ask: Price | None = None
+    """Best ask price; ``None`` when the ask side of the book is empty."""
+    best_ask_qty: Quantity | None = None
+    """Base quantity at the best ask, at the pair's base quantity scale when the
+    catalogs know it; ``None`` when the ask side is empty."""
+    last_trade_ts_ns: str = ""
+    """Time of the last trade, in epoch nanoseconds; empty when there was none."""
+    listed_ts_ns: str = ""
+    """Time the market was listed, in epoch nanoseconds; empty when unknown."""
 
 
 class MarketOverviewList(msgspec.Struct, kw_only=True, omit_defaults=True):

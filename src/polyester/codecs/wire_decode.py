@@ -9,6 +9,7 @@ from polyester.codecs.decode.invariants import (
 from polyester.codecs.decode.lifecycle import lifecycle_reason_from_code
 from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.chain.zipper.v1 import reason_pb2
 from polyester.models.market import (
     Candle,
@@ -305,13 +306,39 @@ def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int) -> list
 
 
 def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
-    from polyester.types.money import Price
+    from polyester.types.money import Price, Quantity
 
     ticks = _field(data, "lastPriceTicks", "last_price_ticks", default=0) or 0
     index_ticks = _field(data, "indexPriceTicks", "index_price_ticks", default=0) or 0
     symbol = str(_field(data, "symbol", default="") or "")
+    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
+
+    def price(*keys: str) -> Price | None:
+        value = int(_field(data, *keys, default=0) or 0)
+        return Price.from_ticks(value, symbol=symbol or None) if value else None
+
+    def book_side(side: str) -> tuple[Price | None, Quantity | None]:
+        # An empty side sends neither its price nor its quantity.
+        best = price(f"best{side.title()}Ticks", f"best_{side}_ticks")
+        if best is None:
+            return None, None
+        scaled = _field(data, f"best{side.title()}QtyScaled", f"best_{side}_qty_scaled", default=0)
+        return best, Quantity.from_scaled(
+            int(scaled or 0), symbol=symbol or None, symbol_id=symbol_id
+        )
+
+    def ts_ns(*keys: str) -> str:
+        return ts_ns_string_from_response(
+            _field(data, *keys, default=0) or 0,
+            context="MarketOverview",
+            field_name=keys[-1],
+            empty_when_zero=True,
+        )
+
+    best_bid, best_bid_qty = book_side("bid")
+    best_ask, best_ask_qty = book_side("ask")
     return MarketOverviewEntry(
-        symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
+        symbol_id=symbol_id,
         symbol=symbol,
         last_price=Price.from_ticks(int(ticks), symbol=symbol or None) if int(ticks) else None,
         index_price=Price.from_ticks(int(index_ticks), symbol=symbol or None)
@@ -337,6 +364,14 @@ def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
             for item in _field(data, "sparklines", default=[]) or []
             if isinstance(item, dict)
         ],
+        high_24h=price("high24hTicks", "high_24h_ticks"),
+        low_24h=price("low24hTicks", "low_24h_ticks"),
+        best_bid=best_bid,
+        best_bid_qty=best_bid_qty,
+        best_ask=best_ask,
+        best_ask_qty=best_ask_qty,
+        last_trade_ts_ns=ts_ns("lastTradeTsNs", "last_trade_ts_ns"),
+        listed_ts_ns=ts_ns("listedTsNs", "listed_ts_ns"),
     )
 
 
@@ -839,18 +874,60 @@ def decode_transfer_destinations(data: dict[str, Any]) -> TransferDestinationsLi
     return TransferDestinationsList(destinations=destinations)
 
 
+def _batch_replace_item_error(item: dict[str, Any]) -> Any:
+    """The item's ``ErrorDetail``, parsed as protobuf so its field violations
+    and rate-limit detail decode as on the protobuf path."""
+    from google.protobuf.json_format import ParseDict, ParseError
+
+    from polyester.gen.orders.v1 import orders_pb2
+
+    detail = orders_pb2.ErrorDetail()
+    raw = _field(item, "error")
+    if isinstance(raw, dict):
+        try:
+            ParseDict(raw, detail, ignore_unknown_fields=True)
+        except ParseError as exc:
+            raise PolyesterResponseContractError(
+                "BatchReplaceOrders", f"item error detail is not valid: {exc}"
+            ) from exc
+    return detail
+
+
+def _batch_replace_action_taken(item: dict[str, Any]) -> str:
+    from polyester.codecs.proto_helpers import proto_enum_name
+    from polyester.gen.orders.v1 import orders_pb2
+
+    raw = _field(item, "actionTaken", "action_taken")
+    if isinstance(raw, str) and raw in orders_pb2.ModifyActionTaken.DESCRIPTOR.values_by_name:
+        raw = orders_pb2.ModifyActionTaken.Value(raw)
+    if isinstance(raw, int) and not isinstance(raw, bool):
+        return proto_enum_name(orders_pb2.ModifyActionTaken, raw)
+    return _enum_name(raw)
+
+
+def _decode_batch_replace_item(item: dict[str, Any]) -> BatchReplaceAdmissionItem:
+    from polyester.codecs.decode.orders import _field_violations_from_proto
+    from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
+
+    error = _batch_replace_item_error(item)
+    return BatchReplaceAdmissionItem(
+        item_index=int(_field(item, "itemIndex", "item_index", default=0) or 0),
+        status=_enum_name(_field(item, "status")).lower(),
+        client_order_id=str(_field(item, "clientOrderId", "client_order_id", default="") or ""),
+        old_order_id=_id_str(_field(item, "oldOrderId", "old_order_id")),
+        replacement_order_id=_id_str(_field(item, "replacementOrderId", "replacement_order_id")),
+        code=str(_field(item, "code", default="") or ""),
+        rate_limit=(
+            rate_limit_detail_from_proto(error.rate_limit) if error.HasField("rate_limit") else None
+        ),
+        action_taken=_batch_replace_action_taken(item),
+        violations=_field_violations_from_proto(error),
+    )
+
+
 def decode_batch_replace_result(data: dict[str, Any]) -> BatchReplaceOrdersResult:
     results = [
-        BatchReplaceAdmissionItem(
-            item_index=int(_field(item, "itemIndex", "item_index", default=0) or 0),
-            status=_enum_name(_field(item, "status")).lower(),
-            client_order_id=str(_field(item, "clientOrderId", "client_order_id", default="") or ""),
-            old_order_id=_id_str(_field(item, "oldOrderId", "old_order_id")),
-            replacement_order_id=_id_str(
-                _field(item, "replacementOrderId", "replacement_order_id")
-            ),
-            code=str(_field(item, "code", default="") or ""),
-        )
+        _decode_batch_replace_item(item)
         for item in _field(data, "results", default=[]) or []
         if isinstance(item, dict)
     ]

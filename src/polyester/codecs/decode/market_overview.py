@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.invariants import ts_ns_string_from_response
 from polyester.codecs.proto_helpers import has_field
 from polyester.codecs.scalars import format_qty_scaled
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
@@ -17,7 +18,7 @@ from polyester.models.market import (
     SpotVolumeHistory,
     StablecoinConversionRate,
 )
-from polyester.types.money import Price
+from polyester.types.money import Price, Quantity
 
 
 def _optional_scaled(msg: marketoverview_pb2.MarketOverview, field_name: str) -> str | None:
@@ -38,6 +39,28 @@ def _decoded_base_volume(
     return format_qty_scaled(int(msg.volume_24h_base_scaled), scale)
 
 
+def _price_or_none(ticks: int, symbol: str | None) -> Price | None:
+    """A price the server sent, or ``None`` for 0, which means none."""
+    return Price.from_ticks(int(ticks), symbol=symbol) if ticks else None
+
+
+def _book_side(
+    ticks: int,
+    qty_scaled: int,
+    *,
+    scale: int | None,
+    symbol: str | None,
+    symbol_id: int,
+) -> tuple[Price | None, Quantity | None]:
+    """The best price of one book side and the base quantity at it; both
+    ``None`` when that side is empty."""
+    if not ticks:
+        return None, None
+    return Price.from_ticks(int(ticks), symbol=symbol), Quantity.from_scaled(
+        int(qty_scaled), scale=scale, symbol=symbol, symbol_id=symbol_id
+    )
+
+
 def market_overview_sparkline_from_proto(
     msg: marketoverview_pb2.Sparkline, symbol: str | None = None
 ) -> MarketOverviewSparkline:
@@ -56,6 +79,23 @@ def market_overview_entry_from_proto(
     symbol_id = int(msg.symbol_id)
     symbol = catalogs.symbol_for_symbol_id(symbol_id) if catalogs is not None else None
     symbol = symbol or ""
+    base_scale = (
+        catalogs.base_quantity_scale_for_symbol_id(symbol_id) if catalogs is not None else None
+    )
+    best_bid, best_bid_qty = _book_side(
+        msg.best_bid_ticks,
+        msg.best_bid_qty_scaled,
+        scale=base_scale,
+        symbol=symbol or None,
+        symbol_id=symbol_id,
+    )
+    best_ask, best_ask_qty = _book_side(
+        msg.best_ask_ticks,
+        msg.best_ask_qty_scaled,
+        scale=base_scale,
+        symbol=symbol or None,
+        symbol_id=symbol_id,
+    )
     return MarketOverviewEntry(
         symbol_id=symbol_id,
         symbol=symbol,
@@ -73,6 +113,24 @@ def market_overview_entry_from_proto(
         sparklines=[
             market_overview_sparkline_from_proto(item, symbol or None) for item in msg.sparklines
         ],
+        high_24h=_price_or_none(msg.high_24h_ticks, symbol or None),
+        low_24h=_price_or_none(msg.low_24h_ticks, symbol or None),
+        best_bid=best_bid,
+        best_bid_qty=best_bid_qty,
+        best_ask=best_ask,
+        best_ask_qty=best_ask_qty,
+        last_trade_ts_ns=ts_ns_string_from_response(
+            msg.last_trade_ts_ns,
+            context="MarketOverview",
+            field_name="last_trade_ts_ns",
+            empty_when_zero=True,
+        ),
+        listed_ts_ns=ts_ns_string_from_response(
+            msg.listed_ts_ns,
+            context="MarketOverview",
+            field_name="listed_ts_ns",
+            empty_when_zero=True,
+        ),
     )
 
 

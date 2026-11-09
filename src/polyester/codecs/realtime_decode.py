@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
 
+import msgspec
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.balances import asset_balance_from_proto
@@ -192,12 +194,16 @@ def decode_account_identity_bytes(payload: bytes) -> AccountIdentity:
 
 
 def decode_address_book_invalidation_bytes(payload: bytes) -> AddressBookViewInvalidation:
+    from polyester.codecs.decode.address_book import account_scope_from_proto
     from polyester.gen.auth.v1.address_book_pb2 import AddressBookViewInvalidated
 
     msg = _parse_proto(payload, AddressBookViewInvalidated)
-    scope = ""
+    scope = None
     if msg.HasField("scope"):
-        scope = format_id(int(msg.scope.root_account_id)) if msg.scope.root_account_id else ""
+        scope = account_scope_from_proto(msg.scope)
+        if not msg.scope.subaccount_id:
+            # A root scope sends sub-account 0, which is not an ID: name none.
+            scope = msgspec.structs.replace(scope, sub_account_id="")
     invalidated_at = ""
     if msg.HasField("invalidated_at"):
         invalidated_at = msg.invalidated_at.ToJsonString()

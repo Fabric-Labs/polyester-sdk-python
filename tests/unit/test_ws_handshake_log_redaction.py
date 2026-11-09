@@ -42,7 +42,14 @@ async def refusing_server() -> AsyncIterator[tuple[int, list[Headers]]]:
     async def handler(_connection: ServerConnection) -> None:
         return None
 
-    async with serve(handler, "127.0.0.1", 0, process_request=refuse) as server:
+    async with serve(
+        handler,
+        "127.0.0.1",
+        0,
+        process_request=refuse,
+        # The fake server's own request log is not the SDK's.
+        logger=logging.getLogger("tests.fake_ws_server"),
+    ) as server:
         port = server.sockets[0].getsockname()[1]
         yield port, seen
 
@@ -92,3 +99,41 @@ async def test_handshake_debug_log_redacts_basic_auth_from_url_userinfo(
     assert any(line.startswith("> Host: 127.0.0.1") for line in handshake)
     assert "> Authorization: [REDACTED]" in handshake
     assert "< HTTP/1.1 403 Forbidden" in handshake
+
+
+@pytest.mark.parametrize(
+    ("msg", "args", "expected"),
+    [
+        ("> %s: %s", ("Authorization", f"Basic {BASIC}"), "> Authorization: [REDACTED]"),
+        ("> %s: %s", ("authorization", f"Bearer {FAKE_PASSWORD}"), "> authorization: [REDACTED]"),
+        (
+            "> %s: %s",
+            ("Proxy-Authorization", f"Basic {BASIC}"),
+            "> Proxy-Authorization: [REDACTED]",
+        ),
+        (f"> Authorization: Basic {BASIC}", (), "> Authorization: [REDACTED]"),
+        ("> %s: %s", ("Host", "127.0.0.1:1"), "> Host: 127.0.0.1:1"),
+        ("> GET %s HTTP/1.1", ("/ws",), "> GET /ws HTTP/1.1"),
+        ("< HTTP/1.1 %d %s", (403, "Forbidden"), "< HTTP/1.1 403 Forbidden"),
+    ],
+)
+def test_ws_client_logger_redacts_only_credential_headers(
+    msg: str, args: tuple[object, ...], expected: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    from polyester.realtime._ws_log import WS_CLIENT_LOGGER
+
+    with caplog.at_level(logging.DEBUG, logger="websockets.client"):
+        WS_CLIENT_LOGGER.debug(msg, *args, extra={"websocket": "fake-connection"})
+    (record,) = caplog.records
+    assert record.name == "websockets.client"
+    assert record.getMessage() == expected
+    assert record.websocket == "fake-connection"  # type: ignore[attr-defined]
+
+
+def test_ws_client_logger_is_silent_when_debug_is_off(caplog: pytest.LogCaptureFixture) -> None:
+    from polyester.realtime._ws_log import WS_CLIENT_LOGGER
+
+    with caplog.at_level(logging.INFO, logger="websockets.client"):
+        WS_CLIENT_LOGGER.debug("> %s: %s", "Authorization", f"Basic {BASIC}")
+    assert caplog.records == []
+    assert not WS_CLIENT_LOGGER.isEnabledFor(logging.DEBUG)

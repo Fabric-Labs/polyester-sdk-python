@@ -43,6 +43,7 @@ from polyester.models.private_orders import (
     PrivateOrdersStale,
 )
 from polyester.models.trading import Order
+from polyester.realtime._ws_log import WS_CLIENT_LOGGER
 from polyester.realtime._ws_uri import checked_ws_uri
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncSubscription
 
@@ -364,6 +365,7 @@ class PrivateOrderStream:
                         max_size=WS_MAX_MESSAGE_BYTES,
                         ping_interval=None,
                         close_timeout=1,
+                        logger=WS_CLIENT_LOGGER,
                     )
                 except asyncio.CancelledError:
                     raise

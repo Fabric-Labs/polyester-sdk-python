@@ -19,6 +19,7 @@ from polyester.errors import (
     PolyesterRealtimeOverflowError,
     PolyesterSubscriptionEndedError,
 )
+from polyester.realtime._ws_log import WS_CLIENT_LOGGER
 from polyester.realtime._ws_uri import checked_ws_uri
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
 from polyester.realtime.protocol import (
@@ -526,6 +527,7 @@ class AsyncRealtimeClient:
             open_timeout=10,
             max_size=WS_MAX_MESSAGE_BYTES,
             subprotocols=[CENTRIFUGO_PROTOBUF_SUBPROTOCOL],
+            logger=WS_CLIENT_LOGGER,
         ) as ws:
             if ws.subprotocol != CENTRIFUGO_PROTOBUF_SUBPROTOCOL:
                 raise PolyesterRealtimeError(

@@ -864,8 +864,13 @@ await client.triggers.create(
 
 A trailing stop attached to an order that sells buys back, so it requires
 `limit_price` too: the most its exit pays per unit, at least
-`activation_price` when that is set. A trailing stop attached to an order that
-buys takes none. Order reads do not return it yet; keep the value you sent.
+`activation_price` when that is set. When it fires, its child is a limit IOC
+order at `limit_price` (lower when `max_slippage_ticks` or `max_slippage_bps`
+cap it below): it fills what it can at or below the limit, and the rest is
+canceled instead of resting. A trailing stop attached to an order that buys
+takes none and exits with a market child. `orders.get`, `orders.list_open` and
+`orders.list_history` with attached risk, and order stream updates, return it
+as `TrailingStop.limit_price`, `None` when there is none.
 Create, preview and batch create check this before sending and raise
 `PolyesterValidationError` with the server's `code` and `violations` (field
 `order.attached_risk.trailing_stop.limit_price_ticks`): set on a buying order

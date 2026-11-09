@@ -771,7 +771,8 @@ def _trailing_stop_from_dict(
     _reject_unknown_keys(data, _TRAILING_STOP_KEYS, field_name="attached_risk.trailing_stop")
     if _mapping_has(data, "order_type", "orderType"):
         raise PolyesterValidationError(
-            "attached trailing_stop child is always market; order_type cannot be supplied"
+            "attached trailing_stop takes no order_type: its child is a limit IOC at "
+            "limit_price when the order sells, and a market order when it buys"
         )
 
     dist_ticks = _mapping_get(

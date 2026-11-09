@@ -280,7 +280,12 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
 
     ``limit_price`` is the most the exit pays per unit when the trailing stop
     buys back: required when the order sells, unset when it buys, and at least
-    ``activation_price`` when both are set. Order reads do not return it yet.
+    ``activation_price`` when both are set. Order reads return it as the server
+    sends it, and ``None`` when it sends none, as for an order that buys. When
+    a trailing stop with a ``limit_price`` fires, its child is a limit IOC order
+    at that price (lower when a slippage cap sets it below): it fills what it
+    can at or below the limit and the rest is canceled, not left resting.
+    Without one the child is a market order.
     """
 
     distance_ticks: int = 0

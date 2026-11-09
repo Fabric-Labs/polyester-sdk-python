@@ -15,8 +15,10 @@ from google.protobuf import json_format
 
 from polyester.codecs.decode.orders import get_order_from_proto, orders_list_from_proto
 from polyester.codecs.decode.private_orders import private_orders_from_proto
+from polyester.codecs.orders import modify_order_to_proto
 from polyester.codecs.proto_helpers import format_uint64_id
 from polyester.gen.orders.v1 import orders_read_pb2
+from polyester.models import OrderId
 from polyester.models.trading import Order, TrailingStop
 
 # 85000 quote units, scaled by 1e9, as GetOrder returns it.
@@ -109,3 +111,17 @@ def test_trailing_stop_without_a_limit_reads_unset(path: str, limit_ticks: int |
     stop = _trailing_stop(_read_paths(_order(7002, "BUY", limit_ticks))[path])
     assert stop.limit_price is None
     assert _unchanged_fields(stop) == _expected_unchanged(7002)
+
+
+def test_trailing_stop_read_back_and_sent_to_modify_keeps_its_limit() -> None:
+    read = _read_paths(_order(7001, "SELL", _LIMIT_TICKS))["get"]
+    assert read.attached_risk is not None
+    proto = modify_order_to_proto(
+        symbol="BTC-USDT",
+        symbol_id=1,
+        key=OrderId(read.order_id),
+        new_attached_risk=read.attached_risk,
+    )
+    trailing = proto.new_attached_risk.trailing_stop
+    assert trailing.limit_price_ticks == _LIMIT_TICKS
+    assert trailing.trailing_distance_bps == 100

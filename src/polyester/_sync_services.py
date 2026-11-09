@@ -148,7 +148,7 @@ class _SyncService:
             return _SyncService(self._loop, attr)
         if inspect.isasyncgenfunction(attr):
             return self._sync_iterator(attr)
-        if inspect.iscoroutinefunction(attr):
+        if asyncio.iscoroutinefunction(attr):
 
             def async_call(*args: Any, **kwargs: Any) -> Any:
                 return run_on_loop(self._loop, lambda: attr(*args, **kwargs))

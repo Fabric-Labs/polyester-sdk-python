@@ -67,8 +67,8 @@ def subscribe_sync(
     loop: asyncio.AbstractEventLoop,
     subscribe: Callable[[], Awaitable[AsyncSubscription[T]]],
     *,
-    on_event: Callable[[T], None],
-    on_error: Callable[[Exception], None] | None = None,
+    on_event: Callable[[T], object],
+    on_error: Callable[[Exception], object] | None = None,
 ) -> SyncSubscription:
     with contextlib.suppress(RuntimeError):
         if asyncio.get_running_loop() is loop:

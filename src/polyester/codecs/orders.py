@@ -376,6 +376,10 @@ def order_intent_from_request(
             raise PolyesterValidationError(
                 "max_slippage_ticks and max_slippage_bps are only valid for market orders"
             )
+        if request.market_client_ref_price is not None:
+            raise PolyesterValidationError(
+                "market_client_ref_price is only valid for market orders"
+            )
         if tif == "gtc":
             intent.limit_gtc.SetInParent()
             if price_ticks is not None:

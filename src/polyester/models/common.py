@@ -108,6 +108,7 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     expires_at: str | None = None
     # Friendly dict, proto-JSON, or AttachedRisk. Encoded in risk_policy_from_dict.
     attached_risk: Any | None = None
+    # Market-order reference price. Rejected on limit orders.
     market_client_ref_price: Any | None = None
     fee_asset: str | None = None
     # Market-IOC execution protection. Set at most one; both omitted keeps

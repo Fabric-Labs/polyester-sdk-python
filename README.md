@@ -827,7 +827,9 @@ for a buy, 1–9999 for a sell), at most one; without one the pair's default
 market slippage applies. A limit child
 takes no cap (its limit price bounds it). Either side may use either child.
 Trigger reads show the cap as `max_slippage` (ticks, as a price delta) or
-`max_slippage_bps`; both unset means the pair default.
+`max_slippage_bps`; both unset means the pair default. A TWAP with
+`order_type="market"` takes the same cap for each slice: `max_slippage_bps`
+1–10000 to buy, 1–9999 to sell.
 
 ```python
 await client.triggers.create(

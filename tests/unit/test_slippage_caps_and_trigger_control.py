@@ -108,15 +108,14 @@ def test_standalone_trailing_stop_rejects_10000_bps(side: str) -> None:
         _trigger("trailing_stop", side, max_slippage_bps=10_000)
 
 
-def test_twap_market_slices_still_accept_10000_bps() -> None:
-    proto = _trigger(
-        "twap",
-        "sell",
-        twap_duration_ms=60_000,
-        twap_slice_interval_ms=1_000,
-        max_slippage_bps=10_000,
-    )
+def test_twap_market_slices_cap_slippage_by_side() -> None:
+    twap = {"twap_duration_ms": 60_000, "twap_slice_interval_ms": 1_000}
+    proto = _trigger("twap", "buy", max_slippage_bps=10_000, **twap)
     assert proto.trigger.twap.market_ioc.max_slippage_bps == 10_000
+    proto = _trigger("twap", "sell", max_slippage_bps=9_999, **twap)
+    assert proto.trigger.twap.market_ioc.max_slippage_bps == 9_999
+    with pytest.raises(PolyesterValidationError, match=CAP_ERROR):
+        _trigger("twap", "sell", max_slippage_bps=10_000, **twap)
 
 
 def test_buy_trailing_stop_limit_price_must_reach_activation_price() -> None:

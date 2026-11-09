@@ -523,17 +523,18 @@ def cancel_reason_label(raw: int) -> str:
     return name.removeprefix("CANCEL_REASON_")
 
 
+def _field_violations_from_proto(msg: orders_pb2.ErrorDetail) -> list[OrderFieldViolation]:
+    """The field violations of an order error detail, in the order sent."""
+    return [
+        OrderFieldViolation(field_path=item.field_path, rule_id=item.rule_id, message=item.message)
+        for item in msg.violations
+    ]
+
+
 def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDetail:
     return OrderErrorDetail(
         code=_error_code_label(int(msg.code)),
-        violations=[
-            OrderFieldViolation(
-                field_path=item.field_path,
-                rule_id=item.rule_id,
-                message=item.message,
-            )
-            for item in msg.violations
-        ],
+        violations=_field_violations_from_proto(msg),
         rate_limit=(
             rate_limit_detail_from_proto(msg.rate_limit) if msg.HasField("rate_limit") else None
         ),
@@ -704,6 +705,7 @@ def batch_replace_from_proto(
                 else None
             ),
             action_taken=proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken),
+            violations=_field_violations_from_proto(item.error),
         )
         for item in msg.results
     ]
@@ -851,6 +853,7 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             code=code,
             rate_limit=rate_limit,
             existing_order_id=format_uint64_id(existing_order_id) if existing_order_id else "",
+            violations=_field_violations_from_proto(item.rejected.error),
         )
     raise PolyesterResponseContractError(
         "BatchCreateOrders", "batch create response item has neither accepted nor rejected outcome"
@@ -906,6 +909,7 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
                 if item.HasField("error") and item.error.HasField("rate_limit")
                 else None
             ),
+            violations=_field_violations_from_proto(item.error),
         )
         for item in msg.results
     ]

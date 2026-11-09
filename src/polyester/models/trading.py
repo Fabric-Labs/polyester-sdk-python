@@ -823,6 +823,9 @@ class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True
     code: str = ""
     rate_limit: RateLimitDetail | None = None
     action_taken: str = ""
+    # Field violations a rejection names, in the order the server sent them;
+    # empty for an accepted item or a rejection that names no field.
+    violations: list[OrderFieldViolation] = []
 
 
 class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -884,6 +887,9 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     take_profit_trigger_id: str = ""
     stop_loss_trigger_id: str = ""
     trailing_stop_trigger_id: str = ""
+    # Field violations a rejection names, in the order the server sent them;
+    # empty for an accepted item or a rejection that names no field.
+    violations: list[OrderFieldViolation] = []
 
 
 class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -898,6 +904,9 @@ class BatchCancelResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_order_id: str = ""
     code: str = ""
     rate_limit: RateLimitDetail | None = None
+    # Field violations a rejection names, in the order the server sent them;
+    # empty for an accepted item or a rejection that names no field.
+    violations: list[OrderFieldViolation] = []
 
 
 class BatchCancelOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):

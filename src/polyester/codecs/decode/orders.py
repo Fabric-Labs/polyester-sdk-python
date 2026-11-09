@@ -188,6 +188,7 @@ def _trailing_stop_from_policy(
         activation_price=(
             _price(policy.activation_price_ticks) if policy.activation_price_ticks else None
         ),
+        limit_price=_price(policy.limit_price_ticks) if policy.limit_price_ticks > 0 else None,
         trigger_price_source=_trigger_price_source_label(policy.trigger_price_source),
         state=state,
     )

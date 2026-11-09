@@ -14,7 +14,7 @@ def test_risk_policy_trailing_stop_requires_positive_distance() -> None:
 
 
 def test_risk_policy_trailing_stop_rejects_order_type() -> None:
-    with pytest.raises(PolyesterValidationError, match="always market"):
+    with pytest.raises(PolyesterValidationError, match="takes no order_type"):
         risk_policy_from_dict(
             {
                 "trailing_stop": {

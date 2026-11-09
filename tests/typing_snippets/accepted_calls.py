@@ -5,8 +5,19 @@
 
 from __future__ import annotations
 
-from polyester import AsyncPolyester
-from polyester.models import CreateOrderParams, CreateOrderRequest, OrderId
+from polyester import AsyncPolyester, Polyester
+from polyester.models import (
+    BalancesList,
+    ChangelogPostSummary,
+    CreateOrderParams,
+    CreateOrderRequest,
+    GetOrderResult,
+    OrderId,
+    OrderMutationResult,
+    OrdersList,
+    PrivateOrdersEvent,
+)
+from polyester.sync_subscribe import SyncSubscription
 
 SUB = 42  # a numeric sub-account ID
 
@@ -100,3 +111,43 @@ async def create_keywords(client: AsyncPolyester) -> None:
         sub_account_id=SUB,
     )
     await client.withdraw.create_api_key_to_funding(asset_id=1, quantity="1", idempotency_key="k")
+
+
+def sync_calls(client: Polyester) -> None:
+    # The sync client has the async signatures, without ``await``.
+    found: GetOrderResult = client.orders.get(key=OrderId(7), sub_account_id=SUB)
+    listed: OrdersList = client.orders.list_open(sub_account_id=SUB, limit=10)
+    balances: BalancesList = client.balances.list(account={"subaccountId": SUB})
+    created: OrderMutationResult = client.orders.create(
+        symbol="BTC-USDT", side="buy", order_type="market", qty="0.01", sub_account_id=SUB
+    )
+    client.orders.create(order(SUB))
+    client.orders.preview_order(order("2"), account="main")
+    client.triggers.create(
+        symbol="BTC-USDT", trigger_type="stop_loss", side="sell", qty="0.01", trigger_price="100"
+    )
+    client.withdraw.create_api_key_to_funding(asset_id=1, quantity="1", idempotency_key="k")
+    posts: list[ChangelogPostSummary] = list(client.changelog.iter_posts(limit=5))
+    keypair_hex: str = client.api_keys.generate_keypair().public_key_hex
+    print(found, listed, balances, created, posts, keypair_hex)
+
+
+def sync_subscriptions(client: Polyester) -> None:
+    def on_order(event: PrivateOrdersEvent) -> None:
+        print(event)
+
+    def on_error(exc: Exception) -> None:
+        print(exc)
+
+    orders: SyncSubscription = client.orders.subscribe_sync(on_event=on_order, account_id=SUB)
+    book = client.orderbook.subscribe_sync(on_event=print, symbol="BTC-USDT", depth=10)
+    identity = client.auth.profile.subscribe_sync(on_event=print, on_error=on_error)
+    orders.close()
+    book.set_bucket(None)
+    identity.close()
+
+
+def sync_construction() -> None:
+    with Polyester(default_sub_account_id=SUB, timeout=5.0, hydrate_catalogs=False) as client:
+        client.vip.list_vip_tiers()
+    Polyester(default_sub_account_id="2", wire_format="json").close()

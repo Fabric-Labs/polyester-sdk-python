@@ -53,6 +53,7 @@ from polyester.services import (
     AsyncWithdrawService,
     AsyncZipperService,
 )
+from polyester.services._scope import default_sub_account_scope
 from polyester.sync_subscribe import (
     SyncSubscription,
 )
@@ -105,14 +106,19 @@ class AsyncPolyester:
         api_private_key: str | bytes | None = None,
         api_url: str | None = None,
         ws_url: str | None = None,
-        default_sub_account_id: str | None = None,
+        default_sub_account_id: str | int | None = None,
         default_account_id: str | int | None = None,
         timeout: float = 10.0,
         wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
         recv_window_ms: int | None = None,
     ) -> None:
-        """``recv_window_ms`` is the receive window of every signed API request,
+        """``default_sub_account_id`` scopes every call that takes a sub-account
+        and names none: a public ID string, or the numeric ID as an ``int``. An
+        empty string or ``None`` means the main account. 0, ``False`` and any
+        other type raise :class:`PolyesterValidationError` here.
+
+        ``recv_window_ms`` is the receive window of every signed API request,
         sent as the signed ``X-API-RECV-WINDOW`` header: the server processes a
         request only until its signing timestamp plus that many milliseconds,
         and refuses it after that, having changed nothing, as the retryable
@@ -122,6 +128,7 @@ class AsyncPolyester:
         default, sends no header, and the server applies 10000. Realtime token
         requests always use the default.
         """
+        default_sub_account_id = default_sub_account_scope(default_sub_account_id)
         resolved = parse_polyester_environment(environment or POLYESTER_DEVNET_ENVIRONMENT)
         self.environment = resolved
         self.api_url = api_url if api_url is not None else resolved.api_url

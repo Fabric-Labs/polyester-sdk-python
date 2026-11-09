@@ -30,6 +30,24 @@ def _public_id(value: str | int, label: str) -> str:
     return value
 
 
+def default_sub_account_scope(value: str | int | None) -> str | None:
+    """Check a client's ``default_sub_account_id`` and return it as a string.
+
+    A string is kept as given; an empty one means no default. An ``int`` is the
+    numeric ID, as its canonical public string. 0, which the wire reads as the
+    main account, and any other type, ``bool`` included, are refused, so a
+    falsy default can't silently address the main account.
+    """
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return _public_id(value, "default_sub_account_id")
+    raise PolyesterValidationError(
+        "default_sub_account_id must be a sub-account ID as a str or int, "
+        f"not {type(value).__name__}"
+    )
+
+
 def resolve_sub_account_id(value: str | None, default: str | None) -> str | None:
     if value == "":
         return None

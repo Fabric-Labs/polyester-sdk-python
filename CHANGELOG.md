@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `AsyncOrdersService.create`, `AsyncOrdersService.preview_order` and `AsyncOrdersService.batch_create` (on `AsyncPolyester.orders` and `Polyester.orders`) refuse a limit order with `market_client_ref_price` set with `PolyesterValidationError` (`market_client_ref_price is only valid for market orders`), before anything is sent, as they already refuse `max_slippage_ticks` and `max_slippage_bps` on a limit order. The public contract carries the reference price on market orders only. On a limit order the SDK accepted it, then dropped it, so the order was created without it and read back with `market_client_ref_price` `None`. `polyester.codecs.orders.order_intent_from_request`, `create_order_to_proto`, `preview_order_to_proto` and `batch_create_orders_to_proto` apply the same rule. Migration: remove `market_client_ref_price` from limit orders; it never had an effect on them.
+
 ## 0.15.1
 
 Git tag: `v0.15.1`. Released 2026-11-09. Built on public contract `c8d9827`.

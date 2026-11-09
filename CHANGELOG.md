@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.15.1
+
+Git tag: `v0.15.1`. Released 2026-11-09. Built on public contract `c8d9827`.
 
 - Order reads now return an attached trailing stop's buy-back limit as `TrailingStop.limit_price`: the maximum price of a trailing stop on an order that sells, the most its exit pays per unit, exactly as the server returns it. It was always `None` on a read, though the server returned it, so a trailing stop read back without its cap and only `triggers.get` showed it. It stays `None` when the server sends none, as for the trailing stop of an order that buys. A `TrailingStop` read from an order and passed back to `orders.modify` now keeps its limit. Affected: `orders.get`, `orders.list_open` and `orders.list_history` with attached risk, and `orders.subscribe`, on `AsyncPolyester` and `Polyester`, and `polyester.codecs.decode.orders.order_from_proto`, `get_order_from_proto` and `orders_list_from_proto`, and `polyester.codecs.decode.private_orders.private_orders_from_proto`.
 - The `TrailingStop` docstring and the README's attached trailing stop section now say what the trailing stop sends when it fires: with a buy-back `limit_price`, a limit IOC child at that price, which fills what it can at or below the limit and cancels the rest instead of resting; without one, a market child. The `PolyesterValidationError` for an `order_type` under `attached_risk.trailing_stop` said the child is always market; it now reads "attached trailing_stop takes no order_type: its child is a limit IOC at limit_price when the order sells, and a market order when it buys". `order_type` there is still refused.

@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** `0.15.1`, pre-1.0: a minor release may include breaking changes (see
+**Status:** `0.16.0`, pre-1.0: a minor release may include breaking changes (see
 [CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
@@ -100,7 +100,7 @@ before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.15.1"
+pip install "polyester-sdk==0.16.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -1389,7 +1389,8 @@ call, returning no handle.
 can close a subscription, the callback's own included, with `close()` or
 `unsubscribe()`: it stops delivery and returns at once, and the stream closes
 after the callback returns. The calls that would have to wait for that loop
-raise `PolyesterError` at once instead of blocking it: every other sync method,
+raise `PolyesterError` at once instead of blocking it: every other sync method
+that runs on the client loop,
 `subscribe_sync` (`PolyesterRealtimeError`) and `Polyester.close()`. Make those
 calls from another thread.
 

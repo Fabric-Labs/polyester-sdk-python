@@ -23,9 +23,11 @@ from werkzeug import Request, Response
 
 from polyester import AsyncPolyester, PolyesterError, PolyesterRedirectError
 from polyester.auth import ApiKeyCredentials
+from polyester.codecs.scalars import format_id
 from polyester.errors import is_retryable_error, mutation_outcome_unknown
 from polyester.gen.auth.v1.auth_connect import AuthServiceClient
 from polyester.gen.auth.v1.auth_pb2 import MeRequest, MeResponse
+from polyester.models.order_key import OrderId
 from polyester.realtime.auth import fetch_connection_token
 from polyester.realtime.private_orders import _is_terminal_token_error
 
@@ -373,3 +375,40 @@ async def test_private_channel_does_not_follow_a_websocket_redirect() -> None:
         assert destination.messages == []
         assert destination.handshakes == 0
         _assert_refusal(raised.value, 307, destination.url, same_origin=False)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("wire_format", ["json", "binary"])
+@pytest.mark.parametrize("status", [307, 308])
+async def test_redirected_mutation_outcome_is_unknown(
+    origins: tuple[HTTPServer, HTTPServer], status: int, wire_format: str
+) -> None:
+    """A redirect proves nothing about whether the origin that answered with it
+    applied the mutation first: the outcome of a refused orders.cancel is
+    unknown, it is not retryable, and the redirect target receives nothing."""
+    redirecting, destination = origins
+    applied: list[str] = []
+
+    def apply_then_redirect(request: Request) -> Response:
+        if request.path == "/orders.v1.OrdersService/CancelOrder" and _signed(request):
+            applied.append(request.path)
+        return Response(status=status, headers={"Location": _base_url(destination) + request.path})
+
+    redirecting.expect_request(_ANY_PATH).respond_with_handler(apply_then_redirect)
+    client = AsyncPolyester(
+        api_url=_base_url(redirecting),
+        api_key_id=_KEY_ID,
+        api_private_key=_disposable_key_hex(),
+        wire_format=wire_format,  # type: ignore[arg-type]
+        hydrate_catalogs=False,
+    )
+    try:
+        with pytest.raises(PolyesterRedirectError) as raised:
+            await client.orders.cancel(key=OrderId(format_id(1)), symbol_id=1)
+    finally:
+        await client.aclose()
+
+    assert applied == ["/orders.v1.OrdersService/CancelOrder"]
+    assert destination.log == []
+    assert mutation_outcome_unknown(raised.value)
+    assert not is_retryable_error(raised.value)

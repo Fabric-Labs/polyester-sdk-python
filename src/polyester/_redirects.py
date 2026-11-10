@@ -4,7 +4,8 @@ A redirect of a request signed with an API key would carry its key ID,
 timestamp and signature to the redirect target, which could replay it within
 its receive window. The signature covers the path, so a same-origin redirect to
 another path could not verify either. Every redirect of a signed request is
-refused with :class:`~polyester.errors.PolyesterRedirectError`.
+refused with :class:`~polyester.errors.PolyesterRedirectError`, and so is one
+whose ``Location`` does not parse, without repeating it.
 """
 
 from __future__ import annotations
@@ -53,7 +54,14 @@ def redirect_refusal(
     """
     if status not in REDIRECT_STATUSES or not location:
         return None
-    shown, target = _origin(urljoin(request_url, location))
+    try:
+        shown, target = _origin(urljoin(request_url, location))
+    except ValueError:
+        # A Location that does not parse, such as one with a port that is not
+        # a number, cannot be followed; the refusal never repeats it.
+        return PolyesterRedirectError(
+            status_code=status, origin="", same_origin=False, malformed=True
+        )
     return PolyesterRedirectError(
         status_code=status, origin=shown, same_origin=target == _origin(request_url)[1]
     )

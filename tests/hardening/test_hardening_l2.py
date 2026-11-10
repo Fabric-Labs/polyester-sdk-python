@@ -354,7 +354,8 @@ async def test_l2_token_http_403_maps_to_auth_not_realtime() -> None:
         assert err.status_code == 403
         assert err.code == "permission_denied"
         assert err.context is not None and "private:auth:transfers:acct:proto" in err.context
-        assert err.endpoint is not None and "/v1/rt/subscribe?channel=" in err.endpoint
+        # The endpoint drops its query; the context names the channel.
+        assert err.endpoint is not None and err.endpoint.endswith("/v1/rt/subscribe")
         text = str(err).lower()
         assert "permission" in text
         assert "http 403" in text

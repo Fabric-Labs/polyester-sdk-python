@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.16.0
+
+Git tag: `v0.16.0`. Released 2026-11-10. Built on public contract `c8d9827`.
 
 - **Breaking:** `AsyncOrdersService.create`, `AsyncOrdersService.preview_order` and `AsyncOrdersService.batch_create` (on `AsyncPolyester.orders` and `Polyester.orders`) refuse a limit order with `market_client_ref_price` set with `PolyesterValidationError` (`market_client_ref_price is only valid for market orders`), before anything is sent, as they already refuse `max_slippage_ticks` and `max_slippage_bps` on a limit order. The public contract carries the reference price on market orders only. On a limit order the SDK accepted it, then dropped it, so the order was created without it and read back with `market_client_ref_price` `None`. `polyester.codecs.orders.order_intent_from_request`, `create_order_to_proto`, `preview_order_to_proto` and `batch_create_orders_to_proto` apply the same rule. Migration: remove `market_client_ref_price` from limit orders; it never had an effect on them.
 - A sync subscription closed from a client callback, its own `on_event` included, now stops delivery and returns at once. `close()` and `unsubscribe()` waited on the client loop that runs the callback, so they blocked every subscription and call on the client for 10 seconds and then raised `TimeoutError`, while events kept arriving. The close finishes on the loop after the callback returns, and no `on_event` starts after `close()` returns; every `close()` from another thread until one has seen it finish, `Polyester.close()` included, waits for it and raises its failure, so the client never stops with a close still running. A `close()` from another thread still waits up to 10 seconds for the stream to close, and closing again does nothing. Affected: `SyncSubscription.close` and `SyncSubscription.unsubscribe`, on the handle every `subscribe*_sync` method of `Polyester` returns.

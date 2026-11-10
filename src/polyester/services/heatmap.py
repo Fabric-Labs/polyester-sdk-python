@@ -21,7 +21,7 @@ from polyester.gen.marketdata.v1.heatmap_pb2 import (
 )
 from polyester.models import ApiData
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
@@ -35,10 +35,12 @@ class AsyncHeatmapService(BaseService):
         catalogs: CatalogManager | None = None,
         *,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
 
     async def get(
         self,
@@ -68,6 +70,8 @@ class AsyncHeatmapService(BaseService):
         the depth requested. A depth below 0 or above 1000 is refused.
         """
         validated_limit = validate_limit(limit)
+        if symbol:
+            await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,
@@ -130,6 +134,8 @@ class AsyncHeatmapService(BaseService):
         any other value is refused before connecting.
         """
         label = heatmap_interval_channel_label(interval)
+        if symbol:
+            await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,

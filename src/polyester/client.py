@@ -52,7 +52,12 @@ from polyester.environment import (
     environment_from_name,
     parse_polyester_environment,
 )
-from polyester.errors import PolyesterError, PolyesterTransportError, PolyesterValidationError
+from polyester.errors import (
+    PolyesterCatalogHydrationError,
+    PolyesterError,
+    PolyesterTransportError,
+    PolyesterValidationError,
+)
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -160,6 +165,8 @@ class AsyncPolyester:
         self.default_sub_account_id = default_sub_account_id
         self.default_account_id = default_account_id
         self.catalogs = CatalogManager()
+        # Services that read the catalogs wait for construction-time hydration.
+        catalog_wait = self._await_catalog_hydration if hydrate_catalogs else None
         credentials = load_api_key_credentials(
             api_key_id=api_key_id,
             api_private_key=api_private_key,
@@ -186,23 +193,26 @@ class AsyncPolyester:
             self._transport,
             self.catalogs,
             realtime=self.realtime,
+            wait_for_catalogs=catalog_wait,
         )
         self.candles = self.market_data
         self.market_overview = AsyncMarketOverviewService(
             self._transport,
             catalogs=self.catalogs,
             realtime=self.realtime,
-            wait_for_catalogs=self.wait_for_catalogs,
+            wait_for_catalogs=catalog_wait,
         )
         self.zipper = AsyncZipperService(
             self._transport,
             catalogs=self.catalogs,
             realtime=self.realtime,
+            wait_for_catalogs=catalog_wait,
         )
         self.heatmap = AsyncHeatmapService(
             self._transport,
             self.catalogs,
             realtime=self.realtime,
+            wait_for_catalogs=catalog_wait,
         )
         self.lifecycle = AsyncLifecycleService(self._transport, realtime=self.realtime)
         self.balances = AsyncBalancesService(
@@ -216,6 +226,7 @@ class AsyncPolyester:
             self._transport,
             catalogs=self.catalogs,
             realtime=self.realtime,
+            wait_for_catalogs=catalog_wait,
         )
         self.triggers = AsyncTriggersService(
             self._transport,
@@ -223,7 +234,7 @@ class AsyncPolyester:
             default_sub_account_id,
             default_account_id=default_account_id,
             realtime=self.realtime,
-            wait_for_catalogs=self.wait_for_catalogs,
+            wait_for_catalogs=catalog_wait,
         )
         self.orders = AsyncOrdersService(
             self._transport,
@@ -231,7 +242,7 @@ class AsyncPolyester:
             default_sub_account_id,
             default_account_id=default_account_id,
             realtime=self.realtime,
-            wait_for_catalogs=self.wait_for_catalogs,
+            wait_for_catalogs=catalog_wait,
             triggers=self.triggers,
         )
         self.trades = AsyncTradesService(
@@ -240,6 +251,7 @@ class AsyncPolyester:
             default_sub_account_id,
             default_account_id=default_account_id,
             realtime=self.realtime,
+            wait_for_catalogs=catalog_wait,
         )
         self.transfers = AsyncTransfersService(
             self._transport,
@@ -251,7 +263,12 @@ class AsyncPolyester:
             self._transport, self.catalogs, default_sub_account_id
         )
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
-        self.fees = AsyncFeeService(self._transport, default_sub_account_id, catalogs=self.catalogs)
+        self.fees = AsyncFeeService(
+            self._transport,
+            default_sub_account_id,
+            catalogs=self.catalogs,
+            wait_for_catalogs=catalog_wait,
+        )
         self.api_keys = AsyncApiKeysService(
             self._transport,
             default_sub_account_id,
@@ -328,17 +345,41 @@ class AsyncPolyester:
         Raises when hydration failed (HTTP errors, empty/malformed catalogs, bad
         scales/ids). Previously returned successfully after a failed best-effort
         attempt — that behavior is removed (POLY-3746).
+
+        Calls that name a market by symbol or need a pair's scales already wait
+        for hydration themselves; call this to learn early whether it failed.
+        Cancelling this call leaves the hydration running.
         """
-        if self._catalog_task is None:
+        task = self._catalog_task
+        if task is None:
             return
-        try:
-            await self._catalog_task
-        except asyncio.CancelledError:
-            if self._catalog_last_error is not None:
-                raise self._catalog_last_error from None
-            raise
+        await _catalog_task_settled(task)
         if self._catalog_last_error is not None:
             raise self._catalog_last_error
+        if task.cancelled():
+            raise asyncio.CancelledError
+
+    async def _await_catalog_hydration(self) -> None:
+        """Wait for construction-time hydration before a service reads the catalogs.
+
+        A failed hydration raises :class:`PolyesterCatalogHydrationError` from
+        the failure, so a call that needs the catalogs names why they are
+        missing rather than refusing the symbol as unknown.
+        """
+        task = self._catalog_task
+        if task is None:
+            return
+        await _catalog_task_settled(task)
+        error = self._catalog_last_error
+        if error is not None:
+            message = str(error)
+            if not message.startswith("catalog hydration failed"):
+                message = f"catalog hydration failed: {message}"
+            raise PolyesterCatalogHydrationError(message) from error
+        if task.cancelled():
+            raise PolyesterCatalogHydrationError(
+                "catalog hydration failed: the client was closed before the catalogs loaded"
+            )
 
     async def __aenter__(self) -> AsyncPolyester:
         return self
@@ -353,6 +394,16 @@ class AsyncPolyester:
                 await self._catalog_task
         await self.realtime.aclose()
         await self._transport.aclose()
+
+
+async def _catalog_task_settled(task: asyncio.Task[None]) -> None:
+    """Return once ``task`` has ended.
+
+    Unlike awaiting the task, a caller cancelled while it waits leaves the
+    shared hydration running for every other call.
+    """
+    if not task.done():
+        await asyncio.wait((task,))
 
 
 class Polyester:

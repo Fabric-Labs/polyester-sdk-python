@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from decimal import Decimal
 
 from polyester.catalogs import CatalogManager
@@ -37,7 +37,7 @@ from polyester.models import (
     TriggersList,
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import (
     subscribe_account_proto,
@@ -62,7 +62,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         *,
         default_account_id: str | int | None = None,
         realtime: AsyncRealtimeClient | None = None,
-        wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
@@ -83,10 +83,6 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             )
             or 0
         )
-
-    async def _ensure_catalogs(self) -> None:
-        if self._wait_for_catalogs is not None:
-            await self._wait_for_catalogs()
 
     async def list(
         self,
@@ -224,12 +220,21 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``PolyesterValidationError`` before sending.
         """
         await self._ensure_catalogs()
+        symbol_id: int | None = None
+        if self._wait_for_catalogs is not None:
+            # The catalogs are loaded: an unknown symbol is refused as unknown,
+            # not for its scale. Without hydration the scale is checked first.
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
+            )
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)
+        if symbol_id is None:
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
+            )
         request = create_trigger_to_proto(
             symbol=symbol,
-            symbol_id=resolve_symbol_id(
-                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
-            ),
+            symbol_id=symbol_id,
             trigger_type=trigger_type,
             trigger_price=trigger_price,
             side=side,

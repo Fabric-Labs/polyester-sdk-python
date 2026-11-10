@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import builtins
 import contextlib
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 import msgspec
 
@@ -34,7 +34,7 @@ from polyester.models.market import (
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import require_realtime, subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_ids
@@ -48,16 +48,12 @@ class AsyncMarketOverviewService(BaseService):
         *,
         catalogs: CatalogManager | None = None,
         realtime: AsyncRealtimeClient | None = None,
-        wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs or CatalogManager()
         self._realtime = realtime
         self._wait_for_catalogs = wait_for_catalogs
-
-    async def _ensure_catalogs(self) -> None:
-        if self._wait_for_catalogs is not None:
-            await self._wait_for_catalogs()
 
     async def list(
         self,
@@ -68,8 +64,8 @@ class AsyncMarketOverviewService(BaseService):
         include_sparklines: bool = False,
     ) -> MarketOverviewList:
         validated_limit = validate_limit(limit)
-        if symbols:
-            await self._ensure_catalogs()
+        # Rows are labelled and scaled from the catalogs; only a symbol filter needs them.
+        await self._ensure_catalogs(required=bool(symbols))
         request = ListMarketOverviewRequest(
             limit=validated_limit,
             page_token=page_token,
@@ -131,6 +127,8 @@ class AsyncMarketOverviewService(BaseService):
             )
         if resolved:
             request.symbol_id.extend(resolved)
+        # Pairs are labelled from the catalogs.
+        await self._ensure_catalogs(required=False)
         return await unary_public_decoded(
             self._transport,
             MarketOverviewServiceClient,
@@ -173,6 +171,8 @@ class AsyncMarketOverviewService(BaseService):
 
     async def subscribe(self) -> AsyncSubscription[MarketOverviewList]:
         """Raw Centrifugo batches (no snapshot merge). Prefer ``create_subscription``."""
+        # Rows are labelled and scaled from the catalogs.
+        await self._ensure_catalogs(required=False)
         return await subscribe_public_proto(
             self._realtime,
             channel="public:spot:market_overview:updates:proto",
@@ -197,8 +197,7 @@ class AsyncMarketOverviewService(BaseService):
         """
         realtime = require_realtime(self._realtime)
         channel = "public:spot:market_overview:updates:proto"
-        if symbols:
-            await self._ensure_catalogs()
+        await self._ensure_catalogs(required=bool(symbols))
         wanted_ids = set(
             resolve_symbol_ids(self._catalogs, symbols, label="market_overview.subscribe symbols")
         )

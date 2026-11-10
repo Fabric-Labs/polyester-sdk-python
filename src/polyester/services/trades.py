@@ -10,7 +10,7 @@ from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import GetUserTradesRequest
 from polyester.models import UserTrade, UserTradesList
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto_batch
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -27,12 +27,14 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         *,
         default_account_id: str | int | None = None,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._default_sub_account_id = default_sub_account_id
         self._default_account_id = default_account_id
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
 
     async def list(
         self,
@@ -63,9 +65,7 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
                 "trades.list order_id and lineage_id are mutually exclusive"
             )
         if through_generation is not None and lineage_id is None:
-            raise PolyesterValidationError(
-                "trades.list through_generation requires lineage_id"
-            )
+            raise PolyesterValidationError("trades.list through_generation requires lineage_id")
         if through_generation is not None:
             if isinstance(through_generation, bool) or not isinstance(through_generation, int):
                 raise PolyesterValidationError(
@@ -85,6 +85,8 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
             request.through_generation = through_generation
         if include_transfers:
             request.include_transfers = True
+        if symbol:
+            await self._ensure_catalogs()
         if after_match_id is not None:
             if not 0 < int(after_match_id) <= UINT64_MAX:
                 raise PolyesterValidationError(

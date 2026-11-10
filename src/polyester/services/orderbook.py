@@ -148,11 +148,13 @@ class AsyncOrderbookService(BaseService):
                 f"symbol_id is required for orderbook subscriptions ({symbol!r})"
             )
 
-        catalog_id = self._catalogs.symbol_id_for_symbol(symbol)
-        if catalog_id is not None and catalog_id != resolved_symbol_id:
-            raise PolyesterValidationError(
-                f"orderbook symbol {symbol!r} does not match symbol_id {resolved_symbol_id}"
-            )
+        # The name and the ID must name one market, as for every other method.
+        resolve_symbol_id(
+            self._catalogs,
+            symbol=symbol,
+            symbol_id=resolved_symbol_id,
+            label="orderbook.create_subscription",
+        )
 
         self._require_quantity_scale(symbol)
         channel = f"public:spot:orderbook:deltas:depth:{stream_depth}:{resolved_symbol_id}:proto"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Unpack, overload
 
 import msgspec
@@ -80,7 +80,7 @@ from polyester.models import (
 )
 from polyester.models.private_orders import PrivateOrdersEvent
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import require_realtime
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resolve_account_id
@@ -115,7 +115,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         *,
         default_account_id: str | int | None = None,
         realtime: AsyncRealtimeClient | None = None,
-        wait_for_catalogs: Callable[[], Awaitable[None]] | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
         triggers: AsyncTriggersService | None = None,
     ) -> None:
         super().__init__(transport)
@@ -125,10 +125,6 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self._realtime = realtime
         self._wait_for_catalogs = wait_for_catalogs
         self._triggers = triggers
-
-    async def _ensure_catalogs(self) -> None:
-        if self._wait_for_catalogs is not None:
-            await self._wait_for_catalogs()
 
     async def list_open(
         self,
@@ -202,6 +198,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if symbol_id is not None:
             request.symbol_id.append(symbol_id)
         elif symbol:
+            await self._ensure_catalogs()
             resolved = resolve_symbol_id(
                 self._catalogs, symbol=symbol, symbol_id=None, label="list_history"
             )
@@ -427,6 +424,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if symbol is not None and symbol_id is not None:
             raise PolyesterValidationError("cancel accepts only one of symbol or symbol_id")
         if symbol is not None:
+            await self._ensure_catalogs()
             symbol_id = resolve_symbol_id(
                 self._catalogs,
                 symbol=symbol,
@@ -465,12 +463,21 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         new_client_order_id: str | None = None,
     ) -> ModifyOrderResult:
         await self._ensure_catalogs()
+        symbol_id: int | None = None
+        if self._wait_for_catalogs is not None:
+            # The catalogs are loaded: an unknown symbol is refused as unknown,
+            # not for its scale. Without hydration the scale is checked first.
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
+            )
         scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
+        if symbol_id is None:
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
+            )
         proto_request = modify_order_to_proto(
             symbol=symbol,
-            symbol_id=resolve_symbol_id(
-                self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
-            ),
+            symbol_id=symbol_id,
             key=key,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,

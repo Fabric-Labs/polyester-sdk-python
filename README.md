@@ -802,11 +802,20 @@ The sync `Polyester` client returns plain iterators:
 
 Invalid status and event-type labels raise `PolyesterValidationError`.
 Connect requests and responses use numeric `symbol_id`. Public methods still
-accept display `symbol` strings and resolve them through the hydrated catalog
-after `wait_for_catalogs()`. Unknown symbols fail closed. Only
-`get_spot_config` returns both `symbol` and `symbol_id`; other Connect
-payloads are ID-only. Display `symbol` on models such as market overview,
-fees, triggers, and policy rules is filled from the catalog when available.
+accept display `symbol` strings and resolve them through the catalogs the
+client loads when it is created. A method that names a market by symbol, or
+needs a pair's scales, waits for that load itself, so you can call it right
+after creating the client; there is no need to call `wait_for_catalogs()`
+first. If the load failed, the method raises `PolyesterCatalogHydrationError`,
+whose `__cause__` is the failure; create a new client to load the catalogs
+again. A symbol the loaded catalogs don't know raises
+`PolyesterValidationError` ("Unknown symbol"). With `hydrate_catalogs=False`
+nothing is loaded and nothing waits: pass `symbol_id`, or hydrate
+`client.catalogs` yourself. Only `get_spot_config` returns both `symbol` and
+`symbol_id`; other Connect payloads are ID-only. Display `symbol` on models
+such as market overview, fees, triggers, and policy rules is filled from the
+catalog when available; those reads wait for a load in progress, and leave
+the label empty when it failed.
 
 Unknown values raise `PolyesterValidationError` (they do not silently return
 an empty list). Response `status` uses the same labels (British spelling

@@ -151,3 +151,22 @@ def sync_construction() -> None:
     with Polyester(default_sub_account_id=SUB, timeout=5.0, hydrate_catalogs=False) as client:
         client.vip.list_vip_tiers()
     Polyester(default_sub_account_id="2", wire_format="json").close()
+
+
+async def service_catalog_wait_callbacks(client: AsyncPolyester) -> None:
+    """A service's ``wait_for_catalogs`` takes a zero-argument coroutine function."""
+    from polyester.services import (
+        AsyncMarketOverviewService,
+        AsyncOrdersService,
+        AsyncTriggersService,
+    )
+
+    async def ready() -> None:
+        return None
+
+    for wait in (client.wait_for_catalogs, ready):
+        AsyncOrdersService(client._transport, client.catalogs, None, wait_for_catalogs=wait)
+        AsyncTriggersService(client._transport, client.catalogs, None, wait_for_catalogs=wait)
+        AsyncMarketOverviewService(
+            client._transport, catalogs=client.catalogs, wait_for_catalogs=wait
+        )

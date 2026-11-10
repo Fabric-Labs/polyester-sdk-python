@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
@@ -23,7 +24,7 @@ from polyester.gen.marketdata.v1.marketdata_pb2 import (
 )
 from polyester.models import Candle, CandlesResult, MarketTradesResult, SpotConfig
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public, unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
@@ -68,10 +69,12 @@ class AsyncMarketDataService(BaseService):
         catalogs: CatalogManager | None = None,
         *,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
 
     async def get_spot_config(self) -> SpotConfig:
         data = await unary_public(
@@ -121,6 +124,8 @@ class AsyncMarketDataService(BaseService):
                     "get_trades after_trade_id cannot be combined with "
                     "start_time, end_time, side or page_token"
                 )
+        # Trades are decoded with the pair's catalog quantity scale.
+        await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,
@@ -184,6 +189,8 @@ class AsyncMarketDataService(BaseService):
         include_reference: bool = False,
         page_token: str = "",
     ) -> CandlesResult:
+        # Candles are decoded with the pair's catalog volume scale.
+        await self._ensure_catalogs()
         request = _build_candles_request(
             self._catalogs,
             symbol=symbol,
@@ -225,6 +232,8 @@ class AsyncMarketDataService(BaseService):
         include_reference: bool = False,
         page_token: str = "",
     ) -> CandlesResult:
+        # Candles are decoded with the pair's catalog volume scale.
+        await self._ensure_catalogs()
         request = _build_candles_request(
             self._catalogs,
             symbol=symbol,
@@ -265,6 +274,17 @@ class AsyncMarketDataService(BaseService):
             raise PolyesterRealtimeError(
                 "Realtime client is not configured on this Polyester instance"
             )
+        return self._subscribe_trades(self._realtime, symbol=symbol, symbol_id=symbol_id)
+
+    async def _subscribe_trades(
+        self,
+        realtime: AsyncRealtimeClient,
+        *,
+        symbol: str | None,
+        symbol_id: int | None,
+    ) -> AsyncSubscription[Any]:
+        # Trades are decoded with the pair's catalog quantity scale.
+        await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,
@@ -274,7 +294,7 @@ class AsyncMarketDataService(BaseService):
         quantity_scale = _quantity_scale_for_symbol_id(
             self._catalogs, resolved_symbol_id, label="subscribe_trades"
         )
-        return self._realtime.subscribe_market_trades(
+        return await realtime.subscribe_market_trades(
             resolved_symbol_id, quantity_scale=quantity_scale
         )
 
@@ -285,6 +305,8 @@ class AsyncMarketDataService(BaseService):
         symbol_id: int | None = None,
         timeframe: str = "1m",
     ) -> AsyncSubscription[Candle]:
+        # Candles are decoded with the pair's catalog volume scale.
+        await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
             self._catalogs,
             symbol=symbol,

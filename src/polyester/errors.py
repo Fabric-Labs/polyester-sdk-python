@@ -154,6 +154,18 @@ class PolyesterTransportError(PolyesterError):
     """Raised for network, timeout, or transport/runtime failures."""
 
 
+class PolyesterCatalogHydrationError(PolyesterError):
+    """Raised by a call that needs the catalogs when the client's catalog hydration failed.
+
+    The client loads the spot and deposit/withdraw catalogs when it is created,
+    and a call that names a market by symbol, or needs a pair's scales, waits
+    for that load. When the load failed, the call raises this error instead of
+    refusing the symbol; ``__cause__`` is the hydration failure, the one
+    :meth:`AsyncPolyester.wait_for_catalogs` raises and ``catalogs_last_error``
+    holds. Create a new client to load the catalogs again.
+    """
+
+
 class PolyesterResponseContractError(PolyesterError):
     """Raised when a successful mutation response violates its wire contract."""
 

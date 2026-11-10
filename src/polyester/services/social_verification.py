@@ -62,6 +62,13 @@ class AsyncSocialVerificationService(BaseService):
         )
 
     async def get(self, *, provider: str) -> ApiData:
+        """Read the account's social verification for ``provider``.
+
+        An API key needs ``READ_SOCIAL_VERIFICATION`` and must be scoped to the
+        main account. It reads the link status only (``provider``, ``method``,
+        ``handle``, ``status``, ``verifiedAt``); the other fields stay empty.
+        ``start`` and ``mark_ready`` still require an interactive session.
+        """
         request = sv_pb2.GetSocialVerificationRequest(
             provider=resolve_proto_enum(
                 sv_pb2, provider, aliases=_PROVIDER_ALIASES, field_name="provider"

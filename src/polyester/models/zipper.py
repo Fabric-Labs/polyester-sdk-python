@@ -43,6 +43,14 @@ class ZipperChainConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
     is_case_sensitive: bool = False
     min_address_length: int = 0
     max_address_length: int = 0
+    # Memo or destination-tag rule for withdrawal destinations on this network:
+    # "required", "optional" or "not_supported"; "" when the server names none,
+    # which does not mean a memo can be omitted; a number this SDK does not
+    # know reads as its decimal string. ``memo_label`` ("Memo", "Destination
+    # tag") and ``memo_format_hint`` are display text, kept as sent.
+    memo_requirement: str = ""
+    memo_label: str = ""
+    memo_format_hint: str = ""
 
 
 class ZipperAssetConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -77,6 +85,14 @@ class ZipperEnrichedAssetChain(msgspec.Struct, kw_only=True, omit_defaults=True)
     is_case_sensitive: bool = False
     min_address_length: int = 0
     max_address_length: int = 0
+    # Memo or destination-tag rule for withdrawal destinations on this network:
+    # "required", "optional" or "not_supported"; "" when the server names none,
+    # which does not mean a memo can be omitted; a number this SDK does not
+    # know reads as its decimal string. ``memo_label`` ("Memo", "Destination
+    # tag") and ``memo_format_hint`` are display text, kept as sent.
+    memo_requirement: str = ""
+    memo_label: str = ""
+    memo_format_hint: str = ""
     zipped_asset_id: int = 0
     is_native_asset: bool = False
     network_fee: str = "0"

@@ -274,7 +274,9 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         """Check one external-chain destination without creating a withdraw.
 
         Use for form feedback before Trading → external submission; create RPCs
-        remain authoritative.
+        remain authoritative. An API key needs ``READ_WITHDRAW_VALIDATION`` on
+        its policy; ``EXTERNAL_WITHDRAW`` alone no longer allows this check.
+        It moves no value, so retrying it is safe.
         """
         if int(destination_chain_id) <= 0:
             raise PolyesterValidationError("destination_chain_id must be non-zero")

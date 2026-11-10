@@ -45,4 +45,5 @@ def internal_transfer_from_proto(
             asset_id=int(msg.asset_id),
         ),
         status=_internal_transfer_status_label(int(msg.status)),
+        flow_id=msg.flow_id,
     )

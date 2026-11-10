@@ -623,6 +623,10 @@ class TransferSide(msgspec.Struct, kw_only=True, omit_defaults=True):
 class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     asset_id: int = 0
     amount: str = "0"
+    # The ``ledger.v1.TransferCode`` number, such as 1074 (SYSTEM_ADJUSTMENT);
+    # 0 when the server names none or a name this SDK does not know. It names
+    # the reason, not the direction: read ``is_debit``. A system adjustment
+    # can credit (account seeding) or debit (a correction) the account.
     transfer_type: int = 0
     account_code: int = 0
     timestamp: int = 0
@@ -656,6 +660,9 @@ class InternalTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``"UNKNOWN(n)"`` for a status this SDK version does not know.
     ``"accepted"`` means the transfer has a durable transfer ID, not that it
     has settled.
+
+    ``flow_id`` is the transfer's lifecycle flow ID, for
+    ``client.lifecycle.get_flow(flow_id=...)``; empty when the response names none.
     """
 
     request_id: str = ""
@@ -664,6 +671,7 @@ class InternalTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     asset_code: str = ""
     quantity: AssetAmount | None = None
     status: str = ""
+    flow_id: str = ""
 
 
 class DepositAddress(msgspec.Struct, kw_only=True, omit_defaults=True):

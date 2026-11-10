@@ -167,10 +167,12 @@ class PolyesterRedirectError(PolyesterError):
     userinfo; ``same_origin`` says whether it is the origin the request was
     sent to.
 
-    Nothing was sent to the redirect target. The configured ``api_url``
-    answered with a redirect instead of a result, so sending the request
-    again gets the same answer: not retryable, and the outcome is known. Set
-    ``api_url`` to the API's own origin.
+    Nothing was sent to the redirect target. A redirect does not prove that
+    the configured ``api_url`` did not apply the request before answering with
+    it, so :func:`mutation_outcome_unknown` is true: read a mutation back
+    before sending it again. Sending it again gets the same redirect, so
+    :func:`is_retryable_error` is false. Set ``api_url`` to the API's own
+    origin.
     """
 
     def __init__(self, *, status_code: int, origin: str, same_origin: bool) -> None:
@@ -637,12 +639,17 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
     True for ambiguous transport and server errors (excluding known admission
     refusals, rate limits and timestamp skew), for any HTTP error with no
     recognised code except a 401 or 403, for a bare 404, for a malformed success
-    response, and for an order or trigger create, cancel, modify or control that
-    was sent but not confirmed in time (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read
-    the order or trigger back before retrying.
+    response, for a refused redirect (:class:`PolyesterRedirectError`: the
+    origin that answered with it may have applied the request), and for an
+    order or trigger create, cancel, modify or control that was sent but not
+    confirmed in time (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or
+    trigger back before retrying.
     """
     return (
-        isinstance(err, (PolyesterResponseContractError, PolyesterRouteNotFoundError))
+        isinstance(
+            err,
+            (PolyesterResponseContractError, PolyesterRouteNotFoundError, PolyesterRedirectError),
+        )
         or _is_outcome_unknown_api_error(err)
         or (
             isinstance(err, (PolyesterTransportError, PolyesterServerError))

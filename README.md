@@ -1621,9 +1621,12 @@ and the signature covers the path, so a same-origin redirect to another path
 could not verify either. The call raises `PolyesterRedirectError`, with the
 redirect status (`status_code`), the origin it pointed at (`origin`, without
 path, query or userinfo), and whether that is the origin the request went to
-(`same_origin`). Nothing was sent to the redirect target, and
-`is_retryable_error(error)` and `mutation_outcome_unknown(error)` are false:
-set `api_url` to the API's own origin.
+(`same_origin`). Nothing was sent to the redirect target, but a redirect
+does not prove that the configured origin did not apply the request before
+answering with it, so `mutation_outcome_unknown(error)` is true: read a
+mutation back before sending it again. `is_retryable_error(error)` is false,
+since sending again gets the same redirect: set `api_url` to the API's own
+origin.
 
 The WebSocket of a private channel, and of the private order stream, sends
 its realtime token once the handshake succeeds, so its handshake never

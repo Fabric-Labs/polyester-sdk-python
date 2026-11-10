@@ -103,7 +103,8 @@ def _assert_refusal(
     assert (err.status_code, err.origin, err.same_origin) == (status, origin, same_origin)
     assert isinstance(err, PolyesterError)
     assert not is_retryable_error(err)
-    assert not mutation_outcome_unknown(err)
+    # The origin that answered with the redirect may have applied the request.
+    assert mutation_outcome_unknown(err)
 
 
 @pytest.mark.asyncio

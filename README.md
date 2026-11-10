@@ -1610,6 +1610,35 @@ See [CHANGELOG.md](CHANGELOG.md).
 Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
 defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
 
+### Redirects of signed requests
+
+The SDK never follows an HTTP redirect of a request signed with an API key:
+Connect calls, the sub-account list read and realtime token requests alike,
+whatever the redirect status and whether it points at another origin or the
+same one. Following it would send the signature, key ID and timestamp to the
+redirect target, which could replay the request within its receive window;
+and the signature covers the path, so a same-origin redirect to another path
+could not verify either. The call raises `PolyesterRedirectError`, with the
+redirect status (`status_code`), the origin it pointed at (`origin`, without
+path, query or userinfo), and whether that is the origin the request went to
+(`same_origin`). Nothing was sent to the redirect target, but a redirect
+does not prove that the configured origin did not apply the request before
+answering with it, so `mutation_outcome_unknown(error)` is true: read a
+mutation back before sending it again. `is_retryable_error(error)` is false,
+since sending again gets the same redirect: set `api_url` to the API's own
+origin.
+
+The WebSocket of a private channel, and of the private order stream, sends
+its realtime token once the handshake succeeds, so its handshake never
+follows a redirect either: the subscription raises `PolyesterRedirectError`
+and does not reconnect. Public channels keep following handshake redirects.
+
+Unsigned public calls carry no credentials and keep following redirects. An
+`httpx.AsyncClient` you pass to `AsyncRealtimeClient(http=...)` keeps its own
+`follow_redirects` setting for everything else; the SDK turns it off for each
+signed token request it sends through it. A custom httpx transport that
+follows redirects by itself is outside that; don't pass one.
+
 Some RPCs may return HTTP 404 on devnet. A bare 404 (no JSON body, or a router's
 own "not found" message) raises `PolyesterRouteNotFoundError` with a clearer message
 than `[unimplemented]: Not Found`. Connect `unimplemented` and a contract code at

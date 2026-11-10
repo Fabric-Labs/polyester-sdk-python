@@ -52,6 +52,7 @@ from polyester.transport import (
     AMBIGUOUS_CONNECT_CODES,
     ROUTE_NOT_FOUND_MESSAGES,
     GatewayProblemError,
+    SignedRedirectRefused,
 )
 from polyester.user_agent import cloudflare_1010_message, is_cloudflare_browser_ban
 
@@ -275,6 +276,8 @@ def _auth_status(exc: ConnectError) -> int | None:
 
 
 def _map_connect_error(exc: ConnectError):
+    if isinstance(exc, SignedRedirectRefused):
+        return exc.refusal
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
             status_code=401 if exc.code.value == "unauthenticated" else None

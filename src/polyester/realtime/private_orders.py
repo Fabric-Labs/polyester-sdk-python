@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
-from websockets.asyncio.client import ClientConnection, connect
+from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
 from polyester.codecs.decode.private_orders import (
@@ -29,6 +29,7 @@ from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
     PolyesterRealtimeOverflowError,
+    PolyesterRedirectError,
     PolyesterValidationError,
 )
 from polyester.gen.orders.v1.orders_read_pb2 import Order as OrderPb
@@ -44,7 +45,7 @@ from polyester.models.private_orders import (
 )
 from polyester.models.trading import Order
 from polyester.realtime._ws_log import WS_CLIENT_LOGGER
-from polyester.realtime._ws_uri import checked_ws_uri
+from polyester.realtime._ws_uri import checked_ws_uri, connect_without_redirects
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncSubscription
 
 PRIVATE_WS_PATH = "/v1/ws/private"
@@ -83,8 +84,9 @@ def _backoff_delay(attempt: int) -> float:
 
 
 def _is_terminal_token_error(exc: BaseException) -> bool:
-    """A refused token stays refused; other failures (timeouts, 5xx) are retried."""
-    return isinstance(exc, (PolyesterAuthError, PolyesterValidationError))
+    """A refused token stays refused, and so does a redirect of its request;
+    other failures (timeouts, 5xx) are retried."""
+    return isinstance(exc, (PolyesterAuthError, PolyesterRedirectError, PolyesterValidationError))
 
 
 def _request_error_code(code: int) -> str:
@@ -358,7 +360,7 @@ class PrivateOrderStream:
                 if not self._owns_connection():
                     return
                 try:
-                    ws = await connect(
+                    ws = await connect_without_redirects(
                         checked_ws_uri(self._url),
                         subprotocols=[PRIVATE_WS_SUBPROTOCOL],
                         open_timeout=OPEN_TIMEOUT,
@@ -369,6 +371,10 @@ class PrivateOrderStream:
                     )
                 except asyncio.CancelledError:
                     raise
+                except PolyesterRedirectError as exc:
+                    # Following it would send the token to the redirect target.
+                    self._fail_all("connection", exc, terminal=True)
+                    return
                 except Exception as exc:
                     error = PolyesterRealtimeError(f"private WebSocket connection failed: {exc}")
                     self._fail_all("connection", error, terminal=False)

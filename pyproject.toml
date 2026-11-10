@@ -31,7 +31,7 @@ dependencies = [
   "httpx>=0.27",
   "msgspec>=0.18",
   "protobuf>=7.35.0",
-  "pyqwest>=0.5.1",
+  "pyqwest>=0.9.0",
   "websockets>=15",
 ]
 

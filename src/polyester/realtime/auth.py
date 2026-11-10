@@ -8,6 +8,7 @@ import httpx
 
 from polyester._problem import decode_http_problem
 from polyester._redact import url_without_userinfo
+from polyester._redirects import redirect_refusal
 from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import (
     TIMESTAMP_SKEW,
@@ -161,12 +162,19 @@ async def signed_get(
     timeout = _client_timeout_seconds(http)
     try:
         async with asyncio.timeout(timeout):
+            # Never follow a redirect, whatever the client's own setting: it
+            # would carry the signed headers to the redirect target.
             stream = (
-                http.stream("GET", target, headers=headers)
+                http.stream("GET", target, headers=headers, follow_redirects=False)
                 if auth is None
-                else http.stream("GET", target, headers=headers, auth=auth)
+                else http.stream("GET", target, headers=headers, auth=auth, follow_redirects=False)
             )
             async with stream as response:
+                refusal = redirect_refusal(
+                    response.status_code, response.headers.get("location"), target
+                )
+                if refusal is not None:
+                    raise refusal
                 try:
                     raw = await _read_limited(response, max_bytes, label=label)
                 except asyncio.CancelledError:

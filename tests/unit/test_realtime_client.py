@@ -134,7 +134,8 @@ async def test_subscribe_proto_private_fetches_tokens_before_subscribe() -> None
             "polyester.realtime.client.fetch_subscription_token",
             AsyncMock(return_value="sub-token"),
         ) as fetch_sub,
-        patch("polyester.realtime.client.websockets.connect", return_value=FakeWS()),
+        # Private channels connect without following handshake redirects.
+        patch("polyester.realtime.client.connect_without_redirects", return_value=FakeWS()),
     ):
         subscription = await client.subscribe_proto(
             "private:spot:trades:acct_test:proto",

@@ -31,9 +31,10 @@ from polyester._contract_codes import (
 )
 from polyester._problem import decode_http_problem
 from polyester._redact import url_without_userinfo
+from polyester._redirects import carries_api_key, redirect_refusal
 from polyester.auth import ApiKeyCredentials, validate_recv_window_ms
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
-from polyester.errors import PolyesterAuthError, PolyesterTransportError
+from polyester.errors import PolyesterAuthError, PolyesterRedirectError, PolyesterTransportError
 from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
 
 WireFormat = Literal["binary", "json"]
@@ -366,25 +367,79 @@ def _raise_problem(
     )
 
 
+class SignedRedirectRefused(ConnectError):
+    """A redirect answering a signed request, as a ``ConnectError``.
+
+    connectrpc passes a ``ConnectError`` from the HTTP client through, so the
+    error mapping turns ``refusal`` into the :class:`PolyesterRedirectError`.
+    """
+
+    def __init__(self, refusal: PolyesterRedirectError) -> None:
+        super().__init__(Code.FAILED_PRECONDITION, str(refusal))
+        self.refusal = refusal
+
+
+_no_redirect_transport: pyqwest.HTTPTransport | None = None
+
+
+def _signed_transport() -> pyqwest.HTTPTransport:
+    """pyqwest's default transport settings, but never following a redirect.
+
+    One per process, as pyqwest's default transport is.
+    """
+    global _no_redirect_transport
+    if _no_redirect_transport is None:
+        _no_redirect_transport = pyqwest.HTTPTransport(
+            tls_include_system_certs=True,
+            connect_timeout=30.0,
+            pool_idle_timeout=90.0,
+            tcp_keepalive_interval=30.0,
+            follow_redirects=False,
+        )
+    return _no_redirect_transport
+
+
 class _ConnectHTTPClient:
     """pyqwest client for generated Connect clients; see ``_raise_for_gateway_rejection``.
 
     It drops URL userinfo before sending. pyqwest never sends it, and its
     connection errors would quote it, password included.
+
+    A request carrying API-key headers goes through ``signed``, a client that
+    never follows a redirect, and a redirect answering it raises
+    :class:`SignedRedirectRefused`. Unsigned requests go through ``inner``,
+    pyqwest's default client, which follows redirects as before.
     """
 
-    def __init__(self, inner: pyqwest.Client | None = None) -> None:
+    def __init__(
+        self, inner: pyqwest.Client | None = None, *, signed: pyqwest.Client | None = None
+    ) -> None:
         self._inner = inner or pyqwest.Client()
+        self._signed = signed or pyqwest.Client(_signed_transport())
 
     async def post(self, url: str, headers=None, content=None, **kwargs) -> pyqwest.FullResponse:
-        response = await self._inner.post(
-            url=url_without_userinfo(url), headers=headers, content=content, **kwargs
-        )
+        target = url_without_userinfo(url)
+        signed = carries_api_key(headers)
+        client = self._signed if signed else self._inner
+        response = await client.post(url=target, headers=headers, content=content, **kwargs)
+        if signed:
+            _refuse_redirect(response, target)
         return _raise_for_gateway_rejection(response)
 
     async def get(self, url: str, headers=None, **kwargs) -> pyqwest.FullResponse:
-        response = await self._inner.get(url=url_without_userinfo(url), headers=headers, **kwargs)
+        target = url_without_userinfo(url)
+        signed = carries_api_key(headers)
+        client = self._signed if signed else self._inner
+        response = await client.get(url=target, headers=headers, **kwargs)
+        if signed:
+            _refuse_redirect(response, target)
         return _raise_for_gateway_rejection(response)
+
+
+def _refuse_redirect(response: pyqwest.FullResponse, url: str) -> None:
+    refusal = redirect_refusal(response.status, response.headers.get("location"), url)
+    if refusal is not None:
+        raise SignedRedirectRefused(refusal)
 
 
 class _CancellationUnaryInterceptor(UnaryInterceptor):

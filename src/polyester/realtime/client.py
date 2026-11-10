@@ -17,10 +17,11 @@ from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
     PolyesterRealtimeOverflowError,
+    PolyesterRedirectError,
     PolyesterSubscriptionEndedError,
 )
 from polyester.realtime._ws_log import WS_CLIENT_LOGGER
-from polyester.realtime._ws_uri import checked_ws_uri
+from polyester.realtime._ws_uri import checked_ws_uri, connect_without_redirects
 from polyester.realtime.auth import fetch_connection_token, fetch_subscription_token
 from polyester.realtime.protocol import (
     Ping,
@@ -443,8 +444,9 @@ class AsyncRealtimeClient:
                                 sub._set_error(ended)
                                 break
                             continue
-                    except PolyesterAuthError as exc:
-                        # Auth failures must be observable; never hide behind reconnect.
+                    except (PolyesterAuthError, PolyesterRedirectError) as exc:
+                        # Auth failures, and a redirect of a signed token
+                        # request, must be observable; never hide behind reconnect.
                         if resume is not None and not resume.ready:
                             sub._set_error(resume.unsubscribed.ended(channel, "token_refused", exc))
                         else:
@@ -522,7 +524,10 @@ class AsyncRealtimeClient:
         on_member_error: Callable[[BaseException], None] | None = None,
         on_renewal_error: Callable[[BaseException], None] | None = None,
     ) -> None:
-        async with websockets.connect(
+        # A private channel sends its tokens once the handshake succeeds: never
+        # follow a handshake redirect for one.
+        connector = connect_without_redirects if is_private_channel(channel) else websockets.connect
+        async with connector(
             checked_ws_uri(self._ws_url),
             open_timeout=10,
             max_size=WS_MAX_MESSAGE_BYTES,

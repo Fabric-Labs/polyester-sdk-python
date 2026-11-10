@@ -19,6 +19,7 @@ from polyester.codecs.scalars import UINT64_MAX, id_to_int
 from polyester.errors import (
     PolyesterAuthError,
     PolyesterRealtimeError,
+    PolyesterRedirectError,
     PolyesterSubscriptionEndedError,
     PolyesterValidationError,
 )
@@ -189,7 +190,7 @@ class SubaccountAccess:
                 raise attempt.unsubscribed.ended(channel, "access_removed")
             try:
                 listed = await self._read()
-            except PolyesterAuthError as exc:
+            except (PolyesterAuthError, PolyesterRedirectError) as exc:
                 raise attempt.unsubscribed.ended(channel, "list_refused", exc) from exc
             except asyncio.CancelledError:
                 raise

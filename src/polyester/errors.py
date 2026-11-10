@@ -154,6 +154,37 @@ class PolyesterTransportError(PolyesterError):
     """Raised for network, timeout, or transport/runtime failures."""
 
 
+class PolyesterRedirectError(PolyesterError):
+    """Raised when a request signed with an API key is answered with an HTTP redirect.
+
+    The SDK never follows such a redirect: the signature, key ID and timestamp
+    would reach the redirect target, which could replay the request within its
+    receive window, and the signature covers the path, so even a same-origin
+    redirect to another path could not verify.
+
+    ``status_code`` is the redirect status, such as 307 or 308. ``origin`` is
+    the scheme, host and port the redirect named, without its path, query or
+    userinfo; ``same_origin`` says whether it is the origin the request was
+    sent to.
+
+    Nothing was sent to the redirect target. The configured ``api_url``
+    answered with a redirect instead of a result, so sending the request
+    again gets the same answer: not retryable, and the outcome is known. Set
+    ``api_url`` to the API's own origin.
+    """
+
+    def __init__(self, *, status_code: int, origin: str, same_origin: bool) -> None:
+        self.status_code = status_code
+        self.origin = origin
+        self.same_origin = same_origin
+        where = "within its origin" if same_origin else "to another origin"
+        super().__init__(
+            f"signed request was redirected (HTTP {status_code}) {where}, {origin}; "
+            "the SDK does not follow redirects of signed requests: "
+            "set api_url to the API's origin"
+        )
+
+
 class PolyesterCatalogHydrationError(PolyesterError):
     """Raised by a call that needs the catalogs when the client's catalog hydration failed.
 

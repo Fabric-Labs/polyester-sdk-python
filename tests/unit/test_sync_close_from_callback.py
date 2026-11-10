@@ -175,6 +175,77 @@ def test_client_close_waits_for_a_close_scheduled_from_a_callback(monkeypatch):
     assert not client._loop_thread.is_alive()
 
 
+def test_every_waiter_drains_a_close_a_callback_scheduled(monkeypatch):
+    """A callback schedules a close whose stream is slow to close. One thread
+    is already waiting in ``close()`` when the client closes from another:
+    the client must still wait for that close, and both callers get its
+    failure, before the loop stops."""
+    failure = RuntimeError("close-failure-proof")
+    released = asyncio.Event()
+    entered = threading.Event()
+
+    class SlowClose(Stream):
+        def __init__(self, events: list[Any]) -> None:
+            super().__init__(events)
+            self.finished = threading.Event()
+
+        async def aclose(self) -> None:
+            entered.set()
+            await released.wait()
+            self.aclose_calls += 1
+            self.finished.set()
+            raise failure
+
+    stream = SlowClose(["first"])
+    _serve(monkeypatch, stream)
+    holder: dict[str, Any] = {}
+    handled = threading.Event()
+
+    def on_event(_: str) -> None:
+        holder["sub"].close()
+        handled.set()
+
+    client = Polyester(hydrate_catalogs=False)
+    holder["sub"] = client.orders.subscribe_sync(on_event=on_event)
+    stream.release(client)
+    assert handled.wait(15), "on_event never ran"
+    assert entered.wait(5), "the scheduled close never reached the stream"
+
+    outcomes: dict[str, object] = {}
+
+    def run(name: str, call) -> threading.Thread:
+        def target() -> None:
+            try:
+                call()
+                outcomes[name] = None
+            except BaseException as error:
+                outcomes[name] = error
+
+        thread = threading.Thread(target=target, daemon=True)
+        thread.start()
+        return thread
+
+    first = run("handle", holder["sub"].close)
+    time.sleep(0.2)  # the first waiter is blocked in close()
+    assert first.is_alive(), "close() from another thread returned before the close finished"
+    shutdown = run("client", client.close)
+    time.sleep(0.2)
+    stopped_early = not shutdown.is_alive()
+    client._loop.call_soon_threadsafe(released.set)
+    first.join(15)
+    shutdown.join(15)
+    # Let a loop stopped too early finish the stranded close so the test ends cleanly.
+    if stopped_early and not client._loop.is_running() and not client._loop.is_closed():
+        client._loop.run_until_complete(asyncio.sleep(0.1))
+    assert not stopped_early, "Polyester.close() stopped the loop with a close still in flight"
+    assert stream.finished.is_set() and stream.aclose_calls == 1
+    assert outcomes["handle"] is failure, outcomes
+    assert outcomes["client"] is failure, outcomes
+    assert not client._loop_thread.is_alive()
+    # Once the failure has been reported, closing again does nothing.
+    holder["sub"].close()
+
+
 def _refused(call) -> list[object]:
     """Run ``call`` from a client callback and return what it did."""
     outcome: list[object] = []

@@ -567,3 +567,43 @@ class GetBrokerStatsResponse(_message.Message):
     PERIODS_FIELD_NUMBER: _ClassVar[int]
     periods: _containers.RepeatedCompositeFieldContainer[BrokerStatsPeriod]
     def __init__(self, periods: _Optional[_Iterable[_Union[BrokerStatsPeriod, _Mapping]]] = ...) -> None: ...
+
+class ListVaultBalancesRequest(_message.Message):
+    __slots__ = ("broker", "vault_account_id", "limit", "page_token")
+    BROKER_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    broker: str
+    vault_account_id: int
+    limit: int
+    page_token: str
+    def __init__(self, broker: _Optional[str] = ..., vault_account_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class VaultAssetBalance(_message.Message):
+    __slots__ = ("asset_id", "amount", "pending_outgoing")
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    PENDING_OUTGOING_FIELD_NUMBER: _ClassVar[int]
+    asset_id: int
+    amount: _quickswap_pb2.TokenAmount
+    pending_outgoing: _quickswap_pb2.TokenAmount
+    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., pending_outgoing: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+
+class VaultBalance(_message.Message):
+    __slots__ = ("vault_account_id", "assets", "as_of")
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ASSETS_FIELD_NUMBER: _ClassVar[int]
+    AS_OF_FIELD_NUMBER: _ClassVar[int]
+    vault_account_id: int
+    assets: _containers.RepeatedCompositeFieldContainer[VaultAssetBalance]
+    as_of: _timestamp_pb2.Timestamp
+    def __init__(self, vault_account_id: _Optional[int] = ..., assets: _Optional[_Iterable[_Union[VaultAssetBalance, _Mapping]]] = ..., as_of: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ListVaultBalancesResponse(_message.Message):
+    __slots__ = ("vaults", "next_page_token")
+    VAULTS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    vaults: _containers.RepeatedCompositeFieldContainer[VaultBalance]
+    next_page_token: str
+    def __init__(self, vaults: _Optional[_Iterable[_Union[VaultBalance, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...

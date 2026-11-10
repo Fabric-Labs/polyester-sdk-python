@@ -33,6 +33,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_SUBACCOUNT_NOT_FOUND: _ClassVar[ErrorCode]
     ERROR_CODE_SUBACCOUNT_INACTIVE: _ClassVar[ErrorCode]
     ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_CLAIM_OUTCOME_UNKNOWN: _ClassVar[ErrorCode]
 
 class ClaimPolicy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -63,6 +64,7 @@ ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED: ErrorCode
 ERROR_CODE_SUBACCOUNT_NOT_FOUND: ErrorCode
 ERROR_CODE_SUBACCOUNT_INACTIVE: ErrorCode
 ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE: ErrorCode
+ERROR_CODE_CLAIM_OUTCOME_UNKNOWN: ErrorCode
 POLICY_UNSPECIFIED: ClaimPolicy
 UTC_DAILY: ClaimPolicy
 CLAIM_UNSPECIFIED: DailyClaimState
@@ -73,10 +75,12 @@ CLAIM_UNAVAILABLE: DailyClaimState
 CLAIM_PAYOUT_DELAYED: DailyClaimState
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code",)
+    __slots__ = ("code", "claim_id")
     CODE_FIELD_NUMBER: _ClassVar[int]
+    CLAIM_ID_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
+    claim_id: str
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., claim_id: _Optional[str] = ...) -> None: ...
 
 class ClaimCampaign(_message.Message):
     __slots__ = ("campaign_id", "name", "description", "claim_policy")

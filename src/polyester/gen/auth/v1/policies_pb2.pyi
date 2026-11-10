@@ -30,6 +30,19 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     READ_AUTO_WITHDRAW: _ClassVar[PolicyAction]
     MANAGE_AUTO_WITHDRAW: _ClassVar[PolicyAction]
     SWAP: _ClassVar[PolicyAction]
+    READ_API_KEYS: _ClassVar[PolicyAction]
+    READ_API_POLICIES: _ClassVar[PolicyAction]
+    READ_SUBACCOUNT_POLICIES: _ClassVar[PolicyAction]
+    READ_SUBACCOUNT_PERMISSIONS: _ClassVar[PolicyAction]
+    READ_VIP_STATUS: _ClassVar[PolicyAction]
+    READ_SOCIAL_VERIFICATION: _ClassVar[PolicyAction]
+    READ_PROFILE: _ClassVar[PolicyAction]
+    READ_ACCOUNT_DIRECTORY: _ClassVar[PolicyAction]
+    READ_WITHDRAW_VALIDATION: _ClassVar[PolicyAction]
+    READ_DAILY_CLAIMS: _ClassVar[PolicyAction]
+    CLAIM_DAILY_REWARD: _ClassVar[PolicyAction]
+    READ_CHECKPOINTS: _ClassVar[PolicyAction]
+    READ_REWARDS: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -42,6 +55,19 @@ MANAGE_ADDRESS_BOOK: PolicyAction
 READ_AUTO_WITHDRAW: PolicyAction
 MANAGE_AUTO_WITHDRAW: PolicyAction
 SWAP: PolicyAction
+READ_API_KEYS: PolicyAction
+READ_API_POLICIES: PolicyAction
+READ_SUBACCOUNT_POLICIES: PolicyAction
+READ_SUBACCOUNT_PERMISSIONS: PolicyAction
+READ_VIP_STATUS: PolicyAction
+READ_SOCIAL_VERIFICATION: PolicyAction
+READ_PROFILE: PolicyAction
+READ_ACCOUNT_DIRECTORY: PolicyAction
+READ_WITHDRAW_VALIDATION: PolicyAction
+READ_DAILY_CLAIMS: PolicyAction
+CLAIM_DAILY_REWARD: PolicyAction
+READ_CHECKPOINTS: PolicyAction
+READ_REWARDS: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()

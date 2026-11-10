@@ -18,6 +18,9 @@ import polyester.gen.transfer.v1.internal_transfer_pb2 as transfer_dot_v1_dot_in
 
 
 class InternalTransferService(Protocol):
+    async def get_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def create_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -27,6 +30,16 @@ class InternalTransferServiceASGIApplication(ConnectASGIApplication[InternalTran
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/transfer.v1.InternalTransferService/GetInternalTransfer": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetInternalTransfer",
+                        service_name="transfer.v1.InternalTransferService",
+                        input=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest,
+                        output=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_internal_transfer,
+                ),
                 "/transfer.v1.InternalTransferService/CreateInternalTransfer": Endpoint.unary(
                     method=MethodInfo(
                         name="CreateInternalTransfer",
@@ -51,6 +64,26 @@ class InternalTransferServiceASGIApplication(ConnectASGIApplication[InternalTran
 
 
 class InternalTransferServiceClient(ConnectClient):
+    async def get_internal_transfer(
+        self,
+        request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetInternalTransfer",
+                service_name="transfer.v1.InternalTransferService",
+                input=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest,
+                output=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def create_internal_transfer(
         self,
         request: transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest,
@@ -76,6 +109,8 @@ class InternalTransferServiceClient(ConnectClient):
 
 
 class InternalTransferServiceSync(Protocol):
+    def get_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -84,6 +119,16 @@ class InternalTransferServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: InternalTransferServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/transfer.v1.InternalTransferService/GetInternalTransfer": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetInternalTransfer",
+                        service_name="transfer.v1.InternalTransferService",
+                        input=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest,
+                        output=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_internal_transfer,
+                ),
                 "/transfer.v1.InternalTransferService/CreateInternalTransfer": EndpointSync.unary(
                     method=MethodInfo(
                         name="CreateInternalTransfer",
@@ -108,6 +153,26 @@ class InternalTransferServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class InternalTransferServiceClientSync(ConnectClientSync):
+    def get_internal_transfer(
+        self,
+        request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetInternalTransfer",
+                service_name="transfer.v1.InternalTransferService",
+                input=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest,
+                output=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     def create_internal_transfer(
         self,
         request: transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest,

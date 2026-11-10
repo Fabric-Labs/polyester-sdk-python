@@ -26,6 +26,13 @@ class TransferCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRADING_WITHDRAW_RESERVE: _ClassVar[TransferCode]
     FUNDING_USER_TRANSFER: _ClassVar[TransferCode]
     TRADING_WITHDRAW_REQUEST_FEE: _ClassVar[TransferCode]
+    TRADING_WITHDRAW_FEE_LEG: _ClassVar[TransferCode]
+    QUICKSWAP_POLYESTER_FEE: _ClassVar[TransferCode]
+    QUICKSWAP_BROKER_FEE: _ClassVar[TransferCode]
+    QUICKSWAP_AFFILIATE_FEE: _ClassVar[TransferCode]
+    FEE_SWEEP: _ClassVar[TransferCode]
+    FEE_REFILL: _ClassVar[TransferCode]
+    SYSTEM_ADJUSTMENT: _ClassVar[TransferCode]
 ACCOUNT_CODE_UNSPECIFIED: AccountCode
 FUNDING: AccountCode
 TRADING: AccountCode
@@ -43,3 +50,10 @@ TRADING_TO_FUNDING: TransferCode
 TRADING_WITHDRAW_RESERVE: TransferCode
 FUNDING_USER_TRANSFER: TransferCode
 TRADING_WITHDRAW_REQUEST_FEE: TransferCode
+TRADING_WITHDRAW_FEE_LEG: TransferCode
+QUICKSWAP_POLYESTER_FEE: TransferCode
+QUICKSWAP_BROKER_FEE: TransferCode
+QUICKSWAP_AFFILIATE_FEE: TransferCode
+FEE_SWEEP: TransferCode
+FEE_REFILL: TransferCode
+SYSTEM_ADJUSTMENT: TransferCode

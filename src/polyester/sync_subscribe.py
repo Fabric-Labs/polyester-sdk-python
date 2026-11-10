@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import threading
 from collections.abc import Awaitable, Callable, Coroutine
 from concurrent.futures import Future
 from concurrent.futures import wait as wait_for_future
 from typing import Any, TypeVar
 
+from polyester._sync_bridge import on_client_loop
 from polyester.errors import PolyesterRealtimeError
 from polyester.realtime.client import AsyncSubscription
 
@@ -14,7 +16,12 @@ T = TypeVar("T")
 
 
 class SyncSubscription:
-    """Thread-safe handle for a sync client realtime subscription."""
+    """Thread-safe handle for a sync client realtime subscription.
+
+    ``close()`` (or ``unsubscribe()``) works from any thread and from a client
+    callback, the subscription's own ``on_event`` included. Delivery stops at
+    once either way: no ``on_event`` starts after ``close()`` returns.
+    """
 
     def __init__(
         self,
@@ -26,7 +33,11 @@ class SyncSubscription:
         self._loop = loop
         self._close_coro = close_coro
         self._holder = holder
-        self._closed = False
+        self._lock = threading.Lock()
+        self._closing: Future[None] | None = None
+        # Set once an off-loop caller has seen the close finish (and so its
+        # failure, if any, reported); until then every off-loop caller waits.
+        self._finished = False
 
     def set_bucket(self, bucket: str | None) -> None:
         """Forward bucket changes to orderbook subscriptions (no-op otherwise)."""
@@ -40,11 +51,35 @@ class SyncSubscription:
         self.close()
 
     def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        future: Future[None] = asyncio.run_coroutine_threadsafe(self._close_coro(), self._loop)
-        future.result(timeout=10)
+        """Stop delivery and close the subscription.
+
+        From another thread, this waits up to 10 s for the close to finish and
+        raises a failure of the subscription or of its close. Every caller
+        that waits while the close is in flight waits for it, the client's
+        own close included, and gets its failure. From a client callback,
+        which runs on the client loop, it schedules the close on the loop and
+        returns at once; the close finishes after the callback returns, and
+        the next ``close()`` from another thread, or :meth:`Polyester.close`,
+        waits for it and raises its failure. Once a caller has seen the close
+        finish, further calls do nothing.
+        """
+        with self._lock:
+            closing = self._closing
+            if closing is None:
+                if self._holder is not None:
+                    # Read by the delivery loop on the client loop before each event.
+                    self._holder["closed"] = True
+                closing = self._closing = asyncio.run_coroutine_threadsafe(
+                    self._close_coro(), self._loop
+                )
+            if on_client_loop(self._loop) or self._finished:
+                return
+        try:
+            closing.result(timeout=10)
+        finally:
+            if closing.done():
+                with self._lock:
+                    self._finished = True
 
 
 def _wait_for_setup(future: Future[None], loop: asyncio.AbstractEventLoop) -> None:
@@ -70,12 +105,11 @@ def subscribe_sync(
     on_event: Callable[[T], object],
     on_error: Callable[[Exception], object] | None = None,
 ) -> SyncSubscription:
-    with contextlib.suppress(RuntimeError):
-        if asyncio.get_running_loop() is loop:
-            # Waiting on the client loop from the client loop can never finish.
-            raise PolyesterRealtimeError("subscribe_sync cannot be called from a client callback")
+    if on_client_loop(loop):
+        # Waiting on the client loop from the client loop can never finish.
+        raise PolyesterRealtimeError("subscribe_sync cannot be called from a client callback")
 
-    holder: dict[str, object | None] = {"sub": None, "task": None}
+    holder: dict[str, object | None] = {"sub": None, "task": None, "closed": False}
 
     async def _consume(sub: AsyncSubscription[T] | None = None) -> None:
         try:
@@ -83,6 +117,10 @@ def subscribe_sync(
                 sub = await subscribe()
             holder["sub"] = sub
             async for event in sub:
+                # A close from a callback returns before the stream stops, and
+                # events can be ready without a suspension point: stop here.
+                if holder["closed"]:
+                    break
                 on_event(event)
         except asyncio.CancelledError:
             raise

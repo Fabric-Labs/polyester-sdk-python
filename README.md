@@ -1385,6 +1385,26 @@ With `on_error`, setup and iteration failures are delivered to it once. Without
 `on_error`, `subscribe_sync` waits for setup and raises a setup failure from the
 call, returning no handle.
 
+`on_event` and `on_error` run on the client's event loop. From a callback you
+can close a subscription, the callback's own included, with `close()` or
+`unsubscribe()`: it stops delivery and returns at once, and the stream closes
+after the callback returns. The calls that would have to wait for that loop
+raise `PolyesterError` at once instead of blocking it: every other sync method,
+`subscribe_sync` (`PolyesterRealtimeError`) and `Polyester.close()`. Make those
+calls from another thread.
+
+```python
+holder = {}
+
+def on_event(trade):
+    print(trade)
+    holder["sub"].close()  # stop after the first trade
+
+holder["sub"] = client.market_data.subscribe_trades_sync(
+    symbol="BTC-USDT", on_event=on_event, on_error=print
+)
+```
+
 ## Testing (contributors)
 
 **CI (no network):**

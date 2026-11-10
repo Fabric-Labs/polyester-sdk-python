@@ -17,7 +17,7 @@ import inspect
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, TypeVar, Unpack, overload
 
-from polyester._sync_bridge import run_on_loop
+from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -147,11 +147,11 @@ class _SyncService:
         if not callable(attr) and type(attr).__name__.endswith("Service"):
             return _SyncService(self._loop, attr)
         if inspect.isasyncgenfunction(attr):
-            return self._sync_iterator(attr)
+            return self._sync_iterator(attr, name)
         if asyncio.iscoroutinefunction(attr):
 
             def async_call(*args: Any, **kwargs: Any) -> Any:
-                return run_on_loop(self._loop, lambda: attr(*args, **kwargs))
+                return run_on_loop(self._loop, lambda: attr(*args, **kwargs), what=f"{name}()")
 
             return async_call
 
@@ -160,7 +160,7 @@ class _SyncService:
             def call(*args: Any, **kwargs: Any) -> Any:
                 result = attr(*args, **kwargs)
                 if asyncio.iscoroutine(result):
-                    return run_on_loop(self._loop, lambda: result)
+                    return run_on_loop(self._loop, lambda: result, what=f"{name}()")
                 return result
 
             return call
@@ -171,9 +171,12 @@ class _SyncService:
         def __getattr__(self, name: str) -> Any:
             return self._forward(name)
 
-    def _sync_iterator(self, attr: Callable[..., AsyncIterator[T]]) -> Callable[..., Iterator[T]]:
+    def _sync_iterator(
+        self, attr: Callable[..., AsyncIterator[T]], name: str
+    ) -> Callable[..., Iterator[T]]:
         """Drive an async generator method on the client loop, one item per
-        step, as a plain iterator. Leaving the loop early closes it."""
+        step, as a plain iterator. Leaving the loop early closes it. Iterating
+        from a client callback is refused before the generator starts."""
 
         async def step(agen: AsyncIterator[T]) -> tuple[bool, T | None]:
             try:
@@ -182,10 +185,11 @@ class _SyncService:
                 return False, None
 
         def iterate(*args: Any, **kwargs: Any) -> Iterator[T]:
+            refuse_on_client_loop(self._loop, f"{name}()")
             agen = attr(*args, **kwargs)
             try:
                 while True:
-                    has_item, item = run_on_loop(self._loop, lambda: step(agen))
+                    has_item, item = run_on_loop(self._loop, lambda: step(agen), what=f"{name}()")
                     if not has_item:
                         return
                     yield item  # type: ignore[misc]

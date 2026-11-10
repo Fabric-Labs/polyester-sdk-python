@@ -6,7 +6,7 @@ import os
 import threading
 from typing import Any, Literal
 
-from polyester._sync_bridge import run_on_loop
+from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
     SyncApiKeysService,
@@ -462,8 +462,15 @@ class Polyester:
         """Close every sync subscription and the client.
 
         A subscription that failed with no ``on_error`` raises its failure here, once
-        everything has shut down.
+        everything has shut down, as does a close a callback scheduled that failed.
+
+        Calling it from a client callback raises
+        :class:`~polyester.errors.PolyesterError` at once and leaves the client
+        open: the callback runs on the client loop, which can't be stopped from
+        inside. Close a subscription from its callback instead, or close the
+        client from another thread.
         """
+        refuse_on_client_loop(self._loop, "Polyester.close()")
         first_failure: Exception | None = None
         for subscription in list(self._active_sync_subscriptions):
             try:

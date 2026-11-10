@@ -1389,7 +1389,8 @@ call, returning no handle.
 can close a subscription, the callback's own included, with `close()` or
 `unsubscribe()`: it stops delivery and returns at once, and the stream closes
 after the callback returns. The calls that would have to wait for that loop
-raise `PolyesterError` at once instead of blocking it: every other sync method,
+raise `PolyesterError` at once instead of blocking it: every other sync method
+that runs on the client loop,
 `subscribe_sync` (`PolyesterRealtimeError`) and `Polyester.close()`. Make those
 calls from another thread.
 

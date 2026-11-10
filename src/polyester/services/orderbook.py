@@ -306,6 +306,12 @@ class AsyncOrderbookService(BaseService):
             last_publication = time.monotonic()
             return [delta]
 
+        def publication_age() -> float:
+            # Read the time before the clock: a sync caller reads this from another
+            # thread, and every recorded time is then earlier than the clock reading.
+            last = last_publication
+            return time.monotonic() - last
+
         stream = AsyncSnapshotThenStreamSubscription(
             realtime=realtime,
             channel=channel,
@@ -329,7 +335,7 @@ class AsyncOrderbookService(BaseService):
             stream=stream,
             set_bucket=set_bucket,
             on_aclose=cancel_recheck,
-            publication_age=lambda: time.monotonic() - last_publication,
+            publication_age=publication_age,
         )
         try:
             await stream.start()

@@ -463,11 +463,18 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         new_client_order_id: str | None = None,
     ) -> ModifyOrderResult:
         await self._ensure_catalogs()
-        # The symbol first: an unknown one is refused as unknown, not for its scale.
-        symbol_id = resolve_symbol_id(
-            self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
-        )
+        symbol_id: int | None = None
+        if self._wait_for_catalogs is not None:
+            # The catalogs are loaded: an unknown symbol is refused as unknown,
+            # not for its scale. Without hydration the scale is checked first.
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
+            )
         scale = resolve_quantity_scale(self._catalogs, symbol, new_qty)
+        if symbol_id is None:
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="orders.modify"
+            )
         proto_request = modify_order_to_proto(
             symbol=symbol,
             symbol_id=symbol_id,

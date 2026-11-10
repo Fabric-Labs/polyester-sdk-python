@@ -461,3 +461,64 @@ def test_sync_client_waits_for_hydration_and_refuses_waits_from_callbacks() -> N
         on_server(harness.__aexit__(None, None, None))
         server_loop.call_soon_threadsafe(server_loop.stop)
         server_thread.join(5)
+
+
+_MISSING_SCALE = (
+    r"quantity scale for 'NOPE-USDT' is unavailable; "
+    r"await client\.wait_for_catalogs\(\) before placing orders"
+)
+
+
+def _scale_first_calls(client: Any) -> list[tuple[str, Callable[[], Any]]]:
+    return [
+        (
+            "orders.modify",
+            lambda: client.orders.modify(key=OrderId(1), symbol="NOPE-USDT", new_qty="1"),
+        ),
+        (
+            "triggers.create",
+            lambda: client.triggers.create(
+                symbol="NOPE-USDT",
+                trigger_type="stop_loss",
+                side="sell",
+                qty="1",
+                trigger_price="0.1",
+            ),
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_hydration_disabled_keeps_missing_scale_refusals() -> None:
+    # Without hydration these check the quantity scale before the symbol, as before.
+    creds = make_test_credentials()
+    client = AsyncPolyester(
+        api_url="http://127.0.0.1:9",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    try:
+        for name, call in _scale_first_calls(client):
+            with pytest.raises(PolyesterValidationError, match=_MISSING_SCALE):
+                await call()
+            assert name
+    finally:
+        await client.aclose()
+
+
+def test_sync_hydration_disabled_keeps_missing_scale_refusals() -> None:
+    creds = make_test_credentials()
+    client = Polyester(
+        api_url="http://127.0.0.1:9",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    try:
+        for name, call in _scale_first_calls(client):
+            with pytest.raises(PolyesterValidationError, match=_MISSING_SCALE):
+                call()
+            assert name
+    finally:
+        client.close()

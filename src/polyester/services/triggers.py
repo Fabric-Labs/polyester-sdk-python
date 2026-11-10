@@ -220,11 +220,18 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``PolyesterValidationError`` before sending.
         """
         await self._ensure_catalogs()
-        # The symbol first: an unknown one is refused as unknown, not for its scale.
-        symbol_id = resolve_symbol_id(
-            self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
-        )
+        symbol_id: int | None = None
+        if self._wait_for_catalogs is not None:
+            # The catalogs are loaded: an unknown symbol is refused as unknown,
+            # not for its scale. Without hydration the scale is checked first.
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
+            )
         scale = resolve_quantity_scale(self._catalogs, symbol, qty)
+        if symbol_id is None:
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create"
+            )
         request = create_trigger_to_proto(
             symbol=symbol,
             symbol_id=symbol_id,

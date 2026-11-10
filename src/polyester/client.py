@@ -359,20 +359,17 @@ class AsyncPolyester:
         if task.cancelled():
             raise asyncio.CancelledError
 
-    async def _await_catalog_hydration(self, *, required: bool = True) -> None:
+    async def _await_catalog_hydration(self) -> None:
         """Wait for construction-time hydration before a service reads the catalogs.
 
-        With ``required``, a failed hydration raises
-        :class:`PolyesterCatalogHydrationError` from the failure, so a call
-        that needs the catalogs names why they are missing rather than
-        refusing the symbol as unknown.
+        A failed hydration raises :class:`PolyesterCatalogHydrationError` from
+        the failure, so a call that needs the catalogs names why they are
+        missing rather than refusing the symbol as unknown.
         """
         task = self._catalog_task
         if task is None:
             return
         await _catalog_task_settled(task)
-        if not required:
-            return
         error = self._catalog_last_error
         if error is not None:
             message = str(error)

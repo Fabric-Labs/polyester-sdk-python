@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import os
 import threading
-from typing import Any, Literal
+import time
+from typing import Any, Literal, NoReturn
 
+from google.protobuf.message import Message
+
+from polyester._catalog_startup import CatalogSource, load_catalog
 from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
@@ -37,6 +42,7 @@ from polyester._sync_services import (
     SyncWithdrawService,
     SyncZipperService,
 )
+from polyester._wire import protobuf_to_public_dict
 from polyester.auth import (
     ACCOUNT_ID_ENV,
     API_KEY_ID_ENV,
@@ -44,6 +50,8 @@ from polyester.auth import (
     load_api_key_credentials,
 )
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.zipper import deposit_withdraw_config_from_proto
+from polyester.codecs.spot_config import spot_config_from_dict
 from polyester.environment import (
     ENV_NAME_ENV,
     ENV_NAME_ENV_ALIAS,
@@ -55,9 +63,12 @@ from polyester.environment import (
 from polyester.errors import (
     PolyesterCatalogHydrationError,
     PolyesterError,
-    PolyesterTransportError,
     PolyesterValidationError,
 )
+from polyester.gen.chain.zipper.v1.zipper_connect import ZipperServiceClient
+from polyester.gen.chain.zipper.v1.zipper_pb2 import GetDepositWithdrawConfigRequest
+from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
+from polyester.gen.marketdata.v1.marketdata_pb2 import GetSpotConfigRequest
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -90,6 +101,25 @@ from polyester.services import (
 from polyester.services._scope import default_sub_account_scope
 from polyester.sync_subscribe import SyncSubscription
 from polyester.transport import TransportConfig, TransportFactory
+
+SPOT_CONFIG = CatalogSource(
+    catalog="spot",
+    name="spot config",
+    operation="marketdata.v1.MarketDataService/GetSpotConfig",
+    client_cls=MarketDataServiceClient,
+    read=lambda client, timeout_ms: client.get_spot_config(
+        GetSpotConfigRequest(), timeout_ms=timeout_ms
+    ),
+)
+FUNDING_CONFIG = CatalogSource(
+    catalog="funding",
+    name="funding config",
+    operation="chain.zipper.v1.ZipperService/GetDepositWithdrawConfig",
+    client_cls=ZipperServiceClient,
+    read=lambda client, timeout_ms: client.get_deposit_withdraw_config(
+        GetDepositWithdrawConfigRequest(), timeout_ms=timeout_ms
+    ),
+)
 
 DEFAULT_API_URL = POLYESTER_DEVNET_ENVIRONMENT.api_url
 DEFAULT_WS_URL = POLYESTER_DEVNET_ENVIRONMENT.websocket_url
@@ -141,6 +171,7 @@ class AsyncPolyester:
         wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
         recv_window_ms: int | None = None,
+        catalog_timeout: float | None = None,
     ) -> None:
         """``default_sub_account_id`` scopes every call that takes a sub-account
         and names none: a public ID string, or the numeric ID as an ``int``. An
@@ -156,7 +187,17 @@ class AsyncPolyester:
         value raises :class:`PolyesterValidationError` here. ``None``, the
         default, sends no header, and the server applies 10000. Realtime token
         requests always use the default.
+
+        ``timeout`` is the deadline of each request, in seconds. With
+        ``hydrate_catalogs`` the client loads the spot config and the funding
+        (deposit/withdraw) config when it is created, each on its own, and
+        reads one again when a connection drops or a read times out: at most
+        3 reads each, with backoff, every retry on a new connection, all
+        within ``catalog_timeout`` seconds of creating the client (by default
+        twice ``timeout``). See :meth:`wait_for_catalogs` and
+        :meth:`wait_for_funding_catalog`.
         """
+        startup_timeout = _catalog_timeout(catalog_timeout, timeout)
         default_sub_account_id = default_sub_account_scope(default_sub_account_id)
         resolved = parse_polyester_environment(environment or POLYESTER_DEVNET_ENVIRONMENT)
         self.environment = resolved
@@ -165,8 +206,11 @@ class AsyncPolyester:
         self.default_sub_account_id = default_sub_account_id
         self.default_account_id = default_account_id
         self.catalogs = CatalogManager()
-        # Services that read the catalogs wait for construction-time hydration.
+        # Services that read the catalogs wait for construction-time hydration:
+        # every one of them for the spot config, the zipper supply stream for
+        # the funding config.
         catalog_wait = self._await_catalog_hydration if hydrate_catalogs else None
+        funding_wait = self._await_funding_hydration if hydrate_catalogs else None
         credentials = load_api_key_credentials(
             api_key_id=api_key_id,
             api_private_key=api_private_key,
@@ -206,7 +250,7 @@ class AsyncPolyester:
             self._transport,
             catalogs=self.catalogs,
             realtime=self.realtime,
-            wait_for_catalogs=catalog_wait,
+            wait_for_catalogs=funding_wait,
         )
         self.heatmap = AsyncHeatmapService(
             self._transport,
@@ -299,12 +343,15 @@ class AsyncPolyester:
         self.changelog = AsyncChangelogService(self._transport)
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
-        self._catalog_last_error: BaseException | None = None
-        self._catalog_task: asyncio.Task[None] | None
+        self._timeout = timeout
+        self._spot_failure: PolyesterCatalogHydrationError | None = None
+        self._funding_failure: PolyesterCatalogHydrationError | None = None
+        self._catalog_task: asyncio.Task[None] | None = None
+        self._funding_task: asyncio.Task[None] | None = None
         if hydrate_catalogs:
-            self._catalog_task = asyncio.create_task(self._hydrate_catalogs())
-        else:
-            self._catalog_task = None
+            deadline = time.monotonic() + startup_timeout
+            self._catalog_task = asyncio.create_task(self._hydrate_spot(deadline))
+            self._funding_task = asyncio.create_task(self._hydrate_funding(deadline))
 
     @classmethod
     def from_env(cls, **overrides) -> AsyncPolyester:
@@ -313,73 +360,94 @@ class AsyncPolyester:
 
     @property
     def catalogs_last_error(self) -> BaseException | None:
-        """Last catalog hydration failure, if any (also raised by ``wait_for_catalogs``)."""
-        return self._catalog_last_error
+        """Why the spot config failed to load, if it did: the ``__cause__`` of the
+        :class:`PolyesterCatalogHydrationError` that :meth:`wait_for_catalogs` raises."""
+        failure = self._spot_failure
+        if failure is None:
+            return None
+        return failure.__cause__ or failure
 
-    async def _hydrate_catalogs(self) -> None:
-        """Hydrate spot + zipper catalogs. Records failure on ``catalogs_last_error``."""
-        try:
-            spot_config = await self.market_data.get_spot_config()
+    async def _hydrate_spot(self, deadline: float) -> None:
+        """Load the spot config; on failure every spot lookup fails closed."""
+
+        def install(response: Message) -> None:
+            spot_config = spot_config_from_dict(protobuf_to_public_dict(response))
             raw = spot_config.raw if hasattr(spot_config, "raw") else spot_config
             if not isinstance(raw, dict):
                 raise PolyesterValidationError("spot catalog response is not an object")
             self.catalogs.hydrate_spot_config(raw)
-            zipper_config = await self.zipper.get_deposit_withdraw_config()
-            self.catalogs.hydrate_zipper_config(zipper_config)
-            self._catalog_last_error = None
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            if not self.catalogs.is_unusable:
-                self.catalogs.mark_unusable(f"catalog hydration failed: {exc}")
-            if isinstance(exc, PolyesterError):
-                self._catalog_last_error = exc
-            else:
-                wrapped = PolyesterTransportError(f"catalog hydration failed: {exc}")
-                wrapped.__cause__ = exc
-                self._catalog_last_error = wrapped
+
+        try:
+            await load_catalog(
+                self._transport,
+                SPOT_CONFIG,
+                install,
+                request_timeout=self._timeout,
+                deadline=deadline,
+            )
+        except PolyesterCatalogHydrationError as exc:
+            self.catalogs.mark_spot_unusable(str(exc))
+            self._spot_failure = exc
+
+    async def _hydrate_funding(self, deadline: float) -> None:
+        """Load the funding config; on failure only funding lookups fail closed."""
+
+        def install(response: Message) -> None:
+            self.catalogs.hydrate_zipper_config(
+                deposit_withdraw_config_from_proto(response)  # type: ignore[arg-type]
+            )
+
+        try:
+            await load_catalog(
+                self._transport,
+                FUNDING_CONFIG,
+                install,
+                request_timeout=self._timeout,
+                deadline=deadline,
+            )
+        except PolyesterCatalogHydrationError as exc:
+            self.catalogs.mark_funding_unusable(str(exc))
+            self._funding_failure = exc
 
     async def wait_for_catalogs(self) -> None:
-        """Await construction-time catalog hydration.
+        """Wait until the spot config, which every spot trading call needs, is ready.
 
-        Raises when hydration failed (HTTP errors, empty/malformed catalogs, bad
-        scales/ids). Previously returned successfully after a failed best-effort
-        attempt — that behavior is removed (POLY-3746).
+        Returns once it has loaded and validated, so spot calls can go on even
+        while the funding config is still loading or failed to: that one has
+        :meth:`wait_for_funding_catalog`. Raises
+        :class:`PolyesterCatalogHydrationError` when the spot config could not be
+        loaded (a read that kept timing out or losing its connection, an error
+        answer, an empty or malformed catalog), naming the operation, the kind
+        of failure and the response reference; its ``__cause__`` is the failure.
+        Calls that name a market then raise it too: they fail closed.
 
         Calls that name a market by symbol or need a pair's scales already wait
-        for hydration themselves; call this to learn early whether it failed.
-        Cancelling this call leaves the hydration running.
+        for the spot config themselves; call this to learn early whether it
+        failed. Cancelling this call leaves the load running.
         """
-        task = self._catalog_task
-        if task is None:
-            return
-        await _catalog_task_settled(task)
-        if self._catalog_last_error is not None:
-            raise self._catalog_last_error
-        if task.cancelled():
-            raise asyncio.CancelledError
+        await self._await_catalog_hydration()
+
+    async def wait_for_funding_catalog(self) -> None:
+        """Wait until the funding (deposit/withdraw) config is ready.
+
+        Raises :class:`PolyesterCatalogHydrationError` naming the funding config
+        when it could not be loaded. Read ``client.catalogs.zipper`` (and the
+        asset lookups that use it) after this returns. Cancelling this call
+        leaves the load running.
+        """
+        await self._await_funding_hydration()
 
     async def _await_catalog_hydration(self) -> None:
-        """Wait for construction-time hydration before a service reads the catalogs.
+        """Wait for the spot config before a service reads the catalogs.
 
-        A failed hydration raises :class:`PolyesterCatalogHydrationError` from
-        the failure, so a call that needs the catalogs names why they are
-        missing rather than refusing the symbol as unknown.
+        A failed load raises :class:`PolyesterCatalogHydrationError`, so a call
+        that needs the catalogs names why they are missing rather than refusing
+        the symbol as unknown.
         """
-        task = self._catalog_task
-        if task is None:
-            return
-        await _catalog_task_settled(task)
-        error = self._catalog_last_error
-        if error is not None:
-            message = str(error)
-            if not message.startswith("catalog hydration failed"):
-                message = f"catalog hydration failed: {message}"
-            raise PolyesterCatalogHydrationError(message) from error
-        if task.cancelled():
-            raise PolyesterCatalogHydrationError(
-                "catalog hydration failed: the client was closed before the catalogs loaded"
-            )
+        await _settled_or_raise(self._catalog_task, lambda: self._spot_failure, "spot config")
+
+    async def _await_funding_hydration(self) -> None:
+        await _settled_or_raise(self._funding_task, lambda: self._funding_failure, "funding config")
 
     async def __aenter__(self) -> AsyncPolyester:
         return self
@@ -388,12 +456,28 @@ class AsyncPolyester:
         await self.aclose()
 
     async def aclose(self) -> None:
-        if self._catalog_task is not None and not self._catalog_task.done():
-            self._catalog_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await self._catalog_task
+        for task in (self._catalog_task, self._funding_task):
+            if task is not None and not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
         await self.realtime.aclose()
         await self._transport.aclose()
+
+
+def _catalog_timeout(catalog_timeout: object, timeout: float) -> float:
+    if catalog_timeout is None:
+        return 2 * timeout
+    if (
+        isinstance(catalog_timeout, bool)
+        or not isinstance(catalog_timeout, int | float)
+        or not math.isfinite(catalog_timeout)
+        or catalog_timeout <= 0
+    ):
+        raise PolyesterValidationError(
+            "catalog_timeout must be a positive, finite number of seconds"
+        )
+    return float(catalog_timeout)
 
 
 async def _catalog_task_settled(task: asyncio.Task[None]) -> None:
@@ -404,6 +488,38 @@ async def _catalog_task_settled(task: asyncio.Task[None]) -> None:
     """
     if not task.done():
         await asyncio.wait((task,))
+
+
+async def _settled_or_raise(
+    task: asyncio.Task[None] | None,
+    failure: Any,
+    name: str,
+) -> None:
+    """Wait for a catalog load and raise a fresh copy of its failure, if any.
+
+    A copy, so each caller gets a traceback of its own, with the same cause.
+    """
+    if task is None:
+        return
+    await _catalog_task_settled(task)
+    error: PolyesterCatalogHydrationError | None = failure()
+    if error is not None:
+        _raise_copy(error)
+    if task.cancelled():
+        raise PolyesterCatalogHydrationError(
+            f"catalog hydration failed: the client was closed before the {name} loaded"
+        )
+
+
+def _raise_copy(error: PolyesterCatalogHydrationError) -> NoReturn:
+    raise PolyesterCatalogHydrationError(
+        str(error),
+        catalog=error.catalog,
+        operation=error.operation,
+        failure=error.failure,
+        attempts=error.attempts,
+        response_ref=error.response_ref,
+    ) from error.__cause__
 
 
 class Polyester:
@@ -425,6 +541,7 @@ class Polyester:
         wire_format: Literal["binary", "json"] = "binary",
         hydrate_catalogs: bool = True,
         recv_window_ms: int | None = None,
+        catalog_timeout: float | None = None,
     ) -> None:
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
@@ -455,6 +572,7 @@ class Polyester:
                 wire_format=wire_format,
                 hydrate_catalogs=hydrate_catalogs,
                 recv_window_ms=recv_window_ms,
+                catalog_timeout=catalog_timeout,
             )
             if hydrate_catalogs:
                 await client.wait_for_catalogs()
@@ -508,6 +626,20 @@ class Polyester:
     def from_env(cls, **overrides) -> Polyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
         return cls(**_apply_from_env(overrides))
+
+    def wait_for_funding_catalog(self) -> None:
+        """Wait until the funding (deposit/withdraw) config is ready.
+
+        The client returns from its constructor once the spot config is ready;
+        the funding config may still be loading. Raises
+        :class:`PolyesterCatalogHydrationError` naming the funding config when
+        it could not be loaded.
+        """
+        run_on_loop(
+            self._loop,
+            self._client.wait_for_funding_catalog,
+            what="Polyester.wait_for_funding_catalog()",
+        )
 
     def close(self) -> None:
         """Close every sync subscription and the client.

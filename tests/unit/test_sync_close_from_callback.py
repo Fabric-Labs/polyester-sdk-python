@@ -38,9 +38,12 @@ class Stream:
     """A subscription that has ``events`` ready at once when released, then
     stays open."""
 
-    def __init__(self, events: list[Any], *, yield_between: bool = False) -> None:
+    def __init__(
+        self, events: list[Any], *, yield_between: bool = False, close_delay: float = 0.0
+    ) -> None:
         self.events = list(events)
         self.yield_between = yield_between
+        self.close_delay = close_delay
         self.aclose_calls = 0
         self.closed = threading.Event()
         self.gate = asyncio.Event()
@@ -57,6 +60,8 @@ class Stream:
         await asyncio.Event().wait()
 
     async def aclose(self) -> None:
+        if self.close_delay:
+            await asyncio.sleep(self.close_delay)
         self.aclose_calls += 1
         self.closed.set()
 
@@ -331,15 +336,19 @@ def test_randomized_close_interleavings_keep_the_close_contract(monkeypatch, see
     Randomized per seed: the number of subscriptions, how many events each has
     ready, whether the stream yields to the loop between events, which event
     triggers a close, which subscription that callback closes, close() or
-    unsubscribe(), an extra close from another thread after a random delay,
-    and whether the test closes each handle or leaves it to the client.
+    unsubscribe(), how long each stream takes to close, an extra close from
+    another thread after a random delay, whether that close is still waiting
+    when the client closes, and whether the test closes each handle or leaves
+    it to the client.
     Replay one schedule with POLYESTER_INTERLEAVING_SEED=<seed>.
     """
     rng = random.Random(seed)
     count = rng.randint(1, 4)
     streams = [
         Stream(
-            [f"s{index}e{n}" for n in range(rng.randint(1, 6))], yield_between=rng.random() < 0.5
+            [f"s{index}e{n}" for n in range(rng.randint(1, 6))],
+            yield_between=rng.random() < 0.5,
+            close_delay=rng.choice([0.0, 0.0, 0.001, 0.01]),
         )
         for index in range(count)
     ]
@@ -397,19 +406,23 @@ def test_randomized_close_interleavings_keep_the_close_contract(monkeypatch, see
             target=lambda: (time.sleep(delay), close_and_record(outside, "close"))
         )
         closer.start()
-        closer.join(15)
-        assert not closer.is_alive(), f"seed {seed}: close from another thread hung"
         if rng.random() < 0.5:
-            for index in range(count):
-                close_and_record(index, "close")
+            closer.join(15)
+            assert not closer.is_alive(), f"seed {seed}: close from another thread hung"
+            if rng.random() < 0.5:
+                for index in range(count):
+                    close_and_record(index, "close")
     finally:
         client.close()
+    closer.join(15)
+    assert not closer.is_alive(), f"seed {seed}: close from another thread hung"
     assert not client._loop_thread.is_alive(), f"seed {seed}: the client did not shut down"
 
     for outcome in in_callback_closes:
         assert not isinstance(outcome, BaseException), f"seed {seed}: {outcome!r}"
         assert outcome < PROMPT_SECONDS, f"seed {seed}: a callback close took {outcome:.3f} s"
     for index, stream in enumerate(streams):
+        # Counted when the close finishes: the client must not stop before it does.
         assert stream.aclose_calls == 1, (
             f"seed {seed}: stream {index} closed {stream.aclose_calls}x"
         )

@@ -35,7 +35,9 @@ class SyncSubscription:
         self._holder = holder
         self._lock = threading.Lock()
         self._closing: Future[None] | None = None
-        self._waited = False
+        # Set once an off-loop caller has seen the close finish (and so its
+        # failure, if any, reported); until then every off-loop caller waits.
+        self._finished = False
 
     def set_bucket(self, bucket: str | None) -> None:
         """Forward bucket changes to orderbook subscriptions (no-op otherwise)."""
@@ -51,13 +53,15 @@ class SyncSubscription:
     def close(self) -> None:
         """Stop delivery and close the subscription.
 
-        From another thread, this waits up to 10 s for the stream to close
-        and raises a failure of the subscription or of its close. From a
-        client callback, which runs on the client loop, it schedules the
-        close on the loop and returns at once; the close finishes after the
-        callback returns, and a later ``close()`` from another thread, or
-        :meth:`Polyester.close`, waits for it and raises its failure. Further
-        calls do nothing.
+        From another thread, this waits up to 10 s for the close to finish and
+        raises a failure of the subscription or of its close. Every caller
+        that waits while the close is in flight waits for it, the client's
+        own close included, and gets its failure. From a client callback,
+        which runs on the client loop, it schedules the close on the loop and
+        returns at once; the close finishes after the callback returns, and
+        the next ``close()`` from another thread, or :meth:`Polyester.close`,
+        waits for it and raises its failure. Once a caller has seen the close
+        finish, further calls do nothing.
         """
         with self._lock:
             closing = self._closing
@@ -68,10 +72,14 @@ class SyncSubscription:
                 closing = self._closing = asyncio.run_coroutine_threadsafe(
                     self._close_coro(), self._loop
                 )
-            if on_client_loop(self._loop) or self._waited:
+            if on_client_loop(self._loop) or self._finished:
                 return
-            self._waited = True
-        closing.result(timeout=10)
+        try:
+            closing.result(timeout=10)
+        finally:
+            if closing.done():
+                with self._lock:
+                    self._finished = True
 
 
 def _wait_for_setup(future: Future[None], loop: asyncio.AbstractEventLoop) -> None:

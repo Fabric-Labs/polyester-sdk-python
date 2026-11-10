@@ -7,7 +7,7 @@ from urllib.parse import quote
 import httpx
 
 from polyester._problem import decode_http_problem
-from polyester._redact import url_without_userinfo
+from polyester._redact import url_for_error, url_without_userinfo
 from polyester._redirects import redirect_refusal
 from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import (
@@ -189,7 +189,7 @@ async def signed_get(
                     raise _auth_http_error(
                         status_code=response.status_code,
                         label=label,
-                        endpoint=url_without_userinfo(url),
+                        endpoint=url_for_error(url),
                         body=raw,
                     )
                 if response.status_code >= 400:

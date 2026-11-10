@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** A signed request answered with a redirect whose `Location` does not parse, such as one with a non-numeric port or an unclosed IPv6 host, raises `PolyesterRedirectError` with the new `malformed` attribute true and an empty `origin`, whose message never repeats the `Location`. It raised `PolyesterServerError` with urllib's parse error ("Port could not be cast to integer value ..."), which `is_retryable_error` reports as retryable, so a retry loop sent the signed request again and got the same redirect; a private WebSocket handshake answered that way raised a bare `ValueError`. As for every refused redirect, `mutation_outcome_unknown` is true and `is_retryable_error` false. No URL credential reached an error before. URLs the SDK names in an error now keep only their scheme, host, port and path: an invalid realtime WebSocket URL raises `InvalidURI` without its query or fragment (an unclosed IPv6 host raised a bare `ValueError`), and `PolyesterAuthError.endpoint` of a refused subscription token request is `.../v1/rt/subscribe` without `?channel=...`, which the message still names. Affected: every method that signs a ConnectRPC request with an API key, such as `auth.me`, `orders.create` and `orders.cancel`; the private order stream and private channel subscriptions, whose WebSocket handshake refuses redirects; the realtime connection and subscription token requests; and `PolyesterRedirectError`. Migration: handle `PolyesterRedirectError` with `malformed` true as any refused redirect, a configuration error: set `api_url` to the API's own origin and read a mutation back before sending it again; read a refused subscription token's channel from the message, not from `endpoint`.
+
 ## 0.19.0
 
 Git tag: `v0.19.0`. Released 2026-11-10. Built on public contract `a3e3784`.

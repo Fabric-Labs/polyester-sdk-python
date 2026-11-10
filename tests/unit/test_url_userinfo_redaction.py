@@ -61,9 +61,7 @@ async def test_token_auth_errors_redact_url_userinfo(
     label = f"{path} HTTP {status} userinfo={userinfo}"
     _assert_no_userinfo(label, err)
     endpoint = (
-        f"https://{HOST}/v1/rt/token"
-        if path == "connection"
-        else f"https://{HOST}/v1/rt/subscribe?channel=orders%3A1"
+        f"https://{HOST}/v1/rt/token" if path == "connection" else f"https://{HOST}/v1/rt/subscribe"
     )
     assert err.status_code == status
     assert err.endpoint == endpoint

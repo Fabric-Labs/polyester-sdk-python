@@ -1626,7 +1626,10 @@ does not prove that the configured origin did not apply the request before
 answering with it, so `mutation_outcome_unknown(error)` is true: read a
 mutation back before sending it again. `is_retryable_error(error)` is false,
 since sending again gets the same redirect: set `api_url` to the API's own
-origin.
+origin. A redirect whose `Location` does not parse raises
+`PolyesterRedirectError` with `malformed` true and an empty `origin`; the error
+never repeats the `Location`, and every URL the SDK names in an error keeps
+only its scheme, host, port and path.
 
 The WebSocket of a private channel, and of the private order stream, sends
 its realtime token once the handshake succeeds, so its handshake never

@@ -173,12 +173,27 @@ class PolyesterRedirectError(PolyesterError):
     before sending it again. Sending it again gets the same redirect, so
     :func:`is_retryable_error` is false. Set ``api_url`` to the API's own
     origin.
+
+    ``malformed`` is true when the redirect's ``Location`` does not parse as a
+    URL; ``origin`` is then empty. Such a redirect cannot be followed, and the
+    error never repeats the ``Location``, which may carry credentials in its
+    userinfo or query.
     """
 
-    def __init__(self, *, status_code: int, origin: str, same_origin: bool) -> None:
+    def __init__(
+        self, *, status_code: int, origin: str, same_origin: bool, malformed: bool = False
+    ) -> None:
         self.status_code = status_code
         self.origin = origin
         self.same_origin = same_origin
+        self.malformed = malformed
+        if malformed:
+            super().__init__(
+                f"signed request was redirected (HTTP {status_code}) to a malformed Location; "
+                "the SDK does not follow redirects of signed requests: "
+                "set api_url to the API's origin"
+            )
+            return
         where = "within its origin" if same_origin else "to another origin"
         super().__init__(
             f"signed request was redirected (HTTP {status_code}) {where}, {origin}; "

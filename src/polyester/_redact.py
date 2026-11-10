@@ -26,6 +26,24 @@ def url_without_userinfo(url: str) -> str:
     return urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
 
 
+def url_for_error(url: str) -> str:
+    """Return ``url`` as an error may name it: scheme, host, port and path.
+
+    Its userinfo, query and fragment are dropped, as any of them can carry a
+    credential. A URL that does not parse, or has an ``@`` but no authority,
+    becomes ``[REDACTED INVALID URL]``.
+    """
+    try:
+        parts = urlsplit(url)
+        parts.port  # noqa: B018 - raises ValueError for a port that is not a number
+    except ValueError:
+        return INVALID_URL
+    if not parts.netloc and "@" in url:
+        return INVALID_URL
+    host = parts.netloc.rpartition("@")[2]
+    return urlunsplit((parts.scheme, host, parts.path, "", ""))
+
+
 # The proxy settings pyqwest (reqwest) and httpx read from the environment.
 _PROXY_ENV = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 _URL_USERINFO = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)[^\s/@]+@")

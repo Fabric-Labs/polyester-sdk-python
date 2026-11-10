@@ -6,7 +6,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import InvalidStatus, InvalidURI
 from websockets.uri import parse_uri
 
-from polyester._redact import url_without_userinfo
+from polyester._redact import url_for_error
 from polyester._redirects import redirect_refusal
 
 
@@ -14,15 +14,19 @@ def checked_ws_uri(url: str) -> str:
     """Return ``url`` when websockets accepts it.
 
     Otherwise raise websockets' ``InvalidURI`` naming the URL without its
-    userinfo: websockets' own error quotes the whole URL, password included.
+    userinfo, query or fragment: websockets' own error quotes the whole URL,
+    password and query included.
     """
     try:
         parse_uri(url)
     except InvalidURI as exc:
         reason = exc.msg
+    except ValueError as exc:
+        # urllib's own refusal, such as an unclosed IPv6 host.
+        reason = str(exc)
     else:
         return url
-    raise InvalidURI(url_without_userinfo(url), reason)
+    raise InvalidURI(url_for_error(url), reason)
 
 
 class connect_without_redirects(connect):  # noqa: N801 - used as websockets' connect

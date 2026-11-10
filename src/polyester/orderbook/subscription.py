@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import AsyncIterator, Callable
 
 from polyester.models import OrderbookData
@@ -19,6 +20,7 @@ class OrderbookSubscription:
         set_bucket: Callable[[str | None], None],
         start_task: asyncio.Task[None] | None = None,
         on_aclose: Callable[[], None] | None = None,
+        publication_age: Callable[[], float] | None = None,
     ) -> None:
         self._queue = queue
         self._close = close
@@ -26,9 +28,25 @@ class OrderbookSubscription:
         self._set_bucket = set_bucket
         self._start_task = start_task
         self._on_aclose = on_aclose
+        started = time.monotonic()
+        self._publication_age = publication_age or (lambda: time.monotonic() - started)
 
     def set_bucket(self, bucket: str | None) -> None:
         self._set_bucket(bucket)
+
+    def since_last_publication(self) -> float:
+        """Seconds since the stream last delivered a publication, or since the start.
+
+        Views from a snapshot or a bucket change don't count. It tells a stalled
+        publisher from a quiet market: the server republishes each book's whole view,
+        as a reset, about every 30 s even when nothing changed (seen on every market and
+        depth of devnet and testnet, though the public contract does not promise a
+        cadence). A quiet market stays well under that, and an age far above it, such
+        as 90 s, means the publisher or the path to it stalled while the socket stayed
+        open. The SDK sets no threshold and takes no action: poll it, and on a stall
+        call ``refresh_snapshot``, or close and subscribe again.
+        """
+        return self._publication_age()
 
     @property
     def last_error(self) -> BaseException | None:

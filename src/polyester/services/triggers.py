@@ -202,6 +202,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``activation_price`` apply only to ``trailing_stop``; TWAP and ladder
         settings apply only to their respective strategies.
 
+        ``trailing_distance_ticks`` is a price delta in 1e-9 quote-unit ticks, the
+        scale of every price tick: on BTC-USDT, 50 USDT is ``50_000_000_000`` and
+        0.5 USDT is ``500_000_000`` (``int(Decimal("0.5").scaleb(9))``). It is not a
+        count of the pair's tick size. ``trailing_distance_bps`` is 1 to 10000.
+
         ``limit_price`` is the child's limit price for a limit stop-loss or
         take-profit. For ``trigger_type="trailing_stop"`` with ``side="buy"`` it
         is the required maximum price, the most the child pays per unit (a
@@ -304,6 +309,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         fixed at creation: cancel the trigger and create a new one to change
         it. ``max_slippage_bps`` is 1 to 9999; ``0`` clears a cap (ticks or
         bps) and a market child falls back to the pair's default slippage.
+        ``trailing_distance_ticks`` is a price delta in 1e-9 quote-unit ticks, as on
+        ``create`` (``500_000_000`` is 0.5 quote units).
         """
         resolved_symbol_id = await self._optional_control_symbol_id(
             symbol=symbol, symbol_id=symbol_id, label="triggers.modify"

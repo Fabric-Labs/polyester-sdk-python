@@ -274,6 +274,9 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
 
     Create/modify dicts must supply a positive ``trailing_distance_ticks`` or
     ``trailing_distance_bps`` (and positive slippage when set).
+    ``distance_ticks`` (``trailing_distance_ticks`` in a dict) is a price delta in
+    1e-9 quote-unit ticks, the scale of every price tick: ``500_000_000`` is 0.5
+    quote units, not 500 million of the pair's tick size.
     ``trigger_price_source`` is ``last``, ``index`` or ``mark``; unset on a
     write means the last trade price. ``order_type`` is rejected if supplied
     under ``attached_risk.trailing_stop``.

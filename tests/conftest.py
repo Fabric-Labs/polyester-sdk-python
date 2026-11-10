@@ -108,6 +108,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                     )
                 )
             )
+        # The marker is the gate: a test that writes runs only with the opt-in,
+        # whether or not it also requests the mutation_enabled fixture.
+        if item.get_closest_marker("mutation") is not None and not _env_truthy(
+            "POLYESTER_TEST_MUTATION"
+        ):
+            item.add_marker(
+                pytest.mark.skip(reason="Set POLYESTER_TEST_MUTATION=1 to run mutation tests")
+            )
         if item.get_closest_marker("integration") is None:
             continue
         if item.get_closest_marker("credentialed") is None:

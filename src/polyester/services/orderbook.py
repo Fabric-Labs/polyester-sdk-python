@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import operator
+import time
 from collections.abc import Callable
 
 from polyester.catalogs import CatalogManager
@@ -121,6 +123,8 @@ class AsyncOrderbookService(BaseService):
         ``depth``; a depth no tier covers is refused before connecting.
         """
         stream_depth = orderbook_stream_tier(depth)
+        # Views report a plain int, also for a NumPy depth.
+        depth = operator.index(depth)
         realtime = require_realtime(self._realtime)
         resolved_symbol_id = symbol_id
         if resolved_symbol_id is None:
@@ -213,14 +217,19 @@ class AsyncOrderbookService(BaseService):
             asks_map = levels_from_proto_levels(snapshot.asks)
             current_book_seq = int(snapshot.book_seq or 0)
             book_available = bool(snapshot.available)
-            # A repeated unavailable answer adds no view.
-            if book_available or not last_view_unavailable or buffered_deltas:
-                emit()
-            recheck_unavailable_snapshot()
+            # The snapshot and the deltas buffered behind it are one book state, so they
+            # add one view: a view per delta would queue copies of superseded states.
+            applied_all = True
             for delta in buffered_deltas:
                 if close.is_set():
                     return
-                handle_delta(delta)
+                if not apply_one(delta):
+                    applied_all = False
+                    break
+            # A repeated unavailable answer adds no view; a gap's refresh adds the next.
+            if applied_all and (book_available or not last_view_unavailable or buffered_deltas):
+                emit()
+            recheck_unavailable_snapshot()
 
         def recheck_unavailable_snapshot() -> None:
             # An unavailable book's levels are unknown, not empty: ask again later,
@@ -261,7 +270,8 @@ class AsyncOrderbookService(BaseService):
                     return
                 handle_delta(delta)
 
-        def handle_delta(delta: OrderBookDeltaUpdate) -> None:
+        def apply_one(delta: OrderBookDeltaUpdate) -> bool:
+            """Apply ``delta`` without a view; on a sequence gap, request a refresh."""
             nonlocal current_book_seq
             current_book_seq, needs_refresh = apply_delta(
                 bids=bids_map,
@@ -275,8 +285,13 @@ class AsyncOrderbookService(BaseService):
                 stream = stream_holder["stream"]
                 if stream is not None and not stream.is_disposed():
                     stream.request_refresh()
-                return
-            emit()
+                return False
+            return True
+
+        def handle_delta(delta: OrderBookDeltaUpdate) -> None:
+            # A live delta is one book state: one view.
+            if apply_one(delta):
+                emit()
 
         def terminal_close() -> None:
             close.set()
@@ -284,12 +299,25 @@ class AsyncOrderbookService(BaseService):
             with contextlib.suppress(asyncio.QueueFull):
                 queue.put_nowait(None)
 
+        last_publication = time.monotonic()
+
+        def read_publication(delta: OrderBookDeltaUpdate) -> list[OrderBookDeltaUpdate]:
+            nonlocal last_publication
+            last_publication = time.monotonic()
+            return [delta]
+
+        def publication_age() -> float:
+            # Read the time before the clock: a sync caller reads this from another
+            # thread, and every recorded time is then earlier than the clock reading.
+            last = last_publication
+            return time.monotonic() - last
+
         stream = AsyncSnapshotThenStreamSubscription(
             realtime=realtime,
             channel=channel,
             decode=decode_orderbook_delta_bytes,
             fetch_snapshot=fetch_snapshot,
-            read_publication=lambda delta: [delta],
+            read_publication=read_publication,
             apply_snapshot=apply_snapshot,
             apply_live_publications=apply_live_publications,
             on_open=on_open,
@@ -307,6 +335,7 @@ class AsyncOrderbookService(BaseService):
             stream=stream,
             set_bucket=set_bucket,
             on_aclose=cancel_recheck,
+            publication_age=publication_age,
         )
         try:
             await stream.start()

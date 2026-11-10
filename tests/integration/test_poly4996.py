@@ -314,6 +314,7 @@ async def test_twap_market_ioc_accepts_slippage(
 
 
 @pytest.mark.integration
+@pytest.mark.mutation
 @pytest.mark.asyncio(loop_scope="session")
 async def test_social_verification_discord_without_handle(live_client) -> None:
     result = await call_optional(

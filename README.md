@@ -862,6 +862,32 @@ await client.triggers.create(
 )
 ```
 
+`trailing_distance_ticks` (and `trailing_distance_ticks` / `distance_ticks` on an
+attached trailing stop) is a price delta in 1e-9 quote-unit ticks, the same scale as
+every price tick, sent as given. It is not a count of the pair's tick size. On
+BTC-USDT, a distance of 50 USDT is `50 * 10**9 = 50_000_000_000` ticks and 0.5 USDT is
+`500_000_000`; a value of `1` trails by 0.000000001 USDT. Convert a decimal distance
+exactly:
+
+```python
+from decimal import Decimal
+
+distance = Decimal("0.5")  # USDT
+ticks = distance.scaleb(9)  # Decimal("5E+8"): 500_000_000 ticks
+assert ticks == ticks.to_integral_value(), "at most 9 decimal places"
+
+await client.triggers.create(
+    symbol="BTC-USDT",
+    trigger_type="trailing_stop",
+    side="sell",
+    qty="0.01",
+    trailing_distance_ticks=int(ticks),
+)
+```
+
+Trigger reads decode the distance back to quote units (`details.trailing.trailing_distance`,
+a `Price`).
+
 A trailing stop attached to an order that sells buys back, so it requires
 `limit_price` too: the most its exit pays per unit, at least
 `activation_price` when that is set. When it fires, its child is a limit IOC
@@ -1175,7 +1201,10 @@ if not book.available:
 Any other depth from 1 to 1000 requests the smallest of them that covers it, 20 for
 `11`, and 0 means 50; the result's `depth` is the depth requested
 (`polyester.codecs.orderbook.orderbook_snapshot_depth`). A depth below 0 or above
-1000, or one that isn't an `int`, raises `PolyesterValidationError` before any request.
+1000, or one that isn't an exact integer, raises `PolyesterValidationError` before any
+request. An exact integer is an `int` or any type with `__index__`, such as a NumPy
+integer; `bool` and `float` are refused. The same rule applies to every depth and
+`limit` argument, and the SDK sends and reports a plain `int`.
 Each level's price and quantity carry the book's symbol, so passing one to an order
 for another market is refused like any other cross-market value.
 The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
@@ -1193,6 +1222,22 @@ subscribe there:
 - `orderbook.subscribe_deltas(symbol_id=..., depth=...)` delivers raw deltas, which
   can't be trimmed, so it takes only a published depth and raises
   `PolyesterValidationError` for any other.
+
+A stream that stops and a market with nothing to report look alike, since no view
+arrives in either case. `since_last_publication()` on a managed order book tells them
+apart: it is the number of seconds since the stream last delivered a publication (or
+since the subscription started); views from a snapshot or a bucket change don't count.
+The server republishes each book's whole view about every 30 s even when nothing
+changed (seen on every market of devnet and testnet; the public contract does not
+promise a cadence), so a quiet market stays under that. The SDK sets no threshold and
+acts on none. Poll it, and treat an age far above 30 s, such as 90 s, as a stall: call
+`refresh_snapshot()`, or close and subscribe again. A sync subscription offers the same
+method.
+
+```python
+if book_sub.since_last_publication() > 90:
+    await book_sub.refresh_snapshot()
+```
 
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its
@@ -1267,7 +1312,8 @@ the list; a root key cannot subscribe to a sub-account's channels.
 - Managed snapshot-then-stream subscriptions disable transport auto-reconnect
   so they can rebuild REST state between reconnect attempts. Buffered
   publications survive a failed snapshot retry and are merged exactly once
-  after recovery; cancellation closes the replacement socket. Managed create
+  after recovery, and a snapshot with the publications buffered behind it adds
+  one view; cancellation closes the replacement socket. Managed create
   methods await the handshake and initial snapshot before returning.
 - Private order stream quantities are raw scaled values. Their
   `Quantity.scale` may be `None`; resolve the hydrated catalog scale with

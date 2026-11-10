@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
+from polyester.codecs.orderbook import exact_int
 from polyester.errors import PolyesterValidationError
 
 
@@ -31,14 +32,17 @@ def validate_limit(
 ) -> int | None:
     """Wire-safety for pagination limits (no SDK-wide max policy).
 
-    Rejects ``bool`` and non-integers so values cannot silently coerce on the
-    wire. Endpoint/server protos remain the authority for allowed ranges.
-    Optional limits omit when ``None`` so server defaults are preserved.
+    Accepts any exact integer (``__index__``, as NumPy integers implement) and
+    returns it as a plain ``int``; rejects ``bool`` and non-integers such as
+    ``float`` so values cannot silently coerce on the wire. Endpoint/server
+    protos remain the authority for allowed ranges. Optional limits omit when
+    ``None`` so server defaults are preserved.
     """
     if limit is None:
         if allow_none:
             return None
         raise PolyesterValidationError(f"{label} must be an integer")
-    if isinstance(limit, bool) or not isinstance(limit, int):
+    value = exact_int(limit)
+    if value is None:
         raise PolyesterValidationError(f"{label} must be an integer")
-    return limit
+    return value

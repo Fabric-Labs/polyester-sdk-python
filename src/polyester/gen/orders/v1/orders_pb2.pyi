@@ -246,6 +246,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_CONDITION_PARAMETER_SET: _ClassVar[ErrorCode]
     ERROR_CODE_TWAP_CAPACITY_REACHED: _ClassVar[ErrorCode]
     ERROR_CODE_CHILD_ORDER_INCONSISTENT: _ClassVar[ErrorCode]
+    ERROR_CODE_PATH_BODY_ID_MISMATCH: _ClassVar[ErrorCode]
     ERROR_CODE_REQUEST_DEADLINE_EXCEEDED: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -500,6 +501,7 @@ ERROR_CODE_CONDITION_FLAGS_INVALID: ErrorCode
 ERROR_CODE_CONDITION_PARAMETER_SET: ErrorCode
 ERROR_CODE_TWAP_CAPACITY_REACHED: ErrorCode
 ERROR_CODE_CHILD_ORDER_INCONSISTENT: ErrorCode
+ERROR_CODE_PATH_BODY_ID_MISMATCH: ErrorCode
 ERROR_CODE_REQUEST_DEADLINE_EXCEEDED: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource

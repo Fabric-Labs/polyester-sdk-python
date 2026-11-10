@@ -58,8 +58,8 @@ Full cross-language comparison:
 <!-- sdk-capabilities:end -->
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
-still applies. In particular, social-verification routes may require a JWT
-session or may not be mounted.
+still applies. In particular, social-verification `start` and `mark_ready`
+require an interactive session, and a route may not be mounted.
 A sub-account member call that targets the sub-account's owner (inviting the
 owner, accepting an invite for the owner, changing the owner's role or
 removing the owner) raises `PolyesterSubaccountOwnerRoleLockedError`, a
@@ -277,6 +277,21 @@ client = AsyncPolyester(
 
 The plain `AsyncPolyester(...)` / `Polyester(...)` constructors never implicitly
 read `os.environ`.
+
+**Account permissions.** An API key reads account data only with the matching
+permission on its API-key policy, granted from an interactive session. Each
+grants exactly its reads: `READ_API_KEYS` (`api_keys.list`, `api_keys.get`),
+`READ_VIP_STATUS` (`vip.get_vip_status`), `READ_SOCIAL_VERIFICATION`
+(`social_verification.get`, link status only) and `READ_WITHDRAW_VALIDATION`
+(`trading_withdraws.validate_destination`). `READ_API_POLICIES`,
+`READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`, `READ_PROFILE`,
+`READ_ACCOUNT_DIRECTORY`, `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`,
+`READ_CHECKPOINTS` and `READ_REWARDS` open calls this SDK does not wrap yet.
+These permissions are valid on API-key policies only. VIP status and social
+verification refuse a key scoped to a sub-account. A key without the permission
+raises `PolyesterApiError` whose `auth_error_code(err)` is
+`AUTH_API_KEY_ACCESS_DENIED`; its message names the missing permission. Policy
+subscriptions decode them like every action, as lowercase names (`read_api_keys`).
 
 **Scripts and local tests only:** `AsyncPolyester.from_env()` and
 `Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,
@@ -689,8 +704,9 @@ fee model and exact integer budgeting guidance.
 ## VIP, spot fees, and trading rate limits
 
 Public catalog reads need no credentials. Authenticated VIP status, effective spot fees, and
-account trading limits require an API key. `GetVIPStatus` has no subaccount selector: JWT and
-API-key callers receive the owning root group only. USD amounts and fee percents are decimal
+account trading limits require an API key. `get_vip_status` needs `READ_VIP_STATUS` on a
+key scoped to the main account. It has no subaccount selector: JWT and API-key callers
+receive the owning root group only. USD amounts and fee percents are decimal
 strings. Optional qualification metrics, timestamps, and next-tier thresholds stay omitted
 when unset. `VIPStatus.settled_volume_quality` and `average_aop_quality` say how complete
 each 30-day metric is: `status` is `complete`, `price_unavailable` (the metric is a lower
@@ -1078,8 +1094,11 @@ SDK notes:
 - **Trading → external destination check:**
   `await client.trading_withdraws.validate_destination(destination_chain_id=..., destination_address=...)`
   returns user-safe `valid` / `code` / `message` / `canonical_destination_address`
-  without creating a withdraw (create RPCs remain authoritative).
+  without creating a withdraw (create RPCs remain authoritative). An API key needs
+  `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer allows it.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
+  The receipt's `flow_id` reads the transfer's lifecycle flow with
+  `client.lifecycle.get_flow(flow_id=...)`; the flow may become readable after the receipt.
 
 API-key withdrawals always use the authenticated key's bound account or
 subaccount. The SDK's default subaccount does not change that source.
@@ -1659,7 +1678,7 @@ except PolyesterAuthError as err:
 ```
 
 A method that accepts only a session token (withdrawals, auto-withdraw rules,
-portfolio equity reads, VIP status, ...) refuses an account API key with
+portfolio equity reads, ...) refuses an account API key with
 `AUTH_SESSION_KIND_NOT_ALLOWED`, Connect `permission_denied` or REST 403. It
 raises `PolyesterSessionRequiredError` (`is_session_required(err)`), which is
 both a `PolyesterAuthError` and a `PolyesterApiError`, so existing handlers

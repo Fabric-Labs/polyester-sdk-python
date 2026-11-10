@@ -116,7 +116,7 @@ class ErrorDetail(_message.Message):
     def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class CreateInternalTransferResponse(_message.Message):
-    __slots__ = ("request_id", "transfer_id", "accepted_at_ts_ns", "asset_id", "asset_code", "u_asset_id", "amount_e18", "destination", "status")
+    __slots__ = ("request_id", "transfer_id", "accepted_at_ts_ns", "asset_id", "asset_code", "u_asset_id", "amount_e18", "destination", "status", "flow_id")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_ID_FIELD_NUMBER: _ClassVar[int]
     ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
@@ -126,6 +126,7 @@ class CreateInternalTransferResponse(_message.Message):
     AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
+    FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     transfer_id: str
     accepted_at_ts_ns: int
@@ -135,4 +136,27 @@ class CreateInternalTransferResponse(_message.Message):
     amount_e18: _u128_pb2.U128
     destination: ResolvedDestination
     status: InternalTransferStatus
-    def __init__(self, request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ..., accepted_at_ts_ns: _Optional[int] = ..., asset_id: _Optional[int] = ..., asset_code: _Optional[str] = ..., u_asset_id: _Optional[str] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination: _Optional[_Union[ResolvedDestination, _Mapping]] = ..., status: _Optional[_Union[InternalTransferStatus, str]] = ...) -> None: ...
+    flow_id: str
+    def __init__(self, request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ..., accepted_at_ts_ns: _Optional[int] = ..., asset_id: _Optional[int] = ..., asset_code: _Optional[str] = ..., u_asset_id: _Optional[str] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination: _Optional[_Union[ResolvedDestination, _Mapping]] = ..., status: _Optional[_Union[InternalTransferStatus, str]] = ..., flow_id: _Optional[str] = ...) -> None: ...
+
+class GetInternalTransferRequest(_message.Message):
+    __slots__ = ("subaccount_id", "request_id", "transfer_id")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    TRANSFER_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    request_id: str
+    transfer_id: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ...) -> None: ...
+
+class GetInternalTransferResponse(_message.Message):
+    __slots__ = ("request_id", "transfer_id", "flow_id", "accepted_at_ts_ns")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    TRANSFER_ID_FIELD_NUMBER: _ClassVar[int]
+    FLOW_ID_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    transfer_id: str
+    flow_id: str
+    accepted_at_ts_ns: int
+    def __init__(self, request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ..., flow_id: _Optional[str] = ..., accepted_at_ts_ns: _Optional[int] = ...) -> None: ...

@@ -19,6 +19,11 @@ class AsyncVIPService(BaseService):
         )
 
     async def get_vip_status(self) -> VIPStatus:
+        """Read the owning root group's VIP status.
+
+        An API key needs ``READ_VIP_STATUS`` on its policy and must be scoped
+        to the main account; a sub-account key is refused.
+        """
         return await unary_auth_decoded(
             self._transport,
             VIPServiceClient,

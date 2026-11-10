@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from polyester.codecs.ledger_amounts import format_ledger_u128
+from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.zipper.v1 import zipper_pb2
 from polyester.models.zipper import (
@@ -60,6 +61,9 @@ def deposit_withdraw_config_from_proto(
             is_case_sensitive=bool(item.is_case_sensitive),
             min_address_length=int(item.min_address_length),
             max_address_length=int(item.max_address_length),
+            memo_requirement=proto_enum_name(zipper_pb2.MemoRequirement, item.memo_requirement),
+            memo_label=item.memo_label,
+            memo_format_hint=item.memo_format_hint,
         )
         for item in msg.chains
     ]

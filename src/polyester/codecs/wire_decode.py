@@ -11,6 +11,7 @@ from polyester.codecs.decode.market_data import _decode_price_field, _decode_vol
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.chain.zipper.v1 import reason_pb2
+from polyester.gen.ledger.v1 import catalog_pb2
 from polyester.models.market import (
     Candle,
     CandlesResult,
@@ -599,11 +600,33 @@ def _decode_transfer_side(data: Any) -> TransferSide | None:
     return TransferSide(kind=kind, account_id=account_id, address=address, chain_id=chain_id)
 
 
+def _transfer_code(value: Any) -> int:
+    """A ``ledger.v1.TransferCode`` number from its number or its name.
+
+    JSON carries the uppercase enum name (``SYSTEM_ADJUSTMENT``), its
+    lowercase label (``system_adjustment``) or the number. A name this SDK's
+    contract does not define reads 0 (unspecified).
+    """
+    if value is None or isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return 0
+    if text.isdigit():
+        return int(text)
+    try:
+        return int(catalog_pb2.TransferCode.Value(text.upper()))
+    except ValueError:
+        return 0
+
+
 def decode_ledger_transfer(data: dict[str, Any]) -> LedgerTransfer:
     return LedgerTransfer(
         asset_id=int(_field(data, "assetId", "asset_id", default=0) or 0),
         amount=_u128_str(_field(data, "amount")),
-        transfer_type=int(_field(data, "type", default=0) or 0),
+        transfer_type=_transfer_code(_field(data, "transferCode", "transfer_code", "type")),
         account_code=int(_field(data, "accountCode", "account_code", default=0) or 0),
         timestamp=int(_field(data, "timestamp", default=0) or 0),
         pending=bool(_field(data, "pending", default=False)),
@@ -642,6 +665,7 @@ def decode_internal_transfer_result(data: dict[str, Any]) -> InternalTransferRes
         quantity=AssetAmount.from_scaled(scaled, domain=QuantityDomain.ASSET, asset_id=asset_id)
         if scaled
         else None,
+        flow_id=str(_field(data, "flowId", "flow_id", default="") or ""),
     )
 
 

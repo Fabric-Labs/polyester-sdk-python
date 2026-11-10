@@ -42,6 +42,12 @@ class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> ApiKeysList:
+        """List API keys.
+
+        An API key needs ``READ_API_KEYS`` on its policy. A key scoped to the
+        main account reads the main account's keys and its sub-accounts'; a
+        key scoped to a sub-account reads only that sub-account's keys.
+        """
         request = ListApiKeysRequest()
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -57,6 +63,7 @@ class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
         )
 
     async def get(self, *, key_id: str) -> ApiKeySummary | None:
+        """Read one API key. An API key needs ``READ_API_KEYS``, as for :meth:`list`."""
         return await unary_auth_decoded(
             self._transport,
             ApiKeyServiceClient,

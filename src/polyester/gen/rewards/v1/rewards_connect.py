@@ -21,6 +21,9 @@ class RewardCampaignService(Protocol):
     async def list_my_reward_awards(self, request: rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def acknowledge_my_reward_award(self, request: rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def set_my_reward_destination(self, request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -39,6 +42,16 @@ class RewardCampaignServiceASGIApplication(ConnectASGIApplication[RewardCampaign
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_my_reward_awards,
+                ),
+                "/rewards.v1.RewardCampaignService/AcknowledgeMyRewardAward": Endpoint.unary(
+                    method=MethodInfo(
+                        name="AcknowledgeMyRewardAward",
+                        service_name="rewards.v1.RewardCampaignService",
+                        input=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest,
+                        output=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.acknowledge_my_reward_award,
                 ),
                 "/rewards.v1.RewardCampaignService/SetMyRewardDestination": Endpoint.unary(
                     method=MethodInfo(
@@ -84,6 +97,26 @@ class RewardCampaignServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def acknowledge_my_reward_award(
+        self,
+        request: rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="AcknowledgeMyRewardAward",
+                service_name="rewards.v1.RewardCampaignService",
+                input=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest,
+                output=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def set_my_reward_destination(
         self,
         request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest,
@@ -111,6 +144,8 @@ class RewardCampaignServiceClient(ConnectClient):
 class RewardCampaignServiceSync(Protocol):
     def list_my_reward_awards(self, request: rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def acknowledge_my_reward_award(self, request: rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def set_my_reward_destination(self, request: rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationRequest, ctx: RequestContext) -> rewards_dot_v1_dot_rewards__pb2.SetMyRewardDestinationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -128,6 +163,16 @@ class RewardCampaignServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_my_reward_awards,
+                ),
+                "/rewards.v1.RewardCampaignService/AcknowledgeMyRewardAward": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="AcknowledgeMyRewardAward",
+                        service_name="rewards.v1.RewardCampaignService",
+                        input=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest,
+                        output=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.acknowledge_my_reward_award,
                 ),
                 "/rewards.v1.RewardCampaignService/SetMyRewardDestination": EndpointSync.unary(
                     method=MethodInfo(
@@ -167,6 +212,26 @@ class RewardCampaignServiceClientSync(ConnectClientSync):
                 service_name="rewards.v1.RewardCampaignService",
                 input=rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsRequest,
                 output=rewards_dot_v1_dot_rewards__pb2.ListMyRewardAwardsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def acknowledge_my_reward_award(
+        self,
+        request: rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="AcknowledgeMyRewardAward",
+                service_name="rewards.v1.RewardCampaignService",
+                input=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardRequest,
+                output=rewards_dot_v1_dot_rewards__pb2.AcknowledgeMyRewardAwardResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

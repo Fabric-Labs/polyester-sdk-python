@@ -2,6 +2,7 @@ from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
@@ -9,8 +10,19 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class MemoRequirement(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    MEMO_UNSPECIFIED: _ClassVar[MemoRequirement]
+    REQUIRED: _ClassVar[MemoRequirement]
+    OPTIONAL: _ClassVar[MemoRequirement]
+    NOT_SUPPORTED: _ClassVar[MemoRequirement]
+MEMO_UNSPECIFIED: MemoRequirement
+REQUIRED: MemoRequirement
+OPTIONAL: MemoRequirement
+NOT_SUPPORTED: MemoRequirement
+
 class ChainConfig(_message.Message):
-    __slots__ = ("chain_id", "code", "name", "native_chain_id", "native_currency_symbol", "explorer_url", "icon", "required_confirmations", "confirmation_time_seconds", "is_case_sensitive", "min_address_length", "max_address_length")
+    __slots__ = ("chain_id", "code", "name", "native_chain_id", "native_currency_symbol", "explorer_url", "icon", "required_confirmations", "confirmation_time_seconds", "is_case_sensitive", "min_address_length", "max_address_length", "memo_requirement", "memo_label", "memo_format_hint")
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -23,6 +35,9 @@ class ChainConfig(_message.Message):
     IS_CASE_SENSITIVE_FIELD_NUMBER: _ClassVar[int]
     MIN_ADDRESS_LENGTH_FIELD_NUMBER: _ClassVar[int]
     MAX_ADDRESS_LENGTH_FIELD_NUMBER: _ClassVar[int]
+    MEMO_REQUIREMENT_FIELD_NUMBER: _ClassVar[int]
+    MEMO_LABEL_FIELD_NUMBER: _ClassVar[int]
+    MEMO_FORMAT_HINT_FIELD_NUMBER: _ClassVar[int]
     chain_id: int
     code: str
     name: str
@@ -35,7 +50,10 @@ class ChainConfig(_message.Message):
     is_case_sensitive: bool
     min_address_length: int
     max_address_length: int
-    def __init__(self, chain_id: _Optional[int] = ..., code: _Optional[str] = ..., name: _Optional[str] = ..., native_chain_id: _Optional[str] = ..., native_currency_symbol: _Optional[str] = ..., explorer_url: _Optional[str] = ..., icon: _Optional[str] = ..., required_confirmations: _Optional[int] = ..., confirmation_time_seconds: _Optional[int] = ..., is_case_sensitive: _Optional[bool] = ..., min_address_length: _Optional[int] = ..., max_address_length: _Optional[int] = ...) -> None: ...
+    memo_requirement: MemoRequirement
+    memo_label: str
+    memo_format_hint: str
+    def __init__(self, chain_id: _Optional[int] = ..., code: _Optional[str] = ..., name: _Optional[str] = ..., native_chain_id: _Optional[str] = ..., native_currency_symbol: _Optional[str] = ..., explorer_url: _Optional[str] = ..., icon: _Optional[str] = ..., required_confirmations: _Optional[int] = ..., confirmation_time_seconds: _Optional[int] = ..., is_case_sensitive: _Optional[bool] = ..., min_address_length: _Optional[int] = ..., max_address_length: _Optional[int] = ..., memo_requirement: _Optional[_Union[MemoRequirement, str]] = ..., memo_label: _Optional[str] = ..., memo_format_hint: _Optional[str] = ...) -> None: ...
 
 class AssetChainVariant(_message.Message):
     __slots__ = ("zipped_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount", "supply_q")

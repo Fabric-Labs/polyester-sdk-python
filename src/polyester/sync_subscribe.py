@@ -47,6 +47,12 @@ class SyncSubscription:
         if sub is not None and hasattr(sub, "set_bucket"):
             self._loop.call_soon_threadsafe(sub.set_bucket, bucket)
 
+    def since_last_publication(self) -> float | None:
+        """An order book's ``since_last_publication``; ``None`` for other streams."""
+        sub = None if self._holder is None else self._holder.get("sub")
+        age = getattr(sub, "since_last_publication", None)
+        return age() if callable(age) else None
+
     def unsubscribe(self) -> None:
         self.close()
 

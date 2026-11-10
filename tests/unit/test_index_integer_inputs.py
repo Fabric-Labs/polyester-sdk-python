@@ -55,7 +55,12 @@ def test_helpers_accept_index_integers_and_return_plain_ints() -> None:
 
 @pytest.mark.parametrize(
     "helper",
-    [orderbook_snapshot_depth, orderbook_stream_tier, require_published_stream_depth, validate_limit],
+    [
+        orderbook_snapshot_depth,
+        orderbook_stream_tier,
+        require_published_stream_depth,
+        validate_limit,
+    ],
 )
 @pytest.mark.parametrize("value", [True, False, 20.0, 1.5, "20", None])
 def test_helpers_still_refuse_bool_float_and_non_integers(helper, value) -> None:

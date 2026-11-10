@@ -24,6 +24,7 @@ async def test_address_book_get_view(live_client):
 
 
 @pytest.mark.integration
+@pytest.mark.mutation
 async def test_address_book_create_update_new_tags_round_trip(live_client) -> None:
     suffix = uuid.uuid4().hex[:10]
     address = f"0x{uuid.uuid4().hex[:40]:0<40}"
@@ -69,6 +70,7 @@ async def test_address_book_create_update_new_tags_round_trip(live_client) -> No
 
 
 @pytest.mark.integration
+@pytest.mark.mutation
 async def test_social_verification_start_accepts_at_handle(live_client) -> None:
     handle = f"@sdk{int(time.time()) % 100000:05d}"
     result = await call_optional(

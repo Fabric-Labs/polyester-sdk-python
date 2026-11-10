@@ -1,3 +1,6 @@
+import operator
+from typing import SupportsIndex
+
 from polyester.errors import PolyesterValidationError
 
 # Depths the snapshot API accepts. The delta stream publishes fewer: see below.
@@ -23,8 +26,16 @@ DEPTH_TO_PROTO: dict[int, str] = {
 ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH = 50
 
 
-def _is_int(depth: object) -> bool:
-    return isinstance(depth, int) and not isinstance(depth, bool)
+def exact_int(value: object) -> int | None:
+    """``value`` as a plain ``int`` when it is an exact integer, else ``None``.
+
+    An exact integer implements ``__index__`` (``operator.index``), as ``int`` and NumPy
+    integers do. ``bool`` implements it too but is refused, and ``float``, ``Decimal`` and
+    ``str`` don't implement it.
+    """
+    if isinstance(value, bool) or not isinstance(value, SupportsIndex):
+        return None
+    return operator.index(value)
 
 
 def orderbook_snapshot_depth(depth: int) -> int:
@@ -39,8 +50,10 @@ def orderbook_snapshot_depth(depth: int) -> int:
 
 def covering_snapshot_depth(depth: int, what: str) -> int:
     """``depth`` when it is a snapshot depth, else the smallest one covering it; 0 is 50."""
-    if not _is_int(depth) or depth < 0:
+    value = exact_int(depth)
+    if value is None or value < 0:
         raise PolyesterValidationError(f"{what} must be a non-negative integer, got {depth!r}")
+    depth = value
     if depth == 0:
         return ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
     for supported in ORDERBOOK_SUPPORTED_DEPTHS:
@@ -58,10 +71,12 @@ def depth_to_connect_enum(depth: int) -> str:
 
 def orderbook_stream_tier(depth: int) -> int:
     """Smallest published stream depth covering ``depth``, for a view trimmed to ``depth``."""
-    if not _is_int(depth) or depth < 1:
+    value = exact_int(depth)
+    if value is None or value < 1:
         raise PolyesterValidationError(
             f"orderbook subscription depth must be a positive integer, got {depth!r}"
         )
+    depth = value
     for tier in ORDERBOOK_STREAM_DEPTHS:
         if tier >= depth:
             return tier
@@ -75,11 +90,12 @@ def orderbook_stream_tier(depth: int) -> int:
 
 def require_published_stream_depth(depth: int) -> int:
     """``depth`` itself when the server publishes it: raw deltas of a tier can't be trimmed."""
-    if not _is_int(depth) or depth not in ORDERBOOK_STREAM_DEPTHS:
+    value = exact_int(depth)
+    if value is None or value not in ORDERBOOK_STREAM_DEPTHS:
         raise PolyesterValidationError(
             f"orderbook delta streams are published only at depths "
             f"{', '.join(map(str, ORDERBOOK_STREAM_DEPTHS))}, "
             f"got {depth!r}; use orderbook.create_subscription for a book trimmed to any depth "
             f"up to {ORDERBOOK_STREAM_DEPTHS[-1]}"
         )
-    return depth
+    return value

@@ -6,7 +6,9 @@ loopback port, so nothing leaves the machine. Every one must be skipped, not att
 
 from __future__ import annotations
 
+import ast
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -91,3 +93,80 @@ def test_mutation_marker_alone_gates_a_test() -> None:
     assert _summary(out).startswith("1 skipped in "), out.stdout + out.stderr
     # Control: with the opt-in the probe runs (and fails on purpose).
     assert _summary(enabled).startswith("1 failed in "), enabled.stdout + enabled.stderr
+
+
+# Client methods that change server state, by name.
+_WRITE_METHOD = re.compile(
+    r"^(create|update|delete|copy|modify|replace|cancel|batch|withdraw|transfer|pause|resume"
+    r"|start|stop|revoke|claim|rotate|set)"
+)
+_WRITE_GATES = {"mutation", "funded", "treasury"}
+# Write-like names that only read.
+_READS = {"create_subscription"}
+
+
+def _marker_names(node: ast.AST) -> set[str]:
+    names = set()
+    for decorator in getattr(node, "decorator_list", []):
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if (
+            isinstance(target, ast.Attribute)
+            and isinstance(target.value, ast.Attribute)
+            and target.value.attr == "mark"
+        ):
+            names.add(target.attr)
+    return names
+
+
+def _is_dry_run(call: ast.Call) -> bool:
+    return any(
+        keyword.arg == "dry_run"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+        for keyword in call.keywords
+    )
+
+
+def _service_writes(fn: ast.AST) -> list[str]:
+    """``<client>.<service>.<write>(...)`` calls in ``fn``."""
+    writes = []
+    for node in ast.walk(fn):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        method, owner = node.func.attr, node.func.value
+        if (
+            isinstance(owner, ast.Attribute)
+            and _WRITE_METHOD.match(method)
+            and method not in _READS
+            and not _is_dry_run(node)
+        ):
+            writes.append(f"{owner.attr}.{method}")
+    return writes
+
+
+def test_every_live_test_that_writes_carries_a_write_gate() -> None:
+    ungated = []
+    checked = 0
+    for path in sorted((REPO_ROOT / "tests").glob("[ie][n2]*/**/test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        module_marks: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "pytestmark" for t in node.targets
+            ):
+                module_marks |= {
+                    getattr(m, "attr", "")
+                    for m in ast.walk(node.value)
+                    if isinstance(m, ast.Attribute)
+                }
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            if not node.name.startswith("test_"):
+                continue
+            checked += 1
+            writes = _service_writes(node)
+            if writes and not (_marker_names(node) | module_marks) & _WRITE_GATES:
+                ungated.append(f"{path.relative_to(REPO_ROOT)}::{node.name} calls {writes}")
+    assert checked > 50, f"checked only {checked} live tests"
+    assert not ungated, "live tests write without @pytest.mark.mutation:\n" + "\n".join(ungated)

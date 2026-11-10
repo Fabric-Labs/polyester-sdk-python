@@ -11,7 +11,7 @@ from polyester.gen.chain.zipper.v1.zipper_connect import ZipperServiceClient
 from polyester.gen.chain.zipper.v1.zipper_pb2 import GetDepositWithdrawConfigRequest
 from polyester.models.zipper import DepositWithdrawConfig, ZippedAssetSupplyBatch
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 
@@ -25,10 +25,12 @@ class AsyncZipperService(BaseService):
         *,
         catalogs: CatalogManager | None = None,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
 
     async def get_deposit_withdraw_config(self) -> DepositWithdrawConfig:
         return await unary_public_decoded(
@@ -60,6 +62,8 @@ class AsyncZipperService(BaseService):
         *,
         patch_catalog: bool = True,
     ) -> AsyncSubscription[ZippedAssetSupplyBatch]:
+        # Each update is decoded with its asset's catalog quantity scale.
+        await self._ensure_catalogs()
         decode = self._decode_supply_batch
         if not patch_catalog:
 

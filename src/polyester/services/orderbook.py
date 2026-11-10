@@ -29,9 +29,10 @@ from polyester.orderbook.local_book import (
 from polyester.orderbook.subscription import OrderbookSubscription
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import require_realtime, subscribe_public_proto
+from polyester.services._symbols import resolve_symbol_id
 
 # A snapshot that came back unavailable is requested again after these delays:
 # the first delay doubles up to the limit, for as long as the stream runs.
@@ -46,10 +47,12 @@ class AsyncOrderbookService(BaseService):
         *,
         catalogs: CatalogManager | None = None,
         realtime: AsyncRealtimeClient | None = None,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._catalogs = catalogs or CatalogManager()
         self._realtime = realtime
+        self._wait_for_catalogs = wait_for_catalogs
 
     def _require_quantity_scale(self, symbol: str) -> int:
         scale = self._catalogs.base_quantity_scale_for_symbol(symbol)
@@ -62,11 +65,12 @@ class AsyncOrderbookService(BaseService):
 
     async def get(self, *, symbol: str, depth: int = 50) -> OrderbookData:
         from polyester.gen.orderbook.v1 import orderbook_pb2
-        from polyester.services._symbols import resolve_symbol_id
 
         # Report the depth requested on the wire, not the one passed.
         depth = orderbook_snapshot_depth(depth)
         depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(depth))
+        # Levels are decoded with the pair's catalog quantity scale.
+        await self._ensure_catalogs()
         request = GetOrderBookRequest(
             symbol_id=resolve_symbol_id(
                 self._catalogs, symbol=symbol, symbol_id=None, label="orderbook.get"
@@ -127,7 +131,17 @@ class AsyncOrderbookService(BaseService):
         depth = operator.index(depth)
         realtime = require_realtime(self._realtime)
         resolved_symbol_id = symbol_id
-        if resolved_symbol_id is None:
+        if self._wait_for_catalogs is not None:
+            # Levels are decoded with the pair's catalog quantity scale.
+            await self._ensure_catalogs()
+            if resolved_symbol_id is None:
+                resolved_symbol_id = resolve_symbol_id(
+                    self._catalogs,
+                    symbol=symbol,
+                    symbol_id=None,
+                    label="orderbook.create_subscription",
+                )
+        elif resolved_symbol_id is None:
             resolved_symbol_id = self._catalogs.symbol_id_for_symbol(symbol)
         if resolved_symbol_id is None or resolved_symbol_id <= 0:
             raise PolyesterValidationError(

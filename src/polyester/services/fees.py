@@ -9,7 +9,7 @@ from polyester.codecs.scalars import market_id, market_ids
 from polyester.gen.fees.v1.fees_connect import FeeServiceClient
 from polyester.gen.fees.v1.fees_pb2 import GetSpotFeeRatesRequest
 from polyester.models.fees import SpotFeeRatesList
-from polyester.services._base import BaseService
+from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
@@ -20,10 +20,13 @@ class AsyncFeeService(ScopedSubAccountMixin, BaseService):
         transport,
         default_sub_account_id: str | None,
         catalogs: CatalogManager | None = None,
+        *,
+        wait_for_catalogs: CatalogWait | None = None,
     ) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
         self._catalogs = catalogs or CatalogManager()
+        self._wait_for_catalogs = wait_for_catalogs
 
     async def get_spot_fee_rates(
         self,
@@ -46,6 +49,8 @@ class AsyncFeeService(ScopedSubAccountMixin, BaseService):
                 request.symbol_id.append(market_id(symbol_id, label))
             else:
                 request.symbol_id.extend(market_ids(symbol_id, label))
+        # Rates are labelled with their symbol from the catalogs.
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
             self._transport,
             FeeServiceClient,

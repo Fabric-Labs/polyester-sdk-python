@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC
 from typing import Any
 
 from connectrpc.errors import ConnectError
@@ -20,7 +21,7 @@ from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
 )
-from polyester.codecs.proto_helpers import error_code_name, format_uint64_id
+from polyester.codecs.proto_helpers import error_code_name, format_uint64_id, u128_to_str
 from polyester.errors import (
     API_KEY_AUTH_ERROR_CODES,
     AUTH_REPLAY_CAPACITY_EXHAUSTED,
@@ -39,9 +40,11 @@ from polyester.errors import (
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
+    PolyesterWithdrawError,
     _is_known_admission_refusal,
     auth_error_code_from_rest,
 )
+from polyester.gen.alerts.v1 import price_alerts_pb2 as alerts_pb2
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
@@ -81,8 +84,13 @@ _DETAIL_MESSAGES: tuple[type[Message], ...] = (
     withdraw_pb2.ErrorDetail,
     transfer_pb2.ErrorDetail,
     ledger_read_pb2.ErrorDetail,
+    alerts_pb2.ErrorDetail,
     ratelimit_pb2.RateLimitDetail,
 )
+
+# alerts.v1 codes answered as server errors: PRICE_UNAVAILABLE changed nothing
+# and is retryable; SERVICE_UNAVAILABLE leaves a mutation's outcome unknown.
+_UNAVAILABLE_ALERT_CODES = frozenset({"PRICE_UNAVAILABLE", "SERVICE_UNAVAILABLE"})
 
 
 def _unpack_error_detail(detail: Message) -> Message | None:
@@ -336,6 +344,15 @@ def _map_connect_error(exc: ConnectError):
             )
         for unpacked in unpacked_details:
             full_name = unpacked.DESCRIPTOR.full_name
+            if full_name == "alerts.v1.ErrorDetail":
+                code_name = error_code_name(alerts_pb2.ErrorCode, unpacked.code)
+                if code_name == "SUBACCOUNT_KEY_REFUSED":
+                    return PolyesterAuthError(error_message, code=code_name, status_code=403)
+                if code_name in _UNAVAILABLE_ALERT_CODES:
+                    return PolyesterServerError(
+                        error_message, code=code_name, status_code=503, raw=unpacked
+                    )
+                return PolyesterApiError(error_message, code=code_name, raw=unpacked)
             if full_name in _SERVICE_ERROR_ENUMS:
                 code_name = error_code_name(_SERVICE_ERROR_ENUMS[full_name], unpacked.code)
                 rate_limit = (
@@ -436,7 +453,22 @@ def _map_connect_error(exc: ConnectError):
                     return PolyesterAuthError(
                         error_message, code=code_name, status_code=_auth_status(exc)
                     )
-                return PolyesterApiError(error_message, code=code_name)
+                return PolyesterWithdrawError(
+                    error_message,
+                    code=code_name,
+                    raw=unpacked,
+                    field_path=unpacked.field_path or None,
+                    min_floor_e18=(
+                        u128_to_str(unpacked.min_floor_e18.hi, unpacked.min_floor_e18.lo)
+                        if unpacked.HasField("min_floor_e18")
+                        else None
+                    ),
+                    payable_from=(
+                        unpacked.payable_from.ToDatetime(tzinfo=UTC)
+                        if unpacked.HasField("payable_from")
+                        else None
+                    ),
+                )
             if full_name == "transfer.v1.ErrorDetail":
                 code_name = error_code_name(transfer_pb2.ErrorCode, unpacked.code)
                 if (

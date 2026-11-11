@@ -54,6 +54,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         self._realtime = realtime
 
     async def list(self) -> SubAccountsList:
+        """List sub-accounts. An API key needs ``READ_SUBACCOUNTS``."""
         return await unary_auth_decoded(
             self._transport,
             SubaccountServiceClient,
@@ -75,6 +76,10 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         invites_direction: str = "",
     ) -> GetSubaccountResult:
         """Read the aggregated view of one sub-account.
+
+        An API key needs ``READ_SUBACCOUNTS``; the members and invites are
+        left out, rather than failing, for a key without
+        ``READ_SUBACCOUNT_MEMBERS`` or ``READ_SUBACCOUNT_INVITES``.
 
         ``include_balances=True`` also returns the sub-account's current
         ``balances``, in the shape of ``balances.list``. It needs the
@@ -114,6 +119,8 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> SubAccountMembersList:
+        """List a sub-account's members. An API key needs
+        ``READ_SUBACCOUNT_MEMBERS``."""
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -128,6 +135,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         )
 
     async def list_invites(self, *, direction: str = "") -> SubAccountInvitesList:
+        """List sub-account invites. An API key needs ``READ_SUBACCOUNT_INVITES``."""
         return await unary_auth_decoded(
             self._transport,
             SubaccountServiceClient,
@@ -144,6 +152,8 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         limit: int = 50,
         page_token: str | None = None,
     ) -> SubAccountActivityList:
+        """List a sub-account's activity. An API key needs
+        ``READ_SUBACCOUNT_ACTIVITY``."""
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

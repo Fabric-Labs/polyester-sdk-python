@@ -28,6 +28,7 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> DepositAddressesList:
+        """List deposit addresses. An API key needs ``READ_DEPOSIT_ADDRESSES``."""
         request = ListDepositAddressesRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -49,6 +50,7 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> DepositAddress:
+        """Create a deposit address. An API key needs ``CREATE_DEPOSIT_ADDRESS``."""
         request = CreateDepositAddressRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)

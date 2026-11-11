@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from google.protobuf.message import DecodeError, Message
 
+from polyester.gen.alerts.v1 import price_alerts_pb2 as alerts_pb2
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
@@ -60,6 +61,7 @@ _CODED_DETAILS: dict[str, type[Message]] = {
     "chain.withdraw.v1.ErrorDetail": withdraw_pb2.ErrorDetail,
     "transfer.v1.ErrorDetail": transfer_pb2.ErrorDetail,
     "ledger.read.v1.ErrorDetail": ledger_read_pb2.ErrorDetail,
+    "alerts.v1.ErrorDetail": alerts_pb2.ErrorDetail,
     "polyester.ratelimit.v1.RateLimitDetail": ratelimit_pb2.RateLimitDetail,
 }
 

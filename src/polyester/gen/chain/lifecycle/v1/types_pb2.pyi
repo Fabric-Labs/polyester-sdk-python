@@ -12,6 +12,7 @@ class RequestFeeStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     REQUEST_FEE_STATUS_UNSPECIFIED: _ClassVar[RequestFeeStatus]
     REQUEST_FEE_STATUS_LOCKED: _ClassVar[RequestFeeStatus]
     REQUEST_FEE_STATUS_SETTLED: _ClassVar[RequestFeeStatus]
+    REQUEST_FEE_STATUS_KEPT: _ClassVar[RequestFeeStatus]
 
 class LifecycleReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -20,6 +21,7 @@ class LifecycleReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ZIPPER_EXECUTION_REJECTED: _ClassVar[LifecycleReason]
     ZIPPER_WITHDRAW_EXECUTION_FAILED: _ClassVar[LifecycleReason]
     ZIPPER_DEPOSIT_REFUND_FAILED: _ClassVar[LifecycleReason]
+    ZIPPER_COMPLIANCE_TRANSFERRED: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_REJECTED: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_TRANSFER_EXISTS: _ClassVar[LifecycleReason]
@@ -68,11 +70,13 @@ class FlowState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
 REQUEST_FEE_STATUS_UNSPECIFIED: RequestFeeStatus
 REQUEST_FEE_STATUS_LOCKED: RequestFeeStatus
 REQUEST_FEE_STATUS_SETTLED: RequestFeeStatus
+REQUEST_FEE_STATUS_KEPT: RequestFeeStatus
 REASON_UNSPECIFIED: LifecycleReason
 ZIPPER_VALIDATION_REJECTED: LifecycleReason
 ZIPPER_EXECUTION_REJECTED: LifecycleReason
 ZIPPER_WITHDRAW_EXECUTION_FAILED: LifecycleReason
 ZIPPER_DEPOSIT_REFUND_FAILED: LifecycleReason
+ZIPPER_COMPLIANCE_TRANSFERRED: LifecycleReason
 LEDGER_MIRROR_REJECTED: LifecycleReason
 LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS: LifecycleReason
 LEDGER_MIRROR_TRANSFER_EXISTS: LifecycleReason

@@ -52,6 +52,7 @@ from polyester.models.common import (
     OrderbookData,
     OrderbookLevel,
     PairOrderLimits,
+    SpotAssetConfig,
     SpotConfig,
 )
 from polyester.models.fees import (
@@ -121,6 +122,7 @@ from polyester.models.sub_accounts import (
     SubAccountMembersList,
     SubAccountsList,
 )
+from polyester.models.system import ServerVersion
 from polyester.models.trading import (
     ApiKeysList,
     ApiKeySummary,
@@ -185,6 +187,8 @@ from polyester.models.trading import (
     TriggerTwapDetails,
     UserTrade,
     UserTradesList,
+    WalletBalance,
+    WalletBalances,
     WithdrawDestinationValidation,
     WithdrawIntentResult,
     ZipperReasonDetails,
@@ -333,6 +337,7 @@ __all__ = [
     "RotateGuardSignerWalletResult",
     "Secret",
     "PairOrderLimits",
+    "SpotAssetConfig",
     "SpotConfig",
     "SpotFeeRate",
     "SpotFeeRateBreakdown",
@@ -380,6 +385,7 @@ __all__ = [
     "ChangelogChangeEntry",
     "ChangelogChangesPage",
     "ChangelogPost",
+    "ServerVersion",
     "ChangelogPostSummary",
     "ChangelogPostsPage",
     "ChangelogSection",
@@ -390,6 +396,8 @@ __all__ = [
     "VIPMetricQuality",
     "UsernameHistoryEntry",
     "UsernameHistoryList",
+    "WalletBalance",
+    "WalletBalances",
     "WithdrawDestinationValidation",
     "WithdrawIntentResult",
     "WithdrawWhitelistView",

@@ -33,6 +33,8 @@ Requires **Python 3.11+**.
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
 | Product changelog (posts + changes) | Yes |
+| Server build version | Yes |
+| Price alerts (devnet) | Yes |
 | Balances and equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -306,11 +308,30 @@ grants exactly its reads: `READ_API_KEYS` (`api_keys.list`, `api_keys.get`),
 `READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`, `READ_PROFILE`,
 `READ_ACCOUNT_DIRECTORY`, `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`,
 `READ_CHECKPOINTS` and `READ_REWARDS` open calls this SDK does not wrap yet.
+Deposit addresses, sub-accounts and Guard Signer status need one too:
+`CREATE_DEPOSIT_ADDRESS` (`deposit.create_address`), `READ_DEPOSIT_ADDRESSES`
+(`deposit.list_addresses`), `READ_SUBACCOUNTS` (`sub_accounts.list`,
+`sub_accounts.get`), `READ_SUBACCOUNT_ACTIVITY` (`sub_accounts.list_activity`),
+`READ_SUBACCOUNT_MEMBERS` (`sub_accounts.list_members`, and the members of
+`sub_accounts.get`), `READ_SUBACCOUNT_INVITES` (`sub_accounts.list_invites`, and
+the invites of `sub_accounts.get`) and `READ_GUARD_SIGNER_STATUS`
+(`guard_signer.get_status`). A key scoped to the main account reaches the main
+account and the sub-accounts it owns; a key scoped to a sub-account reaches only
+that sub-account. `sub_accounts.get` leaves out the members and invites a key
+may not read instead of failing. The main account's address book needs
+`READ_ADDRESS_BOOK` (or `MANAGE_ADDRESS_BOOK`) on a key scoped to the main
+account, as a sub-account's book already did. `guard_signer.get_status` no
+longer answers an API key for a sub-account another main account shares with
+yours; use a key of the owning main account.
 These permissions are valid on API-key policies only. VIP status and social
 verification refuse a key scoped to a sub-account. A key without the permission
 raises `PolyesterApiError` whose `auth_error_code(err)` is
 `AUTH_API_KEY_ACCESS_DENIED`; its message names the missing permission. Policy
 subscriptions decode them like every action, as lowercase names (`read_api_keys`).
+A policy update that replaces the whole action list must keep the permissions
+it read back, or it removes them. `api_keys.list` and `api_keys.get` give each
+key's `purpose`: `"standard"` for your keys, `"assistant"` for keys of the
+Polyester assistant.
 
 **Scripts and local tests only:** `AsyncPolyester.from_env()` and
 `Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,
@@ -504,6 +525,11 @@ decimal strings `max_limit_qty_base`, `max_market_qty_base` and
 one market order, valued at a buy's protection price or a sell's reference
 price (`None` means no cap). `client.catalogs.max_open_orders_total` (or
 `SpotConfig.max_open_orders_total`) is the cross-pair resting-order limit.
+`SpotConfig.assets` lists each asset (`SpotAssetConfig`) with
+`included_in_equity`: whether it counts in the account's total equity. Value
+only the assets where it is `True`; list the `False` ones by amount with no
+value. `None` means unknown (a server that predates the field), never outside
+equity.
 The open-order counts are the venue defaults for a typical account, `0` when
 unpublished; an account may have a lower limit of its own.
 
@@ -677,7 +703,11 @@ empty list does not mean nothing was cancelled, so read open orders instead.
 `cancel_all` and the dead-man switch (`cancel_all_after`) cancel open orders
 only, never triggers: an armed stop still fires and places its order later, a
 TWAP keeps placing slices, and the triggers keep their reserved funds. Orders
-that triggers placed are canceled like any other. To stop all automated
+that triggers placed (TWAP slices, ladder levels, exit orders) are canceled like
+any other; a ladder stops once its levels are canceled. An attached stop-loss,
+take-profit or trailing leg whose exit order is canceled ends, and so do the
+parent's other legs when `oco` is set, so the position loses that protection;
+other attached legs keep protecting the parent's filled quantity. To stop all automated
 trading, `orders.stop_all_trading()` lists the live triggers (`created`,
 `armed`, `running`, `paused`, attached legs included) page by page, cancels
 each, and only then cancels all orders, so an order a trigger places before
@@ -775,6 +805,11 @@ entry = await client.address_book.update_entry(
 
 `social_verification.start(..., handle="@alice")` accepts an optional leading
 `@` on Twitter handles. The SDK forwards the handle as supplied.
+`social_verification.get(provider="telegram")` reads a Telegram link: while it
+waits for the user's confirmation its `status` is `STATUS_AWAITING_CONFIRMATION`
+and it carries `handle`, `displayName` and `providerUserId` (a decimal string;
+keep it a string). Starting, confirming and unlinking a Telegram link need an
+interactive session and are not wrapped.
 
 ## Product changelog API
 
@@ -833,6 +868,65 @@ for entry in await client.changelog.breaking_changes_since(datetime(2026, 9, 1, 
 
 The sync `Polyester` client returns plain iterators:
 `for post in client.changelog.iter_posts(): ...`.
+
+## Server version
+
+`await client.get_version()` returns the build the API serves as
+`ServerVersion`: `version`, the full source `commit` and the `environment` that
+answered (`devnet`, `testnet`, `mainnet` or `local`; any other name reads as
+sent). It needs no API key and sends none. A build made after a release reads
+like `0.10.0-12-g4e21a2f09670`, which is not a semantic version: `release` is
+the part before the first `-`, the release it follows.
+
+## Price alerts (devnet)
+
+`client.alerts` manages durable price alerts. Available on devnet; not yet
+routed on testnet. Alerts belong to the main account: a session or an API key
+of the main account manages them, and a key scoped to a sub-account is refused
+with `PolyesterAuthError` (`code` `SUBACCOUNT_KEY_REFUSED`, HTTP 403).
+
+- `create(symbol=, direction=, price=, channels=, price_source=None,
+  idempotency_key=None)`: `direction` `"above"` fires at a price >= `price`,
+  `"below"` at a price <= `price`. `price_source` is `"last"` or `"index"`;
+  `None` watches the index price where the market has one and the last price
+  otherwise. `channels` names one or two of `"in_app"` and `"telegram"`. The
+  current price is recorded as `reference_price`; an alert whose condition
+  already holds starts with `armed` false and fires only after the price moves
+  back and crosses again.
+- `list(statuses=, symbol=, limit=, page_token=)` returns one page, newest
+  first (`limit` 50 by default, at most 200); `iter_alerts(...)` yields every
+  match across pages.
+- `update(alert_id=, expected_revision=, direction=, price=, channels=,
+  idempotency_key=)` changes only the fields you pass. With none it changes no
+  field: it sets a triggered alert again, and changes nothing on an active one.
+  `outcome` is `"applied"`, `"unchanged"` or `"replayed"`.
+- `cancel(alert_id=)` cancels an active alert; a cancelled alert is returned
+  unchanged.
+
+Prices are exact `Price` values (quote units, 1e9 ticks). `status` is
+`"active"`, `"triggered"` or `"cancelled"`, the contract's spelling (a
+trigger's is `"canceled"`); a triggered alert has `triggered_at` and
+`triggered_price`. Pass the same `idempotency_key` when you send a create or
+update again after a lost answer: it applies at most once. Refusals keep the
+contract code: `PRICE_UNAVAILABLE` raises a retryable `PolyesterServerError`
+(nothing changed); `SERVICE_UNAVAILABLE` raises a `PolyesterServerError` whose
+outcome is unknown for a create, update or cancel (`mutation_outcome_unknown`):
+send a create or update again with the same `idempotency_key`, cancel again (it
+is idempotent), or read the alerts back; `REVISION_CONFLICT` means the alert changed since you
+read it (read it again); `IDEMPOTENCY_CONFLICT` means the key was used for
+another request; `ALERT_LIMIT_REACHED`, `ALERT_UPDATE_LIMIT_REACHED`,
+`ALERT_CANCELLED`, `ALERT_TRIGGERED`, `ALERT_NOT_FOUND`, `UNKNOWN_SYMBOL` and
+`PRICE_SOURCE_UNSUPPORTED` raise `PolyesterApiError`.
+
+```python
+alert = await client.alerts.create(
+    symbol="BTC-USDT", direction="below", price="90000", channels=["in_app"],
+    idempotency_key="btc-dip-1",
+)
+result = await client.alerts.update(
+    alert_id=alert.alert_id, expected_revision=alert.revision, price="91000",
+)
+```
 
 ## Triggers
 
@@ -1153,6 +1247,13 @@ SDK notes:
   returns user-safe `valid` / `code` / `message` / `canonical_destination_address`
   without creating a withdraw (create RPCs remain authoritative). An API key needs
   `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer allows it.
+- **Wallet zTokens:** `await client.trading_withdraws.get_wallet_balances()` reads
+  the zTokens of the account's smart account wallet live from Polyester Chain
+  (`smart_account_address`, and per balance `zipped_asset_id`,
+  `unified_asset_id`, `chain_id`, `ztoken_address`, exact `amount_e18` and
+  `amount`). A withdrawal Zipper rejects is refunded there, net of its kept
+  fee: its lifecycle flow ends `refunded`. `sub_account_id=` selects a
+  sub-account. An API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The receipt's `flow_id` reads the transfer's lifecycle flow with
   `client.lifecycle.get_flow(flow_id=...)`; the flow may become readable after the receipt.
@@ -1871,6 +1972,15 @@ A refused call's server message reaches the caller unchanged. An API key whose
 policy lacks the action a withdraw or auto-withdraw read checks raises
 `PolyesterAuthError` with, for example, "api key policy does not allow
 READ_AUTO_WITHDRAW": grant that action in the key's policy.
+
+Other withdrawal refusals raise `PolyesterWithdrawError`, a `PolyesterApiError`
+whose `code` is the `chain.withdraw.v1.ErrorCode` name. `field_path` names the
+request field to fix when the server names one; `min_floor_e18` and
+`min_floor` give the floor of `ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`.
+`ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN` refuses a broker vault's payout to
+a destination whitelisted less than 24 hours ago: the destination is listed and
+nothing was reserved, so send it again at `payable_from` (`None` when not known
+yet). It is not retryable at once.
 
 `PolyesterApiError.violations` names the request fields to fix, each with
 `field_path`, `rule_id` and `message`: from the `orders.v1.ErrorDetail` of a

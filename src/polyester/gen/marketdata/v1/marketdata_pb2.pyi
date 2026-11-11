@@ -270,20 +270,22 @@ class Candle(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[int] = ..., open: _Optional[int] = ..., high: _Optional[int] = ..., low: _Optional[int] = ..., close: _Optional[int] = ..., volume: _Optional[int] = ..., quote_volume: _Optional[str] = ...) -> None: ...
 
 class AssetConfig(_message.Message):
-    __slots__ = ("asset", "ledger_id", "name", "quantity_display_decimals", "quantity_scale", "market_data_volume_scale")
+    __slots__ = ("asset", "ledger_id", "name", "quantity_display_decimals", "quantity_scale", "market_data_volume_scale", "included_in_equity")
     ASSET_FIELD_NUMBER: _ClassVar[int]
     LEDGER_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_DISPLAY_DECIMALS_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_SCALE_FIELD_NUMBER: _ClassVar[int]
     MARKET_DATA_VOLUME_SCALE_FIELD_NUMBER: _ClassVar[int]
+    INCLUDED_IN_EQUITY_FIELD_NUMBER: _ClassVar[int]
     asset: str
     ledger_id: int
     name: str
     quantity_display_decimals: int
     quantity_scale: int
     market_data_volume_scale: int
-    def __init__(self, asset: _Optional[str] = ..., ledger_id: _Optional[int] = ..., name: _Optional[str] = ..., quantity_display_decimals: _Optional[int] = ..., quantity_scale: _Optional[int] = ..., market_data_volume_scale: _Optional[int] = ...) -> None: ...
+    included_in_equity: bool
+    def __init__(self, asset: _Optional[str] = ..., ledger_id: _Optional[int] = ..., name: _Optional[str] = ..., quantity_display_decimals: _Optional[int] = ..., quantity_scale: _Optional[int] = ..., market_data_volume_scale: _Optional[int] = ..., included_in_equity: _Optional[bool] = ...) -> None: ...
 
 class PairMarketdataConfig(_message.Message):
     __slots__ = ("orderbook_price_buckets",)

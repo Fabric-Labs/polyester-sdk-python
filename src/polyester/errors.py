@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from polyester._problem import HTTPProblem
@@ -40,6 +42,10 @@ AUTH_API_KEY_NOT_ACCEPTED = "AUTH_API_KEY_NOT_ACCEPTED"
 # ConnectRPC ``unauthenticated``). The request was not processed, and the same
 # header is refused again: fix ``recv_window_ms``.
 AUTH_RECV_WINDOW_INVALID = "AUTH_RECV_WINDOW_INVALID"
+# The server already saw this exact signed request (REST ``REPLAY_DETECTED``,
+# HTTP 401). The first copy may have been applied, so it is final: read back
+# before sending the operation again, which signs it with a fresh timestamp.
+AUTH_REPLAY_DETECTED = "AUTH_REPLAY_DETECTED"
 API_KEY_AUTH_ERROR_CODES = frozenset(
     {
         AUTH_SIGNATURE_INVALID,
@@ -50,6 +56,7 @@ API_KEY_AUTH_ERROR_CODES = frozenset(
         AUTH_IP_NOT_ALLOWED,
         AUTH_API_KEY_NOT_ACCEPTED,
         AUTH_RECV_WINDOW_INVALID,
+        AUTH_REPLAY_DETECTED,
     }
 )
 
@@ -386,6 +393,51 @@ class PolyesterApiError(PolyesterError):
         self.violations = list(violations or [])
 
 
+class PolyesterWithdrawError(PolyesterApiError):
+    """A withdrawal or auto-withdraw refusal that carries a
+    ``chain.withdraw.v1.ErrorDetail``.
+
+    ``code`` is the ``chain.withdraw.v1.ErrorCode`` name, such as
+    ``ERROR_CODE_DESTINATION_INVALID``. ``field_path`` names the request field
+    to fix, such as ``destinations[0].min_amount_e18``, when the server names
+    one. ``min_floor_e18`` (exact, scaled by 1e18) and ``min_floor`` (whole
+    units) are set on ``ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR``: the least amount a
+    payout to that destination can pay now.
+
+    ``ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`` refuses a broker vault's
+    payout to a destination added to its whitelist less than 24 hours ago. The
+    destination is listed, so this is not a whitelist error, and nothing was
+    reserved: send it again at ``payable_from``, which is ``None`` when that
+    time is not known yet. :func:`is_retryable_error` reports ``False``, since
+    an immediate retry is refused the same way.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        raw: object | None = None,
+        field_path: str | None = None,
+        min_floor_e18: str | None = None,
+        payable_from: datetime | None = None,
+    ) -> None:
+        super().__init__(message, code=code, raw=raw)
+        self.field_path = field_path
+        self.min_floor_e18 = min_floor_e18
+        self.payable_from = payable_from
+
+    @property
+    def min_floor(self) -> Decimal | None:
+        """``min_floor_e18`` in whole units, exact whatever the decimal context."""
+        if self.min_floor_e18 is None:
+            return None
+        # Imported here: polyester.codecs.scalars imports this module.
+        from polyester.codecs.scalars import format_scaled
+
+        return Decimal(format_scaled(int(self.min_floor_e18), 18))
+
+
 class PolyesterSubaccountOwnerRoleLockedError(PolyesterApiError):
     """Raised when a sub-account member call targets the sub-account's owner.
 
@@ -709,6 +761,12 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
                         err.code == "ERROR_CODE_UNAVAILABLE"
                         and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
                         == "orders.v1.ErrorDetail"
+                    )
+                    # A price alert refused PRICE_UNAVAILABLE changed nothing.
+                    or (
+                        err.code == "PRICE_UNAVAILABLE"
+                        and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
+                        == "alerts.v1.ErrorDetail"
                     )
                 )
             )

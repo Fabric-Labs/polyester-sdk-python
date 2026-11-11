@@ -21,6 +21,7 @@ from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
+    AsyncAlertsService,
     AsyncApiKeysService,
     AsyncAuthService,
     AsyncBalancesService,
@@ -777,6 +778,16 @@ class SyncVIPService(_SyncService):
     list_vip_tiers = call(AsyncVIPService.list_vip_tiers)
 
 
+class SyncAlertsService(_SyncService):
+    """``Polyester`` view of :class:`~polyester.services.AsyncAlertsService`."""
+
+    cancel = call(AsyncAlertsService.cancel)
+    create = call(AsyncAlertsService.create)
+    iter_alerts = iterate(AsyncAlertsService.iter_alerts)
+    list = call(AsyncAlertsService.list)
+    update = call(AsyncAlertsService.update)
+
+
 class SyncChangelogService(_SyncService):
     """``Polyester`` view of :class:`~polyester.services.AsyncChangelogService`."""
 
@@ -798,6 +809,7 @@ class SyncWithdrawService(_SyncService):
     create_to_external_chain = call(AsyncWithdrawService.create_to_external_chain)
     create_to_funding = call(AsyncWithdrawService.create_to_funding)
     create_wallet_trading_withdraw = call(AsyncWithdrawService.create_wallet_trading_withdraw)
+    get_wallet_balances = call(AsyncWithdrawService.get_wallet_balances)
     prepare_api_key_to_external = plain(AsyncWithdrawService.prepare_api_key_to_external)
     prepare_api_key_to_external_chain = plain(
         AsyncWithdrawService.prepare_api_key_to_external_chain

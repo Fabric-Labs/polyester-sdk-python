@@ -1,12 +1,16 @@
+import datetime
+
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
+from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
+from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from collections.abc import Mapping as _Mapping
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
@@ -58,6 +62,11 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_CONFLICT: _ClassVar[ErrorCode]
     ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE: _ClassVar[ErrorCode]
     ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION: _ClassVar[ErrorCode]
+    ERROR_CODE_DESTINATION_INVALID: _ClassVar[ErrorCode]
+    ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR: _ClassVar[ErrorCode]
+    ERROR_CODE_ROUTE_UNSUPPORTED: _ClassVar[ErrorCode]
+    ERROR_CODE_VERSION_CONFLICT: _ClassVar[ErrorCode]
+    ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN: _ClassVar[ErrorCode]
 
 class TradingWithdrawAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -119,6 +128,11 @@ ERROR_CODE_NOT_FOUND: ErrorCode
 ERROR_CODE_CONFLICT: ErrorCode
 ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE: ErrorCode
 ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION: ErrorCode
+ERROR_CODE_DESTINATION_INVALID: ErrorCode
+ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR: ErrorCode
+ERROR_CODE_ROUTE_UNSUPPORTED: ErrorCode
+ERROR_CODE_VERSION_CONFLICT: ErrorCode
+ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN: ErrorCode
 ACTION_UNSPECIFIED: TradingWithdrawAction
 TO_FUNDING: TradingWithdrawAction
 TO_EXTERNAL_CHAIN: TradingWithdrawAction
@@ -143,10 +157,16 @@ class CreateWalletTradingWithdrawResponse(_message.Message):
     def __init__(self, intent_id: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code",)
+    __slots__ = ("code", "field_path", "min_floor_e18", "payable_from")
     CODE_FIELD_NUMBER: _ClassVar[int]
+    FIELD_PATH_FIELD_NUMBER: _ClassVar[int]
+    MIN_FLOOR_E18_FIELD_NUMBER: _ClassVar[int]
+    PAYABLE_FROM_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
+    field_path: str
+    min_floor_e18: _u128_pb2.U128
+    payable_from: _timestamp_pb2.Timestamp
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., field_path: _Optional[str] = ..., min_floor_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., payable_from: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class TradingWithdrawIntentPayload(_message.Message):
     __slots__ = ("action", "asset_id", "destination_chain_id", "amount_e18", "deadline_ts_sec", "nonce", "destination_address", "idempotency_key")
@@ -207,3 +227,31 @@ class ValidateWithdrawDestinationResponse(_message.Message):
     message: str
     canonical_destination_address: str
     def __init__(self, valid: _Optional[bool] = ..., code: _Optional[_Union[WithdrawDestinationValidationCode, str]] = ..., message: _Optional[str] = ..., canonical_destination_address: _Optional[str] = ...) -> None: ...
+
+class GetWalletBalancesRequest(_message.Message):
+    __slots__ = ("subaccount_id",)
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
+
+class WalletBalance(_message.Message):
+    __slots__ = ("zipped_asset_id", "unified_asset_id", "chain_id", "ztoken_address", "amount_e18")
+    ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    UNIFIED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    ZTOKEN_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
+    zipped_asset_id: int
+    unified_asset_id: int
+    chain_id: int
+    ztoken_address: str
+    amount_e18: _u128_pb2.U128
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., unified_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., ztoken_address: _Optional[str] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ...) -> None: ...
+
+class GetWalletBalancesResponse(_message.Message):
+    __slots__ = ("smart_account_address", "balances")
+    SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    BALANCES_FIELD_NUMBER: _ClassVar[int]
+    smart_account_address: str
+    balances: _containers.RepeatedCompositeFieldContainer[WalletBalance]
+    def __init__(self, smart_account_address: _Optional[str] = ..., balances: _Optional[_Iterable[_Union[WalletBalance, _Mapping]]] = ...) -> None: ...

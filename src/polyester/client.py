@@ -15,6 +15,7 @@ from polyester._redact import register_url_secrets
 from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
+    SyncAlertsService,
     SyncApiKeysService,
     SyncAuthService,
     SyncBalancesService,
@@ -70,9 +71,11 @@ from polyester.gen.chain.zipper.v1.zipper_connect import ZipperServiceClient
 from polyester.gen.chain.zipper.v1.zipper_pb2 import GetDepositWithdrawConfigRequest
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import GetSpotConfigRequest
+from polyester.models.system import ServerVersion
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
+    AsyncAlertsService,
     AsyncApiKeysService,
     AsyncAuthService,
     AsyncBalancesService,
@@ -100,6 +103,7 @@ from polyester.services import (
     AsyncZipperService,
 )
 from polyester.services._scope import default_sub_account_scope
+from polyester.services.system import AsyncSystemService
 from polyester.sync_subscribe import SyncSubscription
 from polyester.transport import TransportConfig, TransportFactory
 
@@ -343,6 +347,10 @@ class AsyncPolyester:
         self.rate_limits = AsyncRateLimitService(self._transport, default_sub_account_id)
         self.vip = AsyncVIPService(self._transport)
         self.changelog = AsyncChangelogService(self._transport)
+        self._system = AsyncSystemService(self._transport)
+        self.alerts = AsyncAlertsService(
+            self._transport, self.catalogs, wait_for_catalogs=catalog_wait
+        )
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
         self._timeout = timeout
@@ -410,6 +418,11 @@ class AsyncPolyester:
         except PolyesterCatalogHydrationError as exc:
             self.catalogs.mark_funding_unusable(str(exc))
             self._funding_failure = exc
+
+    async def get_version(self) -> ServerVersion:
+        """The build the API serves: its ``version``, source ``commit`` and
+        ``environment``. Needs no API key and sends none."""
+        return await self._system.get_version()
 
     async def wait_for_catalogs(self) -> None:
         """Wait until the spot config, which every spot trading call needs, is ready.
@@ -621,6 +634,7 @@ class Polyester:
         self.rate_limits = SyncRateLimitService(loop, client.rate_limits)
         self.vip = SyncVIPService(loop, client.vip)
         self.changelog = SyncChangelogService(loop, client.changelog)
+        self.alerts = SyncAlertsService(loop, client.alerts)
         self.withdraw = SyncWithdrawService(loop, client.withdraw)
         self.trading_withdraws = self.withdraw
 
@@ -628,6 +642,13 @@ class Polyester:
     def from_env(cls, **overrides) -> Polyester:
         """Create a client using ``POLYESTER_*`` variables from the process environment."""
         return cls(**_apply_from_env(overrides))
+
+    def get_version(self) -> ServerVersion:
+        """The build the API serves: its ``version``, source ``commit`` and
+        ``environment``. Needs no API key and sends none."""
+        return run_on_loop(
+            self._loop, self._client.get_version, what="Polyester.get_version()"
+        )
 
     def wait_for_funding_catalog(self) -> None:
         """Wait until the funding (deposit/withdraw) config is ready.

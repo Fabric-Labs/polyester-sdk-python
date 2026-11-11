@@ -845,7 +845,13 @@ def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:
         subaccount_id=_id_str(_field(data, "subaccountId", "subaccount_id")),
         updated_at=None,
         revision=int(_field(data, "revision", default=0) or 0),
+        purpose=_api_key_purpose(_field(data, "purpose")),
     )
+
+
+def _api_key_purpose(value: Any) -> str:
+    label = _enum_name(value)
+    return "" if label in {"purpose_unspecified", "0"} else label
 
 
 def decode_api_keys_list(data: dict[str, Any]) -> ApiKeysList:

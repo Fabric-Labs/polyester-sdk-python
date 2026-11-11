@@ -20,6 +20,7 @@ class SocialProvider(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PROVIDER_UNSPECIFIED: _ClassVar[SocialProvider]
     TWITTER: _ClassVar[SocialProvider]
     DISCORD: _ClassVar[SocialProvider]
+    TELEGRAM: _ClassVar[SocialProvider]
 
 class SocialVerificationStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -31,6 +32,7 @@ class SocialVerificationStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper
     STATUS_FAILED: _ClassVar[SocialVerificationStatus]
     STATUS_EXPIRED: _ClassVar[SocialVerificationStatus]
     STATUS_CANCELLED: _ClassVar[SocialVerificationStatus]
+    STATUS_AWAITING_CONFIRMATION: _ClassVar[SocialVerificationStatus]
 
 class SocialVerificationMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -41,6 +43,7 @@ class SocialVerificationMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper
 PROVIDER_UNSPECIFIED: SocialProvider
 TWITTER: SocialProvider
 DISCORD: SocialProvider
+TELEGRAM: SocialProvider
 STATUS_UNSPECIFIED: SocialVerificationStatus
 STATUS_PENDING_USER_ACTION: SocialVerificationStatus
 STATUS_QUEUED: SocialVerificationStatus
@@ -49,18 +52,20 @@ STATUS_VERIFIED: SocialVerificationStatus
 STATUS_FAILED: SocialVerificationStatus
 STATUS_EXPIRED: SocialVerificationStatus
 STATUS_CANCELLED: SocialVerificationStatus
+STATUS_AWAITING_CONFIRMATION: SocialVerificationStatus
 METHOD_UNSPECIFIED: SocialVerificationMethod
 METHOD_PROFILE: SocialVerificationMethod
 METHOD_CHANNEL: SocialVerificationMethod
 METHOD_DM: SocialVerificationMethod
 
 class SocialVerification(_message.Message):
-    __slots__ = ("id", "provider", "method", "handle", "provider_user_id", "challenge_code", "status", "requested_at", "expires_at", "verified_at", "attempts", "last_error", "error_code", "updated_at")
+    __slots__ = ("id", "provider", "method", "handle", "provider_user_id", "display_name", "challenge_code", "status", "requested_at", "expires_at", "verified_at", "attempts", "last_error", "error_code", "updated_at")
     ID_FIELD_NUMBER: _ClassVar[int]
     PROVIDER_FIELD_NUMBER: _ClassVar[int]
     METHOD_FIELD_NUMBER: _ClassVar[int]
     HANDLE_FIELD_NUMBER: _ClassVar[int]
     PROVIDER_USER_ID_FIELD_NUMBER: _ClassVar[int]
+    DISPLAY_NAME_FIELD_NUMBER: _ClassVar[int]
     CHALLENGE_CODE_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     REQUESTED_AT_FIELD_NUMBER: _ClassVar[int]
@@ -75,6 +80,7 @@ class SocialVerification(_message.Message):
     method: SocialVerificationMethod
     handle: str
     provider_user_id: str
+    display_name: str
     challenge_code: str
     status: SocialVerificationStatus
     requested_at: _timestamp_pb2.Timestamp
@@ -84,7 +90,7 @@ class SocialVerification(_message.Message):
     last_error: str
     error_code: _auth_pb2.AuthErrorCode
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ..., provider_user_id: _Optional[str] = ..., challenge_code: _Optional[str] = ..., status: _Optional[_Union[SocialVerificationStatus, str]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verified_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., attempts: _Optional[int] = ..., last_error: _Optional[str] = ..., error_code: _Optional[_Union[_auth_pb2.AuthErrorCode, str]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ..., provider_user_id: _Optional[str] = ..., display_name: _Optional[str] = ..., challenge_code: _Optional[str] = ..., status: _Optional[_Union[SocialVerificationStatus, str]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verified_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., attempts: _Optional[int] = ..., last_error: _Optional[str] = ..., error_code: _Optional[_Union[_auth_pb2.AuthErrorCode, str]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class StartSocialVerificationRequest(_message.Message):
     __slots__ = ("provider", "method", "handle")
@@ -97,14 +103,16 @@ class StartSocialVerificationRequest(_message.Message):
     def __init__(self, provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ...) -> None: ...
 
 class StartSocialVerificationResponse(_message.Message):
-    __slots__ = ("challenge_code", "expires_at", "verification")
+    __slots__ = ("challenge_code", "expires_at", "verification", "action_url")
     CHALLENGE_CODE_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     VERIFICATION_FIELD_NUMBER: _ClassVar[int]
+    ACTION_URL_FIELD_NUMBER: _ClassVar[int]
     challenge_code: str
     expires_at: _timestamp_pb2.Timestamp
     verification: SocialVerification
-    def __init__(self, challenge_code: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verification: _Optional[_Union[SocialVerification, _Mapping]] = ...) -> None: ...
+    action_url: str
+    def __init__(self, challenge_code: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verification: _Optional[_Union[SocialVerification, _Mapping]] = ..., action_url: _Optional[str] = ...) -> None: ...
 
 class SocialVerificationReadyRequest(_message.Message):
     __slots__ = ("provider",)
@@ -125,6 +133,32 @@ class GetSocialVerificationRequest(_message.Message):
     def __init__(self, provider: _Optional[_Union[SocialProvider, str]] = ...) -> None: ...
 
 class GetSocialVerificationResponse(_message.Message):
+    __slots__ = ("verification",)
+    VERIFICATION_FIELD_NUMBER: _ClassVar[int]
+    verification: SocialVerification
+    def __init__(self, verification: _Optional[_Union[SocialVerification, _Mapping]] = ...) -> None: ...
+
+class ConfirmSocialVerificationRequest(_message.Message):
+    __slots__ = ("provider", "provider_user_id")
+    PROVIDER_FIELD_NUMBER: _ClassVar[int]
+    PROVIDER_USER_ID_FIELD_NUMBER: _ClassVar[int]
+    provider: SocialProvider
+    provider_user_id: str
+    def __init__(self, provider: _Optional[_Union[SocialProvider, str]] = ..., provider_user_id: _Optional[str] = ...) -> None: ...
+
+class ConfirmSocialVerificationResponse(_message.Message):
+    __slots__ = ("verification",)
+    VERIFICATION_FIELD_NUMBER: _ClassVar[int]
+    verification: SocialVerification
+    def __init__(self, verification: _Optional[_Union[SocialVerification, _Mapping]] = ...) -> None: ...
+
+class UnlinkSocialAccountRequest(_message.Message):
+    __slots__ = ("provider",)
+    PROVIDER_FIELD_NUMBER: _ClassVar[int]
+    provider: SocialProvider
+    def __init__(self, provider: _Optional[_Union[SocialProvider, str]] = ...) -> None: ...
+
+class UnlinkSocialAccountResponse(_message.Message):
     __slots__ = ("verification",)
     VERIFICATION_FIELD_NUMBER: _ClassVar[int]
     verification: SocialVerification

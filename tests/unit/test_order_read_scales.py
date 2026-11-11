@@ -360,3 +360,65 @@ def test_trade_stream_decodes_with_the_catalog_scale() -> None:
     (trade,) = decode_user_trade_batch_bytes(payload, scales=scales)
     assert not isinstance(trade, Exception)
     assert trade.qty is not None and trade.qty.as_decimal() == Decimal("0.04148504")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("funding", ["pending", "failed"])
+async def test_order_reads_scale_from_the_spot_catalog_without_the_funding_config(
+    funding: str,
+) -> None:
+    """Order, trade and trigger reads need only the spot config: they are
+    scaled while the funding (deposit/withdraw) config is still loading or
+    after it failed, and never wait for it."""
+    import asyncio
+
+    from polyester.errors import PolyesterCatalogHydrationError
+    from polyester.gen.marketdata.v1 import marketdata_pb2
+
+    spot = marketdata_pb2.GetSpotConfigResponse()
+    pair = spot.pairs.add()
+    pair.symbol, pair.symbol_id, pair.base_asset, pair.quote_asset = "BTC-USDT", 1, "BTC", "USDT"
+    pair.base_quantity_scale, pair.quote_quantity_scale = 8, 6
+
+    def handler(req: ParsedRequest) -> HttpScript:
+        rpc = req.path.rsplit("/", 1)[-1]
+        if rpc == "GetSpotConfig":
+            return connect_proto_response(spot.SerializeToString())
+        if rpc == "GetDepositWithdrawConfig":
+            if funding == "pending":
+                return HttpScript.never_respond()
+            return HttpScript.json(500, b'{"code":"internal","message":"funding down"}')
+        if rpc == "GetUserTrades":
+            body = orders_read_pb2.GetUserTradesResponse(trades=[_trade()])
+            return connect_proto_response(body.SerializeToString())
+        if rpc in TRIGGER_RESPONSES:
+            return connect_proto_response(TRIGGER_RESPONSES[rpc].SerializeToString())
+        return connect_proto_response(RESPONSES[rpc].SerializeToString())
+
+    http = await MockHttpServer.spawn(handler)
+    creds = make_test_credentials()
+    client = AsyncPolyester(
+        api_url=http.base_url,
+        ws_url="ws://127.0.0.1:9/unused",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        timeout=30.0,
+    )
+    try:
+        if funding == "failed":
+            with pytest.raises(PolyesterCatalogHydrationError):
+                await client.wait_for_funding_catalog()
+
+        async def reads() -> None:
+            for method in ("get", "list_open", "list_history"):
+                _assert_scaled(await _read(client, method))
+            trade = (await client.trades.list()).trades[0]
+            assert trade.qty is not None and trade.qty.scale == 8
+            trigger = await client.triggers.get(trigger_id="11")
+            assert trigger is not None and trigger.qty is not None and trigger.qty.scale == 8
+
+        # Started right after the client: each read waits for the spot config only.
+        await asyncio.wait_for(reads(), 10)
+    finally:
+        await client.aclose()
+        await http.aclose()

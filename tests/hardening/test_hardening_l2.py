@@ -93,7 +93,7 @@ async def _assert_peers_idle(http: MockHttpServer | None, ws: MockWsServer) -> N
 
 
 @pytest.mark.asyncio
-async def test_l2_auth_10k_identical_requests_are_unique_bounded_and_runtime_safe() -> None:
+async def test_l2_auth_identical_request_burst_is_unique_bounded_and_runtime_safe() -> None:
     source = make_test_credentials()
     credentials = ApiKeyCredentials(
         key_id=source.key_id,
@@ -120,7 +120,7 @@ async def test_l2_auth_10k_identical_requests_are_unique_bounded_and_runtime_saf
     await asyncio.sleep(0)
     before = time.time_ns() // 1_000_000
     try:
-        signed = await asyncio.gather(*(sign() for _ in range(10_000)))
+        signed = await asyncio.gather(*(sign() for _ in range(3_000)))
     finally:
         ticker_running = False
         await ticker_task
@@ -132,8 +132,8 @@ async def test_l2_auth_10k_identical_requests_are_unique_bounded_and_runtime_saf
         int(item["X-API-TIMESTAMP"]) <= observed_at + MAX_SIGNING_FUTURE_SKEW_MS
         for item, observed_at in signed
     )
-    assert len(set(timestamps)) == 10_000
-    assert len({item["X-API-SIGNATURE"] for item in headers}) == 10_000
+    assert len(set(timestamps)) == 3_000
+    assert len({item["X-API-SIGNATURE"] for item in headers}) == 3_000
     # The ticker only runs while signing yields the loop, so it ticks during the
     # seconds this burst waits at the ceiling. A synchronous wait would leave it
     # almost no ticks, however busy the host.

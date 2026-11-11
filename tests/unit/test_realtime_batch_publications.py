@@ -249,4 +249,6 @@ async def test_private_event_subscriptions_use_batch_decoders(
 
     call = realtime.subscribe_proto_batch.await_args
     assert call.args[0].startswith("private:") and ":42:" in call.args[0]
-    assert call.kwargs["decode_batch"].__name__ == decoder
+    decode_batch = call.kwargs["decode_batch"]
+    # A decoder bound to the catalog scales is a functools.partial.
+    assert getattr(decode_batch, "func", decode_batch).__name__ == decoder

@@ -320,3 +320,43 @@ def test_trigger_stream_decodes_with_the_catalog_scales() -> None:
     assert trigger.details is not None and trigger.details.twap is not None
     executed = trigger.details.twap.executed_qty
     assert executed is not None and executed.as_decimal() == Decimal("0.25")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("json_wire", [False, True])
+@pytest.mark.parametrize("catalogs", [True, False])
+async def test_trades_list_carries_the_catalog_scale(json_wire: bool, catalogs: bool) -> None:
+    async def handler(req: ParsedRequest) -> HttpScript:
+        assert req.path.endswith("/GetUserTrades")
+        response = orders_read_pb2.GetUserTradesResponse(trades=[_trade()])
+        if json_wire:
+            return HttpScript.json(200, MessageToDict(response))
+        return connect_proto_response(response.SerializeToString())
+
+    http = await MockHttpServer.spawn(handler)
+    creds = make_test_credentials()
+    client = AsyncPolyester(
+        api_url=http.base_url,
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+        wire_format="json" if json_wire else "binary",
+    )
+    if catalogs:
+        client.catalogs.hydrate_spot_config({"pairs": [BTC_USDT]})
+    try:
+        qty = (await client.trades.list()).trades[0].qty
+        assert qty is not None and qty.scale == (8 if catalogs else None)
+    finally:
+        await client.aclose()
+        await http.aclose()
+
+
+def test_trade_stream_decodes_with_the_catalog_scale() -> None:
+    from polyester.codecs.realtime_decode import decode_user_trade_batch_bytes
+
+    scales = AsyncOrdersService(MagicMock(), _catalogs(), None)._order_scales
+    payload = orders_read_pb2.UserTradeBatch(events=[_trade()]).SerializeToString()
+    (trade,) = decode_user_trade_batch_bytes(payload, scales=scales)
+    assert not isinstance(trade, Exception)
+    assert trade.qty is not None and trade.qty.as_decimal() == Decimal("0.04148504")

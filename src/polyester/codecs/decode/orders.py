@@ -435,9 +435,14 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
     )
 
 
-def user_trades_list_from_proto(msg) -> UserTradesList:
+def scaled_user_trade_from_proto(msg: UserTrade, scales: OrderScales | None) -> PublicUserTrade:
+    """Decode a trade with its pair's base quantity scale from ``scales``."""
+    return user_trade_from_proto(msg, quantity_scale=pair_scales(scales, msg.symbol_id)[0])
+
+
+def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> UserTradesList:
     return UserTradesList(
-        trades=[user_trade_from_proto(item) for item in msg.trades],
+        trades=[scaled_user_trade_from_proto(item, scales) for item in msg.trades],
         transfers=[order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])],
         next_page_token=msg.next_page_token,
     )
@@ -447,10 +452,7 @@ def get_order_from_proto(
     msg: GetOrderResponse, *, scales: OrderScales | None = None
 ) -> GetOrderResult:
     order = scaled_order_from_proto(msg.order, scales) if msg.HasField("order") else None
-    trades = [
-        user_trade_from_proto(item, quantity_scale=pair_scales(scales, item.symbol_id)[0])
-        for item in msg.trades
-    ]
+    trades = [scaled_user_trade_from_proto(item, scales) for item in msg.trades]
     transfers = [order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])]
     next_page_token = getattr(msg, "next_page_token", "") or ""
     return GetOrderResult(

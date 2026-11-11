@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import functools
+
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import user_trades_list_from_proto
-from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.orders import catalog_order_scales, parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_user_trade_batch_bytes
 from polyester.codecs.scalars import UINT64_MAX, id_to_int
 from polyester.errors import PolyesterValidationError
@@ -35,6 +37,10 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         self._default_account_id = default_account_id
         self._realtime = realtime
         self._wait_for_catalogs = wait_for_catalogs
+
+    def _order_scales(self, symbol_id: int) -> tuple[int | None, int | None]:
+        """The pair's (base, quote) quantity scales the loaded catalogs know."""
+        return catalog_order_scales(self._catalogs, symbol_id)
 
     async def list(
         self,
@@ -113,12 +119,15 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
             request.subaccount_id = parsed_sub
         if page_token:
             request.page_token = page_token
+        # Decoded with the pair's catalog scale: a load in progress is awaited,
+        # and a failed one leaves the quantities unscaled.
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
             lambda client, req: client.get_user_trades(req),
             request,
-            user_trades_list_from_proto,
+            functools.partial(user_trades_list_from_proto, scales=self._order_scales),
         )
 
     async def subscribe(
@@ -131,5 +140,7 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
             channel_template="private:spot:trades:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode_batch=decode_user_trade_batch_bytes,
+            decode_batch=functools.partial(
+                decode_user_trade_batch_bytes, scales=self._order_scales
+            ),
         )

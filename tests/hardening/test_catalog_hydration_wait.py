@@ -359,6 +359,7 @@ LABELLED_READS: list[tuple[str, Probe]] = [
     ("orders.list_history", lambda c, _s: c.orders.list_history()),
     ("triggers.get", lambda c, _s: c.triggers.get(trigger_id=7)),
     ("triggers.list", lambda c, _s: c.triggers.list()),
+    ("trades.list", lambda c, _s: c.trades.list()),
 ]
 
 

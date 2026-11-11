@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
@@ -252,17 +253,24 @@ class _TriggerConfig:
         self.max_slippage_bps = 0
 
 
+def _slippage_cap_projection(config, cfg: _TriggerConfig, *, symbol: str | None) -> None:
+    """Copy a ``max_slippage`` oneof (ticks or bps) onto the top-level cap.
+
+    An unset oneof leaves both unset: the pair's default market slippage.
+    """
+    cap = config.WhichOneof("max_slippage")
+    if cap == "max_slippage_ticks":
+        cfg.max_slippage = _price(int(config.max_slippage_ticks), symbol=symbol)
+    elif cap == "max_slippage_bps":
+        cfg.max_slippage_bps = int(config.max_slippage_bps)
+
+
 def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | None) -> None:
     """Derive order_type/tif/post_only/limit_price from a conditional child."""
     if child.HasField("market_ioc"):
         cfg.order_type = "market"
         cfg.time_in_force = "ioc"
-        market = child.market_ioc
-        cap = market.WhichOneof("max_slippage")
-        if cap == "max_slippage_ticks":
-            cfg.max_slippage = _price(int(market.max_slippage_ticks), symbol=symbol)
-        elif cap == "max_slippage_bps":
-            cfg.max_slippage_bps = int(market.max_slippage_bps)
+        _slippage_cap_projection(child.market_ioc, cfg, symbol=symbol)
     elif child.HasField("limit_gtc"):
         cfg.order_type = "limit"
         cfg.time_in_force = "gtc"
@@ -304,6 +312,13 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
             cfg.limit_price = _price(trailing.limit_price_ticks, symbol=symbol)
         else:
             cfg.order_type = "market"
+        _slippage_cap_projection(trailing, cfg, symbol=symbol)
+    elif has_field(msg, "trailing"):
+        # Runtime state without the configuration: its cap still reads back
+        # on the top-level fields (zero there means no cap is set).
+        runtime = msg.trailing
+        cfg.max_slippage = _price(int(runtime.max_slippage_ticks), symbol=symbol)
+        cfg.max_slippage_bps = int(runtime.max_slippage_bps)
     elif has_field(msg, "twap"):
         twap = msg.twap
         cfg.trigger_type = "twap"
@@ -315,6 +330,9 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
         else:
             cfg.order_type = "market"
             cfg.time_in_force = "ioc"
+            if twap.HasField("market_ioc"):
+                # Per-slice cap; unset means the pair's default market slippage.
+                _slippage_cap_projection(twap.market_ioc, cfg, symbol=symbol)
     elif has_field(msg, "ladder"):
         ladder = msg.ladder
         cfg.trigger_type = "ladder"
@@ -325,7 +343,16 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
     return cfg
 
 
-def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None = None) -> Trigger:
+TriggerSymbols = Callable[[int], str]
+"""A pair's name by ``symbol_id`` from loaded catalogs; ``""`` where unknown."""
+
+
+def trigger_from_proto(
+    msg: triggers_pb2.Trigger,
+    *,
+    quantity_scale: int | None = None,
+    symbol: str = "",
+) -> Trigger:
     details = _trigger_details(msg, quantity_scale=quantity_scale)
     cfg = _trigger_config(msg)
     trigger_price = cfg.trigger_price
@@ -338,7 +365,7 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
         trigger_id=format_uint64_id(msg.trigger_id),
         subaccount_id=format_uint64_id(msg.subaccount_id) if msg.subaccount_id else "",
         symbol_id=int(msg.symbol_id),
-        symbol="",
+        symbol=symbol,
         trigger_type=cfg.trigger_type,
         status=_trigger_status_label(msg.status),
         parent_order_id=parent_order_id,
@@ -377,15 +404,27 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
     )
 
 
-def scaled_trigger_from_proto(msg: triggers_pb2.Trigger, scales: OrderScales | None) -> Trigger:
-    """Decode a trigger with its pair's base quantity scale from ``scales``."""
-    return trigger_from_proto(msg, quantity_scale=pair_scales(scales, msg.symbol_id)[0])
+def scaled_trigger_from_proto(
+    msg: triggers_pb2.Trigger,
+    scales: OrderScales | None,
+    symbols: TriggerSymbols | None = None,
+) -> Trigger:
+    """Decode a trigger with its pair's base quantity scale from ``scales``
+    and its pair's name from ``symbols`` (both catalog lookups)."""
+    return trigger_from_proto(
+        msg,
+        quantity_scale=pair_scales(scales, msg.symbol_id)[0],
+        symbol=symbols(int(msg.symbol_id)) if symbols is not None and msg.symbol_id else "",
+    )
 
 
 def triggers_list_from_proto(
-    msg: triggers_pb2.ListTriggersResponse, *, scales: OrderScales | None = None
+    msg: triggers_pb2.ListTriggersResponse,
+    *,
+    scales: OrderScales | None = None,
+    symbols: TriggerSymbols | None = None,
 ) -> TriggersList:
-    triggers = [scaled_trigger_from_proto(item, scales) for item in msg.triggers]
+    triggers = [scaled_trigger_from_proto(item, scales, symbols) for item in msg.triggers]
     return TriggersList(
         triggers=triggers,
         total=len(triggers),
@@ -394,10 +433,13 @@ def triggers_list_from_proto(
 
 
 def get_trigger_from_proto(
-    msg: triggers_pb2.GetTriggerResponse, *, scales: OrderScales | None = None
+    msg: triggers_pb2.GetTriggerResponse,
+    *,
+    scales: OrderScales | None = None,
+    symbols: TriggerSymbols | None = None,
 ) -> Trigger | None:
     if has_field(msg, "trigger"):
-        return scaled_trigger_from_proto(msg.trigger, scales)
+        return scaled_trigger_from_proto(msg.trigger, scales, symbols)
     return None
 
 

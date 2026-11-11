@@ -20,6 +20,7 @@ from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_p
 from polyester.codecs.decode.sub_accounts import subaccount_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto
 from polyester.codecs.decode.triggers import (
+    TriggerSymbols,
     scaled_trigger_from_proto,
     trigger_event_from_proto,
 )
@@ -109,10 +110,15 @@ def decode_ledger_transfer_batch_bytes(
     return _decode_batch_members(batch.events, ledger_transfer_from_proto)
 
 
-def decode_trigger_bytes(payload: bytes, *, scales: OrderScales | None = None) -> Trigger:
+def decode_trigger_bytes(
+    payload: bytes,
+    *,
+    scales: OrderScales | None = None,
+    symbols: TriggerSymbols | None = None,
+) -> Trigger:
     from polyester.gen.triggers.v1.triggers_pb2 import Trigger as TriggerPb
 
-    return scaled_trigger_from_proto(_parse_proto(payload, TriggerPb), scales)
+    return scaled_trigger_from_proto(_parse_proto(payload, TriggerPb), scales, symbols)
 
 
 def decode_trigger_event_bytes(payload: bytes) -> TriggerEvent:

@@ -574,6 +574,8 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_id: str = ""
     subaccount_id: str = ""
     symbol_id: int = 0
+    # The pair's name from the loaded catalogs (``triggers.get``,
+    # ``triggers.list`` and ``triggers.subscribe``); empty without them.
     symbol: str = ""
     trigger_type: str = ""
     status: str = ""
@@ -583,10 +585,12 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     time_in_force: str = ""
     qty: Quantity | None = None
     limit_price: Price | None = None
-    # Slippage cap of a stop-loss or take-profit market child: ``max_slippage``
-    # in ticks (as a Price delta) or ``max_slippage_bps``; both unset means the
-    # pair's default market slippage. Trailing stops report theirs on
-    # ``details.trailing``.
+    # Slippage cap, as configured: of a stop-loss or take-profit market
+    # child, of a trailing stop, or of each market TWAP slice.
+    # ``max_slippage`` in ticks (as a Price delta) or ``max_slippage_bps``,
+    # whichever was set; both unset means the pair's default market slippage
+    # (no explicit cap), not an unprotected order. A trailing stop also
+    # reports its cap on ``details.trailing``.
     max_slippage: Price | None = None
     max_slippage_bps: int = 0
     fee_asset: str = ""

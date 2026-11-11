@@ -125,13 +125,15 @@ def test_buy_trailing_stop_limit_price_must_reach_activation_price() -> None:
         _trigger("trailing_stop", "buy", limit_price="119", activation_price="120")
 
 
-def test_trigger_modify_caps_slippage_at_9999_and_zero_clears() -> None:
-    assert modify_trigger_to_proto(trigger_id="1", max_slippage_bps=9_999).max_slippage_bps == (
-        9_999
+def test_trigger_modify_caps_slippage_at_10000_and_zero_clears() -> None:
+    # The contract's modify bound is 0 to 10000 (POLY-9426); the server
+    # refuses 10000 for a sell or a trailing stop.
+    assert modify_trigger_to_proto(trigger_id="1", max_slippage_bps=10_000).max_slippage_bps == (
+        10_000
     )
     assert modify_trigger_to_proto(trigger_id="1", max_slippage_bps=0).max_slippage_bps == 0
-    with pytest.raises(PolyesterValidationError, match=CAP_ERROR):
-        modify_trigger_to_proto(trigger_id="1", max_slippage_bps=10_000)
+    with pytest.raises(PolyesterValidationError, match="between 1 and 10000"):
+        modify_trigger_to_proto(trigger_id="1", max_slippage_bps=10_001)
 
 
 def test_trigger_modify_no_longer_takes_a_limit_price() -> None:

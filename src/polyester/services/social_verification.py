@@ -11,6 +11,7 @@ from polyester.services._generated import unary_auth_decoded
 _PROVIDER_ALIASES = {
     "twitter": sv_pb2.TWITTER,
     "discord": sv_pb2.DISCORD,
+    "telegram": sv_pb2.TELEGRAM,
 }
 
 _METHOD_ALIASES = {
@@ -68,6 +69,9 @@ class AsyncSocialVerificationService(BaseService):
         main account. It reads the link status only (``provider``, ``method``,
         ``handle``, ``status``, ``verifiedAt``); the other fields stay empty.
         ``start`` and ``mark_ready`` still require an interactive session.
+        A Telegram link awaiting the user's confirmation reads
+        ``STATUS_AWAITING_CONFIRMATION`` with ``displayName`` and the decimal
+        ``providerUserId``; confirming and unlinking need a session.
         """
         request = sv_pb2.GetSocialVerificationRequest(
             provider=resolve_proto_enum(

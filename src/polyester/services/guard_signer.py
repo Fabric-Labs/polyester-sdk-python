@@ -70,6 +70,9 @@ class AsyncGuardSignerService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> GuardSignerStatus | None:
+        """Read Guard Signer status. An API key needs ``READ_GUARD_SIGNER_STATUS``
+        and is refused (``AUTH_API_KEY_ACCESS_DENIED``) for a sub-account that
+        another main account shares with its own."""
         request = GetGuardSignerStatusRequest()
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)

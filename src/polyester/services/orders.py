@@ -525,6 +525,14 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         dry_run: bool = False,
         request_id: str | None = None,
     ) -> CancelAllOrdersResult:
+        """Cancel every matching open order, including those triggers placed.
+
+        Triggers keep running: a standalone stop-loss, take-profit, trailing
+        stop or TWAP can still place new orders. An attached leg whose exit
+        order is canceled ends, and so do its OCO siblings, so the position
+        loses that protection. To stop all automated trading, use
+        :meth:`stop_all_trading`, which cancels the triggers first.
+        """
         if symbol or symbols:
             await self._ensure_catalogs()
         proto_request = cancel_all_orders_to_proto(
@@ -893,6 +901,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         side: str | None = None,
         request_id: str | None = None,
     ) -> CancelAllAfterResult:
+        """Arm the dead-man switch: cancel open orders after ``timeout_sec``
+        unless it is armed again. Like :meth:`cancel_all` it leaves triggers
+        running, and an attached leg whose exit order it cancels ends (with its
+        OCO siblings); cancel triggers first to stop all automated trading."""
         if symbol:
             await self._ensure_catalogs()
         proto_request = cancel_all_after_to_proto(

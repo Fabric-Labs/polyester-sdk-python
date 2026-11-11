@@ -62,6 +62,15 @@ from polyester.services._validation import validate_limit
 
 
 class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
+    """Address books, transfer counterparties and withdraw whitelists.
+
+    An API key reads a book with ``READ_ADDRESS_BOOK`` (or
+    ``MANAGE_ADDRESS_BOOK``) on its policy: the main account's book too, for a
+    key scoped to the main account, as a sub-account's book already did.
+    Without it a read is refused ``permission_denied``
+    (``AUTH_SUBACCOUNT_ACCESS_DENIED``).
+    """
+
     def __init__(
         self,
         transport,

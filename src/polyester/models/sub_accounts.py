@@ -10,6 +10,8 @@ from polyester.models.trading import ApiKeySummary, BalancesList
 
 class SubAccount(msgspec.Struct, kw_only=True, omit_defaults=True):
     id: str = ""
+    # The caller's role: viewer, trader, leveraged_trader, treasury, admin or
+    # owner. Empty when the server sends none, as on a removal.
     role: str = ""
     label: str = ""
     icon: str = ""
@@ -24,6 +26,12 @@ class SubAccount(msgspec.Struct, kw_only=True, omit_defaults=True):
     smart_account_salt_nonce: int = 0
     updated_at: datetime | None = None
     revision: int = 0
+    # True on a realtime update when the caller no longer has access to this
+    # sub-account (for example after its owner removed the caller as a
+    # member): drop it from the caller's list. Its ``role`` is then empty.
+    # A role or access change does not move ``revision`` or ``updated_at``:
+    # apply each update as it arrives. Reads never set it.
+    removed: bool = False
 
 
 class SubAccountsList(msgspec.Struct, kw_only=True, omit_defaults=True):

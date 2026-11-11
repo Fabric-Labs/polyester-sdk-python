@@ -29,6 +29,21 @@ TRIGGER_PRICE_SOURCE_TO_PROTO = {
     "index": "INDEX_PRICE",
     "index_price": "INDEX_PRICE",
 }
+_TRIGGER_TYPE_LABELS = "stop_loss, take_profit, trailing_stop, twap, or ladder"
+
+
+def _trigger_type_key(trigger_type: object) -> str:
+    key = trigger_type.lower().replace("-", "_") if isinstance(trigger_type, str) else ""
+    if key not in TRIGGER_TYPE_TO_PROTO:
+        raise PolyesterValidationError(f"trigger_type must be {_TRIGGER_TYPE_LABELS}")
+    return key
+
+
+def trigger_type_to_proto(trigger_type: str) -> triggers_pb2.TriggerType:
+    """``ListTriggersRequest.trigger_type`` for a ``triggers.create`` label."""
+    return getattr(triggers_pb2, TRIGGER_TYPE_TO_PROTO[_trigger_type_key(trigger_type)])
+
+
 # Spot markets have no mark price; the backend rejects it.
 _UNSUPPORTED_SPOT_PRICE_SOURCES = frozenset({"mark", "mark_price"})
 
@@ -159,7 +174,7 @@ def create_trigger_to_proto(
     side: str,
     qty: object,
     trigger_price: Any | None = None,
-    order_type: str = "market",
+    order_type: str | None = None,
     limit_price: Any | None = None,
     trigger_price_source: str | None = None,
     tif: str | None = None,
@@ -183,15 +198,24 @@ def create_trigger_to_proto(
 ) -> triggers_pb2.CreateTriggerRequest:
     if symbol_id <= 0:
         raise PolyesterValidationError("create trigger requires a resolved symbol_id")
-    type_key = trigger_type.lower().replace("-", "_")
-    if type_key not in TRIGGER_TYPE_TO_PROTO:
-        raise PolyesterValidationError(
-            "trigger_type must be stop_loss, take_profit, trailing_stop, twap, or ladder"
-        )
+    type_key = _trigger_type_key(trigger_type)
     side_key = side.lower()
     if side_key not in ("buy", "sell"):
         raise PolyesterValidationError("side must be buy or sell")
-    order_key = order_type.lower()
+    if order_type is not None and not isinstance(order_type, str):
+        raise PolyesterValidationError("order_type must be limit or market")
+    if type_key == "ladder":
+        # A ladder places LINEAR limit-GTC orders only: any other order type
+        # is refused, never sent as a limit ladder.
+        if order_type is not None and order_type.lower() != "limit":
+            raise PolyesterValidationError(
+                f"order_type={order_type!r} does not apply to a ladder: a ladder places "
+                "limit GTC orders only; pass order_type='limit' or leave it out"
+            )
+        order_key = "limit"
+    else:
+        # Left out, a stop, trailing stop or TWAP child is a market order.
+        order_key = (order_type if order_type is not None else "market").lower()
     if order_key not in ("limit", "market"):
         raise PolyesterValidationError("order_type must be limit or market")
     # Validate presence, including explicit zero values, before selecting a
@@ -462,9 +486,11 @@ def modify_trigger_to_proto(
     that market (an API key limited to specific markets must set it).
     ``symbol`` is that market's name: a ``Price`` bound to another market is
     refused. A child's limit price is fixed at creation: cancel the trigger
-    and create a new one to change it. The patch does not say what it modifies, so
-    ``max_slippage_bps`` takes the cap shared by trailing stops and sells,
-    1 to 9999; ``0`` clears it.
+    and create a new one to change it. ``max_slippage_bps`` is 1 to 10000, as
+    the contract takes it: the patch does not say what it modifies, so the
+    server decides by side and type (a buy stop-loss or take-profit with a
+    market child accepts 10000; a sell or a trailing stop answers
+    ``MAX_SLIPPAGE_INVALID``). ``0`` clears it.
     """
     if not any(
         (
@@ -523,6 +549,5 @@ def modify_trigger_to_proto(
             max_slippage_bps,
             "max_slippage_bps",
             allow_clear=True,
-            max_value=MAX_SELL_SLIPPAGE_BPS,
         )
     return proto

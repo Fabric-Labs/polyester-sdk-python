@@ -81,7 +81,10 @@ async def test_slippage_execution_applicability(kind, option, order_type):
         kwargs["limit_price"] = "100"
     async with capture_transport() as (transport, requests):
         if kind == "ladder" or order_type == "limit":
-            with pytest.raises(PolyesterValidationError, match=option):
+            # A ladder refuses a market order type first (POLY-9423).
+            ladder_market = kind == "ladder" and order_type == "market"
+            match = "does not apply to a ladder" if ladder_market else option
+            with pytest.raises(PolyesterValidationError, match=match):
                 await triggers(transport).create(**kwargs)
             assert len(requests) == 0
         else:

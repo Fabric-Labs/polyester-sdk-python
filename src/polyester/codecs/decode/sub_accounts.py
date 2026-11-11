@@ -20,9 +20,11 @@ from polyester.models.sub_accounts import (
 
 
 def _subaccount_role_from_proto(value: int) -> str:
+    """The role as sent; ``SUBACCOUNT_ROLE_UNSPECIFIED`` (a removed
+    sub-account's role) reads as ``""``, never as a default role."""
     name = proto_enum_name(subaccounts_pb2.SubaccountRole, value)
     if name in {"", "subaccount_role_unspecified"}:
-        return "viewer"
+        return ""
     return name
 
 
@@ -54,6 +56,7 @@ def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
         smart_account_salt_nonce=int(msg.smart_account_salt_nonce),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
         revision=int(msg.revision),
+        removed=bool(msg.removed),
     )
 
 

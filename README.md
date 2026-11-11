@@ -88,6 +88,24 @@ for row in view.balances.balances if view.balances else []:
     print(row.asset_id, row.trading, row.available)
 ```
 
+`sub_accounts.subscribe()` delivers each `SubAccount` change in order. An update
+with `removed` true means the caller no longer has access to that sub-account,
+for example after its owner removed the caller as a member: drop it from the
+caller's list. Its `role` is then empty, never a default role. A change of the
+caller's role or access does not move `revision` or `updated_at`, so apply each
+update as it arrives. `sub_accounts.list` and `sub_accounts.get` never set
+`removed`.
+
+```python
+subscription = await client.sub_accounts.subscribe()
+async with subscription:
+    async for update in subscription:
+        if update.removed:
+            known.pop(update.id, None)
+        else:
+            known[update.id] = update  # update.role: "viewer", "trader", ...
+```
+
 Private streams require an Account ID and the corresponding API-key permission.
 A successful subscribe call means the token exchange and realtime handshake
 completed. The connection and subscription tokens are renewed on the same
@@ -916,6 +934,22 @@ result = await client.alerts.update(
 
 `created`, `armed`, `running`, `completed`, `canceled`, `failed`, `paused`
 
+`triggers.list(trigger_type=...)` keeps one strategy (`stop_loss`,
+`take_profit`, `trailing_stop`, `twap` or `ladder`, the labels
+`triggers.create` takes), and `triggers.list(parent_order_id=...)` keeps the
+attached take-profit, stop-loss and trailing-stop triggers of one order. An
+unknown trigger type, or a parent order ID that is zero or not an order ID,
+raises `PolyesterValidationError` before sending.
+
+```python
+ladders = await client.triggers.list(trigger_type="ladder", status="running")
+legs = await client.triggers.list(parent_order_id=order_id)
+```
+
+With the catalogs loaded, a trigger read from `triggers.get`, `triggers.list`
+or `triggers.subscribe` names its pair in `symbol` (such as `BTC-USDT`);
+without them only `symbol_id` is set.
+
 Invalid status and event-type labels raise `PolyesterValidationError`.
 Connect requests and responses use numeric `symbol_id`. Public methods still
 accept display `symbol` strings and resolve them through the spot config the
@@ -959,9 +993,17 @@ for a buy, 1–9999 for a sell), at most one; without one the pair's default
 market slippage applies. A limit child
 takes no cap (its limit price bounds it). Either side may use either child.
 Trigger reads show the cap as `max_slippage` (ticks, as a price delta) or
-`max_slippage_bps`; both unset means the pair default. A TWAP with
+`max_slippage_bps`, whichever was set; both unset means the pair default. A TWAP with
 `order_type="market"` takes the same cap for each slice: `max_slippage_bps`
-1–10000 to buy, 1–9999 to sell.
+1–10000 to buy, 1–9999 to sell. Reads show a market TWAP's per-slice cap and
+a trailing stop's cap on the same top-level fields; a trailing stop also
+shows its cap on `details.trailing`.
+
+A ladder places limit GTC orders only: create it with `order_type="limit"` or
+without `order_type`. Any other order type, `"market"` included, raises
+`PolyesterValidationError` before sending; it is never sent as a limit ladder.
+Without `order_type`, a stop-loss, take-profit, trailing stop or TWAP child is
+a market order.
 
 ```python
 await client.triggers.create(
@@ -1093,9 +1135,11 @@ activation price with a present zero.
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
 (`Price.from_ticks(0)` or `0`) to clear an existing activation price or
-maximum-slippage cap. Modify `max_slippage_bps` is 1–9999 (the patch does not
-say what it modifies, so it takes the cap shared by trailing stops and
-sells); `0` clears it. Trailing distance in bps is 1–10000; trigger modify
+maximum-slippage cap. Modify `max_slippage_bps` is 1–10000, as at creation,
+and `0` clears it: the patch does not say what it modifies, so the server
+decides by side and type. A buy stop-loss or take-profit with a market child
+accepts 10000; a sell stop-loss or take-profit and a trailing stop refuse it
+with `MAX_SLIPPAGE_INVALID`. Trailing distance in bps is 1–10000; trigger modify
 accepts `0` to clear. A child's limit price is fixed at create, so `modify`
 takes no `limit_price`: cancel the trigger and create a new one instead.
 

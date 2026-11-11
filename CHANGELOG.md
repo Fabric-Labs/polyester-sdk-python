@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.21.1
+
+Git tag: `v0.21.1`. Released 2026-11-12. Built on public contract `a3e3784`.
 
 - Requests signed with an API key could be refused by servers running the new clock rule, which refuses a timestamp more than one second ahead of the server clock as `TIMESTAMP_SKEW` (devnet runs it now; testnet gets it with its next release). The SDK gives each request of a key its own millisecond timestamp, and during a burst it let those timestamps run up to five seconds ahead of the local clock, so a burst of more than about a thousand signed requests, or a few hundred on a host whose clock is a little fast, raised `PolyesterTimestampSkewError`. Automatic timestamps now lead the local clock by at most 500 ms (`polyester.auth.MAX_SIGNING_FUTURE_SKEW_MS` is `500`, was `5000`). A larger burst waits for the clock on the async and sync clients, which sign through `sign_request_async`, as it did at the old ceiling; the low-level synchronous `polyester.auth.sign_request` raises its retryable `PolyesterRateLimitError` (with `retry_after`) once a burst runs 500 ms ahead of the clock, roughly 500 more signatures than milliseconds elapsed, instead of 5000 ms ahead. Keep the host clock synchronized: the other half second is all the room the server leaves for skew. The docs also give the server's new default receive window, 5000 ms (was 10000), used when `recv_window_ms` is `None`. Affected: every method that signs with an API key, such as `auth.me`, `orders.create` and `balances.list`, on `AsyncPolyester` and `Polyester`; the realtime connection and subscription token requests behind every private subscription and the private order stream; `polyester.auth.sign_request` and `sign_request_async` without an explicit timestamp; `polyester.auth.MAX_SIGNING_FUTURE_SKEW_MS`.
 

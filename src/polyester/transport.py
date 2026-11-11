@@ -31,7 +31,7 @@ from polyester._contract_codes import (
     is_recognised_rest_code,
 )
 from polyester._problem import decode_http_problem
-from polyester._redact import url_without_userinfo
+from polyester._redact import redact_exception_chain, url_without_userinfo
 from polyester._redirects import carries_api_key, redirect_refusal
 from polyester.auth import ApiKeyCredentials, validate_recv_window_ms
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
@@ -628,6 +628,5 @@ class TransportFactory:
 
 
 def map_transport_error(exc: Exception) -> PolyesterTransportError:
-    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError)):
-        return PolyesterTransportError(str(exc))
+    redact_exception_chain(exc)
     return PolyesterTransportError(str(exc))

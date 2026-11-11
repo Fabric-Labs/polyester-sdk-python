@@ -1635,8 +1635,18 @@ Each raises `PolyesterCatalogHydrationError` when its catalog could not be
 loaded, and so does every call that needs it: calls that name a market for the
 spot config, `zipper.subscribe_zipped_asset_supply` for the funding config.
 A missing, empty or invalid spot config fails every spot call closed.
-`client.catalogs.ledger_id_for_asset` and `quantity_scale_for_asset` return
-`None` until the funding config has loaded. The sync `Polyester()` returns
+Only what reads the funding config waits for it: the zipper supply stream,
+which decodes with its scales, and the asset lookups. Withdrawals and deposit
+addresses (`withdraw.create_*`, `deposit.list_addresses`,
+`deposit.create_address`) and `zipper.get_deposit_withdraw_config` read
+nothing from it and work while it is loading or failed. A call that waits sends
+nothing until the config loads, and raises `PolyesterCatalogHydrationError`
+naming the funding config, without sending, when it failed.
+`client.catalogs.ledger_id_for_asset` and `quantity_scale_for_asset` don't
+wait: `None` means either that the funding config has not loaded (yet, or its
+load failed) or that it does not know the asset, so await
+`client.wait_for_funding_catalog()` first. With `hydrate_catalogs=False`
+nothing loads and nothing waits, as before. The sync `Polyester()` returns
 once the spot config is ready; call `client.wait_for_funding_catalog()` before
 reading the funding catalog.
 
@@ -1665,6 +1675,12 @@ operation, the kind of failure (`failure`: `"timeout"`,
 `"error"`), the number of reads, and the edge's reference of the last failed
 response (`response_ref`, the `cf-ray` header) when one arrived. `__cause__`
 is the last failure. The message carries no credentials and no proxy URL.
+
+Every SDK error keeps the Connect error and its causes as `__cause__` for
+debugging, and none of them prints a credential: where a Connect error is
+mapped, each URL quoted in the chain, from an answer or from the transport,
+loses its userinfo, query and fragment, and a proxy URL from the environment
+reads `[proxy]`, in `str`, `repr` and `traceback.format_exception` alike.
 
 Timeouts, from the outside in:
 

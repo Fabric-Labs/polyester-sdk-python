@@ -585,3 +585,101 @@ def test_sync_client_starts_when_only_the_funding_config_stalls() -> None:
         asyncio.run_coroutine_threadsafe(http.aclose(), server_loop).result(10)
         server_loop.call_soon_threadsafe(server_loop.stop)
         server_thread.join(5)
+
+
+# Funding paths: only what reads the funding config waits for it.
+
+FUNDING_STATES = [
+    pytest.param("pending", id="funding-pending"),
+    pytest.param("failed", id="funding-failed"),
+]
+
+
+async def _funding_state_client(state: str) -> tuple[AsyncPolyester, MockHttpServer, list[str]]:
+    sent: list[str] = []
+
+    def handler(req: ParsedRequest) -> HttpScript:
+        if req.path.endswith("/GetSpotConfig"):
+            return _proto(_spot_config_body())
+        if req.path.endswith("/GetDepositWithdrawConfig"):
+            if state == "pending":
+                return HttpScript.never_respond()
+            return HttpScript.json(500, b'{"code":"internal","message":"funding down"}')
+        sent.append(req.path.rsplit("/", 1)[-1])
+        return HttpScript.json(400, b'{"code":"failed_precondition","message":"stub"}')
+
+    http = await _plain_api(handler)
+    creds = make_test_credentials()
+    client = AsyncPolyester(
+        api_url=http.base_url,
+        ws_url="ws://127.0.0.1:9/unused",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        default_account_id=1,
+        timeout=30.0,
+    )
+    await client.wait_for_catalogs()
+    if state == "failed":
+        with pytest.raises(PolyesterCatalogHydrationError):
+            await client.wait_for_funding_catalog()
+    return client, http, sent
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", FUNDING_STATES)
+async def test_the_supply_stream_sends_nothing_without_the_funding_config(state: str) -> None:
+    client, http, _sent = await _funding_state_client(state)
+    subscribed: list[str] = []
+
+    async def subscribe(channel: str, *args: Any, **kwargs: Any) -> Any:
+        subscribed.append(channel)
+        raise AssertionError("subscribed without the funding config")
+
+    client.realtime.subscribe_proto = subscribe  # type: ignore[method-assign]
+    try:
+        call = client.zipper.subscribe_zipped_asset_supply()
+        if state == "pending":
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(call, 0.3)
+        else:
+            with pytest.raises(PolyesterCatalogHydrationError, match="funding config"):
+                await call
+        assert subscribed == []
+        # A lookup that reads the funding config answers None, not a guess.
+        assert client.catalogs.ledger_id_for_asset("USDT") is None
+    finally:
+        await client.aclose()
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", FUNDING_STATES)
+async def test_deposit_addresses_and_withdrawals_do_not_wait_for_the_funding_config(
+    state: str,
+) -> None:
+    client, http, sent = await _funding_state_client(state)
+    calls = [
+        ("ListDepositAddresses", lambda: client.deposit.list_addresses(chain_id=1)),
+        ("CreateDepositAddress", lambda: client.deposit.create_address(chain_id=1)),
+        (
+            "CreateTradingWithdraw",
+            lambda: client.withdraw.create_to_funding(
+                asset_id=2,
+                quantity="1",
+                amount_scale=6,
+                payload_signature=b"\x01" * 65,
+                idempotency_key="poly-9228-control",
+                nonce=1,
+                deadline_ts_sec=4_102_444_800,
+            ),
+        ),
+    ]
+    try:
+        for operation, call in calls:
+            with pytest.raises(PolyesterError) as info:
+                await asyncio.wait_for(call(), 5)
+            assert not isinstance(info.value, PolyesterCatalogHydrationError), info.value
+            assert sent[-1] == operation, (operation, sent)
+    finally:
+        await client.aclose()
+        await http.aclose()

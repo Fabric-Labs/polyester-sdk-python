@@ -14,6 +14,7 @@ from polyester._contract_codes import (
     is_placeholder_code,
     is_placeholder_detail,
 )
+from polyester._redact import redact_exception_chain
 from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_json,
     rate_limit_detail_from_proto,
@@ -263,6 +264,9 @@ def _map_gateway_problem(exc: GatewayProblemError):
 
 
 def map_connect_error(exc: ConnectError):
+    # Every SDK error raised for a call is mapped here: redact the Connect
+    # error and its causes once, so nothing in the chain prints a credential.
+    redact_exception_chain(exc)
     mapped = _map_connect_error(exc)
     if isinstance(mapped, PolyesterRateLimitError) and mapped.retry_after is None:
         mapped.retry_after = getattr(exc, "retry_after", None)

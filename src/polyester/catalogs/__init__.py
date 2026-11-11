@@ -489,6 +489,12 @@ class CatalogManager:
         return result
 
     def ledger_id_for_asset(self, asset_symbol: str) -> int | None:
+        """The asset's ledger ID from the funding config.
+
+        ``None`` means either that the funding config has not loaded (yet, or
+        its load failed) or that it does not know the asset. Await
+        ``client.wait_for_funding_catalog()`` first to tell the two apart.
+        """
         if self._funding_unusable:
             return None
         catalog = self.zipper
@@ -505,6 +511,12 @@ class CatalogManager:
         return None
 
     def quantity_scale_for_asset(self, asset_symbol: str) -> int | None:
+        """The asset's quantity scale from the funding config.
+
+        ``None`` means either that the funding config has not loaded (yet, or
+        its load failed) or that it does not know the asset. Await
+        ``client.wait_for_funding_catalog()`` first to tell the two apart.
+        """
         if self._funding_unusable:
             return None
         catalog = self.zipper

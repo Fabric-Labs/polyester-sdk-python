@@ -44,6 +44,7 @@ from polyester.errors import (
     _is_known_admission_refusal,
     auth_error_code_from_rest,
 )
+from polyester.gen.alerts.v1 import price_alerts_pb2 as alerts_pb2
 from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
@@ -83,8 +84,12 @@ _DETAIL_MESSAGES: tuple[type[Message], ...] = (
     withdraw_pb2.ErrorDetail,
     transfer_pb2.ErrorDetail,
     ledger_read_pb2.ErrorDetail,
+    alerts_pb2.ErrorDetail,
     ratelimit_pb2.RateLimitDetail,
 )
+
+# alerts.v1 refusals that changed nothing and succeed when sent again.
+_RETRYABLE_ALERT_CODES = frozenset({"PRICE_UNAVAILABLE", "SERVICE_UNAVAILABLE"})
 
 
 def _unpack_error_detail(detail: Message) -> Message | None:
@@ -338,6 +343,15 @@ def _map_connect_error(exc: ConnectError):
             )
         for unpacked in unpacked_details:
             full_name = unpacked.DESCRIPTOR.full_name
+            if full_name == "alerts.v1.ErrorDetail":
+                code_name = error_code_name(alerts_pb2.ErrorCode, unpacked.code)
+                if code_name == "SUBACCOUNT_KEY_REFUSED":
+                    return PolyesterAuthError(error_message, code=code_name, status_code=403)
+                if code_name in _RETRYABLE_ALERT_CODES:
+                    return PolyesterServerError(
+                        error_message, code=code_name, status_code=503, raw=unpacked
+                    )
+                return PolyesterApiError(error_message, code=code_name, raw=unpacked)
             if full_name in _SERVICE_ERROR_ENUMS:
                 code_name = error_code_name(_SERVICE_ERROR_ENUMS[full_name], unpacked.code)
                 rate_limit = (

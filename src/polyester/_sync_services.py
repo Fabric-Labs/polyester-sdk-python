@@ -21,6 +21,7 @@ from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
+    AsyncAlertsService,
     AsyncApiKeysService,
     AsyncAuthService,
     AsyncBalancesService,
@@ -775,6 +776,16 @@ class SyncVIPService(_SyncService):
 
     get_vip_status = call(AsyncVIPService.get_vip_status)
     list_vip_tiers = call(AsyncVIPService.list_vip_tiers)
+
+
+class SyncAlertsService(_SyncService):
+    """``Polyester`` view of :class:`~polyester.services.AsyncAlertsService`."""
+
+    cancel = call(AsyncAlertsService.cancel)
+    create = call(AsyncAlertsService.create)
+    iter_alerts = iterate(AsyncAlertsService.iter_alerts)
+    list = call(AsyncAlertsService.list)
+    update = call(AsyncAlertsService.update)
 
 
 class SyncChangelogService(_SyncService):

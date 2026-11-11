@@ -753,6 +753,10 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
                         and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
                         == "orders.v1.ErrorDetail"
                     )
+                    # A price alert refused PRICE_UNAVAILABLE or
+                    # SERVICE_UNAVAILABLE changed nothing.
+                    or getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
+                    == "alerts.v1.ErrorDetail"
                 )
             )
         )

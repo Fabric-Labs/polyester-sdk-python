@@ -1,4 +1,5 @@
 from polyester.services.address_book import AsyncAddressBookService
+from polyester.services.alerts import AsyncAlertsService
 from polyester.services.api_keys import AsyncApiKeysService
 from polyester.services.auth import AsyncAuthService
 from polyester.services.balances import AsyncBalancesService
@@ -28,6 +29,7 @@ from polyester.services.zipper import AsyncZipperService
 
 __all__ = [
     "AsyncAddressBookService",
+    "AsyncAlertsService",
     "AsyncChangelogService",
     "AsyncApiKeysService",
     "AsyncAuthService",

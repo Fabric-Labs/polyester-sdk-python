@@ -15,6 +15,7 @@ from polyester._redact import register_url_secrets
 from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
+    SyncAlertsService,
     SyncApiKeysService,
     SyncAuthService,
     SyncBalancesService,
@@ -74,6 +75,7 @@ from polyester.models.system import ServerVersion
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
+    AsyncAlertsService,
     AsyncApiKeysService,
     AsyncAuthService,
     AsyncBalancesService,
@@ -346,6 +348,9 @@ class AsyncPolyester:
         self.vip = AsyncVIPService(self._transport)
         self.changelog = AsyncChangelogService(self._transport)
         self._system = AsyncSystemService(self._transport)
+        self.alerts = AsyncAlertsService(
+            self._transport, self.catalogs, wait_for_catalogs=catalog_wait
+        )
         self.withdraw = AsyncWithdrawService(self._transport, default_sub_account_id)
         self.trading_withdraws = self.withdraw
         self._timeout = timeout
@@ -629,6 +634,7 @@ class Polyester:
         self.rate_limits = SyncRateLimitService(loop, client.rate_limits)
         self.vip = SyncVIPService(loop, client.vip)
         self.changelog = SyncChangelogService(loop, client.changelog)
+        self.alerts = SyncAlertsService(loop, client.alerts)
         self.withdraw = SyncWithdrawService(loop, client.withdraw)
         self.trading_withdraws = self.withdraw
 

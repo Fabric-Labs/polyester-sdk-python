@@ -162,7 +162,7 @@ def create_trigger_to_proto(
     order_type: str = "market",
     limit_price: Any | None = None,
     trigger_price_source: str | None = None,
-    tif: str = "gtc",
+    tif: str | None = None,
     sub_account_id: str | int | None = None,
     client_trigger_id: str | None = None,
     post_only: bool = False,
@@ -224,18 +224,21 @@ def create_trigger_to_proto(
         raise PolyesterValidationError(
             "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop"
         )
-    if not isinstance(tif, str):
+    if tif is not None and not isinstance(tif, str):
         raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
-    tif_key = tif.lower()
-    if tif_key not in ("gtc", "ioc", "fok"):
+    tif_key = tif.lower() if tif is not None else None
+    if tif_key is not None and tif_key not in ("gtc", "ioc", "fok"):
         raise PolyesterValidationError("tif must be one of 'gtc', 'ioc', or 'fok'")
-    # gtc is the public helper's default. Fixed IOC executions also accept ioc.
+    # Unset means gtc for a limit child. A market child and a trailing stop
+    # always execute IOC, so they take ioc or nothing: any other tif is
+    # refused, never sent as IOC.
     if type_key == "ladder" or (type_key == "twap" and order_key == "limit"):
-        if tif_key != "gtc":
+        if tif_key not in (None, "gtc"):
             raise PolyesterValidationError("tif must be gtc for ladder or twap limit slices")
-    elif (type_key == "trailing_stop" or order_key == "market") and tif_key == "fok":
+    elif (type_key == "trailing_stop" or order_key == "market") and tif_key not in (None, "ioc"):
         raise PolyesterValidationError(
-            "tif=fok applies only to stop_loss or take_profit limit children"
+            f"tif={tif_key} applies only to limit children: "
+            "a market child or a trailing_stop executes IOC"
         )
     if type_key == "trailing_stop" and side_key == "sell" and order_key == "limit":
         raise PolyesterValidationError(
@@ -288,7 +291,7 @@ def create_trigger_to_proto(
             _conditional_child(
                 side=side_key,
                 order_type=order_key,
-                tif=tif,
+                tif=tif_key or "gtc",
                 limit_price=limit_price,
                 post_only=post_only,
                 symbol=symbol,

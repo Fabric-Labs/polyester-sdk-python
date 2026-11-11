@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import Decimal
 
 from google.protobuf.message import Message
@@ -274,7 +275,27 @@ def order_transfer_from_proto(msg: ProtoOrderTransfer) -> OrderTransfer:
     )
 
 
-def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> PublicOrder:
+OrderScales = Callable[[int], tuple[int | None, int | None]]
+"""A pair's ``(base, quote)`` quantity scales by ``symbol_id``; ``None`` where unknown."""
+
+
+def pair_scales(scales: OrderScales | None, symbol_id: int) -> tuple[int | None, int | None]:
+    """The ``(base, quote)`` quantity scales ``scales`` knows for ``symbol_id``."""
+    return scales(int(symbol_id)) if scales is not None else (None, None)
+
+
+def scaled_order_from_proto(msg: Order, scales: OrderScales | None) -> PublicOrder:
+    """Decode an order with its pair's scales from ``scales`` (catalog lookup)."""
+    base, quote = pair_scales(scales, msg.symbol_id)
+    return order_from_proto(msg, quantity_scale=base, quote_quantity_scale=quote)
+
+
+def order_from_proto(
+    msg: Order,
+    *,
+    quantity_scale: int | None = None,
+    quote_quantity_scale: int | None = None,
+) -> PublicOrder:
     status = proto_enum_name(OrderStatus, msg.status) if msg.status else ""
     symbol_id = int(msg.symbol_id)
     attached = (
@@ -366,12 +387,17 @@ def order_from_proto(msg: Order, *, quantity_scale: int | None = None) -> Public
             if has_field(msg, "fee_total")
             else None
         ),
+        quote_quantity_scale=quote_quantity_scale,
     )
 
 
-def orders_list_from_proto(msg: GetOpenOrdersResponse | GetOrderHistoryResponse) -> OrdersList:
+def orders_list_from_proto(
+    msg: GetOpenOrdersResponse | GetOrderHistoryResponse,
+    *,
+    scales: OrderScales | None = None,
+) -> OrdersList:
     return OrdersList(
-        orders=[order_from_proto(item) for item in msg.orders],
+        orders=[scaled_order_from_proto(item, scales) for item in msg.orders],
         next_page_token=msg.next_page_token,
     )
 
@@ -417,9 +443,14 @@ def user_trades_list_from_proto(msg) -> UserTradesList:
     )
 
 
-def get_order_from_proto(msg: GetOrderResponse) -> GetOrderResult:
-    order = order_from_proto(msg.order) if msg.HasField("order") else None
-    trades = [user_trade_from_proto(item) for item in msg.trades]
+def get_order_from_proto(
+    msg: GetOrderResponse, *, scales: OrderScales | None = None
+) -> GetOrderResult:
+    order = scaled_order_from_proto(msg.order, scales) if msg.HasField("order") else None
+    trades = [
+        user_trade_from_proto(item, quantity_scale=pair_scales(scales, item.symbol_id)[0])
+        for item in msg.trades
+    ]
     transfers = [order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])]
     next_page_token = getattr(msg, "next_page_token", "") or ""
     return GetOrderResult(

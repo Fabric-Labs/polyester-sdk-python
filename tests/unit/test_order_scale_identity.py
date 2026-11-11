@@ -45,7 +45,7 @@ def order(symbol: str, scale: int) -> CreateOrderRequest:
 
 WRITES = {
     "create": lambda c, symbol, scale: c.orders.create(order(symbol, scale)),
-    "preview_order": lambda c, symbol, scale: c.orders.preview_order(order(symbol, scale)),
+    "preview": lambda c, symbol, scale: c.orders.preview(order(symbol, scale)),
     "batch_create": lambda c, symbol, scale: c.orders.batch_create(
         items=[order("BTC-USDT", 8), order(symbol, scale)]
     ),

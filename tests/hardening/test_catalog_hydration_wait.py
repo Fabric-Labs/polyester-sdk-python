@@ -229,7 +229,7 @@ PROBES: list[tuple[str, Probe]] = [
         lambda c, s: c.orders.cancel_all_after(timeout_sec=10, symbol=s),
     ),
     ("orders.create", lambda c, s: c.orders.create(**_LIMIT_ORDER, symbol=s)),
-    ("orders.preview_order", lambda c, s: c.orders.preview_order(**_LIMIT_ORDER, symbol=s)),
+    ("orders.preview", lambda c, s: c.orders.preview(**_LIMIT_ORDER, symbol=s)),
     (
         "orders.batch_create",
         lambda c, s: c.orders.batch_create(items=[{**_LIMIT_ORDER, "symbol": s}]),
@@ -353,6 +353,12 @@ LABELLED_READS: list[tuple[str, Probe]] = [
     ),
     ("market_overview.subscribe", lambda c, _s: c.market_overview.subscribe()),
     ("fees.get_spot_fee_rates", lambda c, _s: c.fees.get_spot_fee_rates()),
+    # Orders and triggers are decoded at their pair's catalog quantity scales.
+    ("orders.get", lambda c, _s: c.orders.get(key=OrderId(7))),
+    ("orders.list_open", lambda c, _s: c.orders.list_open()),
+    ("orders.list_history", lambda c, _s: c.orders.list_history()),
+    ("triggers.get", lambda c, _s: c.triggers.get(trigger_id=7)),
+    ("triggers.list", lambda c, _s: c.triggers.list()),
 ]
 
 

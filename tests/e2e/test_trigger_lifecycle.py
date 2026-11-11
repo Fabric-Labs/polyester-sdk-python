@@ -89,7 +89,7 @@ async def test_trigger_pause_resume_cancel(
 
         cancelled = await live_client.triggers.cancel(trigger_id=created.trigger_id)
         assert cancelled.trigger_id == created.trigger_id
-        assert cancelled.status == "cancelled"
+        assert cancelled.status == "canceled"
         cancelled_ok = True
     finally:
         if not cancelled_ok:

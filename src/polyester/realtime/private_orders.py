@@ -20,6 +20,7 @@ from urllib.parse import urlsplit, urlunsplit
 from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
+from polyester.codecs.decode.orders import OrderScales
 from polyester.codecs.decode.private_orders import (
     private_orders_from_proto,
     private_orders_unit_from_proto,
@@ -152,7 +153,10 @@ class PrivateOrderStream:
         fetch_connect_token: Callable[[], Awaitable[str]],
         fetch_subscribe_token: Callable[[str], Awaitable[str]],
         max_queue_size: int = 1000,
+        order_scales: OrderScales | None = None,
     ) -> None:
+        # A pair's (base, quote) quantity scales by symbol_id, to decode with.
+        self.order_scales = order_scales
         self._url = url
         self._fetch_connect_token = fetch_connect_token
         self._fetch_subscribe_token = fetch_subscribe_token
@@ -762,7 +766,7 @@ class PrivateOrderStream:
             self._resubscribe(ws, s)
             return
         try:
-            orders = private_orders_from_proto(staged)
+            orders = private_orders_from_proto(staged, scales=self.order_scales)
         except Exception as exc:
             self._report(s, "decode", exc)
             s.cursor = ""
@@ -775,7 +779,7 @@ class PrivateOrderStream:
 
     def _on_unit(self, ws: ClientConnection, s: _Subscription, unit: pb.Unit) -> None:
         try:
-            event = private_orders_unit_from_proto(unit)
+            event = private_orders_unit_from_proto(unit, scales=self.order_scales)
         except Exception as exc:
             # The unit is not applied: resume from the cursor before it.
             self._report(s, "decode", exc)

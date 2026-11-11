@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import time
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Unpack, overload
@@ -27,6 +28,7 @@ from polyester.codecs.orders import (
     batch_replace_orders_to_proto,
     cancel_all_after_to_proto,
     cancel_all_orders_to_proto,
+    catalog_order_scales,
     create_order_to_proto,
     modify_order_to_proto,
     normalize_create_order_request,
@@ -126,6 +128,16 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         self._wait_for_catalogs = wait_for_catalogs
         self._triggers = triggers
 
+    def _order_scales(self, symbol_id: int) -> tuple[int | None, int | None]:
+        """The pair's (base, quote) quantity scales the loaded catalogs know.
+
+        Order reads and the order stream decode with them, so their helpers
+        (``cum_quote()``, ``quote_used()``, ``quote_unspent()``) need no scale
+        argument. Reads don't wait for the catalogs: before they load, a
+        scale is ``None`` and the helpers take it explicitly.
+        """
+        return catalog_order_scales(self._catalogs, symbol_id)
+
     async def list_open(
         self,
         *,
@@ -158,12 +170,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.limit = validated_limit
         if trigger_id is not None and trigger_id != "":
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
+        # Decoded with the pair's catalog scales: a load in progress is
+        # awaited, and a failed one leaves the quantities unscaled.
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
             lambda client, req: client.get_open_orders(req),
             request,
-            orders_list_from_proto,
+            functools.partial(orders_list_from_proto, scales=self._order_scales),
         )
 
     async def list_history(
@@ -207,12 +222,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.page_token = page_token
         if trigger_id is not None and trigger_id != "":
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
             lambda client, req: client.get_order_history(req),
             request,
-            orders_list_from_proto,
+            functools.partial(orders_list_from_proto, scales=self._order_scales),
         )
 
     async def get(
@@ -258,12 +274,13 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
             self._transport,
             OrdersReadServiceClient,
             lambda client, req: client.get_order(req),
             request,
-            get_order_from_proto,
+            functools.partial(get_order_from_proto, scales=self._order_scales),
         )
 
     @overload
@@ -329,16 +346,16 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         )
 
     @overload
-    async def preview_order(
+    async def preview(
         self, request: CreateOrderRequest, *, account: AccountScope | None = None
     ) -> PreviewOrderResult: ...
 
     @overload
-    async def preview_order(
+    async def preview(
         self, *, account: AccountScope | None = None, **kwargs: Unpack[CreateOrderParams]
     ) -> PreviewOrderResult: ...
 
-    async def preview_order(
+    async def preview(
         self,
         request: CreateOrderRequest | None = None,
         *,
@@ -916,7 +933,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         """
         client = require_realtime(self._realtime)
         resolved = resolve_account_id(account_id, self._default_account_id)
-        return await client.subscribe_private_orders(resolved)
+        return await client.subscribe_private_orders(resolved, order_scales=self._order_scales)
 
     async def wait_for_order_trades_complete(
         self,

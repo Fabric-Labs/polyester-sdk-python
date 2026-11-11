@@ -19,7 +19,7 @@ async def misspelt_keywords(client: AsyncPolyester) -> None:
     await client.orders.create(  # E: "qyt"
         symbol="BTC-USDT", side="buy", order_type="market", qyt="0.01"
     )
-    await client.orders.preview_order(  # E: "qyt"
+    await client.orders.preview(  # E: "qyt"
         symbol="BTC-USDT", side="buy", order_type="market", qyt="0.01"
     )
     await client.orders.batch_create(  # E: CreateOrderItem
@@ -55,7 +55,7 @@ async def wrong_shapes(client: AsyncPolyester) -> None:
     # No side: neither overload matches.
     await client.orders.create(symbol="BTC-USDT", order_type="market", qty="0.01")  # E: overload
     await client.orders.create(order(), qty="0.01")  # E: overload
-    await client.orders.preview_order(order(), side="sell")  # E: overload
+    await client.orders.preview(order(), side="sell")  # E: overload
     await client.orders.batch_create(  # E: CreateOrderItem
         items=[
             {

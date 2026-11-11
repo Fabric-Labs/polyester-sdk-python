@@ -508,19 +508,19 @@ class SyncOrdersService(_SyncSubscribeService):
     if TYPE_CHECKING:
         # Overloads don't carry through ``call``: declared as on the async service.
         @overload
-        def preview_order(
+        def preview(
             self, request: CreateOrderRequest, *, account: AccountScope | None = None
         ) -> PreviewOrderResult: ...
 
         @overload
-        def preview_order(
+        def preview(
             self, *, account: AccountScope | None = None, **kwargs: Unpack[CreateOrderParams]
         ) -> PreviewOrderResult: ...
 
-        def preview_order(self, *args: Any, **kwargs: Any) -> PreviewOrderResult: ...
+        def preview(self, *args: Any, **kwargs: Any) -> PreviewOrderResult: ...
 
     else:
-        preview_order = call(AsyncOrdersService.preview_order)
+        preview = call(AsyncOrdersService.preview)
 
     stop_all_trading = call(AsyncOrdersService.stop_all_trading)
     subscribe = call(AsyncOrdersService.subscribe)

@@ -67,7 +67,7 @@ async def account_selectors(client: AsyncPolyester, scope: dict[str, str | int])
     await client.orders.list_open(account={"sub_account_id": "2"})
     await client.orders.list_open(account=scope)
     await client.orders.create(order(), account={"subaccountId": SUB})
-    await client.orders.preview_order(order(), account=scope)
+    await client.orders.preview(order(), account=scope)
 
 
 async def create_keywords(client: AsyncPolyester) -> None:
@@ -83,11 +83,11 @@ async def create_keywords(client: AsyncPolyester) -> None:
         client_order_id="c1",
         account="main",
     )
-    await client.orders.preview_order(
+    await client.orders.preview(
         symbol="BTC-USDT", side="buy", order_type="market", qty="0.01", sub_account_id=SUB
     )
     await client.orders.create(order(SUB))
-    await client.orders.preview_order(order("2"))
+    await client.orders.preview(order("2"))
     params: CreateOrderParams = {
         "symbol": "BTC-USDT",
         "side": "buy",
@@ -122,7 +122,7 @@ def sync_calls(client: Polyester) -> None:
         symbol="BTC-USDT", side="buy", order_type="market", qty="0.01", sub_account_id=SUB
     )
     client.orders.create(order(SUB))
-    client.orders.preview_order(order("2"), account="main")
+    client.orders.preview(order("2"), account="main")
     client.triggers.create(
         symbol="BTC-USDT", trigger_type="stop_loss", side="sell", qty="0.01", trigger_price="100"
     )

@@ -348,8 +348,11 @@ def order_intent_from_request(
     if request.expires_at and tif != "gtd":
         raise PolyesterValidationError("expires_at is only valid for limit GTD orders")
     if request.order_type == "market":
-        if tif == "gtd":
-            raise PolyesterValidationError("tif='gtd' is only valid for limit orders")
+        # The contract's only market execution is market_ioc: market orders
+        # always execute immediate-or-cancel. Any other requested tif is
+        # refused, never sent as IOC.
+        if request.tif is not None and request.tif != "ioc":
+            raise PolyesterValidationError(f"tif='{request.tif}' is only valid for limit orders")
         if request.post_only:
             raise PolyesterValidationError("post_only is only valid for limit GTC or GTD orders")
         if request.price is not None:
@@ -1317,6 +1320,22 @@ def quote_quantity_scale_for_symbol(
             "await client.wait_for_catalogs() before placing orders"
         )
     return scale
+
+
+def catalog_order_scales(
+    catalogs: CatalogManager | None, symbol_id: int
+) -> tuple[int | None, int | None]:
+    """A pair's ``(base, quote)`` quantity scales from loaded catalogs.
+
+    ``None`` for a scale the catalogs do not know, such as before they load
+    or for a pair they do not list. Reads never wait for the catalogs.
+    """
+    if catalogs is None:
+        return None, None
+    base = catalogs.base_quantity_scale_for_symbol_id(symbol_id)
+    symbol = catalogs.symbol_for_symbol_id(symbol_id)
+    quote = catalogs.quote_quantity_scale_for_symbol(symbol) if symbol else None
+    return base, quote
 
 
 def resolve_quantity_scale(

@@ -42,6 +42,7 @@ from polyester.realtime.resubscribe import (
 )
 
 if TYPE_CHECKING:
+    from polyester.codecs.decode.orders import OrderScales
     from polyester.models.private_orders import PrivateOrdersEvent
     from polyester.realtime.private_orders import PrivateOrderStream
 
@@ -260,12 +261,16 @@ class AsyncRealtimeClient:
             self._private_orders = None
 
     async def subscribe_private_orders(
-        self, account_id: str | int
+        self, account_id: str | int, *, order_scales: OrderScales | None = None
     ) -> AsyncSubscription[PrivateOrdersEvent]:
         """Stream an account's orders over the private WebSocket (``/v1/ws/private``).
 
         Every subscription shares one connection, and each account one server
         subscription. Returns once the server confirmed the subscription.
+        ``order_scales`` maps a pair's ``symbol_id`` to its ``(base, quote)``
+        quantity scales, which the stream's orders and fills are decoded with
+        (``orders.subscribe`` passes the catalogs'); the stream keeps the
+        latest one given.
         """
         from polyester.realtime.private_orders import (
             PrivateOrderStream,
@@ -295,6 +300,8 @@ class AsyncRealtimeClient:
                 fetch_subscribe_token=fetch_subscribe_token,
                 max_queue_size=self._max_queue_size,
             )
+        if order_scales is not None:
+            self._private_orders.order_scales = order_scales
         return await self._private_orders.subscribe(account_id)
 
     def _track_sub(self, sub: AsyncSubscription[Any]) -> None:

@@ -16,6 +16,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from typing import Any
 
 import pytest
 
@@ -285,8 +286,8 @@ async def test_wait_refuses_a_success_finished_after_its_timeout(
     timeout = 0.05
     decode = orders_service.get_order_from_proto
 
-    def late_decode(msg: orders_read_pb2.GetOrderResponse) -> GetOrderResult:
-        result = decode(msg)
+    def late_decode(msg: orders_read_pb2.GetOrderResponse, **kwargs: Any) -> GetOrderResult:
+        result = decode(msg, **kwargs)
         time.sleep(timeout + 0.03)  # holds the event loop past the deadline
         return result
 

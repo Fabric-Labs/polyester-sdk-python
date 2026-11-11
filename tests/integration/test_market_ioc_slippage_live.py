@@ -83,12 +83,12 @@ async def test_preview_market_ioc_accepts_slippage_overrides(live_client, smoke_
     async def preview(**overrides: object) -> PreviewOrderResult:
         try:
             return await call_optional(
-                live_client.orders.preview_order(**kwargs, **overrides),
-                label="orders.preview_order",
+                live_client.orders.preview(**kwargs, **overrides),
+                label="orders.preview",
             )
         except (PolyesterRouteNotFoundError, PolyesterApiError) as exc:
             if route_unavailable(exc):
-                pytest.skip(f"orders.preview_order not mounted: {exc}")
+                pytest.skip(f"orders.preview not mounted: {exc}")
             raise
 
     unset = await preview()

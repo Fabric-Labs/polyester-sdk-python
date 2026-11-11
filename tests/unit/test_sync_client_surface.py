@@ -136,7 +136,7 @@ def _overloads(cls: type, name: str) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize("name", ["create", "preview_order"])
+@pytest.mark.parametrize("name", ["create", "preview"])
 def test_overloaded_order_methods_keep_the_async_overloads(name: str) -> None:
     from polyester._sync_services import SyncOrdersService
 

@@ -99,7 +99,7 @@ async def test_preview_resolves_id_quantity_scale(identity, json_wire):
     kwargs = {"symbol": "BTC-USDT"} if identity == "symbol" else {"symbol_id": 1}
     qty = Quantity.from_scaled(16000, scale=8 if identity == "explicit" else None)
     try:
-        result = await client.orders.preview_order(
+        result = await client.orders.preview(
             **kwargs, side="buy", order_type="limit", qty=qty, price="100"
         )
         assert len(seen) == 1
@@ -289,12 +289,12 @@ async def test_preview_without_catalog_requires_explicit_scale(explicit):
             "qty": Quantity.from_scaled(16000, scale=8 if explicit else None),
         }
         if explicit:
-            result = await client.orders.preview_order(**kwargs)
+            result = await client.orders.preview(**kwargs)
             assert result.resolved_base_qty.as_decimal() == Decimal("0.00016")
             assert len(seen) == 1
         else:
             with pytest.raises(PolyesterValidationError, match="explicit scale"):
-                await client.orders.preview_order(**kwargs)
+                await client.orders.preview(**kwargs)
             assert seen == []
     finally:
         await client.aclose()

@@ -11,11 +11,14 @@ from polyester.codecs.decode.balances import asset_balance_from_proto
 from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
 from polyester.codecs.decode.market_data import candle_point_from_proto
 from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
-from polyester.codecs.decode.orders import user_trade_from_proto
+from polyester.codecs.decode.orders import OrderScales, user_trade_from_proto
 from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_policy_from_proto
 from polyester.codecs.decode.sub_accounts import subaccount_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto
-from polyester.codecs.decode.triggers import trigger_event_from_proto, trigger_from_proto
+from polyester.codecs.decode.triggers import (
+    scaled_trigger_from_proto,
+    trigger_event_from_proto,
+)
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterRealtimeError
 from polyester.models import ApiData, AssetBalance, LedgerTransfer, UserTrade
@@ -98,10 +101,10 @@ def decode_ledger_transfer_batch_bytes(
     return _decode_batch_members(batch.events, ledger_transfer_from_proto)
 
 
-def decode_trigger_bytes(payload: bytes) -> Trigger:
+def decode_trigger_bytes(payload: bytes, *, scales: OrderScales | None = None) -> Trigger:
     from polyester.gen.triggers.v1.triggers_pb2 import Trigger as TriggerPb
 
-    return trigger_from_proto(_parse_proto(payload, TriggerPb))
+    return scaled_trigger_from_proto(_parse_proto(payload, TriggerPb), scales)
 
 
 def decode_trigger_event_bytes(payload: bytes) -> TriggerEvent:

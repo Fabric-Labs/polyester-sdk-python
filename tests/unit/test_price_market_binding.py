@@ -282,7 +282,7 @@ async def test_order_preview_refuses_values_for_another_market(
     await _refused(
         ORDERS,
         orders_pb2.PreviewOrderResponse(),
-        lambda: service.preview_order(**params),
+        lambda: service.preview(**params),
         match,
     )
 

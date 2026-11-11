@@ -19,7 +19,7 @@ REFUSAL = "market_client_ref_price is only valid for market orders"
 
 RESPONSES: dict[str, Message] = {
     "create": orders_pb2.CreateOrderResponse(order_id=42),
-    "preview_order": orders_pb2.PreviewOrderResponse(
+    "preview": orders_pb2.PreviewOrderResponse(
         admissible=True, evaluated_at=Timestamp(seconds=1_700_000_000)
     ),
     "batch_create": orders_pb2.BatchCreateOrdersResponse(),
@@ -61,7 +61,7 @@ def _order(side: str, order_type: str, tif: str | None = None) -> dict[str, obje
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("method", ["create", "preview_order", "batch_create"])
+@pytest.mark.parametrize("method", ["create", "preview", "batch_create"])
 @pytest.mark.parametrize("side", ["buy", "sell"])
 @pytest.mark.parametrize("tif", ["gtc", "gtd", "ioc", "fok"])
 async def test_limit_order_refuses_market_client_ref_price_before_sending(

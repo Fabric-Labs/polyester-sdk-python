@@ -93,7 +93,7 @@ SCOPED_CALLS: dict[str, Call] = {
         _order(sub_account_id=s["sub_account_id"]) if "sub_account_id" in s else _order(),
         account=s.get("account"),
     ),
-    "orders.preview_order": lambda c, s: c.orders.preview_order(
+    "orders.preview": lambda c, s: c.orders.preview(
         _order(sub_account_id=s["sub_account_id"]) if "sub_account_id" in s else _order(),
         account=s.get("account"),
     ),

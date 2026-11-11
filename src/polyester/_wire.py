@@ -272,6 +272,9 @@ def map_connect_error(exc: ConnectError):
         mapped.retry_after = getattr(exc, "retry_after", None)
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
+    # The mapped error holds what it decoded from the answer too, such as a
+    # rate-limit detail from a binary detail.
+    redact_exception_chain(mapped)
     return mapped
 
 

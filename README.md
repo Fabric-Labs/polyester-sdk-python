@@ -1680,7 +1680,9 @@ Every SDK error keeps the Connect error and its causes as `__cause__` for
 debugging, and none of them prints a credential: where a Connect error is
 mapped, each URL quoted in the chain, from an answer or from the transport,
 loses its userinfo, query and fragment, and a proxy URL from the environment
-reads `[proxy]`, in `str`, `repr` and `traceback.format_exception` alike.
+reads `[proxy]`, in `str`, `repr` and `traceback.format_exception` alike, and in
+structured diagnostics such as `error.problem` and a rate limit's
+`error.detail`.
 
 Timeouts, from the outside in:
 

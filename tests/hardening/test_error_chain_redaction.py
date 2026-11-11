@@ -124,3 +124,157 @@ async def test_catalog_startup_chains_no_credential(answer) -> None:
     finally:
         await client.aclose()
         await http.aclose()
+
+
+# Round 2: URLs whose userinfo or query holds a parenthesis or an apostrophe,
+# OSError fields that are not args, and structured diagnostics.
+
+TRICKY_URLS = [
+    pytest.param(f"http://{USER}:one(two-{SECRET})@proxy.example.test/x", id="paren-userinfo"),
+    pytest.param(f"http://{USER}:one'two-{SECRET}@proxy.example.test/x", id="quote-userinfo"),
+    pytest.param(f"http://proxy.example.test/x?{QUERY}one(two-{SECRET})", id="paren-query"),
+    pytest.param(f"http://proxy.example.test/x?{QUERY}one'two-{SECRET}", id="quote-query"),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", TRICKY_URLS)
+async def test_a_url_with_parentheses_or_quotes_is_redacted(url: str) -> None:
+    answer = HttpScript.json(503, {"code": "unavailable", "message": f"upstream {url} refused"})
+    http = await MockHttpServer.spawn(lambda _req: answer)
+    client = AsyncPolyester(
+        api_url=http.base_url, ws_url="ws://127.0.0.1:9/unused", hydrate_catalogs=False
+    )
+    try:
+        with pytest.raises(PolyesterServerError) as info:
+            await client.market_data.get_spot_config()
+        assert "proxy.example.test" in str(info.value)
+        _assert_clean(info.value)
+    finally:
+        await client.aclose()
+        await http.aclose()
+
+
+class _FailingHTTP:
+    """An HTTP client whose every request fails with ``error``."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    async def post(self, *_args, **_kwargs):
+        raise self.error
+
+    async def get(self, *_args, **_kwargs):
+        raise self.error
+
+
+def _os_errors() -> list:
+    import errno
+
+    return [
+        pytest.param(
+            lambda: ConnectionResetError(errno.ECONNRESET, f"upstream {PROXY_URL}"),
+            id="connection-reset-strerror",
+        ),
+        pytest.param(lambda: OSError(errno.EIO, "failure", PROXY_URL), id="os-error-filename"),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("make_error", _os_errors())
+async def test_a_transport_os_error_is_redacted_in_every_field(make_error) -> None:
+    client = AsyncPolyester(
+        api_url="http://127.0.0.1:9", ws_url="ws://127.0.0.1:9/unused", hydrate_catalogs=False
+    )
+    client._transport._connect_http = _FailingHTTP(make_error())  # type: ignore[assignment]
+    try:
+        with pytest.raises(PolyesterServerError) as info:
+            await client.market_data.get_spot_config()
+        cause = info.value.__cause__
+        assert isinstance(cause, ConnectError)
+        assert isinstance(cause.__cause__, OSError)
+        _assert_clean(info.value)
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("make_error", _os_errors())
+async def test_a_catalog_load_os_error_is_redacted_in_every_field(make_error) -> None:
+    client = AsyncPolyester(
+        api_url="http://127.0.0.1:9",
+        ws_url="ws://127.0.0.1:9/unused",
+        timeout=0.5,
+        catalog_timeout=1.0,
+    )
+    failing = _FailingHTTP(make_error())
+    client._transport._connect_http = failing  # type: ignore[assignment]
+
+    class _Transport:
+        async def aclose(self) -> None:
+            return None
+
+    def fresh():  # every retry fails the same way
+        return _Transport()
+
+    client._transport._new_http_transport = fresh  # type: ignore[assignment]
+    import polyester.transport as transport_module
+
+    original = transport_module._ConnectHTTPClient
+
+    class _Failing(original):  # type: ignore[misc, valid-type]
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        async def post(self, *_args, **_kwargs):
+            raise make_error()
+
+    transport_module._ConnectHTTPClient = _Failing  # type: ignore[misc]
+    try:
+        with pytest.raises(PolyesterCatalogHydrationError) as info:
+            await client.wait_for_funding_catalog()
+        _assert_clean(info.value)
+    finally:
+        transport_module._ConnectHTTPClient = original  # type: ignore[misc]
+        await client.aclose()
+
+
+STRUCTURED = [
+    pytest.param(
+        401,
+        {"code": "TIMESTAMP_SKEW", "detail": f"upstream {PROXY_URL} refused"},
+        "problem",
+        id="timestamp-skew-problem",
+    ),
+    pytest.param(
+        429,
+        {
+            "code": "RATE_LIMIT_EXCEEDED",
+            "detail": f"upstream {PROXY_URL}",
+            "rate_limit": {"reason": "ip", "operation_id": PROXY_URL},
+        },
+        "detail",
+        id="rate-limit-detail",
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("status", "body", "attribute"), STRUCTURED)
+async def test_structured_diagnostics_are_redacted(status: int, body: dict, attribute: str) -> None:
+    http = await MockHttpServer.spawn(lambda _req: HttpScript.json(status, body))
+    client = AsyncPolyester(
+        api_url=http.base_url, ws_url="ws://127.0.0.1:9/unused", hydrate_catalogs=False
+    )
+    try:
+        with pytest.raises(PolyesterError) as info:
+            await client.market_data.get_spot_config()
+        diagnostic = getattr(info.value, attribute)
+        assert diagnostic is not None, info.value
+        printed = repr(diagnostic) + str(diagnostic)
+        for secret in (USER, SECRET, QUERY):
+            assert secret not in printed, printed
+        _assert_clean(info.value)
+    finally:
+        await client.aclose()
+        await http.aclose()

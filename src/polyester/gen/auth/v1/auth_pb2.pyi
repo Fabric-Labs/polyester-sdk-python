@@ -80,6 +80,11 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_RECV_WINDOW_INVALID: _ClassVar[AuthErrorCode]
     AUTH_REPLAY_CAPACITY_EXHAUSTED: _ClassVar[AuthErrorCode]
     AUTH_PATH_BODY_ID_MISMATCH: _ClassVar[AuthErrorCode]
+    AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED: _ClassVar[AuthErrorCode]
+    AUTH_ASSISTANT_KEY_PROOF_INVALID: _ClassVar[AuthErrorCode]
+    AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED: _ClassVar[AuthErrorCode]
+    AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR: _ClassVar[AuthErrorCode]
+    AUTH_REPLAY_DETECTED: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -140,6 +145,11 @@ AUTH_WALLET_ALREADY_LINKED: AuthErrorCode
 AUTH_RECV_WINDOW_INVALID: AuthErrorCode
 AUTH_REPLAY_CAPACITY_EXHAUSTED: AuthErrorCode
 AUTH_PATH_BODY_ID_MISMATCH: AuthErrorCode
+AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED: AuthErrorCode
+AUTH_ASSISTANT_KEY_PROOF_INVALID: AuthErrorCode
+AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED: AuthErrorCode
+AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR: AuthErrorCode
+AUTH_REPLAY_DETECTED: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

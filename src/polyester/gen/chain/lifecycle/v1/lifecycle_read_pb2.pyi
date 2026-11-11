@@ -318,7 +318,7 @@ class FlowSummaryProgressView(_message.Message):
     def __init__(self, current_step_started_at_unix_ms: _Optional[int] = ..., current_step_expected_duration_ms: _Optional[int] = ..., current_confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., approve_count: _Optional[int] = ..., reject_count: _Optional[int] = ..., validator_count: _Optional[int] = ..., required_approvals: _Optional[int] = ..., required_rejections: _Optional[int] = ...) -> None: ...
 
 class FlowStepView(_message.Message):
-    __slots__ = ("sequence", "step", "asset_ids", "polyester_chain_id", "amount_e18", "request_fee", "milestone_tx_ref", "milestone_tx_chain_id", "lifecycle_source", "lifecycle_reason", "zipper_reason", "current_confirmations", "required_confirmations", "approve_count", "reject_count", "validator_count", "required_approvals", "required_rejections", "occurred_at_unix_ms", "block_time_moving_average_ms", "activities")
+    __slots__ = ("sequence", "step", "asset_ids", "polyester_chain_id", "amount_e18", "request_fee", "milestone_tx_ref", "milestone_tx_chain_id", "lifecycle_source", "lifecycle_reason", "zipper_reason", "current_confirmations", "required_confirmations", "approve_count", "reject_count", "validator_count", "required_approvals", "required_rejections", "occurred_at_unix_ms", "block_time_moving_average_ms", "activities", "refund_address")
     SEQUENCE_FIELD_NUMBER: _ClassVar[int]
     STEP_FIELD_NUMBER: _ClassVar[int]
     ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
@@ -340,6 +340,7 @@ class FlowStepView(_message.Message):
     OCCURRED_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     BLOCK_TIME_MOVING_AVERAGE_MS_FIELD_NUMBER: _ClassVar[int]
     ACTIVITIES_FIELD_NUMBER: _ClassVar[int]
+    REFUND_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     sequence: int
     step: FlowStep
     asset_ids: _types_pb2.AssetIds
@@ -361,7 +362,8 @@ class FlowStepView(_message.Message):
     occurred_at_unix_ms: int
     block_time_moving_average_ms: int
     activities: _containers.RepeatedCompositeFieldContainer[FlowStepActivityView]
-    def __init__(self, sequence: _Optional[int] = ..., step: _Optional[_Union[FlowStep, str]] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., request_fee: _Optional[_Union[_types_pb2.RequestFee, _Mapping]] = ..., milestone_tx_ref: _Optional[str] = ..., milestone_tx_chain_id: _Optional[int] = ..., lifecycle_source: _Optional[_Union[_types_pb2.LifecycleSource, str]] = ..., lifecycle_reason: _Optional[_Union[_types_pb2.LifecycleReason, str]] = ..., zipper_reason: _Optional[_Union[_reason_pb2.ZipperReasonDetails, _Mapping]] = ..., current_confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., approve_count: _Optional[int] = ..., reject_count: _Optional[int] = ..., validator_count: _Optional[int] = ..., required_approvals: _Optional[int] = ..., required_rejections: _Optional[int] = ..., occurred_at_unix_ms: _Optional[int] = ..., block_time_moving_average_ms: _Optional[int] = ..., activities: _Optional[_Iterable[_Union[FlowStepActivityView, _Mapping]]] = ...) -> None: ...
+    refund_address: str
+    def __init__(self, sequence: _Optional[int] = ..., step: _Optional[_Union[FlowStep, str]] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., request_fee: _Optional[_Union[_types_pb2.RequestFee, _Mapping]] = ..., milestone_tx_ref: _Optional[str] = ..., milestone_tx_chain_id: _Optional[int] = ..., lifecycle_source: _Optional[_Union[_types_pb2.LifecycleSource, str]] = ..., lifecycle_reason: _Optional[_Union[_types_pb2.LifecycleReason, str]] = ..., zipper_reason: _Optional[_Union[_reason_pb2.ZipperReasonDetails, _Mapping]] = ..., current_confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., approve_count: _Optional[int] = ..., reject_count: _Optional[int] = ..., validator_count: _Optional[int] = ..., required_approvals: _Optional[int] = ..., required_rejections: _Optional[int] = ..., occurred_at_unix_ms: _Optional[int] = ..., block_time_moving_average_ms: _Optional[int] = ..., activities: _Optional[_Iterable[_Union[FlowStepActivityView, _Mapping]]] = ..., refund_address: _Optional[str] = ...) -> None: ...
 
 class FlowStepActivityView(_message.Message):
     __slots__ = ("sequence", "tx_ref", "tx_chain_id", "occurred_at_unix_ms", "lifecycle_source", "lifecycle_reason", "zipper_reason", "current_confirmations", "required_confirmations", "approve_count", "reject_count", "validator_count", "kind", "required_approvals", "required_rejections", "amount_e18", "ledger_transfer_id")

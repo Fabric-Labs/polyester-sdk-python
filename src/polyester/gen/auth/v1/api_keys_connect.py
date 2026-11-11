@@ -33,6 +33,15 @@ class ApiKeyService(Protocol):
     async def update_api_key(self, request: auth_dot_v1_dot_api__keys__pb2.UpdateApiKeyRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.UpdateApiKeyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def set_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def delete_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class ApiKeyServiceASGIApplication(ConnectASGIApplication[ApiKeyService]):
     def __init__(self, service: ApiKeyService | AsyncGenerator[ApiKeyService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -88,6 +97,36 @@ class ApiKeyServiceASGIApplication(ConnectASGIApplication[ApiKeyService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.update_api_key,
+                ),
+                "/auth.v1.ApiKeyService/SetAssistantKeys": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SetAssistantKeys",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.set_assistant_keys,
+                ),
+                "/auth.v1.ApiKeyService/ListAssistantKeys": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListAssistantKeys",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_assistant_keys,
+                ),
+                "/auth.v1.ApiKeyService/DeleteAssistantKeys": Endpoint.unary(
+                    method=MethodInfo(
+                        name="DeleteAssistantKeys",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.delete_assistant_keys,
                 ),
             },
             interceptors=interceptors,
@@ -203,6 +242,66 @@ class ApiKeyServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def set_assistant_keys(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetAssistantKeys",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_assistant_keys(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListAssistantKeys",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def delete_assistant_keys(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="DeleteAssistantKeys",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -217,6 +316,12 @@ class ApiKeyServiceSync(Protocol):
     def delete_api_key(self, request: auth_dot_v1_dot_api__keys__pb2.DeleteApiKeyRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.DeleteApiKeyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def update_api_key(self, request: auth_dot_v1_dot_api__keys__pb2.UpdateApiKeyRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.UpdateApiKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def set_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def delete_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -273,6 +378,36 @@ class ApiKeyServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.update_api_key,
+                ),
+                "/auth.v1.ApiKeyService/SetAssistantKeys": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SetAssistantKeys",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.set_assistant_keys,
+                ),
+                "/auth.v1.ApiKeyService/ListAssistantKeys": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListAssistantKeys",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_assistant_keys,
+                ),
+                "/auth.v1.ApiKeyService/DeleteAssistantKeys": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="DeleteAssistantKeys",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.delete_assistant_keys,
                 ),
             },
             interceptors=interceptors,
@@ -382,6 +517,66 @@ class ApiKeyServiceClientSync(ConnectClientSync):
                 service_name="auth.v1.ApiKeyService",
                 input=auth_dot_v1_dot_api__keys__pb2.UpdateApiKeyRequest,
                 output=auth_dot_v1_dot_api__keys__pb2.UpdateApiKeyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def set_assistant_keys(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetAssistantKeys",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.SetAssistantKeysResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_assistant_keys(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListAssistantKeys",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def delete_assistant_keys(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="DeleteAssistantKeys",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -43,6 +43,13 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CLAIM_DAILY_REWARD: _ClassVar[PolicyAction]
     READ_CHECKPOINTS: _ClassVar[PolicyAction]
     READ_REWARDS: _ClassVar[PolicyAction]
+    CREATE_DEPOSIT_ADDRESS: _ClassVar[PolicyAction]
+    READ_DEPOSIT_ADDRESSES: _ClassVar[PolicyAction]
+    READ_SUBACCOUNTS: _ClassVar[PolicyAction]
+    READ_SUBACCOUNT_ACTIVITY: _ClassVar[PolicyAction]
+    READ_SUBACCOUNT_MEMBERS: _ClassVar[PolicyAction]
+    READ_SUBACCOUNT_INVITES: _ClassVar[PolicyAction]
+    READ_GUARD_SIGNER_STATUS: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -68,6 +75,13 @@ READ_DAILY_CLAIMS: PolicyAction
 CLAIM_DAILY_REWARD: PolicyAction
 READ_CHECKPOINTS: PolicyAction
 READ_REWARDS: PolicyAction
+CREATE_DEPOSIT_ADDRESS: PolicyAction
+READ_DEPOSIT_ADDRESSES: PolicyAction
+READ_SUBACCOUNTS: PolicyAction
+READ_SUBACCOUNT_ACTIVITY: PolicyAction
+READ_SUBACCOUNT_MEMBERS: PolicyAction
+READ_SUBACCOUNT_INVITES: PolicyAction
+READ_GUARD_SIGNER_STATUS: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()

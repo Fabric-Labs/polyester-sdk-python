@@ -33,6 +33,7 @@ class TransferCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FEE_SWEEP: _ClassVar[TransferCode]
     FEE_REFILL: _ClassVar[TransferCode]
     SYSTEM_ADJUSTMENT: _ClassVar[TransferCode]
+    WITHDRAW_FAILED: _ClassVar[TransferCode]
 ACCOUNT_CODE_UNSPECIFIED: AccountCode
 FUNDING: AccountCode
 TRADING: AccountCode
@@ -57,3 +58,4 @@ QUICKSWAP_AFFILIATE_FEE: TransferCode
 FEE_SWEEP: TransferCode
 FEE_REFILL: TransferCode
 SYSTEM_ADJUSTMENT: TransferCode
+WITHDRAW_FAILED: TransferCode

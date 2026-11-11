@@ -24,6 +24,12 @@ class SocialVerificationService(Protocol):
     async def social_verification_ready(self, request: auth_dot_v1_dot_social__verification__pb2.SocialVerificationReadyRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.SocialVerificationReadyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def confirm_social_verification(self, request: auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def unlink_social_account(self, request: auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_social_verification(self, request: auth_dot_v1_dot_social__verification__pb2.GetSocialVerificationRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.GetSocialVerificationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -52,6 +58,26 @@ class SocialVerificationServiceASGIApplication(ConnectASGIApplication[SocialVeri
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.social_verification_ready,
+                ),
+                "/auth.v1.SocialVerificationService/ConfirmSocialVerification": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ConfirmSocialVerification",
+                        service_name="auth.v1.SocialVerificationService",
+                        input=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest,
+                        output=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.confirm_social_verification,
+                ),
+                "/auth.v1.SocialVerificationService/UnlinkSocialAccount": Endpoint.unary(
+                    method=MethodInfo(
+                        name="UnlinkSocialAccount",
+                        service_name="auth.v1.SocialVerificationService",
+                        input=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest,
+                        output=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.unlink_social_account,
                 ),
                 "/auth.v1.SocialVerificationService/GetSocialVerification": Endpoint.unary(
                     method=MethodInfo(
@@ -117,6 +143,46 @@ class SocialVerificationServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def confirm_social_verification(
+        self,
+        request: auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ConfirmSocialVerification",
+                service_name="auth.v1.SocialVerificationService",
+                input=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest,
+                output=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def unlink_social_account(
+        self,
+        request: auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UnlinkSocialAccount",
+                service_name="auth.v1.SocialVerificationService",
+                input=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest,
+                output=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def get_social_verification(
         self,
         request: auth_dot_v1_dot_social__verification__pb2.GetSocialVerificationRequest,
@@ -146,6 +212,10 @@ class SocialVerificationServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def social_verification_ready(self, request: auth_dot_v1_dot_social__verification__pb2.SocialVerificationReadyRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.SocialVerificationReadyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def confirm_social_verification(self, request: auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def unlink_social_account(self, request: auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_social_verification(self, request: auth_dot_v1_dot_social__verification__pb2.GetSocialVerificationRequest, ctx: RequestContext) -> auth_dot_v1_dot_social__verification__pb2.GetSocialVerificationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -173,6 +243,26 @@ class SocialVerificationServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.social_verification_ready,
+                ),
+                "/auth.v1.SocialVerificationService/ConfirmSocialVerification": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ConfirmSocialVerification",
+                        service_name="auth.v1.SocialVerificationService",
+                        input=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest,
+                        output=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.confirm_social_verification,
+                ),
+                "/auth.v1.SocialVerificationService/UnlinkSocialAccount": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="UnlinkSocialAccount",
+                        service_name="auth.v1.SocialVerificationService",
+                        input=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest,
+                        output=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.unlink_social_account,
                 ),
                 "/auth.v1.SocialVerificationService/GetSocialVerification": EndpointSync.unary(
                     method=MethodInfo(
@@ -232,6 +322,46 @@ class SocialVerificationServiceClientSync(ConnectClientSync):
                 service_name="auth.v1.SocialVerificationService",
                 input=auth_dot_v1_dot_social__verification__pb2.SocialVerificationReadyRequest,
                 output=auth_dot_v1_dot_social__verification__pb2.SocialVerificationReadyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def confirm_social_verification(
+        self,
+        request: auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ConfirmSocialVerification",
+                service_name="auth.v1.SocialVerificationService",
+                input=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationRequest,
+                output=auth_dot_v1_dot_social__verification__pb2.ConfirmSocialVerificationResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def unlink_social_account(
+        self,
+        request: auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UnlinkSocialAccount",
+                service_name="auth.v1.SocialVerificationService",
+                input=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountRequest,
+                output=auth_dot_v1_dot_social__verification__pb2.UnlinkSocialAccountResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

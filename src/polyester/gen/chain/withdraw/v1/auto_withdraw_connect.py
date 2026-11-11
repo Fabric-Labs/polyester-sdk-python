@@ -21,13 +21,16 @@ class AutoWithdrawService(Protocol):
     async def set_auto_withdraw_rule(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def disable_auto_withdraw_rule(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse:
+    async def set_auto_withdraw_rule_enabled(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def get_auto_withdraw_rule(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.GetAutoWithdrawRuleRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.GetAutoWithdrawRuleResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def list_auto_withdraw_runs(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.ListAutoWithdrawRunsRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.ListAutoWithdrawRunsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def preview_auto_withdraw_run(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -46,15 +49,15 @@ class AutoWithdrawServiceASGIApplication(ConnectASGIApplication[AutoWithdrawServ
                     ),
                     function=svc.set_auto_withdraw_rule,
                 ),
-                "/chain.withdraw.v1.AutoWithdrawService/DisableAutoWithdrawRule": Endpoint.unary(
+                "/chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRuleEnabled": Endpoint.unary(
                     method=MethodInfo(
-                        name="DisableAutoWithdrawRule",
+                        name="SetAutoWithdrawRuleEnabled",
                         service_name="chain.withdraw.v1.AutoWithdrawService",
-                        input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest,
-                        output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse,
+                        input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=svc.disable_auto_withdraw_rule,
+                    function=svc.set_auto_withdraw_rule_enabled,
                 ),
                 "/chain.withdraw.v1.AutoWithdrawService/GetAutoWithdrawRule": Endpoint.unary(
                     method=MethodInfo(
@@ -75,6 +78,16 @@ class AutoWithdrawServiceASGIApplication(ConnectASGIApplication[AutoWithdrawServ
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_auto_withdraw_runs,
+                ),
+                "/chain.withdraw.v1.AutoWithdrawService/PreviewAutoWithdrawRun": Endpoint.unary(
+                    method=MethodInfo(
+                        name="PreviewAutoWithdrawRun",
+                        service_name="chain.withdraw.v1.AutoWithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.preview_auto_withdraw_run,
                 ),
             },
             interceptors=interceptors,
@@ -110,20 +123,20 @@ class AutoWithdrawServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
-    async def disable_auto_withdraw_rule(
+    async def set_auto_withdraw_rule_enabled(
         self,
-        request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest,
+        request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse:
+    ) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse:
         return await self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="DisableAutoWithdrawRule",
+                name="SetAutoWithdrawRuleEnabled",
                 service_name="chain.withdraw.v1.AutoWithdrawService",
-                input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest,
-                output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse,
+                input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest,
+                output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -170,6 +183,26 @@ class AutoWithdrawServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def preview_auto_withdraw_run(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="PreviewAutoWithdrawRun",
+                service_name="chain.withdraw.v1.AutoWithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest,
+                output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -177,11 +210,13 @@ class AutoWithdrawServiceClient(ConnectClient):
 class AutoWithdrawServiceSync(Protocol):
     def set_auto_withdraw_rule(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def disable_auto_withdraw_rule(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse:
+    def set_auto_withdraw_rule_enabled(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_auto_withdraw_rule(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.GetAutoWithdrawRuleRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.GetAutoWithdrawRuleResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_auto_withdraw_runs(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.ListAutoWithdrawRunsRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.ListAutoWithdrawRunsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def preview_auto_withdraw_run(self, request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -199,15 +234,15 @@ class AutoWithdrawServiceWSGIApplication(ConnectWSGIApplication):
                     ),
                     function=service.set_auto_withdraw_rule,
                 ),
-                "/chain.withdraw.v1.AutoWithdrawService/DisableAutoWithdrawRule": EndpointSync.unary(
+                "/chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRuleEnabled": EndpointSync.unary(
                     method=MethodInfo(
-                        name="DisableAutoWithdrawRule",
+                        name="SetAutoWithdrawRuleEnabled",
                         service_name="chain.withdraw.v1.AutoWithdrawService",
-                        input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest,
-                        output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse,
+                        input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=service.disable_auto_withdraw_rule,
+                    function=service.set_auto_withdraw_rule_enabled,
                 ),
                 "/chain.withdraw.v1.AutoWithdrawService/GetAutoWithdrawRule": EndpointSync.unary(
                     method=MethodInfo(
@@ -228,6 +263,16 @@ class AutoWithdrawServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_auto_withdraw_runs,
+                ),
+                "/chain.withdraw.v1.AutoWithdrawService/PreviewAutoWithdrawRun": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="PreviewAutoWithdrawRun",
+                        service_name="chain.withdraw.v1.AutoWithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.preview_auto_withdraw_run,
                 ),
             },
             interceptors=interceptors,
@@ -263,20 +308,20 @@ class AutoWithdrawServiceClientSync(ConnectClientSync):
             timeout_ms=timeout_ms,
         )
 
-    def disable_auto_withdraw_rule(
+    def set_auto_withdraw_rule_enabled(
         self,
-        request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest,
+        request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse:
+    ) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse:
         return self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="DisableAutoWithdrawRule",
+                name="SetAutoWithdrawRuleEnabled",
                 service_name="chain.withdraw.v1.AutoWithdrawService",
-                input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleRequest,
-                output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.DisableAutoWithdrawRuleResponse,
+                input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledRequest,
+                output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.SetAutoWithdrawRuleEnabledResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -317,6 +362,26 @@ class AutoWithdrawServiceClientSync(ConnectClientSync):
                 service_name="chain.withdraw.v1.AutoWithdrawService",
                 input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.ListAutoWithdrawRunsRequest,
                 output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.ListAutoWithdrawRunsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def preview_auto_withdraw_run(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="PreviewAutoWithdrawRun",
+                service_name="chain.withdraw.v1.AutoWithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunRequest,
+                output=chain_dot_withdraw_dot_v1_dot_auto__withdraw__pb2.PreviewAutoWithdrawRunResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

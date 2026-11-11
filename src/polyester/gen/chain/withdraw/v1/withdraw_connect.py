@@ -18,6 +18,9 @@ import polyester.gen.chain.withdraw.v1.withdraw_pb2 as chain_dot_withdraw_dot_v1
 
 
 class WithdrawService(Protocol):
+    async def get_wallet_balances(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def validate_withdraw_destination(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -33,6 +36,16 @@ class WithdrawServiceASGIApplication(ConnectASGIApplication[WithdrawService]):
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/chain.withdraw.v1.WithdrawService/GetWalletBalances": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetWalletBalances",
+                        service_name="chain.withdraw.v1.WithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_wallet_balances,
+                ),
                 "/chain.withdraw.v1.WithdrawService/ValidateWithdrawDestination": Endpoint.unary(
                     method=MethodInfo(
                         name="ValidateWithdrawDestination",
@@ -77,6 +90,26 @@ class WithdrawServiceASGIApplication(ConnectASGIApplication[WithdrawService]):
 
 
 class WithdrawServiceClient(ConnectClient):
+    async def get_wallet_balances(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetWalletBalances",
+                service_name="chain.withdraw.v1.WithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest,
+                output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def validate_withdraw_destination(
         self,
         request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,
@@ -142,6 +175,8 @@ class WithdrawServiceClient(ConnectClient):
 
 
 class WithdrawServiceSync(Protocol):
+    def get_wallet_balances(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def validate_withdraw_destination(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawResponse:
@@ -154,6 +189,16 @@ class WithdrawServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: WithdrawServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/chain.withdraw.v1.WithdrawService/GetWalletBalances": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetWalletBalances",
+                        service_name="chain.withdraw.v1.WithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_wallet_balances,
+                ),
                 "/chain.withdraw.v1.WithdrawService/ValidateWithdrawDestination": EndpointSync.unary(
                     method=MethodInfo(
                         name="ValidateWithdrawDestination",
@@ -198,6 +243,26 @@ class WithdrawServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class WithdrawServiceClientSync(ConnectClientSync):
+    def get_wallet_balances(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetWalletBalances",
+                service_name="chain.withdraw.v1.WithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesRequest,
+                output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.GetWalletBalancesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     def validate_withdraw_destination(
         self,
         request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.ValidateWithdrawDestinationRequest,

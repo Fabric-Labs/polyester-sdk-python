@@ -27,6 +27,7 @@ class FeeKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AFFILIATE: _ClassVar[FeeKind]
     DEPOSIT_NETWORK: _ClassVar[FeeKind]
     WITHDRAWAL_NETWORK: _ClassVar[FeeKind]
+    REFERRAL: _ClassVar[FeeKind]
 
 class DepositAddressState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -65,6 +66,7 @@ class QuickSwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DEPOSIT_ADDRESS_RETIRED: _ClassVar[QuickSwapReason]
     DEPOSIT_ADDRESS_NOT_ISSUED: _ClassVar[QuickSwapReason]
     INTERMEDIATE_BELOW_MINIMUM: _ClassVar[QuickSwapReason]
+    MARKET_CLOSED: _ClassVar[QuickSwapReason]
 
 class WithdrawalRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -72,6 +74,7 @@ class WithdrawalRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DESTINATION: _ClassVar[WithdrawalRole]
     REFUND: _ClassVar[WithdrawalRole]
     RETURN: _ClassVar[WithdrawalRole]
+    COMPLIANCE_TRANSFER: _ClassVar[WithdrawalRole]
 
 class WithdrawalState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -100,6 +103,7 @@ class QuickSwapStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     REFUNDED: _ClassVar[QuickSwapStatus]
     RETURNED: _ClassVar[QuickSwapStatus]
     EXPIRED: _ClassVar[QuickSwapStatus]
+    CLOSED: _ClassVar[QuickSwapStatus]
 
 class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -134,6 +138,18 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FEES_INVALID: _ClassVar[ErrorCode]
     STATS_INCOMPLETE: _ClassVar[ErrorCode]
     ADDRESS_CONFLICT: _ClassVar[ErrorCode]
+    REFERRAL_CODE_TAKEN: _ClassVar[ErrorCode]
+    REFERRAL_CODE_RESERVED: _ClassVar[ErrorCode]
+    REFERRAL_CODE_INVALID: _ClassVar[ErrorCode]
+    REFERRAL_PARTNER_NOT_FOUND: _ClassVar[ErrorCode]
+    REFERRAL_PARTNER_EXISTS: _ClassVar[ErrorCode]
+    EARNINGS_ACCOUNT_INVALID: _ClassVar[ErrorCode]
+    REFERRAL_PARTNER_DISABLED: _ClassVar[ErrorCode]
+    REFERRAL_CODE_LIMIT: _ClassVar[ErrorCode]
+    REFERRAL_NOT_SUPPORTED: _ClassVar[ErrorCode]
+    REFERRAL_CODE_UNKNOWN: _ClassVar[ErrorCode]
+    REFERRAL_PARTNER_INACTIVE: _ClassVar[ErrorCode]
+    PAYOUT_NOT_FOUND: _ClassVar[ErrorCode]
 BASIS_UNSPECIFIED: QuoteBasis
 SOURCE_AMOUNT: QuoteBasis
 DESTINATION_AMOUNT: QuoteBasis
@@ -143,6 +159,7 @@ BROKER: FeeKind
 AFFILIATE: FeeKind
 DEPOSIT_NETWORK: FeeKind
 WITHDRAWAL_NETWORK: FeeKind
+REFERRAL: FeeKind
 ADDRESS_UNSPECIFIED: DepositAddressState
 ACTIVE: DepositAddressState
 REFUND_MODE: DepositAddressState
@@ -172,10 +189,12 @@ DEPOSIT_ADDRESS_ALREADY_USED: QuickSwapReason
 DEPOSIT_ADDRESS_RETIRED: QuickSwapReason
 DEPOSIT_ADDRESS_NOT_ISSUED: QuickSwapReason
 INTERMEDIATE_BELOW_MINIMUM: QuickSwapReason
+MARKET_CLOSED: QuickSwapReason
 ROLE_UNSPECIFIED: WithdrawalRole
 DESTINATION: WithdrawalRole
 REFUND: WithdrawalRole
 RETURN: WithdrawalRole
+COMPLIANCE_TRANSFER: WithdrawalRole
 WITHDRAWAL_UNSPECIFIED: WithdrawalState
 QUEUED: WithdrawalState
 SUBMITTED: WithdrawalState
@@ -198,6 +217,7 @@ COMPLETED: QuickSwapStatus
 REFUNDED: QuickSwapStatus
 RETURNED: QuickSwapStatus
 EXPIRED: QuickSwapStatus
+CLOSED: QuickSwapStatus
 ERROR_UNSPECIFIED: ErrorCode
 ROUTE_UNSUPPORTED: ErrorCode
 AMOUNT_OUT_OF_RANGE: ErrorCode
@@ -229,6 +249,18 @@ INVITE_NOT_FOUND: ErrorCode
 FEES_INVALID: ErrorCode
 STATS_INCOMPLETE: ErrorCode
 ADDRESS_CONFLICT: ErrorCode
+REFERRAL_CODE_TAKEN: ErrorCode
+REFERRAL_CODE_RESERVED: ErrorCode
+REFERRAL_CODE_INVALID: ErrorCode
+REFERRAL_PARTNER_NOT_FOUND: ErrorCode
+REFERRAL_PARTNER_EXISTS: ErrorCode
+EARNINGS_ACCOUNT_INVALID: ErrorCode
+REFERRAL_PARTNER_DISABLED: ErrorCode
+REFERRAL_CODE_LIMIT: ErrorCode
+REFERRAL_NOT_SUPPORTED: ErrorCode
+REFERRAL_CODE_UNKNOWN: ErrorCode
+REFERRAL_PARTNER_INACTIVE: ErrorCode
+PAYOUT_NOT_FOUND: ErrorCode
 
 class TokenAmount(_message.Message):
     __slots__ = ("base_units", "decimals")
@@ -296,8 +328,18 @@ class QuoteFee(_message.Message):
     account_id: int
     def __init__(self, kind: _Optional[_Union[FeeKind, str]] = ..., zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., bps: _Optional[int] = ..., account_id: _Optional[int] = ...) -> None: ...
 
+class ReferralPricing(_message.Message):
+    __slots__ = ("base_broker_bps", "discount_bps", "commission_bps")
+    BASE_BROKER_BPS_FIELD_NUMBER: _ClassVar[int]
+    DISCOUNT_BPS_FIELD_NUMBER: _ClassVar[int]
+    COMMISSION_BPS_FIELD_NUMBER: _ClassVar[int]
+    base_broker_bps: int
+    discount_bps: int
+    commission_bps: int
+    def __init__(self, base_broker_bps: _Optional[int] = ..., discount_bps: _Optional[int] = ..., commission_bps: _Optional[int] = ...) -> None: ...
+
 class QuickSwapQuote(_message.Message):
-    __slots__ = ("deposit_amount", "expected_amount_out", "min_amount_out", "min_rate", "min_deposit_amount", "max_deposit_amount", "intermediate_asset_id", "fees", "quoted_at", "expires_at")
+    __slots__ = ("deposit_amount", "expected_amount_out", "min_amount_out", "min_rate", "min_deposit_amount", "max_deposit_amount", "intermediate_asset_id", "fees", "quoted_at", "expires_at", "referral")
     DEPOSIT_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     EXPECTED_AMOUNT_OUT_FIELD_NUMBER: _ClassVar[int]
     MIN_AMOUNT_OUT_FIELD_NUMBER: _ClassVar[int]
@@ -308,6 +350,7 @@ class QuickSwapQuote(_message.Message):
     FEES_FIELD_NUMBER: _ClassVar[int]
     QUOTED_AT_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    REFERRAL_FIELD_NUMBER: _ClassVar[int]
     deposit_amount: TokenAmount
     expected_amount_out: TokenAmount
     min_amount_out: TokenAmount
@@ -318,7 +361,8 @@ class QuickSwapQuote(_message.Message):
     fees: _containers.RepeatedCompositeFieldContainer[QuoteFee]
     quoted_at: _timestamp_pb2.Timestamp
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., expected_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_rate: _Optional[str] = ..., min_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., max_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., fees: _Optional[_Iterable[_Union[QuoteFee, _Mapping]]] = ..., quoted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    referral: ReferralPricing
+    def __init__(self, deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., expected_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_rate: _Optional[str] = ..., min_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., max_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., fees: _Optional[_Iterable[_Union[QuoteFee, _Mapping]]] = ..., quoted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., referral: _Optional[_Union[ReferralPricing, _Mapping]] = ...) -> None: ...
 
 class Screening(_message.Message):
     __slots__ = ("source_wallet",)
@@ -509,14 +553,16 @@ class ChargedFee(_message.Message):
     def __init__(self, kind: _Optional[_Union[FeeKind, str]] = ..., account_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
 
 class QuoteQuickSwapRequest(_message.Message):
-    __slots__ = ("terms", "broker_bps", "affiliates")
+    __slots__ = ("terms", "broker_bps", "affiliates", "referral_code")
     TERMS_FIELD_NUMBER: _ClassVar[int]
     BROKER_BPS_FIELD_NUMBER: _ClassVar[int]
     AFFILIATES_FIELD_NUMBER: _ClassVar[int]
+    REFERRAL_CODE_FIELD_NUMBER: _ClassVar[int]
     terms: QuickSwapTerms
     broker_bps: int
     affiliates: _containers.RepeatedCompositeFieldContainer[AffiliateShare]
-    def __init__(self, terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ...) -> None: ...
+    referral_code: str
+    def __init__(self, terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., referral_code: _Optional[str] = ...) -> None: ...
 
 class QuoteQuickSwapResponse(_message.Message):
     __slots__ = ("quote",)
@@ -533,7 +579,7 @@ class AffiliateShare(_message.Message):
     def __init__(self, account_id: _Optional[int] = ..., bps: _Optional[int] = ...) -> None: ...
 
 class CreateQuickSwapRequest(_message.Message):
-    __slots__ = ("idempotency_key", "terms", "destination_address", "destination_memo", "return_address", "return_memo", "refund_zipped_asset_id", "refund_address", "refund_memo", "source_wallet", "affiliates", "broker_bps")
+    __slots__ = ("idempotency_key", "terms", "destination_address", "destination_memo", "return_address", "return_memo", "refund_zipped_asset_id", "refund_address", "refund_memo", "source_wallet", "affiliates", "broker_bps", "referral_code")
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     TERMS_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
@@ -546,6 +592,7 @@ class CreateQuickSwapRequest(_message.Message):
     SOURCE_WALLET_FIELD_NUMBER: _ClassVar[int]
     AFFILIATES_FIELD_NUMBER: _ClassVar[int]
     BROKER_BPS_FIELD_NUMBER: _ClassVar[int]
+    REFERRAL_CODE_FIELD_NUMBER: _ClassVar[int]
     idempotency_key: str
     terms: QuickSwapTerms
     destination_address: str
@@ -558,7 +605,8 @@ class CreateQuickSwapRequest(_message.Message):
     source_wallet: str
     affiliates: _containers.RepeatedCompositeFieldContainer[AffiliateShare]
     broker_bps: int
-    def __init__(self, idempotency_key: _Optional[str] = ..., terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., destination_address: _Optional[str] = ..., destination_memo: _Optional[str] = ..., return_address: _Optional[str] = ..., return_memo: _Optional[str] = ..., refund_zipped_asset_id: _Optional[int] = ..., refund_address: _Optional[str] = ..., refund_memo: _Optional[str] = ..., source_wallet: _Optional[str] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., broker_bps: _Optional[int] = ...) -> None: ...
+    referral_code: str
+    def __init__(self, idempotency_key: _Optional[str] = ..., terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., destination_address: _Optional[str] = ..., destination_memo: _Optional[str] = ..., return_address: _Optional[str] = ..., return_memo: _Optional[str] = ..., refund_zipped_asset_id: _Optional[int] = ..., refund_address: _Optional[str] = ..., refund_memo: _Optional[str] = ..., source_wallet: _Optional[str] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., broker_bps: _Optional[int] = ..., referral_code: _Optional[str] = ...) -> None: ...
 
 class CreateQuickSwapResponse(_message.Message):
     __slots__ = ("quick_swap",)

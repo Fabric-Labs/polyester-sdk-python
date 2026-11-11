@@ -27,6 +27,9 @@ class PolicyClass(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     WITHDRAW_VALIDATE: _ClassVar[PolicyClass]
     GUARD_SIGN: _ClassVar[PolicyClass]
     SOCIAL_PROVIDER: _ClassVar[PolicyClass]
+    ASSISTANT_MESSAGE: _ClassVar[PolicyClass]
+    ASSISTANT_CONTROL: _ClassVar[PolicyClass]
+    ASSISTANT_READ: _ClassVar[PolicyClass]
 
 class LimiterScope(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -64,6 +67,9 @@ WITHDRAW_SUBMIT: PolicyClass
 WITHDRAW_VALIDATE: PolicyClass
 GUARD_SIGN: PolicyClass
 SOCIAL_PROVIDER: PolicyClass
+ASSISTANT_MESSAGE: PolicyClass
+ASSISTANT_CONTROL: PolicyClass
+ASSISTANT_READ: PolicyClass
 SCOPE_UNSPECIFIED: LimiterScope
 CLIENT_IP: LimiterScope
 API_KEY: LimiterScope

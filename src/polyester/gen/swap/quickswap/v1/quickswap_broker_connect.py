@@ -81,6 +81,18 @@ class QuickSwapBrokerService(Protocol):
     async def get_broker_stats(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetBrokerStatsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetBrokerStatsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_payouts(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_payout(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_upcoming_payouts(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_vault_payout_rules(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class QuickSwapBrokerServiceASGIApplication(ConnectASGIApplication[QuickSwapBrokerService]):
     def __init__(self, service: QuickSwapBrokerService | AsyncGenerator[QuickSwapBrokerService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -296,6 +308,46 @@ class QuickSwapBrokerServiceASGIApplication(ConnectASGIApplication[QuickSwapBrok
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_broker_stats,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListPayouts": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListPayouts",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_payouts,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/GetPayout": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetPayout",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_payout,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListUpcomingPayouts": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListUpcomingPayouts",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_upcoming_payouts,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultPayoutRules": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListVaultPayoutRules",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_vault_payout_rules,
                 ),
             },
             interceptors=interceptors,
@@ -731,6 +783,86 @@ class QuickSwapBrokerServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def list_payouts(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListPayouts",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_payout(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPayout",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_upcoming_payouts(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListUpcomingPayouts",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_vault_payout_rules(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultPayoutRules",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -777,6 +909,14 @@ class QuickSwapBrokerServiceSync(Protocol):
     def get_fee_totals(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetFeeTotalsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_broker_stats(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetBrokerStatsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetBrokerStatsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_payouts(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_payout(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_upcoming_payouts(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_vault_payout_rules(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -993,6 +1133,46 @@ class QuickSwapBrokerServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_broker_stats,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListPayouts": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListPayouts",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_payouts,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/GetPayout": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetPayout",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_payout,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListUpcomingPayouts": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListUpcomingPayouts",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_upcoming_payouts,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultPayoutRules": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListVaultPayoutRules",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_vault_payout_rules,
                 ),
             },
             interceptors=interceptors,
@@ -1422,6 +1602,86 @@ class QuickSwapBrokerServiceClientSync(ConnectClientSync):
                 service_name="swap.quickswap.v1.QuickSwapBrokerService",
                 input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetBrokerStatsRequest,
                 output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetBrokerStatsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_payouts(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListPayouts",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListPayoutsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_payout(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPayout",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.GetPayoutResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_upcoming_payouts(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListUpcomingPayouts",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_vault_payout_rules(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultPayoutRules",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

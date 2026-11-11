@@ -4,7 +4,7 @@ assistant keys, Telegram links, withdrawal refusals, transfer codes and equity f
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -349,6 +349,33 @@ def test_min_amount_below_floor_carries_the_floor_and_field() -> None:
     assert err.min_floor_e18 == "400000000000000000"
     assert err.min_floor == Decimal("0.4")
     assert err.payable_from is None
+
+
+def test_min_floor_is_exact_for_the_largest_u128() -> None:
+    err = polyester_errors.PolyesterWithdrawError(
+        "below floor", code="ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR", min_floor_e18=str(2**128 - 1)
+    )
+    assert err.min_floor == Decimal("340282366920938463463.374607431768211455")
+    assert str(err.min_floor) == "340282366920938463463.374607431768211455"
+
+
+def test_min_floor_does_not_depend_on_the_decimal_context() -> None:
+    err = polyester_errors.PolyesterWithdrawError(
+        "below floor", code="ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR", min_floor_e18="123456789012345678"
+    )
+    with localcontext() as ctx:
+        ctx.prec = 5
+        floor = err.min_floor
+    assert floor is not None
+    assert str(floor) == "0.123456789012345678"
+    whole = polyester_errors.PolyesterWithdrawError(
+        "below floor",
+        code="ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR",
+        min_floor_e18="25000000000000000000000",
+    )
+    with localcontext() as ctx:
+        ctx.prec = 3
+        assert str(whole.min_floor) == "25000"
 
 
 @pytest.mark.parametrize(

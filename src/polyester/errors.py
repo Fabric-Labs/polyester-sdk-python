@@ -429,9 +429,13 @@ class PolyesterWithdrawError(PolyesterApiError):
 
     @property
     def min_floor(self) -> Decimal | None:
+        """``min_floor_e18`` in whole units, exact whatever the decimal context."""
         if self.min_floor_e18 is None:
             return None
-        return Decimal(int(self.min_floor_e18)).scaleb(-18).normalize()
+        # Imported here: polyester.codecs.scalars imports this module.
+        from polyester.codecs.scalars import format_scaled
+
+        return Decimal(format_scaled(int(self.min_floor_e18), 18))
 
 
 class PolyesterSubaccountOwnerRoleLockedError(PolyesterApiError):

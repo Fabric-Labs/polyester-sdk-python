@@ -32,7 +32,7 @@ async def test_preview_order_admission_shape(live_client, smoke_symbol) -> None:
 
     try:
         preview = await call_optional(
-            live_client.orders.preview_order(
+            live_client.orders.preview(
                 symbol=smoke_symbol,
                 side="buy",
                 order_type="limit",
@@ -41,11 +41,11 @@ async def test_preview_order_admission_shape(live_client, smoke_symbol) -> None:
                 price=price,
                 post_only=True,
             ),
-            label="orders.preview_order",
+            label="orders.preview",
         )
     except (PolyesterRouteNotFoundError, PolyesterApiError) as exc:
         if route_unavailable(exc):
-            pytest.skip(f"orders.preview_order not mounted: {exc}")
+            pytest.skip(f"orders.preview not mounted: {exc}")
         raise
 
     assert isinstance(preview, PreviewOrderResult)

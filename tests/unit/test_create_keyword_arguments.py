@@ -43,7 +43,7 @@ def _order(**extra: Any) -> dict[str, Any]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("helper", ["create", "preview_order"])
+@pytest.mark.parametrize("helper", ["create", "preview"])
 async def test_order_keyword_helpers_refuse_an_unknown_keyword(helper: str) -> None:
     capture = CaptureUnary(orders_pb2.CreateOrderResponse(order_id=42))
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
@@ -56,7 +56,7 @@ async def test_order_keyword_helpers_refuse_an_unknown_keyword(helper: str) -> N
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("helper", ["create", "preview_order"])
+@pytest.mark.parametrize("helper", ["create", "preview"])
 async def test_order_keyword_helpers_refuse_request_and_keywords(helper: str) -> None:
     capture = CaptureUnary(orders_pb2.CreateOrderResponse(order_id=42))
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)

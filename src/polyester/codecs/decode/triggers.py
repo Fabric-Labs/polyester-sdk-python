@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
+from polyester.codecs.decode.orders import OrderScales, pair_scales
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
@@ -21,13 +22,14 @@ from polyester.models import (
 )
 from polyester.types.money import Price, Quantity
 
-# Match TypeScript TriggerStatusCodec.protoToOutput (British "cancelled" for status).
+# Labels are the contract's enum names, lowercased: a canceled trigger reads
+# "canceled" (STATUS_CANCELED), as its "canceled" event does.
 _TRIGGER_STATUS_LABELS: dict[int, str] = {
     triggers_pb2.STATUS_CREATED: "created",
     triggers_pb2.STATUS_ARMED: "armed",
     triggers_pb2.STATUS_RUNNING: "running",
     triggers_pb2.STATUS_COMPLETED: "completed",
-    triggers_pb2.STATUS_CANCELED: "cancelled",
+    triggers_pb2.STATUS_CANCELED: "canceled",
     triggers_pb2.STATUS_FAILED: "failed",
     triggers_pb2.STATUS_PAUSED: "paused",
 }
@@ -37,13 +39,12 @@ _TRIGGER_STATUS_FROM_LABEL: dict[str, int] = {
     "armed": triggers_pb2.STATUS_ARMED,
     "running": triggers_pb2.STATUS_RUNNING,
     "completed": triggers_pb2.STATUS_COMPLETED,
-    "cancelled": triggers_pb2.STATUS_CANCELED,
     "canceled": triggers_pb2.STATUS_CANCELED,
     "failed": triggers_pb2.STATUS_FAILED,
     "paused": triggers_pb2.STATUS_PAUSED,
 }
 
-# Match TypeScript TriggerEventTypeCodec.protoToOutput (American "canceled" for events).
+# Event types are the contract's EVENT_ names, lowercased.
 _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
     triggers_pb2.EVENT_FIRED: "fired",
     triggers_pb2.EVENT_CANCELED: "canceled",
@@ -56,7 +57,6 @@ _TRIGGER_EVENT_TYPE_LABELS: dict[int, str] = {
 _TRIGGER_EVENT_TYPE_FROM_LABEL: dict[str, int] = {
     "fired": triggers_pb2.EVENT_FIRED,
     "canceled": triggers_pb2.EVENT_CANCELED,
-    "cancelled": triggers_pb2.EVENT_CANCELED,
     "updated": triggers_pb2.EVENT_UPDATED,
     "failed": triggers_pb2.EVENT_FAILED,
     "activated": triggers_pb2.EVENT_ACTIVATED,
@@ -79,7 +79,7 @@ def trigger_status_from_label(label: str) -> int:
     if key not in _TRIGGER_STATUS_FROM_LABEL:
         raise PolyesterValidationError(
             f"invalid trigger status {label!r}; expected one of: "
-            "created, armed, running, completed, cancelled, failed, paused"
+            "created, armed, running, completed, canceled, failed, paused"
         )
     return _TRIGGER_STATUS_FROM_LABEL[key]
 
@@ -134,7 +134,9 @@ def _timestamp(ts) -> datetime | None:
     return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
 
 
-def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
+def _trigger_details(
+    msg: triggers_pb2.Trigger, *, quantity_scale: int | None = None
+) -> TriggerDetails | None:
     """Project runtime execution state (``stop``/``trailing``/``twap_state``/
     ``ladder_state``) onto the discriminated ``TriggerDetails`` payload."""
     symbol = None
@@ -184,6 +186,7 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
                 executed_qty=(
                     Quantity.from_scaled(
                         executed_scaled,
+                        scale=quantity_scale,
                         symbol=symbol,
                         symbol_id=symbol_id,
                     )
@@ -208,6 +211,7 @@ def _trigger_details(msg: triggers_pb2.Trigger) -> TriggerDetails | None:
                 executed_qty=(
                     Quantity.from_scaled(
                         executed_scaled,
+                        scale=quantity_scale,
                         symbol=symbol,
                         symbol_id=symbol_id,
                     )
@@ -322,7 +326,7 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
 
 
 def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None = None) -> Trigger:
-    details = _trigger_details(msg)
+    details = _trigger_details(msg, quantity_scale=quantity_scale)
     cfg = _trigger_config(msg)
     trigger_price = cfg.trigger_price
     if trigger_price is None and details is not None and details.case == "stop" and details.stop:
@@ -373,8 +377,15 @@ def trigger_from_proto(msg: triggers_pb2.Trigger, *, quantity_scale: int | None 
     )
 
 
-def triggers_list_from_proto(msg: triggers_pb2.ListTriggersResponse) -> TriggersList:
-    triggers = [trigger_from_proto(item) for item in msg.triggers]
+def scaled_trigger_from_proto(msg: triggers_pb2.Trigger, scales: OrderScales | None) -> Trigger:
+    """Decode a trigger with its pair's base quantity scale from ``scales``."""
+    return trigger_from_proto(msg, quantity_scale=pair_scales(scales, msg.symbol_id)[0])
+
+
+def triggers_list_from_proto(
+    msg: triggers_pb2.ListTriggersResponse, *, scales: OrderScales | None = None
+) -> TriggersList:
+    triggers = [scaled_trigger_from_proto(item, scales) for item in msg.triggers]
     return TriggersList(
         triggers=triggers,
         total=len(triggers),
@@ -382,9 +393,11 @@ def triggers_list_from_proto(msg: triggers_pb2.ListTriggersResponse) -> Triggers
     )
 
 
-def get_trigger_from_proto(msg: triggers_pb2.GetTriggerResponse) -> Trigger | None:
+def get_trigger_from_proto(
+    msg: triggers_pb2.GetTriggerResponse, *, scales: OrderScales | None = None
+) -> Trigger | None:
     if has_field(msg, "trigger"):
-        return trigger_from_proto(msg.trigger)
+        return scaled_trigger_from_proto(msg.trigger, scales)
     return None
 
 

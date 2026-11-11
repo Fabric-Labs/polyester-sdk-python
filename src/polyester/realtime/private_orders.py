@@ -20,6 +20,7 @@ from urllib.parse import urlsplit, urlunsplit
 from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
+from polyester.codecs.decode.orders import OrderScales
 from polyester.codecs.decode.private_orders import (
     private_orders_from_proto,
     private_orders_unit_from_proto,
@@ -43,7 +44,6 @@ from polyester.models.private_orders import (
     PrivateOrdersSnapshot,
     PrivateOrdersStale,
 )
-from polyester.models.trading import Order
 from polyester.realtime._ws_log import WS_CLIENT_LOGGER
 from polyester.realtime._ws_uri import checked_ws_uri, connect_without_redirects
 from polyester.realtime.client import WS_MAX_MESSAGE_BYTES, AsyncSubscription
@@ -116,8 +116,10 @@ class _Subscription:
     # Last applied resume position, kept across resubscribes and reconnects.
     cursor: str = ""
     staged: list[OrderPb] | None = None
-    # The live view as last applied, for consumers that join later.
-    orders: dict[str, Order] | None = None
+    # The live view as last applied, for consumers that join later. Kept as
+    # received and decoded on replay, so a consumer gets it at the scales the
+    # catalogs know when it joins, not when the orders arrived.
+    orders: dict[str, OrderPb] | None = None
     # The last connection state consumers were told about.
     state: Literal["pending", "connected", "disconnected"] = "pending"
     stale: bool = False
@@ -152,7 +154,10 @@ class PrivateOrderStream:
         fetch_connect_token: Callable[[], Awaitable[str]],
         fetch_subscribe_token: Callable[[str], Awaitable[str]],
         max_queue_size: int = 1000,
+        order_scales: OrderScales | None = None,
     ) -> None:
+        # A pair's (base, quote) quantity scales by symbol_id, to decode with.
+        self.order_scales = order_scales
         self._url = url
         self._fetch_connect_token = fetch_connect_token
         self._fetch_subscribe_token = fetch_subscribe_token
@@ -244,7 +249,9 @@ class PrivateOrderStream:
 
     def _deliver_cached(self, s: _Subscription, consumer: _Consumer) -> None:
         if s.orders is not None:
-            self._deliver_to(s, consumer, PrivateOrdersSnapshot(orders=list(s.orders.values())))
+            # Each order decoded when it arrived, so this decode cannot fail.
+            orders = private_orders_from_proto(s.orders.values(), scales=self.order_scales)
+            self._deliver_to(s, consumer, PrivateOrdersSnapshot(orders=orders))
         if s.ready:
             self._deliver_to(s, consumer, PrivateOrdersReady())
         if s.stale:
@@ -762,7 +769,7 @@ class PrivateOrderStream:
             self._resubscribe(ws, s)
             return
         try:
-            orders = private_orders_from_proto(staged)
+            orders = private_orders_from_proto(staged, scales=self.order_scales)
         except Exception as exc:
             self._report(s, "decode", exc)
             s.cursor = ""
@@ -770,12 +777,12 @@ class PrivateOrderStream:
             return
         s.cursor = end.cursor
         s.retries = 0
-        s.orders = {order.order_id: order for order in orders}
+        s.orders = {order.order_id: raw for order, raw in zip(orders, staged, strict=True)}
         self._deliver(s, PrivateOrdersSnapshot(orders=orders))
 
     def _on_unit(self, ws: ClientConnection, s: _Subscription, unit: pb.Unit) -> None:
         try:
-            event = private_orders_unit_from_proto(unit)
+            event = private_orders_unit_from_proto(unit, scales=self.order_scales)
         except Exception as exc:
             # The unit is not applied: resume from the cursor before it.
             self._report(s, "decode", exc)
@@ -784,8 +791,8 @@ class PrivateOrderStream:
         s.cursor = unit.next_cursor
         s.retries = 0
         if s.orders is not None:
-            for order in event.orders:
-                s.orders[order.order_id] = order
+            for order, raw in zip(event.orders, unit.orders, strict=True):
+                s.orders[order.order_id] = raw
             for order_id in event.removed_order_ids:
                 s.orders.pop(order_id, None)
         self._deliver(s, event)

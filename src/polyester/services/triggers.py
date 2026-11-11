@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from collections.abc import Sequence
 from decimal import Decimal
 
@@ -11,7 +12,11 @@ from polyester.codecs.decode.triggers import (
     trigger_status_from_label,
     triggers_list_from_proto,
 )
-from polyester.codecs.orders import parse_optional_subaccount_id, resolve_quantity_scale
+from polyester.codecs.orders import (
+    catalog_order_scales,
+    parse_optional_subaccount_id,
+    resolve_quantity_scale,
+)
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
@@ -71,6 +76,15 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         self._realtime = realtime
         self._wait_for_catalogs = wait_for_catalogs
 
+    def _order_scales(self, symbol_id: int) -> tuple[int | None, int | None]:
+        """The pair's (base, quote) quantity scales the loaded catalogs know.
+
+        Trigger reads and the trigger stream decode ``qty`` and the TWAP and
+        ladder ``executed_qty`` with the base scale; ``None`` before the
+        catalogs load. Reads don't wait for them.
+        """
+        return catalog_order_scales(self._catalogs, symbol_id)
+
     async def _optional_control_symbol_id(
         self, *, symbol: str | None, symbol_id: int | None, label: str
     ) -> int:
@@ -97,7 +111,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         """List triggers.
 
         ``status`` accepts one or more of: created, armed, running, completed,
-        cancelled, failed, paused. Unknown values raise ``PolyesterValidationError``.
+        canceled, failed, paused. Unknown values, ``cancelled`` included, raise
+        ``PolyesterValidationError`` before sending.
 
         Like :meth:`get`, this read resends the same request while the server
         answers ``unavailable`` (HTTP 503), for about 2 seconds.
@@ -122,12 +137,15 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         if status is not None:
             labels = [status] if isinstance(status, str) else list(status)
             request.status.extend(trigger_status_from_label(label) for label in labels)
+        # Decoded with the pair's catalog scales: a load in progress is
+        # awaited, and a failed one leaves the quantities unscaled.
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded_retry_unavailable(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.list_triggers(req),
             request,
-            triggers_list_from_proto,
+            functools.partial(triggers_list_from_proto, scales=self._order_scales),
             policy=TRIGGER_READ_RETRY,
         )
 
@@ -152,12 +170,15 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
+        # Decoded with the pair's catalog scales: a load in progress is
+        # awaited, and a failed one leaves the quantities unscaled.
+        await self._ensure_catalogs(required=False)
         return await unary_auth_decoded_retry_unavailable(
             self._transport,
             TriggersServiceClient,
             lambda client, req: client.get_trigger(req),
             request,
-            get_trigger_from_proto,
+            functools.partial(get_trigger_from_proto, scales=self._order_scales),
             policy=TRIGGER_READ_RETRY,
         )
 
@@ -173,7 +194,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         order_type: str = "market",
         limit_price: str | Decimal | Price | None = None,
         trigger_price_source: str | None = None,
-        tif: str = "gtc",
+        tif: str | None = None,
         sub_account_id: str | int | None = None,
         client_trigger_id: str | None = None,
         post_only: bool = False,
@@ -208,6 +229,12 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         is the required maximum price, the most the child pays per unit (a
         9-decimal string or ``Decimal``, or ``Price.from_ticks`` for ticks);
         a sell trailing stop takes none. The maximum price is fixed at create.
+
+        ``tif`` is the child's time in force. A limit stop-loss or take-profit
+        child takes ``gtc`` (the default when unset), ``ioc`` or ``fok``; ladder
+        and TWAP limit slices take ``gtc``. A market child and a trailing stop
+        always execute IOC: they take ``ioc`` or no ``tif``, and ``gtc`` or
+        ``fok`` raises ``PolyesterValidationError`` before sending.
 
         ``trigger_price_source`` (``last``, ``index`` or ``mark``) sets the
         price a stop-loss, take-profit or trailing stop watches; unset means
@@ -455,7 +482,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             channel_template="private:spot:triggers:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode=decode_trigger_bytes,
+            decode=functools.partial(decode_trigger_bytes, scales=self._order_scales),
         )
 
     async def subscribe_events(

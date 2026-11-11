@@ -147,7 +147,7 @@ class CreateOrderItem(TypedDict, total=False):
 
 
 class CreateOrderParams(CreateOrderItem, total=False):
-    """The keyword arguments of ``orders.create`` and ``orders.preview_order``:
+    """The keyword arguments of ``orders.create`` and ``orders.preview``:
     the fields of :class:`CreateOrderRequest`."""
 
     sub_account_id: str | int | None

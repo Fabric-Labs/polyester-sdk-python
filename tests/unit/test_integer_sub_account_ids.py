@@ -216,7 +216,7 @@ def _order_keywords() -> dict[str, str]:
 
 ORDER_KEYWORD_HELPERS = {
     "create": orders_pb2.CreateOrderResponse(order_id=42),
-    "preview_order": orders_pb2.PreviewOrderResponse(evaluated_at={"seconds": 1}),
+    "preview": orders_pb2.PreviewOrderResponse(evaluated_at={"seconds": 1}),
 }
 
 

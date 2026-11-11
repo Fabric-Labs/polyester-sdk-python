@@ -74,7 +74,7 @@ async def _sent_quantities(json_wire: bool, method: str, symbol_id: int, qty) ->
         if method == "create":
             await client.orders.create(**order)
         elif method == "preview":
-            await client.orders.preview_order(**order)
+            await client.orders.preview(**order)
         else:
             await client.orders.batch_create(items=[order])
     finally:

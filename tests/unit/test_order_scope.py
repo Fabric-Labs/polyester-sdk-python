@@ -95,8 +95,8 @@ WRITE_HELPERS = {
     "orders.create": (
         lambda c, scope: c.orders.create(**order_input(), **scope), ["CreateOrder"]
     ),
-    "orders.preview_order": (
-        lambda c, scope: c.orders.preview_order(**order_input(), **scope), ["PreviewOrder"]
+    "orders.preview": (
+        lambda c, scope: c.orders.preview(**order_input(), **scope), ["PreviewOrder"]
     ),
     "orders.batch_create": (
         lambda c, scope: c.orders.batch_create(items=[order_input()], **scope),
@@ -207,7 +207,7 @@ async def test_write_helpers_refuse_whitespace_scope(helper, scope):
         assert seen == []
 
 
-@pytest.mark.parametrize("helper", ["create", "preview_order"])
+@pytest.mark.parametrize("helper", ["create", "preview"])
 @pytest.mark.parametrize("account", ["main", "active"])
 @pytest.mark.parametrize("override", ["", format_id(44)])
 async def test_typed_order_requests_refuse_selector_conflicts(helper, account, override):
@@ -218,7 +218,7 @@ async def test_typed_order_requests_refuse_selector_conflicts(helper, account, o
         assert seen == []
 
 
-@pytest.mark.parametrize("helper", ["create", "preview_order"])
+@pytest.mark.parametrize("helper", ["create", "preview"])
 @pytest.mark.parametrize("request_scope,account,want", [
     (None, None, 42),
     (None, "main", 42),

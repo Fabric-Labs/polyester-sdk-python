@@ -95,6 +95,10 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     avg_price: Decimal | None = None
     cum_notional_scaled: str = "0"
     fee_total: OrderFeeTotal | None = None
+    # The pair's quote quantity scale from the catalogs, attached when the
+    # order was read with the catalogs loaded; ``None`` otherwise. The base
+    # quantity scale is ``cum_qty.scale``.
+    quote_quantity_scale: int | None = None
 
     def _base_scale(self, base_quantity_scale: int | None) -> int | None:
         if base_quantity_scale is not None:
@@ -163,14 +167,27 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
         return Decimal(format_scaled(used[0], used[1]))
 
     def quote_unspent(
-        self, *, quote_quantity_scale: int, base_quantity_scale: int | None = None
+        self,
+        *,
+        quote_quantity_scale: int | None = None,
+        base_quantity_scale: int | None = None,
     ) -> Decimal | None:
         """The part of a buy's quote amount its fills did not use.
 
         ``submitted_max_quote_debit_scaled`` (at the pair's
         ``quote_quantity_scale``) less :meth:`quote_used`. ``None`` for an
         order not sized by a quote amount, or while ``quote_used`` is ``None``.
+        ``quote_quantity_scale`` defaults to the scale the order was read
+        with (:attr:`quote_quantity_scale`).
         """
+        if quote_quantity_scale is None:
+            quote_quantity_scale = self.quote_quantity_scale
+        if quote_quantity_scale is None:
+            from polyester.errors import PolyesterValidationError
+
+            raise PolyesterValidationError(
+                "quote_quantity_scale is required: pass the pair's quote quantity scale"
+            )
         validate_protocol_scale(quote_quantity_scale, field_name="quote_quantity_scale")
         if not self.submitted_max_quote_debit_scaled:
             return None

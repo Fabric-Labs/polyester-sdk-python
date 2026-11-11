@@ -392,7 +392,7 @@ result = await client.orders.create(
 )
 ```
 
-Use `orders.preview_order(...)` to check current order admissibility and, when
+Use `orders.preview(...)` to check current order admissibility and, when
 available, resolved base quantity plus protected price bound before submitting.
 Preview accepts the same public create kwargs and encodes them as an
 `OrderIntent` (same wire contract as create). It does not return fee or
@@ -403,7 +403,12 @@ evaluated. Preview is not deployed on every API
 host, so handle an unimplemented/not-found response and do not make Preview a
 prerequisite for order submission.
 
-Market orders are IOC and enforce a slippage-derived execution boundary. See
+Market orders are IOC and enforce a slippage-derived execution boundary. A
+market order takes `tif="ioc"` or no `tif`; `fok`, `gtc` or `gtd` raises
+`PolyesterValidationError` (`tif='fok' is only valid for limit orders`) before
+anything is sent, in `create`, `preview` and `batch_create`. A
+trigger's market child and a trailing stop take the same: `ioc` or no `tif`.
+See
 [Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
 before overriding pair defaults. Set at most one of `max_slippage_bps` or
 `max_slippage_ticks`. `max_slippage_bps` is 1–10000 for a buy and 1–9999 for a
@@ -488,7 +493,7 @@ limits = client.catalogs.order_limits_for_symbol("BTC-USDT")
 if limits is not None and limits.max_limit_qty_base is not None:
     print("largest limit order:", limits.max_limit_qty_base, "BTC")
 ```
-`orders.preview_order(...)` remains the authority for balances, reservations,
+`orders.preview(...)` remains the authority for balances, reservations,
 liquidity, and other stateful rules.
 
 ### For bots (scaled integers)
@@ -814,7 +819,7 @@ The sync `Polyester` client returns plain iterators:
 
 `triggers.list(status=...)` filters by lifecycle status. Valid values:
 
-`created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
+`created`, `armed`, `running`, `completed`, `canceled`, `failed`, `paused`
 
 Invalid status and event-type labels raise `PolyesterValidationError`.
 Connect requests and responses use numeric `symbol_id`. Public methods still
@@ -840,8 +845,9 @@ catalog when available; those reads wait for a load in progress, and leave
 the label empty when it failed.
 
 Unknown values raise `PolyesterValidationError` (they do not silently return
-an empty list). Response `status` uses the same labels (British spelling
-`cancelled`).
+an empty list), `cancelled` included. Response `status` uses the same labels:
+a canceled trigger reads `canceled`, the contract's spelling, as its
+`canceled` event does.
 
 `orders.get(..., include_attached_risk=True)` returns policy data on
 `order.attached_risk` (take-profit / stop-loss / trailing-stop). Independently,
@@ -1047,7 +1053,7 @@ from its last event. `list_events(event_type="fire_refused")` filters them.
 `activated` (a trailing stop started tracking), `armed` (an attached
 take-profit, stop-loss or trailing stop started protecting its parent's filled
 quantity, once) or `fire_refused`. A ladder has no event types of its own: read
-its `status`, `completed`, `cancelled` or `failed`. A completed ladder may not
+its `status`, `completed`, `canceled` or `failed`. A completed ladder may not
 have filled: read its executed quantity and levels.
 
 A trigger change that names a listed pair other than the trigger's own is
@@ -1057,7 +1063,7 @@ the trigger's own pair or omit the symbol. A pair that is not listed is
 malformed sub-account ID is refused with the ledger code
 `ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), read from `PolyesterApiError.code`.
 
-A ladder whose levels were all canceled before any filled ends `cancelled`
+A ladder whose levels were all canceled before any filled ends `canceled`
 with `cancel_reason` `user_request`; one that filled anything ends
 `completed`. An attached leg's `qty` follows the order's whole settled
 position, less what its exit orders sold, so it can be larger than its working

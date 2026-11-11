@@ -103,7 +103,7 @@ def test_trigger_status_from_label() -> None:
     from polyester.codecs.decode.triggers import trigger_status_from_label
 
     assert trigger_status_from_label("armed") == triggers_pb2.STATUS_ARMED
-    assert trigger_status_from_label("cancelled") == triggers_pb2.STATUS_CANCELED
+    assert trigger_status_from_label("canceled") == triggers_pb2.STATUS_CANCELED
     with pytest.raises(PolyesterValidationError):
         trigger_status_from_label("nope")
 
@@ -135,13 +135,13 @@ def test_trigger_mutation_from_proto() -> None:
     assert result.status == "accepted"
 
 
-def test_trigger_status_cancelled_matches_typescript() -> None:
+def test_trigger_status_canceled_uses_the_contract_spelling() -> None:
     msg = triggers_pb2.CancelTriggerResponse(
         trigger_id=9,
         status=triggers_pb2.STATUS_CANCELED,
     )
     result = trigger_mutation_from_proto(msg)
-    assert result.status == "cancelled"
+    assert result.status == "canceled"
 
 
 def test_trigger_events_list_from_proto() -> None:

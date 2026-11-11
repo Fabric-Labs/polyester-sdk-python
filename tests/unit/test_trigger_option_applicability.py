@@ -143,7 +143,8 @@ async def test_limit_price_and_post_only_controls(kind):
 
 
 @pytest.mark.parametrize("kind", ["stop_loss", "trailing_stop"])
-@pytest.mark.parametrize("tif", [None, "", 1, False])
+# None is no tif: gtc for a limit child, IOC for a market child or trailing stop.
+@pytest.mark.parametrize("tif", ["", 1, False])
 async def test_invalid_tif_uses_validation_error_before_transport(kind, tif):
     kwargs = base_options(kind)
     kwargs["tif"] = tif

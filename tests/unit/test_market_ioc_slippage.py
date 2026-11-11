@@ -168,7 +168,7 @@ async def test_preview_service_sends_market_slippage_ticks_on_wire() -> None:
     )
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
     with patch("polyester.services.orders.unary_auth_decoded", capture):
-        await service.preview_order(
+        await service.preview(
             symbol="BTC-USDT",
             side="buy",
             order_type="market",

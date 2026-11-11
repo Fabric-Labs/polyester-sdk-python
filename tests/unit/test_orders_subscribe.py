@@ -23,7 +23,9 @@ async def test_orders_subscribe_uses_the_private_order_socket() -> None:
     result = await service.subscribe()
 
     assert result == "subscription"
-    realtime.subscribe_private_orders.assert_awaited_once_with("j")
+    realtime.subscribe_private_orders.assert_awaited_once_with(
+        "j", order_scales=service._order_scales
+    )
     realtime.subscribe_proto.assert_not_called()
 
 

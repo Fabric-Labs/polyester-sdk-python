@@ -162,7 +162,7 @@ async def test_order_preview_limit_price_is_q9() -> None:
     )
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
     with patch("polyester.services.orders.unary_auth_decoded", capture):
-        await service.preview_order(
+        await service.preview(
             symbol="ETH-USDT",
             side="buy",
             order_type="limit",
@@ -186,7 +186,7 @@ async def test_order_preview_decodes_protected_price_bound_as_q9() -> None:
     )
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
     with patch("polyester.services.orders.unary_auth_decoded", capture):
-        result = await service.preview_order(
+        result = await service.preview(
             symbol="BTC-USDT",
             side="buy",
             order_type="market",

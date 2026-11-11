@@ -201,7 +201,7 @@ async def test_batch_cancel_sends_integer_item_market_id() -> None:
 
 
 ORDER_WRITES = {
-    "preview_order": lambda c, order: c.orders.preview_order(order),
+    "preview": lambda c, order: c.orders.preview(order),
     "create": lambda c, order: c.orders.create(order),
     "batch_create": lambda c, order: c.orders.batch_create(items=[order]),
 }
@@ -226,7 +226,7 @@ async def test_order_request_objects_send_integer_market_id(write: str) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("write", ["preview_order", "create"])
+@pytest.mark.parametrize("write", ["preview", "create"])
 @pytest.mark.parametrize("symbol_id", [8.9, True, "7"], ids=repr)
 async def test_order_keywords_refuse_malformed_market_ids(write: str, symbol_id: Any) -> None:
     await _refused(

@@ -147,6 +147,61 @@ async def test_create_accepts_symbol_id_price_type_and_price_source() -> None:
     assert capture.request.idempotency_key == ""
 
 
+async def test_create_by_symbol_id_accepts_a_price_bound_to_that_market() -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert(symbol_id=2)))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await _service().create(
+            symbol_id=2,
+            direction="below",
+            price=Price.from_ticks(2_900 * 10**9, symbol="ETH-USDT"),
+            channels=["in_app"],
+        )
+    assert capture.request.symbol_id == 2
+    assert capture.request.price_ticks == 2_900 * 10**9
+
+
+async def test_create_by_symbol_id_refuses_a_price_bound_to_another_market() -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert()))
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="BTC-USDT"),
+    ):
+        await _service().create(
+            symbol_id=2,
+            direction="below",
+            price=Price.from_ticks(90_000 * 10**9, symbol="BTC-USDT"),
+            channels=["in_app"],
+        )
+    assert capture.request is None
+
+
+async def test_create_refuses_a_bound_price_for_an_uncatalogued_symbol_id() -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert()))
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="symbol_id 77"),
+    ):
+        await _service().create(
+            symbol_id=77,
+            direction="below",
+            price=Price.from_ticks(90_000 * 10**9, symbol="BTC-USDT"),
+            channels=["in_app"],
+        )
+    assert capture.request is None
+
+
+async def test_create_keeps_an_unbound_price_for_an_uncatalogued_symbol_id() -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert(symbol_id=77)))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await AsyncAlertsService(MagicMock(), None).create(
+            symbol_id=77,
+            direction="below",
+            price=Price.from_ticks(90_000 * 10**9),
+            channels=["in_app"],
+        )
+    assert capture.request.symbol_id == 77
+
+
 @pytest.mark.parametrize(
     ("kwargs", "match"),
     [

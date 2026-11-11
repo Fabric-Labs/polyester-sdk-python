@@ -135,7 +135,11 @@ class AsyncAlertsService(BaseService):
         alert's ``reference_price``; an alert whose condition already holds
         there starts unarmed and fires only after the price moves back and
         crosses again. The same ``idempotency_key`` and request return the
-        alert created first.
+        alert created first. A :class:`~polyester.types.Price` bound to a
+        market must be bound to this one: with only ``symbol_id``, the
+        catalogs name it, and a bound price for an ID they don't know is
+        refused, since it cannot be checked. An unbound price works with any
+        ``symbol_id``.
         """
         direction_value = _enum(direction, _DIRECTIONS, "direction")
         source_value = (
@@ -145,16 +149,27 @@ class AsyncAlertsService(BaseService):
         )
         channel_values = _channels(channels)
         key = _idempotency_key(idempotency_key)
-        if symbol:
-            await self._ensure_catalogs()
+        bound_symbol = price.symbol if isinstance(price, Price) else None
+        if symbol or bound_symbol is not None:
+            # A bound price is checked against the market's catalog name.
+            await self._ensure_catalogs(required=bool(symbol))
         resolved_id = resolve_symbol_id(
             self._catalogs, symbol=symbol, symbol_id=symbol_id, label="alerts.create"
         )
+        market = symbol or (
+            self._catalogs.symbol_for_symbol_id(resolved_id) if self._catalogs else None
+        )
+        if bound_symbol is not None and market is None:
+            raise PolyesterValidationError(
+                f"price is bound to {bound_symbol}, but the catalogs do not name "
+                f"symbol_id {resolved_id}, so it cannot be checked; pass an unbound "
+                "price or the market's symbol"
+            )
         request = pb.CreateAlertRequest(
             symbol_id=resolved_id,
             direction=direction_value,
             price_source=source_value,
-            price_ticks=_price_ticks(price, symbol),
+            price_ticks=_price_ticks(price, market),
             channels=channel_values,
             idempotency_key=key,
         )

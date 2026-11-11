@@ -33,6 +33,8 @@ Requires **Python 3.11+**.
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
 | Product changelog (posts + changes) | Yes |
+| Server build version | Yes |
+| Price alerts (devnet) | Yes |
 | Balances and equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |

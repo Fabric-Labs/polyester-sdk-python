@@ -6,7 +6,8 @@ import contextlib
 import dataclasses
 import inspect
 import os
-from urllib.parse import urlsplit, urlunsplit
+import threading
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 import msgspec
 
@@ -51,6 +52,52 @@ def url_for_error(url: str) -> str:
 # The proxy settings pyqwest (reqwest) and httpx read from the environment.
 _PROXY_ENV = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 PROXY_PLACEHOLDER = "[proxy]"
+SECRET_PLACEHOLDER = "[REDACTED]"
+# A client-held secret shorter than this is too common to replace in text.
+_MIN_SECRET_LENGTH = 4
+_known_secrets: set[str] = set()
+_known_secrets_lock = threading.Lock()
+
+
+def register_secret(secret: str) -> None:
+    """Remember a client-held secret so :func:`redact_text` removes it anywhere."""
+    if len(secret) >= _MIN_SECRET_LENGTH:
+        with _known_secrets_lock:
+            _known_secrets.add(secret)
+
+
+def register_url_secrets(url: str) -> None:
+    """Remember the userinfo of a URL the client holds, and its password.
+
+    Both, raw and decoded, are removed wherever they appear in error text,
+    however the URL around them was quoted or mangled.
+    """
+    netloc = url.partition("://")[2].split("/", 1)[0]
+    userinfo, at, _host = netloc.rpartition("@")
+    if not at or not userinfo:
+        return
+    # The exact userinfo and the password: a user name alone is not secret
+    # and too common to replace in text.
+    password = userinfo.partition(":")[2]
+    for part in (userinfo, password):
+        register_secret(part)
+        register_secret(unquote(part))
+
+
+def _secrets_in_effect() -> list[str]:
+    """The registered secrets and the userinfo of the proxies the environment sets."""
+    with _known_secrets_lock:
+        secrets = set(_known_secrets)
+    for name in _PROXY_ENV:
+        proxy = (os.environ.get(name) or "").strip()
+        netloc = proxy.partition("://")[2].split("/", 1)[0]
+        userinfo, at, _host = netloc.rpartition("@")
+        if at and userinfo:
+            password = userinfo.partition(":")[2]
+            secrets.update(part for part in (userinfo, password) if len(part) >= _MIN_SECRET_LENGTH)
+    return sorted(secrets, key=len, reverse=True)
+
+
 # How deep redaction follows containers and models held by an exception.
 _MAX_DEPTH = 6
 
@@ -61,9 +108,12 @@ def redact_text(text: str) -> str:
     For messages that quote an answer's or a transport's own words, where a
     URL's userinfo or query may hold any character, parentheses and quotes
     included: after each ``://``, up to the next whitespace, everything up to
-    the last ``@`` before any ``?`` or ``#`` (the userinfo) and everything
-    from that ``?`` or ``#`` on (the query and fragment) is dropped. A proxy
-    URL from the environment becomes ``[proxy]``.
+    the last ``@`` (the userinfo, whatever it holds) and everything from the
+    next ``?`` or ``#`` on (the query and fragment) is dropped. A proxy
+    URL from the environment becomes ``[proxy]``, a URL the old parser would
+    refuse becomes ``[REDACTED INVALID URL]``, and every client-held secret
+    (see :func:`register_url_secrets` and :func:`register_secret`) and the
+    userinfo of the environment's proxies become ``[REDACTED]``.
     """
     for name in _PROXY_ENV:
         proxy = (os.environ.get(name) or "").strip()
@@ -81,16 +131,31 @@ def redact_text(text: str) -> str:
         while end < len(text) and not text[end].isspace():
             end += 1
         token = text[start:end]
-        cut = min((i for i in (token.find("?"), token.find("#")) if i != -1), default=len(token))
-        at = token.rfind("@", 0, cut)
+        scheme = separator
+        while scheme > position and (text[scheme - 1].isalnum() or text[scheme - 1] in "+.-"):
+            scheme -= 1
+        if url_for_error(text[scheme:end]) == INVALID_URL:
+            # At least what the URL parser refuses stays refused: a URL that
+            # does not parse is dropped whole.
+            out.append(text[position:scheme])
+            out.append(INVALID_URL)
+            position = end
+            continue
+        # Fail closed: the last "@" anywhere ends a userinfo, even one that
+        # holds "?" or "#", or a URL that does not parse.
+        at = token.rfind("@")
         if at != -1:
             token = token[at + 1 :]
-            cut -= at + 1
+        cut = min((i for i in (token.find("?"), token.find("#")) if i != -1), default=len(token))
         out.append(text[position:start])
         out.append(token[:cut])
         position = end
     out.append(text[position:])
-    return "".join(out)
+    # URLs first, so a registered secret inside one can't make it unparsable.
+    text = "".join(out)
+    for secret in _secrets_in_effect():
+        text = text.replace(secret, SECRET_PLACEHOLDER)
+    return text
 
 
 def _redacted(value: object, depth: int = 0) -> object:

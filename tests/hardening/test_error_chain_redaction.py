@@ -134,6 +134,8 @@ TRICKY_URLS = [
     pytest.param(f"http://{USER}:one'two-{SECRET}@proxy.example.test/x", id="quote-userinfo"),
     pytest.param(f"http://proxy.example.test/x?{QUERY}one(two-{SECRET})", id="paren-query"),
     pytest.param(f"http://proxy.example.test/x?{QUERY}one'two-{SECRET}", id="quote-query"),
+    pytest.param(f"http://{USER}:{SECRET}?bad@proxy.example.test/x", id="question-in-userinfo"),
+    pytest.param(f"http://{USER}:{SECRET}#bad@proxy.example.test/x", id="hash-in-userinfo"),
 ]
 
 
@@ -148,7 +150,11 @@ async def test_a_url_with_parentheses_or_quotes_is_redacted(url: str) -> None:
     try:
         with pytest.raises(PolyesterServerError) as info:
             await client.market_data.get_spot_config()
-        assert "proxy.example.test" in str(info.value)
+        if "bad@" in url:
+            # A URL the parser refuses is dropped whole, as before.
+            assert "[REDACTED INVALID URL]" in str(info.value)
+        else:
+            assert "proxy.example.test" in str(info.value)
         _assert_clean(info.value)
     finally:
         await client.aclose()
@@ -275,6 +281,61 @@ async def test_structured_diagnostics_are_redacted(status: int, body: dict, attr
         for secret in (USER, SECRET, QUERY):
             assert secret not in printed, printed
         _assert_clean(info.value)
+    finally:
+        await client.aclose()
+        await http.aclose()
+
+
+# Client-held secrets: the userinfo of the client's own API and WebSocket URLs,
+# of the environment's proxies, and the API private key never reach an error's
+# text, however the answer quotes them.
+
+API_USER, API_SECRET = "sdk-api-user", "api-secret-9228"
+WS_USER, WS_SECRET = "sdk-ws-user", "ws-secret-9228"
+ENV_USER, ENV_SECRET = "sdk-env-proxy-user", "env-proxy-secret-9228"
+
+
+@pytest.mark.asyncio
+async def test_client_held_secrets_never_reach_an_error(monkeypatch) -> None:
+    from tests.hardening_support import make_test_credentials
+
+    monkeypatch.setenv("HTTPS_PROXY", f"http://{ENV_USER}:{ENV_SECRET}@127.0.0.1:9")
+    creds = make_test_credentials()
+    seed = creds.private_key[:32].hex()
+    message = (
+        f"auth {API_USER}:{API_SECRET} via http//{API_USER}:{API_SECRET}@api "
+        f"ws {WS_USER}:{WS_SECRET} and {WS_SECRET} proxy {ENV_USER}:{ENV_SECRET} and {ENV_SECRET} "
+        f"key {seed} "
+        f"{creds.private_key.hex()} {API_SECRET}"
+    )
+    http = await MockHttpServer.spawn(
+        lambda _req: HttpScript.json(503, {"code": "unavailable", "message": message})
+    )
+    host = http.base_url.removeprefix("http://")
+    client = AsyncPolyester(
+        api_url=f"http://{API_USER}:{API_SECRET}@{host}",
+        ws_url=f"ws://{WS_USER}:{WS_SECRET}@127.0.0.1:9/unused",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    try:
+        with pytest.raises(PolyesterServerError) as info:
+            await client.market_data.get_spot_config()
+        printed = "".join(traceback.format_exception(info.value))
+        for member in _chain(info.value):
+            printed += str(member) + repr(member)
+        for secret in (
+            f"{API_USER}:{API_SECRET}",
+            API_SECRET,
+            f"{WS_USER}:{WS_SECRET}",
+            WS_SECRET,
+            f"{ENV_USER}:{ENV_SECRET}",
+            ENV_SECRET,
+            seed,
+        ):
+            assert secret not in printed, (secret, printed)
+        assert "[REDACTED]" in str(info.value)
     finally:
         await client.aclose()
         await http.aclose()

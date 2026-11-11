@@ -11,6 +11,7 @@ from typing import Any, Literal, NoReturn
 from google.protobuf.message import Message
 
 from polyester._catalog_startup import CatalogSource, load_catalog
+from polyester._redact import register_url_secrets
 from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
@@ -203,6 +204,7 @@ class AsyncPolyester:
         self.environment = resolved
         self.api_url = api_url if api_url is not None else resolved.api_url
         self.ws_url = ws_url if ws_url is not None else resolved.websocket_url
+        register_url_secrets(self.ws_url)
         self.default_sub_account_id = default_sub_account_id
         self.default_account_id = default_account_id
         self.catalogs = CatalogManager()

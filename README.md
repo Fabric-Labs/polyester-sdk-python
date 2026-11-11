@@ -1682,7 +1682,10 @@ mapped, each URL quoted in the chain, from an answer or from the transport,
 loses its userinfo, query and fragment, and a proxy URL from the environment
 reads `[proxy]`, in `str`, `repr` and `traceback.format_exception` alike, and in
 structured diagnostics such as `error.problem` and a rate limit's
-`error.detail`.
+`error.detail`. A URL that does not parse is dropped whole. The client's own
+secrets read `[REDACTED]` however an answer quotes them: the userinfo and
+password of its `api_url` and `ws_url` and of a proxy the environment sets,
+and its API private key.
 
 Timeouts, from the outside in:
 

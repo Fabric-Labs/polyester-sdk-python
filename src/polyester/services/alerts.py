@@ -89,9 +89,13 @@ class AsyncAlertsService(BaseService):
 
     Prices are quote units: a decimal string, a ``Decimal`` or a
     :class:`~polyester.types.money.Price`. Refusals carry the
-    ``alerts.v1.ErrorCode`` name as ``code``: ``PRICE_UNAVAILABLE`` and
-    ``SERVICE_UNAVAILABLE`` raise a retryable
-    :class:`~polyester.errors.PolyesterServerError`; ``REVISION_CONFLICT``
+    ``alerts.v1.ErrorCode`` name as ``code``. ``PRICE_UNAVAILABLE`` raises a
+    retryable :class:`~polyester.errors.PolyesterServerError`: nothing
+    changed. ``SERVICE_UNAVAILABLE`` raises a ``PolyesterServerError`` whose
+    outcome is unknown for a create, update or cancel
+    (:func:`~polyester.errors.mutation_outcome_unknown`): send a create or
+    update again with the same ``idempotency_key``, cancel again (it is
+    idempotent), or read the alerts back. ``REVISION_CONFLICT``
     means the alert changed since you read it (read it again);
     ``IDEMPOTENCY_CONFLICT`` means the key was used for another request (the
     original stands). Pass an ``idempotency_key`` to make a create or update

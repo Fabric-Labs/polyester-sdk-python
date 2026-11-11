@@ -386,21 +386,24 @@ def test_subaccount_key_is_refused_as_an_auth_error() -> None:
     assert not is_retryable_error(err)
 
 
-@pytest.mark.parametrize(
-    ("code", "connect_code"),
-    [
-        (pb.PRICE_UNAVAILABLE, Code.UNAVAILABLE),
-        (pb.SERVICE_UNAVAILABLE, Code.UNAVAILABLE),
-    ],
-)
-def test_unavailable_refusals_are_retryable_and_changed_nothing(
-    code: int, connect_code: Code
-) -> None:
-    err = _alert_error(code, connect_code)
+def test_price_unavailable_is_retryable_and_changed_nothing() -> None:
+    err = _alert_error(pb.PRICE_UNAVAILABLE, Code.UNAVAILABLE)
     assert isinstance(err, PolyesterServerError)
-    assert err.code == pb.ErrorCode.Name(code)
+    assert err.code == "PRICE_UNAVAILABLE"
+    assert err.status_code == 503
     assert is_retryable_error(err)
     assert not mutation_outcome_unknown(err)
+
+
+def test_service_unavailable_leaves_a_mutation_outcome_unknown() -> None:
+    # As for every other service: the alert may have changed. Send the create
+    # or update again with the same idempotency key, cancel again, or read back.
+    err = _alert_error(pb.SERVICE_UNAVAILABLE, Code.UNAVAILABLE)
+    assert isinstance(err, PolyesterServerError)
+    assert err.code == "SERVICE_UNAVAILABLE"
+    assert err.status_code == 503
+    assert mutation_outcome_unknown(err)
+    assert not is_retryable_error(err)
 
 
 @pytest.mark.parametrize(

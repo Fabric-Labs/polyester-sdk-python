@@ -88,8 +88,9 @@ _DETAIL_MESSAGES: tuple[type[Message], ...] = (
     ratelimit_pb2.RateLimitDetail,
 )
 
-# alerts.v1 refusals that changed nothing and succeed when sent again.
-_RETRYABLE_ALERT_CODES = frozenset({"PRICE_UNAVAILABLE", "SERVICE_UNAVAILABLE"})
+# alerts.v1 codes answered as server errors: PRICE_UNAVAILABLE changed nothing
+# and is retryable; SERVICE_UNAVAILABLE leaves a mutation's outcome unknown.
+_UNAVAILABLE_ALERT_CODES = frozenset({"PRICE_UNAVAILABLE", "SERVICE_UNAVAILABLE"})
 
 
 def _unpack_error_detail(detail: Message) -> Message | None:
@@ -347,7 +348,7 @@ def _map_connect_error(exc: ConnectError):
                 code_name = error_code_name(alerts_pb2.ErrorCode, unpacked.code)
                 if code_name == "SUBACCOUNT_KEY_REFUSED":
                     return PolyesterAuthError(error_message, code=code_name, status_code=403)
-                if code_name in _RETRYABLE_ALERT_CODES:
+                if code_name in _UNAVAILABLE_ALERT_CODES:
                     return PolyesterServerError(
                         error_message, code=code_name, status_code=503, raw=unpacked
                     )

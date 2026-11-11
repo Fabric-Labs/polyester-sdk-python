@@ -890,8 +890,11 @@ Prices are exact `Price` values (quote units, 1e9 ticks). `status` is
 trigger's is `"canceled"`); a triggered alert has `triggered_at` and
 `triggered_price`. Pass the same `idempotency_key` when you send a create or
 update again after a lost answer: it applies at most once. Refusals keep the
-contract code: `PRICE_UNAVAILABLE` and `SERVICE_UNAVAILABLE` raise a retryable
-`PolyesterServerError`; `REVISION_CONFLICT` means the alert changed since you
+contract code: `PRICE_UNAVAILABLE` raises a retryable `PolyesterServerError`
+(nothing changed); `SERVICE_UNAVAILABLE` raises a `PolyesterServerError` whose
+outcome is unknown for a create, update or cancel (`mutation_outcome_unknown`):
+send a create or update again with the same `idempotency_key`, cancel again (it
+is idempotent), or read the alerts back; `REVISION_CONFLICT` means the alert changed since you
 read it (read it again); `IDEMPOTENCY_CONFLICT` means the key was used for
 another request; `ALERT_LIMIT_REACHED`, `ALERT_UPDATE_LIMIT_REACHED`,
 `ALERT_CANCELLED`, `ALERT_TRIGGERED`, `ALERT_NOT_FOUND`, `UNKNOWN_SYMBOL` and

@@ -417,3 +417,35 @@ def test_assistant_policy_classes_read_by_name(name: str) -> None:
         ratelimit_pb2.RateLimitDetail(policy_class=ratelimit_pb2.PolicyClass.Value(name))
     )
     assert detail.policy_class == name
+
+
+# --- AUTH_REPLAY_DETECTED is a final API-key refusal ------------------------------------------
+
+
+def test_connect_replay_detected_is_a_final_auth_error() -> None:
+    err = map_connect_error(
+        ConnectError(
+            Code.UNAUTHENTICATED,
+            "replayed",
+            details=[
+                auth_pb2.AuthErrorDetail(code=auth_pb2.AUTH_REPLAY_DETECTED, message="replayed")
+            ],
+        )
+    )
+    assert isinstance(err, PolyesterAuthError)
+    assert auth_error_code(err) == polyester_errors.AUTH_REPLAY_DETECTED == "AUTH_REPLAY_DETECTED"
+    assert err.status_code == 401
+    # The server already saw that exact signed request: never retry it as is.
+    assert not is_retryable_error(err)
+
+
+async def test_rest_replay_detected_is_the_same_auth_error(httpserver: HTTPServer) -> None:
+    from tests.unit.test_auth_error_codes import _rest_error
+
+    err = await _rest_error(
+        httpserver, 401, {"status": 401, "code": "REPLAY_DETECTED", "title": "Unauthorized"}
+    )
+    assert isinstance(err, PolyesterAuthError)
+    assert auth_error_code(err) == "AUTH_REPLAY_DETECTED"
+    assert err.status_code == 401
+    assert not is_retryable_error(err)

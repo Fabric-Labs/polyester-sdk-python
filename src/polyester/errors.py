@@ -42,6 +42,10 @@ AUTH_API_KEY_NOT_ACCEPTED = "AUTH_API_KEY_NOT_ACCEPTED"
 # ConnectRPC ``unauthenticated``). The request was not processed, and the same
 # header is refused again: fix ``recv_window_ms``.
 AUTH_RECV_WINDOW_INVALID = "AUTH_RECV_WINDOW_INVALID"
+# The server already saw this exact signed request (REST ``REPLAY_DETECTED``,
+# HTTP 401). The first copy may have been applied, so it is final: read back
+# before sending the operation again, which signs it with a fresh timestamp.
+AUTH_REPLAY_DETECTED = "AUTH_REPLAY_DETECTED"
 API_KEY_AUTH_ERROR_CODES = frozenset(
     {
         AUTH_SIGNATURE_INVALID,
@@ -52,6 +56,7 @@ API_KEY_AUTH_ERROR_CODES = frozenset(
         AUTH_IP_NOT_ALLOWED,
         AUTH_API_KEY_NOT_ACCEPTED,
         AUTH_RECV_WINDOW_INVALID,
+        AUTH_REPLAY_DETECTED,
     }
 )
 
@@ -753,10 +758,12 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
                         and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
                         == "orders.v1.ErrorDetail"
                     )
-                    # A price alert refused PRICE_UNAVAILABLE or
-                    # SERVICE_UNAVAILABLE changed nothing.
-                    or getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
-                    == "alerts.v1.ErrorDetail"
+                    # A price alert refused PRICE_UNAVAILABLE changed nothing.
+                    or (
+                        err.code == "PRICE_UNAVAILABLE"
+                        and getattr(getattr(err.raw, "DESCRIPTOR", None), "full_name", None)
+                        == "alerts.v1.ErrorDetail"
+                    )
                 )
             )
         )

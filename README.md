@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** `0.20.0`, pre-1.0: a minor release may include breaking changes (see
+**Status:** `0.21.0`, pre-1.0: a minor release may include breaking changes (see
 [CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
@@ -100,7 +100,7 @@ before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.20.0"
+pip install "polyester-sdk==0.21.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -1642,7 +1642,8 @@ loaded, and so does every call that needs it: calls that name a market for the
 spot config, `zipper.subscribe_zipped_asset_supply` for the funding config.
 A missing, empty or invalid spot config fails every spot call closed.
 Only what reads the funding config waits for it: the zipper supply stream,
-which decodes with its scales, and the asset lookups. Withdrawals and deposit
+which decodes with its scales. The asset lookups don't wait; they return `None`
+while the funding config is loading or failed. Withdrawals and deposit
 addresses (`withdraw.create_*`, `deposit.list_addresses`,
 `deposit.create_address`) and `zipper.get_deposit_withdraw_config` read
 nothing from it and work while it is loading or failed. A call that waits sends

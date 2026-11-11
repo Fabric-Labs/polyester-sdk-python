@@ -133,8 +133,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
 
         Order reads and the order stream decode with them, so their helpers
         (``cum_quote()``, ``quote_used()``, ``quote_unspent()``) need no scale
-        argument. Reads don't wait for the catalogs: before they load, a
-        scale is ``None`` and the helpers take it explicitly.
+        argument. Reads wait for a spot config load in progress, never for the
+        funding config; if that load failed, a scale is ``None`` and the
+        helpers take it explicitly.
         """
         return catalog_order_scales(self._catalogs, symbol_id)
 

@@ -81,7 +81,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
 
         Trigger reads and the trigger stream decode ``qty`` and the TWAP and
         ladder ``executed_qty`` with the base scale; ``None`` before the
-        catalogs load. Reads don't wait for them.
+        catalogs load. Reads wait for a spot config load in progress, never for
+        the funding config.
         """
         return catalog_order_scales(self._catalogs, symbol_id)
 

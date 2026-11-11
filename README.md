@@ -3,7 +3,7 @@
 Official Python SDK for Polyester APIs, built for trading bots, backend jobs,
 research notebooks, and automation.
 
-**Status:** `0.21.0`, pre-1.0: a minor release may include breaking changes (see
+**Status:** `0.21.1`, pre-1.0: a minor release may include breaking changes (see
 [CHANGELOG.md](CHANGELOG.md)). Proprietary license (not open source).
 API-key only; no browser login or JWT flows.
 
@@ -118,7 +118,7 @@ before retrying.
 PyPI: https://pypi.org/project/polyester-sdk/
 
 ```bash
-pip install "polyester-sdk==0.21.0"
+pip install "polyester-sdk==0.21.1"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are included by default.
@@ -213,11 +213,12 @@ Credentials with the same API key ID share one timestamp allocator in the proces
 separate `AsyncPolyester` and `Polyester` clients and independently loaded `ApiKeyCredentials`.
 The signing protocol has no cross-process nonce, so assign one API key per process; sharing a key
 between processes can produce identical authentication tuples.
-Timestamps can lead the local clock by at most five seconds. The async client applies bounded,
+Timestamps can lead the local clock by at most half a second. The async client applies bounded,
 cooperative backpressure without blocking the event loop. The low-level synchronous
 `polyester.auth.sign_request` helper instead raises `PolyesterRateLimitError` immediately when
-capacity is exhausted; honor `retry_after`. Neither path reuses a signature or drifts outside the
-API's 10-second freshness window.
+capacity is exhausted; honor `retry_after`. Neither path reuses a signature or runs past the API's
+limit, which refuses a timestamp more than one second ahead of the server clock as
+`PolyesterTimestampSkewError`. Keep the host clock synchronized.
 
 `ApiKeyCredentials` redacts the private key in `repr`, `str` and logging. Pickling, deep-copying
 and `dataclasses.asdict`/`astuple` raise `TypeError`, also for a dataclass that holds the
@@ -232,7 +233,7 @@ credentials; read `private_key` explicitly when you need it.
 request: the server processes a request only until its signing timestamp plus that many
 milliseconds, sent as the signed `X-API-RECV-WINDOW` header. It must be an `int` from 1 to 60000,
 and any other value raises `PolyesterValidationError` before anything is sent. `None`, the default,
-sends no header, and the server applies 10000. A request that arrives after its window raises the
+sends no header, and the server applies 5000. A request that arrives after its window raises the
 retryable `PolyesterTimestampSkewError`; one that waited past it before admission raises
 `PolyesterApiError` with `code` `REQUEST_DEADLINE_EXCEEDED`, also retryable. Both changed nothing,
 and a retry signs again with a fresh timestamp. Realtime token requests always use the default

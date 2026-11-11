@@ -108,7 +108,7 @@ def test_backpressured_clients_on_separate_event_loops_share_one_key(clock: Fake
     """Each sync client runs its own event loop; a shared key must not tie them to one loop."""
     key_id = fresh_key_id()
     creds = independent_credentials(key_id, 2)
-    # Fill the five-second lead so every async caller has to wait for the clock.
+    # Fill the lead so every async caller has to wait for the clock.
     for _ in range(MAX_SIGNING_FUTURE_SKEW_MS + 1):
         sign_request(creds[0], method="GET", url=URL, body=b"")
 

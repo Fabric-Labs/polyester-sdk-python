@@ -21,7 +21,10 @@ from polyester.errors import (
 API_KEY_ID_ENV = "POLYESTER_API_KEY_ID"
 API_PRIVATE_KEY_ENV = "POLYESTER_API_PRIVATE_KEY"
 ACCOUNT_ID_ENV = "POLYESTER_ACCOUNT_ID"
-MAX_SIGNING_FUTURE_SKEW_MS = 5_000
+# How far ahead of this host's clock an automatically allocated timestamp may
+# run. The API refuses a timestamp more than one second ahead of its own clock
+# as TIMESTAMP_SKEW; half a second leaves the other half for clock skew.
+MAX_SIGNING_FUTURE_SKEW_MS = 500
 _MAX_SIGNING_BACKPRESSURE_SECONDS = 10.0
 
 
@@ -255,7 +258,7 @@ def canonical_query(url: str) -> str:
 
 
 # Bounds of an API-key request's receive window (``X-API-RECV-WINDOW``), in
-# milliseconds. Without the header the server applies 10000.
+# milliseconds. Without the header the server applies 5000.
 MIN_RECV_WINDOW_MS = 1
 MAX_RECV_WINDOW_MS = 60_000
 

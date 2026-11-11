@@ -38,6 +38,7 @@ _LIFECYCLE_REASON_BY_CODE: dict[int, str] = {
         "trading_withdraw_execution_failed"
     ),
     int(types_pb2.DEPOSIT_SOURCE_NOT_CONFIRMED): "deposit_source_not_confirmed",
+    int(types_pb2.ZIPPER_COMPLIANCE_TRANSFERRED): "zipper_compliance_transferred",
 }
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from polyester._problem import HTTPProblem
@@ -384,6 +386,47 @@ class PolyesterApiError(PolyesterError):
         self.raw = raw
         self.existing_order_id = existing_order_id
         self.violations = list(violations or [])
+
+
+class PolyesterWithdrawError(PolyesterApiError):
+    """A withdrawal or auto-withdraw refusal that carries a
+    ``chain.withdraw.v1.ErrorDetail``.
+
+    ``code`` is the ``chain.withdraw.v1.ErrorCode`` name, such as
+    ``ERROR_CODE_DESTINATION_INVALID``. ``field_path`` names the request field
+    to fix, such as ``destinations[0].min_amount_e18``, when the server names
+    one. ``min_floor_e18`` (exact, scaled by 1e18) and ``min_floor`` (whole
+    units) are set on ``ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR``: the least amount a
+    payout to that destination can pay now.
+
+    ``ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`` refuses a broker vault's
+    payout to a destination added to its whitelist less than 24 hours ago. The
+    destination is listed, so this is not a whitelist error, and nothing was
+    reserved: send it again at ``payable_from``, which is ``None`` when that
+    time is not known yet. :func:`is_retryable_error` reports ``False``, since
+    an immediate retry is refused the same way.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        raw: object | None = None,
+        field_path: str | None = None,
+        min_floor_e18: str | None = None,
+        payable_from: datetime | None = None,
+    ) -> None:
+        super().__init__(message, code=code, raw=raw)
+        self.field_path = field_path
+        self.min_floor_e18 = min_floor_e18
+        self.payable_from = payable_from
+
+    @property
+    def min_floor(self) -> Decimal | None:
+        if self.min_floor_e18 is None:
+            return None
+        return Decimal(int(self.min_floor_e18)).scaleb(-18).normalize()
 
 
 class PolyesterSubaccountOwnerRoleLockedError(PolyesterApiError):

@@ -43,7 +43,8 @@ def test_unknown_error_code_maps_to_a_labelled_api_error(detail: object) -> None
     mapped = map_connect_error(
         ConnectError(Code.FAILED_PRECONDITION, "refused", details=[detail])  # type: ignore[list-item]
     )
-    assert type(mapped) is PolyesterApiError
+    # A withdraw refusal is a PolyesterWithdrawError, a PolyesterApiError.
+    assert isinstance(mapped, PolyesterApiError)
     assert mapped.code == f"UNKNOWN_ERROR_CODE({UNKNOWN})"
     assert str(mapped) == "refused"
 

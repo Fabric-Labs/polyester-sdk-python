@@ -798,6 +798,7 @@ class SyncWithdrawService(_SyncService):
     create_to_external_chain = call(AsyncWithdrawService.create_to_external_chain)
     create_to_funding = call(AsyncWithdrawService.create_to_funding)
     create_wallet_trading_withdraw = call(AsyncWithdrawService.create_wallet_trading_withdraw)
+    get_wallet_balances = call(AsyncWithdrawService.get_wallet_balances)
     prepare_api_key_to_external = plain(AsyncWithdrawService.prepare_api_key_to_external)
     prepare_api_key_to_external_chain = plain(
         AsyncWithdrawService.prepare_api_key_to_external_chain

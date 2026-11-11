@@ -16,6 +16,7 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
         last_used_at=timestamp_dict_to_datetime(msg.last_used_at),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
         revision=int(msg.revision),
+        purpose=proto_enum_name(api_keys_pb2.ApiKeyPurpose, msg.purpose),
     )
 
 

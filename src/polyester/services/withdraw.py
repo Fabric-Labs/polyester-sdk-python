@@ -6,6 +6,7 @@ from google.protobuf.message import DecodeError
 
 from polyester.auth import ApiKeyCredentials
 from polyester.codecs.decode.withdraw import (
+    wallet_balances_from_proto,
     withdraw_destination_validation_from_proto,
     withdraw_intent_from_proto,
 )
@@ -17,7 +18,7 @@ from polyester.codecs.withdraw import (
 from polyester.errors import PolyesterAuthError, PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.chain.withdraw.v1.withdraw_connect import WithdrawServiceClient
-from polyester.models import WithdrawDestinationValidation, WithdrawIntentResult
+from polyester.models import WalletBalances, WithdrawDestinationValidation, WithdrawIntentResult
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -292,6 +293,36 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.validate_withdraw_destination(req),
             request,
             withdraw_destination_validation_from_proto,
+        )
+
+    async def get_wallet_balances(
+        self,
+        *,
+        account: AccountScope | None = None,
+        sub_account_id: str | int | None = None,
+    ) -> WalletBalances:
+        """zTokens the account's smart account wallet holds, read live from
+        Polyester Chain.
+
+        A withdrawal Zipper rejects is refunded there, net of its kept fee, as
+        zTokens: its flow ends ``refunded``. ``sub_account_id`` (or the
+        client's default) selects a sub-account; none reads the main account.
+        An API key needs ``READ_BALANCES`` on its policy. A failed chain read
+        raises a retryable ``unavailable`` error; an account without a wallet
+        is refused ``failed_precondition`` (``SOURCE_SMART_ACCOUNT_UNAVAILABLE``).
+        """
+        request = withdraw_pb2.GetWalletBalancesRequest()
+        parsed_sub = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(sub_account_id, account=account)
+        )
+        if parsed_sub is not None:
+            request.subaccount_id = parsed_sub
+        return await unary_auth_decoded(
+            self._transport,
+            WithdrawServiceClient,
+            lambda client, req: client.get_wallet_balances(req),
+            request,
+            wallet_balances_from_proto,
         )
 
     async def create_to_funding(

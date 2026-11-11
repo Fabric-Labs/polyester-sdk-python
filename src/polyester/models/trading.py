@@ -789,6 +789,9 @@ class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     last_used_at: datetime | None = None
     updated_at: datetime | None = None
     revision: int = 0
+    # "standard" for a key the user created, "assistant" for a key of the
+    # Polyester assistant; "" when the server does not say.
+    purpose: str = ""
 
 
 class ApiKeysList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -979,3 +982,32 @@ class WithdrawDestinationValidation(msgspec.Struct, kw_only=True, omit_defaults=
     code: str = "unspecified"
     message: str = ""
     canonical_destination_address: str = ""
+
+
+class WalletBalance(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One nonzero zToken balance of the account's smart account wallet.
+
+    ``amount_e18`` is the exact amount scaled by 1e18; ``amount`` is the same
+    in whole units of the asset. ``zipped_asset_id`` names the zToken,
+    ``unified_asset_id`` the asset it wraps and ``chain_id`` the chain it
+    came from.
+    """
+
+    zipped_asset_id: int = 0
+    unified_asset_id: int = 0
+    chain_id: int = 0
+    ztoken_address: str = ""
+    amount_e18: str = "0"
+
+    @property
+    def amount(self) -> Decimal:
+        return Decimal(format_qty_scaled(int(self.amount_e18 or 0), 18))
+
+
+class WalletBalances(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """zTokens held by the account's smart account wallet, read live from
+    Polyester Chain, such as the refund of a rejected withdrawal. Ordered by
+    ``zipped_asset_id``."""
+
+    smart_account_address: str = ""
+    balances: list[WalletBalance] = msgspec.field(default_factory=list)

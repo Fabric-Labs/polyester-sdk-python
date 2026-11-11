@@ -72,11 +72,31 @@ class PairOrderLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
     max_open_orders_per_pair: int = 0
 
 
+class SpotAssetConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One asset of the spot config.
+
+    ``included_in_equity`` says whether the asset counts in the account's total
+    equity: value only the assets where it is ``True`` and list the ``False``
+    ones by amount, with no value. ``None`` means unknown (a server that
+    predates the field): show no value for it, and never call it outside
+    equity.
+    """
+
+    asset: str
+    ledger_id: int = 0
+    name: str = ""
+    quantity_scale: int = 0
+    quantity_display_decimals: int = 0
+    market_data_volume_scale: int = 0
+    included_in_equity: bool | None = None
+
+
 class SpotConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Spot pair catalog payload. Prefer resolving symbols via ``client.catalogs``."""
 
     raw: dict[str, Any]
     pair_order_limits: list[PairOrderLimits] = []
+    assets: list[SpotAssetConfig] = []
     # Default resting-order limit for a typical account across all pairs
     # (``0`` when unpublished); an account may have a lower limit of its own.
     max_open_orders_total: int = 0

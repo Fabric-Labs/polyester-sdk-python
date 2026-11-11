@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC
 from typing import Any
 
 from connectrpc.errors import ConnectError
@@ -20,7 +21,7 @@ from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
 )
-from polyester.codecs.proto_helpers import error_code_name, format_uint64_id
+from polyester.codecs.proto_helpers import error_code_name, format_uint64_id, u128_to_str
 from polyester.errors import (
     API_KEY_AUTH_ERROR_CODES,
     AUTH_REPLAY_CAPACITY_EXHAUSTED,
@@ -39,6 +40,7 @@ from polyester.errors import (
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
+    PolyesterWithdrawError,
     _is_known_admission_refusal,
     auth_error_code_from_rest,
 )
@@ -436,7 +438,22 @@ def _map_connect_error(exc: ConnectError):
                     return PolyesterAuthError(
                         error_message, code=code_name, status_code=_auth_status(exc)
                     )
-                return PolyesterApiError(error_message, code=code_name)
+                return PolyesterWithdrawError(
+                    error_message,
+                    code=code_name,
+                    raw=unpacked,
+                    field_path=unpacked.field_path or None,
+                    min_floor_e18=(
+                        u128_to_str(unpacked.min_floor_e18.hi, unpacked.min_floor_e18.lo)
+                        if unpacked.HasField("min_floor_e18")
+                        else None
+                    ),
+                    payable_from=(
+                        unpacked.payable_from.ToDatetime(tzinfo=UTC)
+                        if unpacked.HasField("payable_from")
+                        else None
+                    ),
+                )
             if full_name == "transfer.v1.ErrorDetail":
                 code_name = error_code_name(transfer_pb2.ErrorCode, unpacked.code)
                 if (

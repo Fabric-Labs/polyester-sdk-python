@@ -529,7 +529,7 @@ class TransportConfig:
     wire_format: WireFormat = "binary"
     # Receive window of every signed ConnectRPC request, in milliseconds (1 to
     # 60000), sent as the signed X-API-RECV-WINDOW header. None sends none, and
-    # the server applies 10000.
+    # the server applies 5000.
     recv_window_ms: int | None = None
 
     def __post_init__(self) -> None:

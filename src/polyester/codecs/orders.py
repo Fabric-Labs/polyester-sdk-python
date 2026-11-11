@@ -1328,7 +1328,7 @@ def catalog_order_scales(
     """A pair's ``(base, quote)`` quantity scales from loaded catalogs.
 
     ``None`` for a scale the catalogs do not know, such as before they load
-    or for a pair they do not list. Reads never wait for the catalogs.
+    or for a pair they do not list. Reads wait for a spot config load in progress; a failed one leaves the scales `None`.
     """
     if catalogs is None:
         return None, None

@@ -339,3 +339,30 @@ async def test_client_held_secrets_never_reach_an_error(monkeypatch) -> None:
     finally:
         await client.aclose()
         await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_percent_encoded_environment_proxy_userinfo_is_redacted_decoded(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "HTTPS_PROXY", "http://decoded%2Denv%2Duser:decoded%2Denv%2Dsecret%2DA73x@127.0.0.1:9"
+    )
+    message = "proxy decoded-env-user:decoded-env-secret-A73x and decoded-env-secret-A73x refused"
+    http = await MockHttpServer.spawn(
+        lambda _req: HttpScript.json(503, {"code": "unavailable", "message": message})
+    )
+    client = AsyncPolyester(
+        api_url=http.base_url, ws_url="ws://127.0.0.1:9/unused", hydrate_catalogs=False
+    )
+    try:
+        with pytest.raises(PolyesterServerError) as info:
+            await client.market_data.get_spot_config()
+        printed = "".join(traceback.format_exception(info.value))
+        for member in _chain(info.value):
+            printed += str(member) + repr(member)
+        assert "decoded-env-secret-A73x" not in printed, printed
+        assert "decoded-env-user:decoded-env-secret-A73x" not in printed, printed
+    finally:
+        await client.aclose()
+        await http.aclose()

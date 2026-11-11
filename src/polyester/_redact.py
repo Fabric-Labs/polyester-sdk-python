@@ -94,7 +94,13 @@ def _secrets_in_effect() -> list[str]:
         userinfo, at, _host = netloc.rpartition("@")
         if at and userinfo:
             password = userinfo.partition(":")[2]
-            secrets.update(part for part in (userinfo, password) if len(part) >= _MIN_SECRET_LENGTH)
+            # Raw and decoded, as register_url_secrets does.
+            secrets.update(
+                form
+                for part in (userinfo, password)
+                for form in (part, unquote(part))
+                if len(form) >= _MIN_SECRET_LENGTH
+            )
     return sorted(secrets, key=len, reverse=True)
 
 

@@ -818,14 +818,20 @@ The sync `Polyester` client returns plain iterators:
 
 Invalid status and event-type labels raise `PolyesterValidationError`.
 Connect requests and responses use numeric `symbol_id`. Public methods still
-accept display `symbol` strings and resolve them through the catalogs the
+accept display `symbol` strings and resolve them through the spot config the
 client loads when it is created. A method that names a market by symbol, or
 needs a pair's scales, waits for that load itself, so you can call it right
 after creating the client; there is no need to call `wait_for_catalogs()`
 first. If the load failed, the method raises `PolyesterCatalogHydrationError`,
 whose `__cause__` is the failure; create a new client to load the catalogs
 again. A symbol the loaded catalogs don't know raises
-`PolyesterValidationError` ("Unknown symbol"). With `hydrate_catalogs=False`
+`PolyesterValidationError` ("Unknown symbol"). A method that takes both
+`symbol` and `symbol_id` needs them to name one market: a name the catalog
+maps to another market, or a name it doesn't know paired with an ID it does,
+raises `PolyesterValidationError` (`... symbol mismatch: 'LTC-USDT' does not
+match symbol_id 1 (BTC-USDT)`) before anything is sent. Pass one of them, or
+a matching pair. See [Startup catalogs](#startup-catalogs-timeouts-and-proxies)
+for what loads when, and what a failed load reports. With `hydrate_catalogs=False`
 nothing is loaded and nothing waits: pass `symbol_id`, or hydrate
 `client.catalogs` yourself. Only `get_spot_config` returns both `symbol` and
 `symbol_id`; other Connect payloads are ID-only. Display `symbol` on models
@@ -1609,6 +1615,99 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 Connect RPC over HTTP via generated clients in `src/polyester/gen/`. Wire format
 defaults to **binary protobuf**; pass `wire_format="json"` for debugging.
+
+### Startup catalogs, timeouts and proxies
+
+With `hydrate_catalogs=True`, the default, the client loads two catalogs when it
+is created, each on its own:
+
+- the **spot config** (`marketdata.v1.MarketDataService/GetSpotConfig`): pairs,
+  symbol IDs, scales and order limits. Every spot trading call needs it.
+- the **funding config**
+  (`chain.zipper.v1.ZipperService/GetDepositWithdrawConfig`): deposit and
+  withdrawal assets and chains, as `client.catalogs.zipper`.
+
+`await client.wait_for_catalogs()` reports **spot readiness**: it returns once
+the spot config has loaded and validated, and does not wait for the funding
+config, so a bot can trade even while that one is still loading or failed to
+load. `await client.wait_for_funding_catalog()` reports the funding config.
+Each raises `PolyesterCatalogHydrationError` when its catalog could not be
+loaded, and so does every call that needs it: calls that name a market for the
+spot config, `zipper.subscribe_zipped_asset_supply` for the funding config.
+A missing, empty or invalid spot config fails every spot call closed.
+Only what reads the funding config waits for it: the zipper supply stream,
+which decodes with its scales, and the asset lookups. Withdrawals and deposit
+addresses (`withdraw.create_*`, `deposit.list_addresses`,
+`deposit.create_address`) and `zipper.get_deposit_withdraw_config` read
+nothing from it and work while it is loading or failed. A call that waits sends
+nothing until the config loads, and raises `PolyesterCatalogHydrationError`
+naming the funding config, without sending, when it failed.
+`client.catalogs.ledger_id_for_asset` and `quantity_scale_for_asset` don't
+wait: `None` means either that the funding config has not loaded (yet, or its
+load failed) or that it does not know the asset, so await
+`client.wait_for_funding_catalog()` first. With `hydrate_catalogs=False`
+nothing loads and nothing waits, as before. The sync `Polyester()` returns
+once the spot config is ready; call `client.wait_for_funding_catalog()` before
+reading the funding catalog.
+
+These two reads change nothing, so a read that times out or loses its
+connection (a proxy closing its tunnel shows as `peer closed connection
+without sending TLS close_notify`) is read again: at most 3 reads per catalog,
+0.25 s and then 0.5 s apart, each retry on a new connection, all within
+`catalog_timeout` seconds of creating the client (by default twice `timeout`).
+A read that keeps stalling fails within that deadline. Any other error answer,
+and a catalog that does not validate, fails at once. No other call is retried
+this way, and mutations never are.
+
+```python
+try:
+    await client.wait_for_catalogs()
+except PolyesterCatalogHydrationError as err:
+    # catalog hydration failed: spot config (marketdata.v1.MarketDataService/
+    # GetSpotConfig) timed out after 2 attempts in 20.0s: Request timed out
+    print(err.catalog, err.operation, err.failure, err.attempts, err.response_ref)
+    raise
+```
+
+The error names the catalog (`catalog`: `"spot"` or `"funding"`), the
+operation, the kind of failure (`failure`: `"timeout"`,
+`"connection_closed"`, `"connect_failed"`, `"unavailable"`, `"invalid"` or
+`"error"`), the number of reads, and the edge's reference of the last failed
+response (`response_ref`, the `cf-ray` header) when one arrived. `__cause__`
+is the last failure. The message carries no credentials and no proxy URL.
+
+Every SDK error keeps the Connect error and its causes as `__cause__` for
+debugging, and none of them prints a credential: where a Connect error is
+mapped, each URL quoted in the chain, from an answer or from the transport,
+loses its userinfo, query and fragment, and a proxy URL from the environment
+reads `[proxy]`, in `str`, `repr` and `traceback.format_exception` alike, and in
+structured diagnostics such as `error.problem` and a rate limit's
+`error.detail`. A URL that does not parse is dropped whole. The client's own
+secrets read `[REDACTED]` however an answer quotes them: the userinfo and
+password of its `api_url` and `ws_url` and of a proxy the environment sets
+(raw and percent-decoded), and its API private key. Limitations: a password
+shorter than 4 characters is not replaced where it stands alone, since
+replacing so short a string would mangle ordinary text; and a request
+signature is not redacted when the server echoes it back, since it is
+single-use and expires with its receive window.
+
+Timeouts, from the outside in:
+
+- `catalog_timeout` bounds the startup reads of each catalog, retries
+  included.
+- `timeout` (default 10 s) is the deadline of each request: the SDK ends it
+  locally with `PolyesterTimeoutError` (`Request timed out`) and sends it as
+  `Connect-Timeout-Ms`. It is the only deadline that produces that message,
+  so `Request timed out` after about 10 s means that request ran with a 10 s
+  `timeout`. `from_env()` reads no timeout from the environment; pass
+  `timeout=` to it.
+- The HTTP transport (pyqwest) allows 30 s to open a connection, never more
+  than `timeout`, and has no read timeout of its own. It keeps idle
+  connections for 90 s, and over HTTP/2 every request to the API shares one
+  connection, so the SDK retries a startup read on a new one.
+
+Connect calls honour `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY` and `NO_PROXY`
+(and their lowercase forms), as the HTTP transport reads them.
 
 ### Redirects of signed requests
 

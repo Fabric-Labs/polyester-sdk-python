@@ -74,35 +74,57 @@ class CatalogManager:
     zipper: ZipperCatalogData | None = None
     deposit_withdraw_config: DepositWithdrawConfig | None = None
     _legacy_zipper_raw: dict[str, Any] = field(default_factory=dict)
+    # The spot config (trading metadata) and the funding (deposit/withdraw)
+    # config fail closed separately: either one can be unusable alone.
     _unusable: bool = False
     _unusable_reason: str | None = None
+    _funding_unusable: bool = False
+    _funding_unusable_reason: str | None = None
 
     @property
     def is_unusable(self) -> bool:
-        return self._unusable
+        """Whether the spot config or the funding config is unusable."""
+        return self._unusable or self._funding_unusable
 
     @property
     def unusable_reason(self) -> str | None:
-        return self._unusable_reason
+        return self._unusable_reason or self._funding_unusable_reason
 
     def mark_unusable(self, reason: str) -> None:
+        """Drop both catalogs: every lookup fails closed until each loads again."""
+        self.mark_spot_unusable(reason)
+        self.mark_funding_unusable(reason)
+
+    def mark_spot_unusable(self, reason: str) -> None:
+        """Drop the spot config: symbol and scale lookups fail closed."""
         self._unusable = True
         self._unusable_reason = reason
         self.spot_config = {}
+
+    def mark_funding_unusable(self, reason: str) -> None:
+        """Drop the funding config: asset lookups fail closed; spot lookups go on."""
+        self._funding_unusable = True
+        self._funding_unusable_reason = reason
         self.zipper = None
         self.deposit_withdraw_config = None
         self._legacy_zipper_raw = {}
 
-    def _reject_refresh(self, reason: str) -> None:
-        """Keep a previously valid snapshot intact when a refresh is invalid."""
-        if (
-            self.spot_config
-            or self.zipper is not None
+    def _has_funding_config(self) -> bool:
+        return (
+            self.zipper is not None
             or self.deposit_withdraw_config is not None
-            or self._legacy_zipper_raw
-        ):
-            return
-        self.mark_unusable(reason)
+            or bool(self._legacy_zipper_raw)
+        )
+
+    def _reject_refresh(self, reason: str) -> None:
+        """Keep a previously valid spot snapshot intact when a refresh is invalid."""
+        if not self.spot_config:
+            self.mark_spot_unusable(reason)
+
+    def _reject_funding_refresh(self, reason: str) -> None:
+        """Keep a previously valid funding snapshot intact when a refresh is invalid."""
+        if not self._has_funding_config():
+            self.mark_funding_unusable(reason)
 
     @property
     def zipper_config(self) -> dict[str, Any]:
@@ -219,11 +241,11 @@ class CatalogManager:
             self.hydrate_zipper_config_typed(config)
             return
         if not isinstance(config, dict):
-            self._reject_refresh("zipper catalog is not an object")
+            self._reject_funding_refresh("zipper catalog is not an object")
             raise PolyesterValidationError("zipper catalog is not an object")
         assets = config.get("assets") or []
         if not isinstance(assets, list):
-            self._reject_refresh("zipper catalog assets must be a list")
+            self._reject_funding_refresh("zipper catalog assets must be a list")
             raise PolyesterValidationError("zipper catalog assets must be a list")
         assets_seen: set[str] = set()
         ledger_ids_seen: set[int] = set()
@@ -277,13 +299,13 @@ class CatalogManager:
                         )
                     zipped_ids_seen.add(zipped_id)
         except PolyesterValidationError as exc:
-            self._reject_refresh(str(exc))
+            self._reject_funding_refresh(str(exc))
             raise
         self.deposit_withdraw_config = None
         self.zipper = None
         self._legacy_zipper_raw = config
-        self._unusable = False
-        self._unusable_reason = None
+        self._funding_unusable = False
+        self._funding_unusable_reason = None
 
     def hydrate_zipper_config_typed(self, config: DepositWithdrawConfig) -> None:
         """Hydrate from the typed deposit/withdraw config (no consumer JSON round-trip)."""
@@ -323,13 +345,13 @@ class CatalogManager:
                         )
                     zipped_ids_seen.add(zipped_id)
         except PolyesterValidationError as exc:
-            self._reject_refresh(str(exc))
+            self._reject_funding_refresh(str(exc))
             raise
         self.deposit_withdraw_config = config
         self.zipper = build_zipper_catalog_data(config)
         self._legacy_zipper_raw = {}
-        self._unusable = False
-        self._unusable_reason = None
+        self._funding_unusable = False
+        self._funding_unusable_reason = None
 
     def hydrate_deposit_withdraw_config(self, config: DepositWithdrawConfig) -> None:
         self.hydrate_zipper_config_typed(config)
@@ -467,7 +489,13 @@ class CatalogManager:
         return result
 
     def ledger_id_for_asset(self, asset_symbol: str) -> int | None:
-        if self._unusable:
+        """The asset's ledger ID from the funding config.
+
+        ``None`` means either that the funding config has not loaded (yet, or
+        its load failed) or that it does not know the asset. Await
+        ``client.wait_for_funding_catalog()`` first to tell the two apart.
+        """
+        if self._funding_unusable:
             return None
         catalog = self.zipper
         if catalog is not None:
@@ -483,7 +511,13 @@ class CatalogManager:
         return None
 
     def quantity_scale_for_asset(self, asset_symbol: str) -> int | None:
-        if self._unusable:
+        """The asset's quantity scale from the funding config.
+
+        ``None`` means either that the funding config has not loaded (yet, or
+        its load failed) or that it does not know the asset. Await
+        ``client.wait_for_funding_catalog()`` first to tell the two apart.
+        """
+        if self._funding_unusable:
             return None
         catalog = self.zipper
         if catalog is not None:

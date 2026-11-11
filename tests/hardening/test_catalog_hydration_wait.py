@@ -73,6 +73,8 @@ class _Harness:
         # For a client on another thread, as the sync client is.
         self.spot_requested_sync = threading.Event()
         self.fail_spot = False
+        # Hold the funding config too, behind the same gate.
+        self.hold_funding = False
         self.reached = False
         self.symbol_ids: list[int] = []
         self.http: MockHttpServer | None = None
@@ -128,6 +130,10 @@ class _Harness:
                 return HttpScript.json(500, b'{"code":"internal","message":"spot down"}')
             return connect_proto_response(_spot_config_body())
         if req.path.endswith("/GetDepositWithdrawConfig"):
+            if self.hold_funding:
+                await self.gate.wait()
+                if self.fail_spot:
+                    return HttpScript.json(500, b'{"code":"internal","message":"funding down"}')
             return connect_proto_response(
                 zipper_pb2.GetDepositWithdrawConfigResponse().SerializeToString()
             )
@@ -378,11 +384,22 @@ async def test_labelled_read_waits_for_hydration_but_tolerates_failure(
 @pytest.mark.parametrize("fail", [False, True], ids=["loaded", "failed"])
 async def test_zipped_asset_supply_waits_for_the_scales_it_decodes_with(fail: bool) -> None:
     async with _Harness() as harness:
+        harness.hold_funding = True
         task = await harness.start(lambda c, _s: c.zipper.subscribe_zipped_asset_supply())
-        assert not task.done(), "the supply stream started before the catalogs loaded"
+        assert not task.done(), "the supply stream started before the funding config loaded"
         harness.release(fail=fail)
+        # POLY-9228: the stream waits for the funding config, not the spot config.
         expected = PolyesterCatalogHydrationError if fail else _Reached
-        with pytest.raises(expected):
+        with pytest.raises(expected, match="funding config" if fail else ""):
+            await asyncio.wait_for(task, 10)
+
+
+@pytest.mark.asyncio
+async def test_zipped_asset_supply_does_not_need_the_spot_config() -> None:
+    async with _Harness() as harness:
+        task = await harness.start(lambda c, _s: c.zipper.subscribe_zipped_asset_supply())
+        harness.release(fail=True)
+        with pytest.raises(_Reached):
             await asyncio.wait_for(task, 10)
 
 

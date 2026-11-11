@@ -195,13 +195,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        if symbol_id is not None:
-            request.symbol_id.append(symbol_id)
-        elif symbol:
+        if symbol:
             await self._ensure_catalogs()
-            resolved = resolve_symbol_id(
-                self._catalogs, symbol=symbol, symbol_id=None, label="list_history"
-            )
+        resolved = resolve_optional_symbol_id(
+            self._catalogs, symbol=symbol, symbol_id=symbol_id, label="orders.list_history"
+        )
+        if resolved is not None:
             request.symbol_id.append(resolved)
         if page_token:
             request.page_token = page_token

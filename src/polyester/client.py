@@ -186,7 +186,7 @@ class AsyncPolyester:
         :class:`PolyesterTimestampSkewError`, or ``REQUEST_DEADLINE_EXCEEDED``
         once authenticated. It must be an ``int`` from 1 to 60000; any other
         value raises :class:`PolyesterValidationError` here. ``None``, the
-        default, sends no header, and the server applies 10000. Realtime token
+        default, sends no header, and the server applies 5000. Realtime token
         requests always use the default.
 
         ``timeout`` is the deadline of each request, in seconds. With

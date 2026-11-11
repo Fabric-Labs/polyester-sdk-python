@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import re
 from base64 import b64decode
-from collections.abc import Awaitable, Callable
-from contextlib import suppress
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager, suppress
+from contextvars import ContextVar
 from dataclasses import dataclass
 from http import HTTPStatus
 from math import isfinite
-from typing import Literal, NoReturn
+from typing import Any, Literal, NoReturn
 
 import httpx
 import pyqwest
@@ -30,7 +31,12 @@ from polyester._contract_codes import (
     is_recognised_rest_code,
 )
 from polyester._problem import decode_http_problem
-from polyester._redact import url_without_userinfo
+from polyester._redact import (
+    redact_exception_chain,
+    register_secret,
+    register_url_secrets,
+    url_without_userinfo,
+)
 from polyester._redirects import carries_api_key, redirect_refusal
 from polyester.auth import ApiKeyCredentials, validate_recv_window_ms
 from polyester.auth_interceptor import ApiKeyAuthUnaryInterceptor, UserAgentUnaryInterceptor
@@ -382,6 +388,17 @@ class SignedRedirectRefused(ConnectError):
 _no_redirect_transport: pyqwest.HTTPTransport | None = None
 
 
+def _new_http_transport(*, follow_redirects: bool = True) -> pyqwest.HTTPTransport:
+    """A transport with pyqwest's default settings and a connection pool of its own."""
+    return pyqwest.HTTPTransport(
+        tls_include_system_certs=True,
+        connect_timeout=30.0,
+        pool_idle_timeout=90.0,
+        tcp_keepalive_interval=30.0,
+        follow_redirects=follow_redirects,
+    )
+
+
 def _signed_transport() -> pyqwest.HTTPTransport:
     """pyqwest's default transport settings, but never following a redirect.
 
@@ -389,14 +406,35 @@ def _signed_transport() -> pyqwest.HTTPTransport:
     """
     global _no_redirect_transport
     if _no_redirect_transport is None:
-        _no_redirect_transport = pyqwest.HTTPTransport(
-            tls_include_system_certs=True,
-            connect_timeout=30.0,
-            pool_idle_timeout=90.0,
-            tcp_keepalive_interval=30.0,
-            follow_redirects=False,
-        )
+        _no_redirect_transport = _new_http_transport(follow_redirects=False)
     return _no_redirect_transport
+
+
+# Response headers that name a response at the edge, most specific first.
+_RESPONSE_REF_HEADERS = ("cf-ray", "x-request-id")
+_response_refs: ContextVar[list[str] | None] = ContextVar("polyester_response_refs", default=None)
+
+
+@contextmanager
+def capture_response_refs() -> Iterator[list[str]]:
+    """Collect the edge reference of every response the calls made inside receive."""
+    refs: list[str] = []
+    token = _response_refs.set(refs)
+    try:
+        yield refs
+    finally:
+        _response_refs.reset(token)
+
+
+def _record_response_ref(response: pyqwest.FullResponse) -> None:
+    refs = _response_refs.get()
+    if refs is None:
+        return
+    for header in _RESPONSE_REF_HEADERS:
+        value = response.headers.get(header)
+        if value:
+            refs.append(value.strip())
+            return
 
 
 class _ConnectHTTPClient:
@@ -422,6 +460,7 @@ class _ConnectHTTPClient:
         signed = carries_api_key(headers)
         client = self._signed if signed else self._inner
         response = await client.post(url=target, headers=headers, content=content, **kwargs)
+        _record_response_ref(response)
         if signed:
             _refuse_redirect(response, target)
         return _raise_for_gateway_rejection(response)
@@ -431,6 +470,7 @@ class _ConnectHTTPClient:
         signed = carries_api_key(headers)
         client = self._signed if signed else self._inner
         response = await client.get(url=target, headers=headers, **kwargs)
+        _record_response_ref(response)
         if signed:
             _refuse_redirect(response, target)
         return _raise_for_gateway_rejection(response)
@@ -514,6 +554,11 @@ class TransportFactory:
     ) -> None:
         self.config = config
         self.credentials = credentials
+        # Client-held secrets never reach an error's text (see _redact).
+        register_url_secrets(config.api_url)
+        if credentials is not None:
+            register_secret(credentials.private_key.hex())
+            register_secret(credentials.private_key[:32].hex())
         self.public_http = httpx.AsyncClient(
             base_url=config.api_url,
             timeout=config.timeout,
@@ -521,6 +566,8 @@ class TransportFactory:
         )
         self._codec = codec_for_config(config)
         self._connect_http = _ConnectHTTPClient()
+        # Builds the transport of a fresh connection; see fresh_public_client.
+        self._new_http_transport: Callable[[], pyqwest.HTTPTransport] = _new_http_transport
         # Outermost, so no other interceptor sees a cancellation as an error.
         self._public_interceptors: list[UnaryInterceptor] = [
             _CancellationUnaryInterceptor(),
@@ -558,6 +605,25 @@ class TransportFactory:
             **self._client_kwargs(),
         )
 
+    @asynccontextmanager
+    async def fresh_public_client(self, client_cls: type) -> AsyncIterator[Any]:
+        """A public client on a connection pool of its own, closed on exit.
+
+        Requests through it open a new connection, so a read retried through
+        it can't queue behind a connection that dropped or stalled: an HTTP/2
+        connection carries every request to the host, a stalled one included.
+        """
+        transport = self._new_http_transport()
+        try:
+            http = pyqwest.Client(transport)
+            yield client_cls(
+                self.config.api_url,
+                interceptors=self._public_interceptors,
+                **{**self._client_kwargs(), "http_client": _ConnectHTTPClient(http, signed=http)},
+            )
+        finally:
+            await transport.aclose()
+
     def create_auth_client(self, client_cls: type):
         if self.credentials is None:
             raise PolyesterAuthError("This endpoint requires Polyester API-key credentials")
@@ -572,6 +638,5 @@ class TransportFactory:
 
 
 def map_transport_error(exc: Exception) -> PolyesterTransportError:
-    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError)):
-        return PolyesterTransportError(str(exc))
+    redact_exception_chain(exc)
     return PolyesterTransportError(str(exc))

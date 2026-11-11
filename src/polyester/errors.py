@@ -203,15 +203,46 @@ class PolyesterRedirectError(PolyesterError):
 
 
 class PolyesterCatalogHydrationError(PolyesterError):
-    """Raised by a call that needs the catalogs when the client's catalog hydration failed.
+    """Raised when a catalog the client loads at startup could not be loaded.
 
-    The client loads the spot and deposit/withdraw catalogs when it is created,
-    and a call that names a market by symbol, or needs a pair's scales, waits
-    for that load. When the load failed, the call raises this error instead of
-    refusing the symbol; ``__cause__`` is the hydration failure, the one
-    :meth:`AsyncPolyester.wait_for_catalogs` raises and ``catalogs_last_error``
-    holds. Create a new client to load the catalogs again.
+    The client loads two catalogs when it is created: the spot config, which
+    every call that names a market by symbol or needs a pair's scales waits
+    for, and the funding (deposit/withdraw) config, which only
+    ``zipper.subscribe_zipped_asset_supply`` waits for. When a load failed,
+    those calls raise this error instead of refusing the symbol, as do
+    :meth:`AsyncPolyester.wait_for_catalogs` (spot config) and
+    :meth:`AsyncPolyester.wait_for_funding_catalog` (funding config).
+    Create a new client to load the catalogs again.
+
+    ``catalog`` is ``"spot"`` or ``"funding"``; ``operation`` the Connect
+    procedure that failed, such as
+    ``chain.zipper.v1.ZipperService/GetDepositWithdrawConfig``; ``failure``
+    one of ``"timeout"``, ``"connection_closed"``, ``"connect_failed"``,
+    ``"unavailable"``, ``"invalid"`` (the response did not validate) or
+    ``"error"``; ``attempts`` how many times it was read; and
+    ``response_ref`` the edge's reference of the last failed response (the
+    ``cf-ray`` header), when one arrived. ``__cause__`` is the last failure,
+    the one ``catalogs_last_error`` holds for the spot config. The message
+    carries no credentials and no proxy URL. Each attribute is ``None`` when
+    the error does not come from a catalog load.
     """
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        catalog: str | None = None,
+        operation: str | None = None,
+        failure: str | None = None,
+        attempts: int | None = None,
+        response_ref: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.catalog = catalog
+        self.operation = operation
+        self.failure = failure
+        self.attempts = attempts
+        self.response_ref = response_ref
 
 
 class PolyesterResponseContractError(PolyesterError):

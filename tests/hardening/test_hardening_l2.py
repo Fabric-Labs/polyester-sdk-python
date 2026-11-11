@@ -28,6 +28,7 @@ from polyester.codecs.ledger_amounts import format_ledger_u128
 from polyester.codecs.orders import quantity_scale_for_symbol, resolve_quantity_scale
 from polyester.errors import (
     PolyesterAuthError,
+    PolyesterCatalogHydrationError,
     PolyesterRealtimeError,
     PolyesterResponseContractError,
     PolyesterTransportError,
@@ -824,8 +825,9 @@ async def test_l2_wait_for_catalogs_fail_closed_on_empty_or_malformed() -> None:
             hydrate_catalogs=True,
             timeout=2.0,
         )
-        with pytest.raises(PolyesterValidationError, match="empty"):
+        with pytest.raises(PolyesterCatalogHydrationError, match="empty") as info:
             await client.wait_for_catalogs()
+        assert isinstance(info.value.__cause__, PolyesterValidationError)
         assert client.catalogs.is_unusable
         await client.aclose()
     finally:

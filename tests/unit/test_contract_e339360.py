@@ -359,6 +359,28 @@ def test_min_floor_is_exact_for_the_largest_u128() -> None:
     assert str(err.min_floor) == "340282366920938463463.374607431768211455"
 
 
+def test_mapped_min_floor_is_exact_for_the_largest_u128() -> None:
+    err = _withdraw_error(
+        withdraw_pb2.ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR,
+        min_floor_e18=u128_pb2.U128(hi=2**64 - 1, lo=2**64 - 1),
+    )
+    assert isinstance(err, polyester_errors.PolyesterWithdrawError)
+    assert err.min_floor_e18 == str(2**128 - 1)
+    assert str(err.min_floor) == "340282366920938463463.374607431768211455"
+
+
+def test_mapped_min_floor_does_not_depend_on_the_decimal_context() -> None:
+    err = _withdraw_error(
+        withdraw_pb2.ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR,
+        min_floor_e18=u128_pb2.U128(lo=123_456_789_012_345_678),
+    )
+    assert isinstance(err, polyester_errors.PolyesterWithdrawError)
+    with localcontext() as ctx:
+        ctx.prec = 6
+        floor = err.min_floor
+    assert str(floor) == "0.123456789012345678"
+
+
 def test_min_floor_does_not_depend_on_the_decimal_context() -> None:
     err = polyester_errors.PolyesterWithdrawError(
         "below floor", code="ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR", min_floor_e18="123456789012345678"

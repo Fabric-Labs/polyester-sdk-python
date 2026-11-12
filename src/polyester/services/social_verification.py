@@ -70,8 +70,8 @@ class AsyncSocialVerificationService(BaseService):
         ``handle``, ``status``, ``verifiedAt``); the other fields stay empty.
         ``start`` and ``mark_ready`` still require an interactive session.
         A Telegram link awaiting the user's confirmation reads
-        ``STATUS_AWAITING_CONFIRMATION`` with ``displayName`` and the decimal
-        ``providerUserId``; confirming and unlinking need a session.
+        ``STATUS_AWAITING_CONFIRMATION`` with the ``handle`` of the Telegram
+        account that sent the code; confirming and unlinking need a session.
         """
         request = sv_pb2.GetSocialVerificationRequest(
             provider=resolve_proto_enum(

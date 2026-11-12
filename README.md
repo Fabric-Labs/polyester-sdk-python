@@ -807,9 +807,10 @@ entry = await client.address_book.update_entry(
 `@` on Twitter handles. The SDK forwards the handle as supplied.
 `social_verification.get(provider="telegram")` reads a Telegram link: while it
 waits for the user's confirmation its `status` is `STATUS_AWAITING_CONFIRMATION`
-and it carries `handle`, `displayName` and `providerUserId` (a decimal string;
-keep it a string). Starting, confirming and unlinking a Telegram link need an
-interactive session and are not wrapped.
+and it carries the `handle` of the Telegram account that sent the code. An API
+key reads the link status only, so `displayName` and `providerUserId` stay
+empty. Starting, marking ready, confirming and unlinking a Telegram link need an
+interactive session.
 
 ## Product changelog API
 

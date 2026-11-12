@@ -11,9 +11,9 @@ from polyester.codecs.decode.alerts import (
     DIRECTION_LABELS,
     PRICE_SOURCE_LABELS,
     STATUS_LABELS,
-    price_alert_from_proto,
     price_alert_update_from_proto,
     price_alerts_page_from_proto,
+    required_price_alert,
 )
 from polyester.codecs.scalars import parse_account_id
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
@@ -136,10 +136,17 @@ class AsyncAlertsService(BaseService):
         there starts unarmed and fires only after the price moves back and
         crosses again. The same ``idempotency_key`` and request return the
         alert created first. A :class:`~polyester.types.Price` bound to a
-        market must be bound to this one: with only ``symbol_id``, the
-        catalogs name it, and a bound price for an ID they don't know is
-        refused, since it cannot be checked. An unbound price works with any
-        ``symbol_id``.
+        market must be bound to this one, as the catalogs name it: a bound
+        price is refused with
+        :class:`~polyester.errors.PolyesterValidationError` before sending
+        when the catalogs do not know the market's ``symbol_id`` (they are
+        empty, still loading and then failed, or don't list it), whatever
+        ``symbol`` says, since nothing proves which market that ID is. An
+        unbound price works with any ``symbol_id``. A response without the
+        created alert raises
+        :class:`~polyester.errors.PolyesterResponseContractError`; the alert
+        may exist, so read the alerts back or send the create again with the
+        same ``idempotency_key``.
         """
         direction_value = _enum(direction, _DIRECTIONS, "direction")
         source_value = (
@@ -156,14 +163,15 @@ class AsyncAlertsService(BaseService):
         resolved_id = resolve_symbol_id(
             self._catalogs, symbol=symbol, symbol_id=symbol_id, label="alerts.create"
         )
-        market = symbol or (
-            self._catalogs.symbol_for_symbol_id(resolved_id) if self._catalogs else None
-        )
+        # The market a bound price is checked against is the catalogs' name for
+        # the ID sent. A caller's ``symbol`` beside an ID the catalogs don't
+        # know proves nothing about that ID, so it is never used for the check.
+        market = self._catalogs.symbol_for_symbol_id(resolved_id) if self._catalogs else None
         if bound_symbol is not None and market is None:
             raise PolyesterValidationError(
                 f"price is bound to {bound_symbol}, but the catalogs do not name "
-                f"symbol_id {resolved_id}, so it cannot be checked; pass an unbound "
-                "price or the market's symbol"
+                f"symbol_id {resolved_id}, so it cannot be checked; hydrate catalogs "
+                "or pass an unbound price"
             )
         request = pb.CreateAlertRequest(
             symbol_id=resolved_id,
@@ -179,7 +187,7 @@ class AsyncAlertsService(BaseService):
             PriceAlertServiceClient,
             lambda client, req: client.create_alert(req),
             request,
-            lambda msg: price_alert_from_proto(msg.alert, self._catalogs),
+            lambda msg: required_price_alert(msg, "CreateAlert", self._catalogs),
         )
 
     async def list(
@@ -280,7 +288,10 @@ class AsyncAlertsService(BaseService):
         a stale one is refused ``REVISION_CONFLICT``. The same
         ``idempotency_key`` and changes (``expected_revision`` aside) apply at
         most once: a repeat returns the alert as it is now with ``outcome``
-        ``"replayed"``. A cancelled alert can no longer change.
+        ``"replayed"``. A cancelled alert can no longer change. A response
+        without the alert raises
+        :class:`~polyester.errors.PolyesterResponseContractError` whatever its
+        ``outcome``: the update may have applied, so read the alert back.
         """
         parsed_id = parse_account_id(alert_id, "alert_id")
         if isinstance(expected_revision, bool) or not isinstance(expected_revision, int):
@@ -316,7 +327,9 @@ class AsyncAlertsService(BaseService):
     async def cancel(self, *, alert_id: str | int) -> PriceAlert:
         """Cancel an active alert. Cancelling a cancelled alert returns it
         unchanged; a triggered alert is refused ``ALERT_TRIGGERED`` (update it
-        to set it again)."""
+        to set it again). A response without the alert raises
+        :class:`~polyester.errors.PolyesterResponseContractError`: cancel
+        again (it is idempotent) or read the alert back."""
         request = pb.CancelAlertRequest(alert_id=parse_account_id(alert_id, "alert_id"))
         await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
@@ -324,5 +337,5 @@ class AsyncAlertsService(BaseService):
             PriceAlertServiceClient,
             lambda client, req: client.cancel_alert(req),
             request,
-            lambda msg: price_alert_from_proto(msg.alert, self._catalogs),
+            lambda msg: required_price_alert(msg, "CancelAlert", self._catalogs),
         )

@@ -84,6 +84,10 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     market_max_slippage_bps: int = 0
     # RFC3339 UTC expiry for GTD orders; omitted for every other TIF.
     expire_at: str | None = None
+    # Public ID of the batch replace that admitted the order, as
+    # ``BatchReplaceResult.batch_request_id`` (pass it to
+    # ``orders.get_batch_replace_status``); "" for every other origin.
+    batch_request_id: str = ""
     # Why a ``rejected`` order was refused: the Orders API error code for the
     # same refusal, without its ``ERROR_CODE_`` prefix (for example
     # ``POST_ONLY_CROSS``). ``None`` for every other status.
@@ -796,6 +800,17 @@ class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     # "standard" for a key the user created, "assistant" for a key of the
     # Polyester assistant; "" when the server does not say.
     purpose: str = ""
+    # Public ID of the API policy attached to the key, as ``ApiPolicy.id``;
+    # "" when none is attached, in which case the key has no permissions.
+    policy_id: str = ""
+    # CIDR allowlist of the addresses the key may be used from, as sent;
+    # empty means no IP restriction.
+    ip_whitelist: list[str] = []
+    # UTC time after which the key cannot authenticate, whatever its status;
+    # ``None`` when the key does not expire.
+    expires_at: datetime | None = None
+    # Hex of the key's Ed25519 public key; "" when the server sends none.
+    public_key_ed25519: str = ""
 
 
 class ApiKeysList(msgspec.Struct, kw_only=True, omit_defaults=True):

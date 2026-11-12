@@ -2,11 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 
-from polyester.codecs.proto_helpers import (
-    format_optional_uint64_id,
-    format_uint64_id,
-    proto_enum_name,
-)
+from polyester.codecs.proto_helpers import format_optional_uint64_id, proto_enum_name
 from polyester.codecs.scalars import timestamp_dict_to_datetime
 from polyester.gen.auth.v1 import api_keys_pb2
 from polyester.models import ApiKeysList, ApiKeySummary
@@ -16,8 +12,12 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
     return ApiKeySummary(
         key_id=msg.key_id,
         label=msg.label,
+        icon=msg.icon,
+        color=msg.color,
+        created_by_actor=msg.created_by_actor,
         status=proto_enum_name(api_keys_pb2.ApiKeyStatus, msg.status),
-        subaccount_id=format_uint64_id(msg.subaccount_id),
+        # "" for a key of the main account, unset or an explicit 0.
+        subaccount_id=format_optional_uint64_id(msg.subaccount_id),
         created_at=timestamp_dict_to_datetime(msg.created_at),
         last_used_at=timestamp_dict_to_datetime(msg.last_used_at),
         updated_at=timestamp_dict_to_datetime(msg.updated_at),

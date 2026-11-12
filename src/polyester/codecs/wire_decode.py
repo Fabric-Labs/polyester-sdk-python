@@ -838,20 +838,23 @@ def decode_market_trade_bytes(payload: bytes, *, quantity_scale: int) -> MarketT
 
 
 def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:
-    return ApiKeySummary(
-        key_id=str(_field(data, "keyId", "key_id", default="") or ""),
-        label=str(_field(data, "label", default="") or ""),
-        status=_enum_name(_field(data, "status")),
-        subaccount_id=_id_str(_field(data, "subaccountId", "subaccount_id")),
-        updated_at=None,
-        revision=int(_field(data, "revision", default=0) or 0),
-        purpose=_api_key_purpose(_field(data, "purpose")),
-    )
+    """Decode an ``auth.v1.ApiKey`` in its protobuf JSON form.
 
+    It reads exactly as the binary decoder does: the dict is parsed into the
+    generated message (camelCase or snake_case names; unknown fields are
+    ignored) and decoded by ``api_key_from_proto``.
+    """
+    from google.protobuf.json_format import ParseDict, ParseError
 
-def _api_key_purpose(value: Any) -> str:
-    label = _enum_name(value)
-    return "" if label in {"purpose_unspecified", "0"} else label
+    from polyester.codecs.decode.api_keys import api_key_from_proto
+    from polyester.gen.auth.v1 import api_keys_pb2
+
+    message = api_keys_pb2.ApiKey()
+    try:
+        ParseDict(data, message, ignore_unknown_fields=True)
+    except ParseError as exc:
+        raise PolyesterResponseContractError("ApiKey", f"API key is not valid: {exc}") from exc
+    return api_key_from_proto(message)
 
 
 def decode_api_keys_list(data: dict[str, Any]) -> ApiKeysList:

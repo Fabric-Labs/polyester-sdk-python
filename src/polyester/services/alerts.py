@@ -281,7 +281,13 @@ class AsyncAlertsService(BaseService):
     ) -> PriceAlertUpdate:
         """Change an alert's ``direction``, ``price`` and/or ``channels``.
 
-        Only the fields you pass change. With none, the call changes no field:
+        Only the fields you pass change. ``price`` must be unbound (a decimal
+        string, a ``Decimal`` or ``Price.from_ticks(ticks)``): a
+        :class:`~polyester.types.Price` bound to a market, such as an alert's
+        own ``price``, is refused with
+        :class:`~polyester.errors.PolyesterValidationError` before sending,
+        since the update names the alert, not its market, and nothing proves
+        the binding. With none, the call changes no field:
         it sets a triggered alert again as it is, and changes nothing on an
         active one. Updating a triggered alert sets it again.
         ``expected_revision`` is the alert's ``revision`` from your last read;
@@ -310,6 +316,14 @@ class AsyncAlertsService(BaseService):
             request.update.direction = _enum(direction, _DIRECTIONS, "direction")
             request.update_mask.paths.append("direction")
         if price is not None:
+            if isinstance(price, Price) and price.symbol is not None:
+                # The update names the alert, not its market, so nothing
+                # proves a bound price is for that market.
+                raise PolyesterValidationError(
+                    f"alerts.update cannot check a price bound to {price.symbol} against "
+                    "the alert's market; pass an unbound price: a decimal string, a "
+                    "Decimal or Price.from_ticks(ticks)"
+                )
             request.update.price_ticks = _price_ticks(price, None)
             request.update_mask.paths.append("price_ticks")
         if channels is not None:

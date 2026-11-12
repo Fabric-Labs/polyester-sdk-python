@@ -920,7 +920,11 @@ with `PolyesterAuthError` (`code` `SUBACCOUNT_KEY_REFUSED`, HTTP 403).
 - `update(alert_id=, expected_revision=, direction=, price=, channels=,
   idempotency_key=)` changes only the fields you pass. With none it changes no
   field: it sets a triggered alert again, and changes nothing on an active one.
-  `outcome` is `"applied"`, `"unchanged"` or `"replayed"`.
+  `outcome` is `"applied"`, `"unchanged"` or `"replayed"`. Pass `price` as a
+  decimal string, a `Decimal` or an unbound `Price.from_ticks(ticks)`: a `Price`
+  bound to a market (including an alert's own `price`) raises
+  `PolyesterValidationError` before sending, since the update names the alert,
+  not its market.
 - `cancel(alert_id=)` cancels an active alert; a cancelled alert is returned
   unchanged.
 

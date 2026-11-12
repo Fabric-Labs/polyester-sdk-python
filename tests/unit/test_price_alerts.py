@@ -566,6 +566,40 @@ async def test_update_refuses_bad_input(kwargs: dict, match: str) -> None:
         await _service().update(**args)
 
 
+@pytest.mark.parametrize(
+    "price",
+    [
+        pytest.param(Price.from_ticks(3_000_000_000_000, symbol="ETH-USDT"), id="other-market"),
+        pytest.param(Price.from_ticks(90_000 * 10**9, symbol="BTC-USDT"), id="alert-market"),
+    ],
+)
+async def test_update_refuses_a_market_bound_price(price: Price) -> None:
+    # The update names the alert, not its market: nothing proves a bound
+    # price is for the alert's market without reading the alert.
+    capture = CaptureUnary(pb.UpdateAlertResponse(alert=_alert(), outcome=pb.APPLIED))
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="unbound price"),
+    ):
+        await _service().update(alert_id=ALERT_ID, expected_revision=1, price=price)
+    assert capture.calls == 0
+
+
+@pytest.mark.parametrize(
+    "price",
+    [
+        pytest.param(Price.from_ticks(91_000 * 10**9), id="unbound-price"),
+        pytest.param(Decimal("91000"), id="decimal"),
+        pytest.param("91000", id="string"),
+    ],
+)
+async def test_update_sends_an_unbound_price(price: Any) -> None:
+    capture = CaptureUnary(pb.UpdateAlertResponse(alert=_alert(), outcome=pb.APPLIED))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await _service().update(alert_id=ALERT_ID, expected_revision=1, price=price)
+    assert capture.request.update.price_ticks == 91_000 * 10**9
+
+
 _OUTCOMES = [pb.UPDATE_OUTCOME_UNSPECIFIED, pb.APPLIED, pb.UNCHANGED, pb.REPLAYED]
 
 

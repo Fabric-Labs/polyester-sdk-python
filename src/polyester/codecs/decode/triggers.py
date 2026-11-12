@@ -366,6 +366,9 @@ def trigger_from_proto(
     parent_order_id = ""
     if has_field(msg, "parent_order_id") and msg.parent_order_id:
         parent_order_id = format_uint64_id(msg.parent_order_id)
+    order_list_id = ""
+    if has_field(msg, "order_list_id") and msg.order_list_id:
+        order_list_id = format_uint64_id(msg.order_list_id)
     return Trigger(
         trigger_id=format_uint64_id(msg.trigger_id),
         subaccount_id=format_uint64_id(msg.subaccount_id) if msg.subaccount_id else "",
@@ -374,6 +377,8 @@ def trigger_from_proto(
         trigger_type=cfg.trigger_type,
         status=_trigger_status_label(msg.status),
         parent_order_id=parent_order_id,
+        order_list_id=order_list_id,
+        client_list_id=msg.client_list_id,
         side=cfg.side,
         order_type=cfg.order_type,
         time_in_force=cfg.time_in_force,

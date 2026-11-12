@@ -584,6 +584,12 @@ class Trigger(msgspec.Struct, kw_only=True, omit_defaults=True):
     trigger_type: str = ""
     status: str = ""
     parent_order_id: str = ""
+    # Both triggers of an OCO created with ``triggers.create_oco`` carry the
+    # OCO's ``order_list_id`` (a public ID, the one ``triggers.cancel_oco``
+    # takes) and the ``client_list_id`` it was created with, and neither has a
+    # parent order. Both are empty for any other trigger.
+    order_list_id: str = ""
+    client_list_id: str = ""
     side: str = ""
     order_type: str = ""
     time_in_force: str = ""

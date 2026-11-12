@@ -205,7 +205,7 @@ async def test_create_oco_takes_risk_leg_models(oco_client) -> None:
     assert not request.HasField("subaccount_id")
 
 
-@pytest.mark.parametrize("kwargs", [{}, {"client_list_id": None}, {"client_list_id": ""}])
+@pytest.mark.parametrize("kwargs", [{}, {"client_list_id": None}])
 async def test_create_oco_without_an_id_sends_a_generated_one(oco_client, kwargs) -> None:
     client, server = oco_client
     server.answers["CreateOco"] = _created
@@ -220,8 +220,11 @@ async def test_create_oco_without_an_id_sends_a_generated_one(oco_client, kwargs
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"client_list_id": "   "}, "client_list_id"),
-        ({"client_list_id": "x" * 37}, "client_list_id"),
+        ({"client_list_id": ""}, "client_list_id must be 1 to 36 bytes in UTF-8; got 0"),
+        ({"client_list_id": "x" * 37}, "client_list_id must be 1 to 36 bytes in UTF-8; got 37"),
+        # 19 characters, 38 bytes: the limit counts bytes.
+        ({"client_list_id": "é" * 19}, "client_list_id must be 1 to 36 bytes in UTF-8; got 38"),
+        ({"client_list_id": "\ud800"}, "client_list_id must be valid UTF-8"),
         ({"side": "short"}, "side must be buy or sell"),
         ({"self_trade_prevention_mode": "decrement"}, "self_trade_prevention_mode"),
         ({"take_profit": {"trigger_price": "110000", "order_type": "limit"}}, "limit_price"),
@@ -240,6 +243,30 @@ async def test_create_oco_refuses_bad_input_before_sending(oco_client, overrides
     with pytest.raises(PolyesterValidationError, match=message):
         await _create_oco(client, **overrides)
     assert server.seen == []
+
+
+# Any characters within 36 bytes in UTF-8, sent exactly as given: not stripped,
+# not normalized, not limited to ASCII.
+CONTRACT_CLIENT_LIST_IDS = [
+    "ordre-été-✓",
+    "é" * 18,  # 36 bytes
+    "x" * 36,
+    "  my oco  ",
+    "a b+c=d",
+    "cafe\u0301",  # decomposed, kept decomposed
+]
+
+
+@pytest.mark.parametrize("client_list_id", CONTRACT_CLIENT_LIST_IDS)
+async def test_create_oco_sends_any_id_within_36_bytes_unchanged(
+    oco_client, client_list_id
+) -> None:
+    client, server = oco_client
+    server.answers["CreateOco"] = _created
+    result = await _create_oco(client, client_list_id=client_list_id)
+    [request] = server.requests("CreateOco")
+    assert request.oco.client_list_id == client_list_id
+    assert result.client_list_id == client_list_id
 
 
 async def test_create_oco_unconfirmed_outcome_is_raised_once_and_not_resent(oco_client) -> None:
@@ -446,7 +473,8 @@ async def test_list_filters_by_oco(oco_client) -> None:
     [
         ({"order_list_id": 0}, "order_list_id must be a non-zero"),
         ({"order_list_id": "1"}, "order_list_id must be a non-zero"),
-        ({"client_list_id": " "}, "client_list_id"),
+        ({"client_list_id": ""}, "client_list_id must be 1 to 36 bytes in UTF-8; got 0"),
+        ({"client_list_id": "é" * 19}, "client_list_id must be 1 to 36 bytes in UTF-8; got 38"),
     ],
 )
 async def test_list_refuses_a_bad_oco_filter_before_sending(oco_client, kwargs, message) -> None:
@@ -455,3 +483,14 @@ async def test_list_refuses_a_bad_oco_filter_before_sending(oco_client, kwargs, 
     with pytest.raises(PolyesterValidationError, match=message):
         await client.triggers.list(**kwargs)
     assert server.seen == []
+
+
+@pytest.mark.parametrize("client_list_id", CONTRACT_CLIENT_LIST_IDS)
+async def test_list_sends_any_client_list_id_within_36_bytes_unchanged(
+    oco_client, client_list_id
+) -> None:
+    client, server = oco_client
+    server.answers["ListTriggers"] = _ok(triggers.ListTriggersResponse())
+    await client.triggers.list(client_list_id=client_list_id)
+    [request] = server.requests("ListTriggers")
+    assert request.client_list_id == client_list_id

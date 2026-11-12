@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import Any
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.correlation_id import required_client_id
 from polyester.codecs.decode.triggers import (
     batch_cancel_triggers_from_proto,
     cancel_oco_from_proto,
@@ -17,7 +16,7 @@ from polyester.codecs.decode.triggers import (
     trigger_status_from_label,
     triggers_list_from_proto,
 )
-from polyester.codecs.oco import create_oco_to_proto
+from polyester.codecs.oco import create_oco_to_proto, validate_client_list_id
 from polyester.codecs.orders import (
     catalog_order_scales,
     parse_optional_subaccount_id,
@@ -156,8 +155,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         (the ID :meth:`create_oco` returned), and ``client_list_id`` those of
         the OCO created with that client list ID: use it to find an OCO whose
         create raised an error for which ``mutation_outcome_unknown`` is true.
-        An ``order_list_id`` of 0 or a blank ``client_list_id`` raises
-        ``PolyesterValidationError`` before sending.
+        ``client_list_id`` is 1 to 36 bytes in UTF-8, any characters, and is
+        sent unchanged. An ``order_list_id`` of 0, or an empty or longer
+        ``client_list_id``, raises ``PolyesterValidationError`` before sending.
+        Each trigger reads back its ``order_list_id`` and ``client_list_id``.
 
         With the catalogs loaded, each trigger's ``symbol`` names its pair.
 
@@ -197,7 +198,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
                 raise PolyesterValidationError("order_list_id must be a non-zero OCO ID")
             request.order_list_id = order_list
         if client_list_id is not None:
-            request.client_list_id = required_client_id(client_list_id, "client_list_id")
+            request.client_list_id = validate_client_list_id(client_list_id)
         # Decoded with the pair's catalog scales: a load in progress is
         # awaited, and a failed one leaves the quantities unscaled.
         await self._ensure_catalogs(required=False)
@@ -431,17 +432,20 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``self_trade_prevention_mode`` is ``expire_taker``, ``expire_maker``
         (the server's default when unset) or ``expire_both``.
 
-        ``client_list_id`` identifies this create. Left out or empty, the SDK
-        generates one, which the result echoes. Sending the same create again
-        with the same ``client_list_id`` returns the same OCO while it is
-        active and for 60 seconds after both legs end; a different create with
-        the same ID is refused ``CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID``. A
-        create not confirmed in time raises an error for which
-        ``mutation_outcome_unknown`` is true (``TRIGGER_CREATE_OUTCOME_UNKNOWN``):
-        the OCO may exist, so look for its legs with
-        ``list(client_list_id=...)`` before retrying. An ID you choose and keep
-        is what lets you do that, so set one when you may need to. A blank one
-        raises ``PolyesterValidationError`` before sending.
+        ``client_list_id`` identifies this create: 1 to 36 bytes in UTF-8, any
+        characters, sent exactly as given. Left out, the SDK generates one,
+        which the result echoes. Both legs read the OCO back on
+        ``Trigger.order_list_id`` and ``Trigger.client_list_id``. Sending the
+        same create again with the same ``client_list_id`` returns the same
+        OCO while it is active and for 60 seconds after both legs end; a
+        different create with the same ID is refused
+        ``CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID``. A create not confirmed in
+        time raises an error for which ``mutation_outcome_unknown`` is true
+        (``TRIGGER_CREATE_OUTCOME_UNKNOWN``): the OCO may exist, so look for
+        its legs with ``list(client_list_id=...)`` before retrying. An ID you
+        choose and keep is what lets you do that, so set one when you may need
+        to. An empty one, or one over 36 bytes, raises
+        ``PolyesterValidationError`` before sending.
         """
         await self._ensure_catalogs()
         symbol_id: int | None = None

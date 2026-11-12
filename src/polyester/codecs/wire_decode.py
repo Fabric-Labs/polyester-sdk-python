@@ -562,6 +562,8 @@ def decode_trigger(data: dict[str, Any]) -> Trigger:
         client_trigger_id=str(
             _field(data, "clientTriggerId", "client_trigger_id", default="") or ""
         ),
+        order_list_id=_id_str(_field(data, "orderListId", "order_list_id")),
+        client_list_id=str(_field(data, "clientListId", "client_list_id", default="") or ""),
         cancel_reason=str(_field(data, "cancelReason", "cancel_reason", default="") or ""),
         failure_reason=str(_field(data, "failureReason", "failure_reason", default="") or ""),
     )

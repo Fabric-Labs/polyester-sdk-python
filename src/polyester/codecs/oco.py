@@ -5,15 +5,43 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from polyester.codecs.correlation_id import required_client_id
 from polyester.codecs.orders import _risk_leg_from_dict, _risk_leg_model_to_dict
 from polyester.codecs.scalars import parse_account_id
 from polyester.codecs.triggers import self_trade_prevention_mode_to_proto
 from polyester.errors import PolyesterValidationError
+from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models.trading import RiskLeg
 from polyester.types.money import resolve_qty_scaled
+
+
+def _contract_client_list_id_max_bytes() -> int:
+    """The ``client_list_id`` byte limit the public contract sets."""
+    field = triggers_pb2.OcoIntent.DESCRIPTOR.fields_by_name["client_list_id"]
+    return int(field.GetOptions().Extensions[validate_pb2.field].string.max_bytes)
+
+
+CLIENT_LIST_ID_MAX_BYTES = _contract_client_list_id_max_bytes()
+
+
+def validate_client_list_id(value: object, field_name: str = "client_list_id") -> str:
+    """Check a client list ID as the contract does: 1 to 36 bytes in UTF-8.
+
+    Any characters are allowed. The ID is returned, and sent, exactly as given:
+    it is not stripped or normalized.
+    """
+    if not isinstance(value, str):
+        raise PolyesterValidationError(f"{field_name} must be a string")
+    try:
+        size = len(value.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise PolyesterValidationError(f"{field_name} must be valid UTF-8 text") from exc
+    if size == 0 or size > CLIENT_LIST_ID_MAX_BYTES:
+        raise PolyesterValidationError(
+            f"{field_name} must be 1 to {CLIENT_LIST_ID_MAX_BYTES} bytes in UTF-8; got {size}"
+        )
+    return value
 
 
 def _oco_leg(leg: RiskLeg | dict[str, Any], *, field_name: str, symbol: str) -> triggers_pb2.OcoLeg:
@@ -48,8 +76,9 @@ def create_oco_to_proto(
 ) -> triggers_pb2.CreateOcoRequest:
     """Encode an OCO over ``qty`` of ``symbol`` that both legs trade on ``side``.
 
-    ``client_list_id`` is the create's idempotency key; left out or empty, one
-    is generated. A blank one raises ``PolyesterValidationError``.
+    ``client_list_id`` is the create's idempotency key; left out (``None``),
+    one is generated. Given, it must be 1 to 36 bytes in UTF-8, any
+    characters, and is sent unchanged; otherwise ``PolyesterValidationError``.
     """
     if symbol_id <= 0:
         raise PolyesterValidationError("create OCO requires a resolved symbol_id")
@@ -66,13 +95,13 @@ def create_oco_to_proto(
             symbol=symbol,
             symbol_id=symbol_id,
         ),
-        # The contract requires an ID. A blank one is a caller's mistake:
+        # The contract requires an ID. An empty one is a caller's mistake:
         # replacing it would hide that a retry can no longer find its first
         # attempt.
         client_list_id=(
-            required_client_id(client_list_id, "client_list_id")
-            if client_list_id
-            else f"oco-{uuid.uuid4().hex[:12]}"
+            f"oco-{uuid.uuid4().hex[:12]}"
+            if client_list_id is None
+            else validate_client_list_id(client_list_id)
         ),
     )
     if self_trade_prevention_mode is not None:

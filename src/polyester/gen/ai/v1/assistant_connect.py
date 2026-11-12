@@ -51,6 +51,12 @@ class AssistantService(Protocol):
     async def list_assistant_keys(self, request: ai_dot_v1_dot_assistant__pb2.ListAssistantKeysRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.ListAssistantKeysResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def set_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class AssistantServiceASGIApplication(ConnectASGIApplication[AssistantService]):
     def __init__(self, service: AssistantService | AsyncGenerator[AssistantService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -166,6 +172,26 @@ class AssistantServiceASGIApplication(ConnectASGIApplication[AssistantService]):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.list_assistant_keys,
+                ),
+                "/ai.v1.AssistantService/GetTelegramApprovalLimits": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetTelegramApprovalLimits",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_telegram_approval_limits,
+                ),
+                "/ai.v1.AssistantService/SetTelegramApprovalLimits": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SetTelegramApprovalLimits",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.set_telegram_approval_limits,
                 ),
             },
             interceptors=interceptors,
@@ -409,6 +435,48 @@ class AssistantServiceClient(ConnectClient):
             use_get=use_get,
         )
 
+    async def get_telegram_approval_limits(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetTelegramApprovalLimits",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def set_telegram_approval_limits(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetTelegramApprovalLimits",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest,
+                output=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -435,6 +503,10 @@ class AssistantServiceSync(Protocol):
     def complete_assistant_keys(self, request: ai_dot_v1_dot_assistant__pb2.CompleteAssistantKeysRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.CompleteAssistantKeysResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_assistant_keys(self, request: ai_dot_v1_dot_assistant__pb2.ListAssistantKeysRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.ListAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def set_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -551,6 +623,26 @@ class AssistantServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.list_assistant_keys,
+                ),
+                "/ai.v1.AssistantService/GetTelegramApprovalLimits": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetTelegramApprovalLimits",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_telegram_approval_limits,
+                ),
+                "/ai.v1.AssistantService/SetTelegramApprovalLimits": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SetTelegramApprovalLimits",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.set_telegram_approval_limits,
                 ),
             },
             interceptors=interceptors,
@@ -792,6 +884,48 @@ class AssistantServiceClientSync(ConnectClientSync):
             headers=headers,
             timeout_ms=timeout_ms,
             use_get=use_get,
+        )
+
+    def get_telegram_approval_limits(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetTelegramApprovalLimits",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def set_telegram_approval_limits(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetTelegramApprovalLimits",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest,
+                output=ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
         )
 
 

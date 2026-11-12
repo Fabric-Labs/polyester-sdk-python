@@ -21,6 +21,12 @@ class TriggersService(Protocol):
     async def create_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.CreateTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CreateTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def create_oco(self, request: triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def cancel_oco(self, request: triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.GetTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.GetTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -31,6 +37,9 @@ class TriggersService(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def cancel_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.CancelTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelTriggerResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def batch_cancel_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def modify_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.ModifyTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.ModifyTriggerResponse:
@@ -57,6 +66,26 @@ class TriggersServiceASGIApplication(ConnectASGIApplication[TriggersService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.create_trigger,
+                ),
+                "/triggers.v1.TriggersService/CreateOco": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CreateOco",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.create_oco,
+                ),
+                "/triggers.v1.TriggersService/CancelOco": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CancelOco",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.cancel_oco,
                 ),
                 "/triggers.v1.TriggersService/GetTrigger": Endpoint.unary(
                     method=MethodInfo(
@@ -97,6 +126,16 @@ class TriggersServiceASGIApplication(ConnectASGIApplication[TriggersService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.cancel_trigger,
+                ),
+                "/triggers.v1.TriggersService/BatchCancelTriggers": Endpoint.unary(
+                    method=MethodInfo(
+                        name="BatchCancelTriggers",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.batch_cancel_triggers,
                 ),
                 "/triggers.v1.TriggersService/ModifyTrigger": Endpoint.unary(
                     method=MethodInfo(
@@ -156,6 +195,46 @@ class TriggersServiceClient(ConnectClient):
                 service_name="triggers.v1.TriggersService",
                 input=triggers_dot_v1_dot_triggers__pb2.CreateTriggerRequest,
                 output=triggers_dot_v1_dot_triggers__pb2.CreateTriggerResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def create_oco(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CreateOco",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def cancel_oco(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelOco",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -242,6 +321,26 @@ class TriggersServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def batch_cancel_triggers(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="BatchCancelTriggers",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def modify_trigger(
         self,
         request: triggers_dot_v1_dot_triggers__pb2.ModifyTriggerRequest,
@@ -309,6 +408,10 @@ class TriggersServiceClient(ConnectClient):
 class TriggersServiceSync(Protocol):
     def create_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.CreateTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CreateTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def create_oco(self, request: triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def cancel_oco(self, request: triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.GetTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.GetTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.ListTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.ListTriggersResponse:
@@ -316,6 +419,8 @@ class TriggersServiceSync(Protocol):
     def list_trigger_events(self, request: triggers_dot_v1_dot_triggers__pb2.ListTriggerEventsRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.ListTriggerEventsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def cancel_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.CancelTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelTriggerResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def batch_cancel_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def modify_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.ModifyTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.ModifyTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -338,6 +443,26 @@ class TriggersServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.create_trigger,
+                ),
+                "/triggers.v1.TriggersService/CreateOco": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CreateOco",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.create_oco,
+                ),
+                "/triggers.v1.TriggersService/CancelOco": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CancelOco",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.cancel_oco,
                 ),
                 "/triggers.v1.TriggersService/GetTrigger": EndpointSync.unary(
                     method=MethodInfo(
@@ -378,6 +503,16 @@ class TriggersServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.cancel_trigger,
+                ),
+                "/triggers.v1.TriggersService/BatchCancelTriggers": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="BatchCancelTriggers",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.batch_cancel_triggers,
                 ),
                 "/triggers.v1.TriggersService/ModifyTrigger": EndpointSync.unary(
                     method=MethodInfo(
@@ -437,6 +572,46 @@ class TriggersServiceClientSync(ConnectClientSync):
                 service_name="triggers.v1.TriggersService",
                 input=triggers_dot_v1_dot_triggers__pb2.CreateTriggerRequest,
                 output=triggers_dot_v1_dot_triggers__pb2.CreateTriggerResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def create_oco(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CreateOco",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.CreateOcoRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.CreateOcoResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def cancel_oco(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelOco",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.CancelOcoRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.CancelOcoResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -517,6 +692,26 @@ class TriggersServiceClientSync(ConnectClientSync):
                 service_name="triggers.v1.TriggersService",
                 input=triggers_dot_v1_dot_triggers__pb2.CancelTriggerRequest,
                 output=triggers_dot_v1_dot_triggers__pb2.CancelTriggerResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def batch_cancel_triggers(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="BatchCancelTriggers",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -1,4 +1,5 @@
 from polyester.gen.orders.v1 import orders_pb2 as _orders_pb2
+from polyester.gen.triggers.v1 import triggers_pb2 as _triggers_pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Mapping as _Mapping
@@ -7,7 +8,7 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ClientFrame(_message.Message):
-    __slots__ = ("seq", "correlation_id", "timestamp_ms", "recv_window_ms", "ping", "create_order", "cancel_order", "modify_order", "cancel_all_orders", "batch_create_orders", "batch_replace_orders", "batch_cancel_orders", "cancel_all_after")
+    __slots__ = ("seq", "correlation_id", "timestamp_ms", "recv_window_ms", "ping", "create_order", "cancel_order", "modify_order", "cancel_all_orders", "batch_create_orders", "batch_replace_orders", "batch_cancel_orders", "cancel_all_after", "create_oco", "cancel_oco")
     SEQ_FIELD_NUMBER: _ClassVar[int]
     CORRELATION_ID_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
@@ -21,6 +22,8 @@ class ClientFrame(_message.Message):
     BATCH_REPLACE_ORDERS_FIELD_NUMBER: _ClassVar[int]
     BATCH_CANCEL_ORDERS_FIELD_NUMBER: _ClassVar[int]
     CANCEL_ALL_AFTER_FIELD_NUMBER: _ClassVar[int]
+    CREATE_OCO_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_OCO_FIELD_NUMBER: _ClassVar[int]
     seq: int
     correlation_id: str
     timestamp_ms: int
@@ -34,7 +37,9 @@ class ClientFrame(_message.Message):
     batch_replace_orders: _orders_pb2.BatchReplaceOrdersRequest
     batch_cancel_orders: _orders_pb2.BatchCancelOrdersRequest
     cancel_all_after: _orders_pb2.CancelAllAfterRequest
-    def __init__(self, seq: _Optional[int] = ..., correlation_id: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., recv_window_ms: _Optional[int] = ..., ping: _Optional[_Union[PingRequest, _Mapping]] = ..., create_order: _Optional[_Union[_orders_pb2.CreateOrderRequest, _Mapping]] = ..., cancel_order: _Optional[_Union[_orders_pb2.CancelOrderRequest, _Mapping]] = ..., modify_order: _Optional[_Union[_orders_pb2.ModifyOrderRequest, _Mapping]] = ..., cancel_all_orders: _Optional[_Union[_orders_pb2.CancelAllOrdersRequest, _Mapping]] = ..., batch_create_orders: _Optional[_Union[_orders_pb2.BatchCreateOrdersRequest, _Mapping]] = ..., batch_replace_orders: _Optional[_Union[_orders_pb2.BatchReplaceOrdersRequest, _Mapping]] = ..., batch_cancel_orders: _Optional[_Union[_orders_pb2.BatchCancelOrdersRequest, _Mapping]] = ..., cancel_all_after: _Optional[_Union[_orders_pb2.CancelAllAfterRequest, _Mapping]] = ...) -> None: ...
+    create_oco: _triggers_pb2.CreateOcoRequest
+    cancel_oco: _triggers_pb2.CancelOcoRequest
+    def __init__(self, seq: _Optional[int] = ..., correlation_id: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., recv_window_ms: _Optional[int] = ..., ping: _Optional[_Union[PingRequest, _Mapping]] = ..., create_order: _Optional[_Union[_orders_pb2.CreateOrderRequest, _Mapping]] = ..., cancel_order: _Optional[_Union[_orders_pb2.CancelOrderRequest, _Mapping]] = ..., modify_order: _Optional[_Union[_orders_pb2.ModifyOrderRequest, _Mapping]] = ..., cancel_all_orders: _Optional[_Union[_orders_pb2.CancelAllOrdersRequest, _Mapping]] = ..., batch_create_orders: _Optional[_Union[_orders_pb2.BatchCreateOrdersRequest, _Mapping]] = ..., batch_replace_orders: _Optional[_Union[_orders_pb2.BatchReplaceOrdersRequest, _Mapping]] = ..., batch_cancel_orders: _Optional[_Union[_orders_pb2.BatchCancelOrdersRequest, _Mapping]] = ..., cancel_all_after: _Optional[_Union[_orders_pb2.CancelAllAfterRequest, _Mapping]] = ..., create_oco: _Optional[_Union[_triggers_pb2.CreateOcoRequest, _Mapping]] = ..., cancel_oco: _Optional[_Union[_triggers_pb2.CancelOcoRequest, _Mapping]] = ...) -> None: ...
 
 class PingRequest(_message.Message):
     __slots__ = ("payload",)
@@ -67,7 +72,7 @@ class PongResponse(_message.Message):
     def __init__(self, payload: _Optional[bytes] = ...) -> None: ...
 
 class AckResponse(_message.Message):
-    __slots__ = ("create_order", "cancel_order", "modify_order", "cancel_all_orders", "batch_create_orders", "batch_replace_orders", "batch_cancel_orders", "cancel_all_after")
+    __slots__ = ("create_order", "cancel_order", "modify_order", "cancel_all_orders", "batch_create_orders", "batch_replace_orders", "batch_cancel_orders", "cancel_all_after", "create_oco", "cancel_oco")
     CREATE_ORDER_FIELD_NUMBER: _ClassVar[int]
     CANCEL_ORDER_FIELD_NUMBER: _ClassVar[int]
     MODIFY_ORDER_FIELD_NUMBER: _ClassVar[int]
@@ -76,6 +81,8 @@ class AckResponse(_message.Message):
     BATCH_REPLACE_ORDERS_FIELD_NUMBER: _ClassVar[int]
     BATCH_CANCEL_ORDERS_FIELD_NUMBER: _ClassVar[int]
     CANCEL_ALL_AFTER_FIELD_NUMBER: _ClassVar[int]
+    CREATE_OCO_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_OCO_FIELD_NUMBER: _ClassVar[int]
     create_order: _orders_pb2.CreateOrderResponse
     cancel_order: _orders_pb2.CancelOrderResponse
     modify_order: _orders_pb2.ModifyOrderResponse
@@ -84,7 +91,9 @@ class AckResponse(_message.Message):
     batch_replace_orders: _orders_pb2.BatchReplaceOrdersResponse
     batch_cancel_orders: _orders_pb2.BatchCancelOrdersResponse
     cancel_all_after: _orders_pb2.CancelAllAfterResponse
-    def __init__(self, create_order: _Optional[_Union[_orders_pb2.CreateOrderResponse, _Mapping]] = ..., cancel_order: _Optional[_Union[_orders_pb2.CancelOrderResponse, _Mapping]] = ..., modify_order: _Optional[_Union[_orders_pb2.ModifyOrderResponse, _Mapping]] = ..., cancel_all_orders: _Optional[_Union[_orders_pb2.CancelAllOrdersResponse, _Mapping]] = ..., batch_create_orders: _Optional[_Union[_orders_pb2.BatchCreateOrdersResponse, _Mapping]] = ..., batch_replace_orders: _Optional[_Union[_orders_pb2.BatchReplaceOrdersResponse, _Mapping]] = ..., batch_cancel_orders: _Optional[_Union[_orders_pb2.BatchCancelOrdersResponse, _Mapping]] = ..., cancel_all_after: _Optional[_Union[_orders_pb2.CancelAllAfterResponse, _Mapping]] = ...) -> None: ...
+    create_oco: _triggers_pb2.CreateOcoResponse
+    cancel_oco: _triggers_pb2.CancelOcoResponse
+    def __init__(self, create_order: _Optional[_Union[_orders_pb2.CreateOrderResponse, _Mapping]] = ..., cancel_order: _Optional[_Union[_orders_pb2.CancelOrderResponse, _Mapping]] = ..., modify_order: _Optional[_Union[_orders_pb2.ModifyOrderResponse, _Mapping]] = ..., cancel_all_orders: _Optional[_Union[_orders_pb2.CancelAllOrdersResponse, _Mapping]] = ..., batch_create_orders: _Optional[_Union[_orders_pb2.BatchCreateOrdersResponse, _Mapping]] = ..., batch_replace_orders: _Optional[_Union[_orders_pb2.BatchReplaceOrdersResponse, _Mapping]] = ..., batch_cancel_orders: _Optional[_Union[_orders_pb2.BatchCancelOrdersResponse, _Mapping]] = ..., cancel_all_after: _Optional[_Union[_orders_pb2.CancelAllAfterResponse, _Mapping]] = ..., create_oco: _Optional[_Union[_triggers_pb2.CreateOcoResponse, _Mapping]] = ..., cancel_oco: _Optional[_Union[_triggers_pb2.CancelOcoResponse, _Mapping]] = ...) -> None: ...
 
 class CommandReject(_message.Message):
     __slots__ = ("code", "detail", "error")

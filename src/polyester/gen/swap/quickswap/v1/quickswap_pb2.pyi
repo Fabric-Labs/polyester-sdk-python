@@ -150,6 +150,13 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     REFERRAL_CODE_UNKNOWN: _ClassVar[ErrorCode]
     REFERRAL_PARTNER_INACTIVE: _ClassVar[ErrorCode]
     PAYOUT_NOT_FOUND: _ClassVar[ErrorCode]
+    ALLOWLIST_DESTINATION_INVALID: _ClassVar[ErrorCode]
+    ALLOWLIST_DESTINATION_EXISTS: _ClassVar[ErrorCode]
+    ALLOWLIST_FULL: _ClassVar[ErrorCode]
+    ALLOWLIST_DESTINATION_NOT_LISTED: _ClassVar[ErrorCode]
+    ALLOWLIST_DESTINATION_IN_USE: _ClassVar[ErrorCode]
+    ALLOWLIST_CHANGE_PENDING: _ClassVar[ErrorCode]
+    VAULT_ALLOWLIST_NOT_READY: _ClassVar[ErrorCode]
 BASIS_UNSPECIFIED: QuoteBasis
 SOURCE_AMOUNT: QuoteBasis
 DESTINATION_AMOUNT: QuoteBasis
@@ -261,6 +268,13 @@ REFERRAL_NOT_SUPPORTED: ErrorCode
 REFERRAL_CODE_UNKNOWN: ErrorCode
 REFERRAL_PARTNER_INACTIVE: ErrorCode
 PAYOUT_NOT_FOUND: ErrorCode
+ALLOWLIST_DESTINATION_INVALID: ErrorCode
+ALLOWLIST_DESTINATION_EXISTS: ErrorCode
+ALLOWLIST_FULL: ErrorCode
+ALLOWLIST_DESTINATION_NOT_LISTED: ErrorCode
+ALLOWLIST_DESTINATION_IN_USE: ErrorCode
+ALLOWLIST_CHANGE_PENDING: ErrorCode
+VAULT_ALLOWLIST_NOT_READY: ErrorCode
 
 class TokenAmount(_message.Message):
     __slots__ = ("base_units", "decimals")
@@ -419,7 +433,15 @@ class Deposit(_message.Message):
     def __init__(self, index: _Optional[int] = ..., tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., disposition: _Optional[_Union[DepositDisposition, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., credited_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow_id: _Optional[str] = ...) -> None: ...
 
 class ExecutionProgress(_message.Message):
-    __slots__ = ("input_amount", "executed_input", "output_amount", "intermediate_remainder", "completed_slices", "total_slices", "started_at", "deadline", "finished_at")
+    __slots__ = ("input_amount", "executed_input", "output_amount", "intermediate_remainder", "completed_slices", "total_slices", "started_at", "deadline", "finished_at", "slices", "slices_truncated", "slices_unavailable_reason")
+    class SlicesUnavailableReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        UNAVAILABLE_REASON_UNSPECIFIED: _ClassVar[ExecutionProgress.SlicesUnavailableReason]
+        ACCOUNTING_INCONSISTENCY: _ClassVar[ExecutionProgress.SlicesUnavailableReason]
+        PRECISION_UNAVAILABLE: _ClassVar[ExecutionProgress.SlicesUnavailableReason]
+    UNAVAILABLE_REASON_UNSPECIFIED: ExecutionProgress.SlicesUnavailableReason
+    ACCOUNTING_INCONSISTENCY: ExecutionProgress.SlicesUnavailableReason
+    PRECISION_UNAVAILABLE: ExecutionProgress.SlicesUnavailableReason
     INPUT_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     EXECUTED_INPUT_FIELD_NUMBER: _ClassVar[int]
     OUTPUT_AMOUNT_FIELD_NUMBER: _ClassVar[int]
@@ -429,6 +451,9 @@ class ExecutionProgress(_message.Message):
     STARTED_AT_FIELD_NUMBER: _ClassVar[int]
     DEADLINE_FIELD_NUMBER: _ClassVar[int]
     FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    SLICES_FIELD_NUMBER: _ClassVar[int]
+    SLICES_TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    SLICES_UNAVAILABLE_REASON_FIELD_NUMBER: _ClassVar[int]
     input_amount: TokenAmount
     executed_input: TokenAmount
     output_amount: TokenAmount
@@ -438,7 +463,87 @@ class ExecutionProgress(_message.Message):
     started_at: _timestamp_pb2.Timestamp
     deadline: _timestamp_pb2.Timestamp
     finished_at: _timestamp_pb2.Timestamp
-    def __init__(self, input_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., executed_input: _Optional[_Union[TokenAmount, _Mapping]] = ..., output_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., intermediate_remainder: _Optional[_Union[TokenAmount, _Mapping]] = ..., completed_slices: _Optional[int] = ..., total_slices: _Optional[int] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deadline: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    slices: _containers.RepeatedCompositeFieldContainer[ExecutionSlice]
+    slices_truncated: bool
+    slices_unavailable_reason: ExecutionProgress.SlicesUnavailableReason
+    def __init__(self, input_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., executed_input: _Optional[_Union[TokenAmount, _Mapping]] = ..., output_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., intermediate_remainder: _Optional[_Union[TokenAmount, _Mapping]] = ..., completed_slices: _Optional[int] = ..., total_slices: _Optional[int] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deadline: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., slices: _Optional[_Iterable[_Union[ExecutionSlice, _Mapping]]] = ..., slices_truncated: _Optional[bool] = ..., slices_unavailable_reason: _Optional[_Union[ExecutionProgress.SlicesUnavailableReason, str]] = ...) -> None: ...
+
+class ExecutionSlice(_message.Message):
+    __slots__ = ("index", "planned_at", "executed_at", "finished_at", "state", "reason", "completed", "input_traded", "output_received", "average_price", "second_leg", "intermediate_carried", "carry_reason")
+    class State(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATE_UNSPECIFIED: _ClassVar[ExecutionSlice.State]
+        PLANNED: _ClassVar[ExecutionSlice.State]
+        EXECUTING: _ClassVar[ExecutionSlice.State]
+        TRADED: _ClassVar[ExecutionSlice.State]
+        PARTLY_TRADED: _ClassVar[ExecutionSlice.State]
+        SKIPPED: _ClassVar[ExecutionSlice.State]
+        FAILED: _ClassVar[ExecutionSlice.State]
+    STATE_UNSPECIFIED: ExecutionSlice.State
+    PLANNED: ExecutionSlice.State
+    EXECUTING: ExecutionSlice.State
+    TRADED: ExecutionSlice.State
+    PARTLY_TRADED: ExecutionSlice.State
+    SKIPPED: ExecutionSlice.State
+    FAILED: ExecutionSlice.State
+    class Reason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        REASON_UNSPECIFIED: _ClassVar[ExecutionSlice.Reason]
+        SLOT_MISSED: _ClassVar[ExecutionSlice.Reason]
+        DEADLINE_REACHED: _ClassVar[ExecutionSlice.Reason]
+        MARKET_CLOSED: _ClassVar[ExecutionSlice.Reason]
+        BELOW_MINIMUM: _ClassVar[ExecutionSlice.Reason]
+        ABOVE_MAXIMUM: _ClassVar[ExecutionSlice.Reason]
+        PROTECTION_NOT_MET: _ClassVar[ExecutionSlice.Reason]
+        ORDER_REJECTED: _ClassVar[ExecutionSlice.Reason]
+        INSUFFICIENT_LIQUIDITY: _ClassVar[ExecutionSlice.Reason]
+        EXECUTION_ENDED: _ClassVar[ExecutionSlice.Reason]
+    REASON_UNSPECIFIED: ExecutionSlice.Reason
+    SLOT_MISSED: ExecutionSlice.Reason
+    DEADLINE_REACHED: ExecutionSlice.Reason
+    MARKET_CLOSED: ExecutionSlice.Reason
+    BELOW_MINIMUM: ExecutionSlice.Reason
+    ABOVE_MAXIMUM: ExecutionSlice.Reason
+    PROTECTION_NOT_MET: ExecutionSlice.Reason
+    ORDER_REJECTED: ExecutionSlice.Reason
+    INSUFFICIENT_LIQUIDITY: ExecutionSlice.Reason
+    EXECUTION_ENDED: ExecutionSlice.Reason
+    class SecondLeg(_message.Message):
+        __slots__ = ("input_traded", "output_received", "average_price")
+        INPUT_TRADED_FIELD_NUMBER: _ClassVar[int]
+        OUTPUT_RECEIVED_FIELD_NUMBER: _ClassVar[int]
+        AVERAGE_PRICE_FIELD_NUMBER: _ClassVar[int]
+        input_traded: TokenAmount
+        output_received: TokenAmount
+        average_price: str
+        def __init__(self, input_traded: _Optional[_Union[TokenAmount, _Mapping]] = ..., output_received: _Optional[_Union[TokenAmount, _Mapping]] = ..., average_price: _Optional[str] = ...) -> None: ...
+    INDEX_FIELD_NUMBER: _ClassVar[int]
+    PLANNED_AT_FIELD_NUMBER: _ClassVar[int]
+    EXECUTED_AT_FIELD_NUMBER: _ClassVar[int]
+    FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    COMPLETED_FIELD_NUMBER: _ClassVar[int]
+    INPUT_TRADED_FIELD_NUMBER: _ClassVar[int]
+    OUTPUT_RECEIVED_FIELD_NUMBER: _ClassVar[int]
+    AVERAGE_PRICE_FIELD_NUMBER: _ClassVar[int]
+    SECOND_LEG_FIELD_NUMBER: _ClassVar[int]
+    INTERMEDIATE_CARRIED_FIELD_NUMBER: _ClassVar[int]
+    CARRY_REASON_FIELD_NUMBER: _ClassVar[int]
+    index: int
+    planned_at: _timestamp_pb2.Timestamp
+    executed_at: _timestamp_pb2.Timestamp
+    finished_at: _timestamp_pb2.Timestamp
+    state: ExecutionSlice.State
+    reason: ExecutionSlice.Reason
+    completed: bool
+    input_traded: TokenAmount
+    output_received: TokenAmount
+    average_price: str
+    second_leg: ExecutionSlice.SecondLeg
+    intermediate_carried: TokenAmount
+    carry_reason: ExecutionSlice.Reason
+    def __init__(self, index: _Optional[int] = ..., planned_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., executed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., state: _Optional[_Union[ExecutionSlice.State, str]] = ..., reason: _Optional[_Union[ExecutionSlice.Reason, str]] = ..., completed: _Optional[bool] = ..., input_traded: _Optional[_Union[TokenAmount, _Mapping]] = ..., output_received: _Optional[_Union[TokenAmount, _Mapping]] = ..., average_price: _Optional[str] = ..., second_leg: _Optional[_Union[ExecutionSlice.SecondLeg, _Mapping]] = ..., intermediate_carried: _Optional[_Union[TokenAmount, _Mapping]] = ..., carry_reason: _Optional[_Union[ExecutionSlice.Reason, str]] = ...) -> None: ...
 
 class Withdrawal(_message.Message):
     __slots__ = ("index", "role", "deposit_index", "zipped_asset_id", "address", "memo", "amount", "network_fee", "state", "tx_hash", "submitted_at", "finalized_at", "flow_id", "unsent_amount")

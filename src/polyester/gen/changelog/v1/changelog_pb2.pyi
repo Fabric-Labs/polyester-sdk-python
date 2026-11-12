@@ -43,6 +43,7 @@ class Surface(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MARKET_DATA: _ClassVar[Surface]
     QUICKSWAP: _ClassVar[Surface]
     REWARDS: _ClassVar[Surface]
+    ASSISTANT: _ClassVar[Surface]
 
 class SortDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -70,6 +71,7 @@ PLATFORM: Surface
 MARKET_DATA: Surface
 QUICKSWAP: Surface
 REWARDS: Surface
+ASSISTANT: Surface
 SORT_DIRECTION_UNSPECIFIED: SortDirection
 SORT_ASC: SortDirection
 SORT_DESC: SortDirection

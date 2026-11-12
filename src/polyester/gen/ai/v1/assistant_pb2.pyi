@@ -1164,3 +1164,35 @@ class ListAssistantKeysResponse(_message.Message):
     KEYS_FIELD_NUMBER: _ClassVar[int]
     keys: _containers.RepeatedCompositeFieldContainer[AssistantKey]
     def __init__(self, keys: _Optional[_Iterable[_Union[AssistantKey, _Mapping]]] = ...) -> None: ...
+
+class TelegramApprovalLimits(_message.Message):
+    __slots__ = ("per_approval_usd", "daily_usd")
+    PER_APPROVAL_USD_FIELD_NUMBER: _ClassVar[int]
+    DAILY_USD_FIELD_NUMBER: _ClassVar[int]
+    per_approval_usd: str
+    daily_usd: str
+    def __init__(self, per_approval_usd: _Optional[str] = ..., daily_usd: _Optional[str] = ...) -> None: ...
+
+class GetTelegramApprovalLimitsRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetTelegramApprovalLimitsResponse(_message.Message):
+    __slots__ = ("limits", "approved_last_24h_usd")
+    LIMITS_FIELD_NUMBER: _ClassVar[int]
+    APPROVED_LAST_24H_USD_FIELD_NUMBER: _ClassVar[int]
+    limits: TelegramApprovalLimits
+    approved_last_24h_usd: str
+    def __init__(self, limits: _Optional[_Union[TelegramApprovalLimits, _Mapping]] = ..., approved_last_24h_usd: _Optional[str] = ...) -> None: ...
+
+class SetTelegramApprovalLimitsRequest(_message.Message):
+    __slots__ = ("limits",)
+    LIMITS_FIELD_NUMBER: _ClassVar[int]
+    limits: TelegramApprovalLimits
+    def __init__(self, limits: _Optional[_Union[TelegramApprovalLimits, _Mapping]] = ...) -> None: ...
+
+class SetTelegramApprovalLimitsResponse(_message.Message):
+    __slots__ = ("limits",)
+    LIMITS_FIELD_NUMBER: _ClassVar[int]
+    limits: TelegramApprovalLimits
+    def __init__(self, limits: _Optional[_Union[TelegramApprovalLimits, _Mapping]] = ...) -> None: ...

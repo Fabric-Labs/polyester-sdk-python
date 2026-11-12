@@ -93,6 +93,18 @@ class QuickSwapBrokerService(Protocol):
     async def list_vault_payout_rules(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_vault_ledger(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_vault_allowlist(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_vault_allowlist_changes(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def request_vault_allowlist_change(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class QuickSwapBrokerServiceASGIApplication(ConnectASGIApplication[QuickSwapBrokerService]):
     def __init__(self, service: QuickSwapBrokerService | AsyncGenerator[QuickSwapBrokerService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -348,6 +360,46 @@ class QuickSwapBrokerServiceASGIApplication(ConnectASGIApplication[QuickSwapBrok
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_vault_payout_rules,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultLedger": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListVaultLedger",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_vault_ledger,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlist": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListVaultAllowlist",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_vault_allowlist,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlistChanges": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListVaultAllowlistChanges",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_vault_allowlist_changes,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/RequestVaultAllowlistChange": Endpoint.unary(
+                    method=MethodInfo(
+                        name="RequestVaultAllowlistChange",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.request_vault_allowlist_change,
                 ),
             },
             interceptors=interceptors,
@@ -863,6 +915,86 @@ class QuickSwapBrokerServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def list_vault_ledger(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultLedger",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_vault_allowlist(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultAllowlist",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_vault_allowlist_changes(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultAllowlistChanges",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def request_vault_allowlist_change(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="RequestVaultAllowlistChange",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -917,6 +1049,14 @@ class QuickSwapBrokerServiceSync(Protocol):
     def list_upcoming_payouts(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListUpcomingPayoutsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_vault_payout_rules(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_vault_ledger(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_vault_allowlist(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_vault_allowlist_changes(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def request_vault_allowlist_change(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -1173,6 +1313,46 @@ class QuickSwapBrokerServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_vault_payout_rules,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultLedger": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListVaultLedger",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_vault_ledger,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlist": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListVaultAllowlist",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_vault_allowlist,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlistChanges": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListVaultAllowlistChanges",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_vault_allowlist_changes,
+                ),
+                "/swap.quickswap.v1.QuickSwapBrokerService/RequestVaultAllowlistChange": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="RequestVaultAllowlistChange",
+                        service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.request_vault_allowlist_change,
                 ),
             },
             interceptors=interceptors,
@@ -1682,6 +1862,86 @@ class QuickSwapBrokerServiceClientSync(ConnectClientSync):
                 service_name="swap.quickswap.v1.QuickSwapBrokerService",
                 input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesRequest,
                 output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultPayoutRulesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_vault_ledger(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultLedger",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultLedgerResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_vault_allowlist(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultAllowlist",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_vault_allowlist_changes(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListVaultAllowlistChanges",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.ListVaultAllowlistChangesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def request_vault_allowlist_change(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="RequestVaultAllowlistChange",
+                service_name="swap.quickswap.v1.QuickSwapBrokerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__broker__pb2.RequestVaultAllowlistChangeResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

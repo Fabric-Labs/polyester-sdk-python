@@ -119,6 +119,8 @@ class ActivityEventAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTIVITY_ACTION_BLOCKED: _ClassVar[ActivityEventAction]
     ACTIVITY_ACTION_HOLD_PLACED: _ClassVar[ActivityEventAction]
     ACTIVITY_ACTION_HOLD_RELEASED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_REQUESTED: _ClassVar[ActivityEventAction]
+    ACTIVITY_ACTION_APPLIED: _ClassVar[ActivityEventAction]
 
 class ActivityEventSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -202,6 +204,8 @@ ACTIVITY_ACTION_REVOKED: ActivityEventAction
 ACTIVITY_ACTION_BLOCKED: ActivityEventAction
 ACTIVITY_ACTION_HOLD_PLACED: ActivityEventAction
 ACTIVITY_ACTION_HOLD_RELEASED: ActivityEventAction
+ACTIVITY_ACTION_REQUESTED: ActivityEventAction
+ACTIVITY_ACTION_APPLIED: ActivityEventAction
 ACTIVITY_SOURCE_UNSPECIFIED: ActivityEventSource
 ACTIVITY_SOURCE_WEB: ActivityEventSource
 ACTIVITY_SOURCE_MOBILE: ActivityEventSource

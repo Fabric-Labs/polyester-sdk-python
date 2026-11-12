@@ -7,7 +7,7 @@ from typing import Any
 
 from polyester.codecs.scalars import UINT32_MAX
 from polyester.errors import PolyesterValidationError
-from polyester.models.common import PairOrderLimits, SpotAssetConfig, SpotConfig
+from polyester.models.common import PairOrderLimits, PriceBand, SpotAssetConfig, SpotConfig
 
 _DECIMAL_LIMIT = re.compile(r"^\d+(?:\.\d+)?$")
 
@@ -44,6 +44,20 @@ def _open_orders_limit(row: dict[str, Any], snake: str, camel: str) -> int:
     return parsed
 
 
+def _price_band(pair: dict[str, Any]) -> PriceBand | None:
+    """The pair's price band; ``None`` when the pair has none (absent)."""
+    band = _field(pair, "price_band", "priceBand")
+    if band is None:
+        return None
+    if not isinstance(band, dict):
+        raise PolyesterValidationError("spot config price_band must be an object")
+    return PriceBand(
+        lower_bps=_open_orders_limit(band, "lower_bps", "lowerBps"),
+        upper_bps=_open_orders_limit(band, "upper_bps", "upperBps"),
+        reference_window_ms=_open_orders_limit(band, "reference_window_ms", "referenceWindowMs"),
+    )
+
+
 def pair_order_limits_from_dict(pair: dict[str, Any]) -> PairOrderLimits:
     symbol_id = _field(pair, "symbol_id", "symbolId")
     return PairOrderLimits(
@@ -60,6 +74,7 @@ def pair_order_limits_from_dict(pair: dict[str, Any]) -> PairOrderLimits:
         max_open_orders_per_pair=_open_orders_limit(
             pair, "max_open_orders_per_pair", "maxOpenOrdersPerPair"
         ),
+        price_band=_price_band(pair),
     )
 
 

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
-from polyester.codecs.scalars import timestamp_dict_to_datetime
+from polyester.codecs.proto_helpers import format_uint64_id, optional_timestamp, proto_enum_name
 from polyester.gen.auth.v1 import policies_pb2
 from polyester.models.policies import (
     ApiPolicy,
@@ -54,10 +53,10 @@ def subaccount_policy_from_proto(
         max_open_orders=int(msg.max_open_orders),
         trading_halted=bool(msg.trading_halted),
         locked=bool(msg.locked),
-        review_at=timestamp_dict_to_datetime(msg.review_at),
-        expires_at=timestamp_dict_to_datetime(msg.expires_at),
-        created_at=timestamp_dict_to_datetime(msg.created_at),
-        updated_at=timestamp_dict_to_datetime(msg.updated_at),
+        review_at=optional_timestamp(msg, "review_at"),
+        expires_at=optional_timestamp(msg, "expires_at"),
+        created_at=optional_timestamp(msg, "created_at"),
+        updated_at=optional_timestamp(msg, "updated_at"),
         revision=int(msg.revision),
     )
 
@@ -75,7 +74,7 @@ def api_policy_from_proto(
         spot_market_scope=proto_enum_name(policies_pb2.MarketScope.Value, msg.spot_market_scope),
         is_template=bool(msg.is_template),
         source_template_id=_optional_uint64_id(msg.source_template_id),
-        created_at=timestamp_dict_to_datetime(msg.created_at),
-        updated_at=timestamp_dict_to_datetime(msg.updated_at),
+        created_at=optional_timestamp(msg, "created_at"),
+        updated_at=optional_timestamp(msg, "updated_at"),
         revision=int(msg.revision),
     )

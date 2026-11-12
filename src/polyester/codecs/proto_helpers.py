@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 from google.protobuf.message import Message
 
@@ -81,6 +83,22 @@ def has_field(message: Message, field_name: str) -> bool:
         return message.HasField(field_name)
     except ValueError:
         return False
+
+
+def optional_timestamp(message: Message, field_name: str) -> datetime | None:
+    """The ``Timestamp`` field ``field_name`` as an aware UTC datetime, or
+    ``None`` when the server left it unset.
+
+    Field presence decides: an unset field reads from the message as a
+    default ``Timestamp``, the Unix epoch, so its value cannot tell unset
+    from sent. A sent time, even the epoch itself, is kept. Integer
+    arithmetic: the exact time to the microsecond.
+    """
+    if not has_field(message, field_name):
+        return None
+    value = getattr(message, field_name)
+    result: datetime = value.ToDatetime(tzinfo=UTC)
+    return result
 
 
 def timestamp_to_ms(msg: Message | None) -> int:

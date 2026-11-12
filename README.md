@@ -339,7 +339,10 @@ authenticate (`None` when it does not expire), and `public_key_ed25519` as hex.
 `subaccount_id` is the public ID of the sub-account the key is scoped to, and
 `""` for a key of the main account. `icon` and `color` are the user-chosen icon
 or emoji and color token, and `created_by_actor` is the read-only label of who
-created the key, all as sent and `""` when unset. The API keys of
+created the key, all as sent and `""` when unset. `created_at`,
+`last_used_at` and `updated_at` are UTC `datetime`s, `None` when the server
+leaves them unset, as it does for `last_used_at` on a key that was never used;
+never 1970-01-01. The API keys of
 `sub_accounts.get(..., include_api_keys=True)` and the API-key subscriptions
 read the same way.
 
@@ -1369,7 +1372,9 @@ List and heatmap `limit` arguments must be integers (booleans and other types
 are rejected for wire safety). Optional limits omit when unset so the server
 default applies; allowed ranges are enforced by each API, not a global SDK cap.
 Response fields named `ts_ns` are treated as epoch nanoseconds per the API
-contract.
+contract. A protobuf `Timestamp` field the server leaves unset reads as
+`None`, never as 1970-01-01, on every model field typed `datetime | None`;
+integer `*_ms` fields read `0` when unset.
 
 `get_trades()` lists trades newest first. Narrow it with `start_time` /
 `end_time` (inclusive), `side` (`"buy"` or `"sell"` aggressor), and page with

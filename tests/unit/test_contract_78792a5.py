@@ -989,3 +989,59 @@ def test_attached_risk_leg_violation_reads_on_preview_and_batch_items() -> None:
         )
     )
     assert batch.results[0].violations[0].field_path == "order.attached_risk.stop_loss"
+
+
+# The OCO create and cancel and the batch trigger cancel keep the server's
+# time to the nanosecond: the *_ts_ns field when sent, else its paired
+# Timestamp, else None.
+_EXACT_NS = 1_762_560_000_123_456_789
+_STAMP_NS = 1_762_560_000_987_654_321
+
+
+def _stamp() -> Any:
+    from google.protobuf.timestamp_pb2 import Timestamp
+
+    return Timestamp(seconds=1_762_560_000, nanos=987_654_321)
+
+
+def test_create_oco_keeps_accepted_time_to_the_nanosecond() -> None:
+    from polyester.codecs.decode.triggers import create_oco_from_proto
+
+    exact = create_oco_from_proto(
+        triggers_pb2.CreateOcoResponse(
+            order_list_id=1, accepted_at_ts_ns=_EXACT_NS, accepted_at=_stamp()
+        )
+    )
+    fallback = create_oco_from_proto(
+        triggers_pb2.CreateOcoResponse(order_list_id=1, accepted_at=_stamp())
+    )
+    unset = create_oco_from_proto(triggers_pb2.CreateOcoResponse(order_list_id=1))
+    assert (exact.accepted_ts_ns, fallback.accepted_ts_ns, unset.accepted_ts_ns) == (
+        _EXACT_NS,
+        _STAMP_NS,
+        None,
+    )
+
+
+def test_cancel_oco_keeps_its_time_to_the_nanosecond() -> None:
+    from polyester.codecs.decode.triggers import cancel_oco_from_proto
+
+    exact = cancel_oco_from_proto(
+        triggers_pb2.CancelOcoResponse(order_list_id=1, ts_ns=_EXACT_NS, ts=_stamp())
+    )
+    fallback = cancel_oco_from_proto(triggers_pb2.CancelOcoResponse(order_list_id=1, ts=_stamp()))
+    unset = cancel_oco_from_proto(triggers_pb2.CancelOcoResponse(order_list_id=1))
+    assert (exact.ts_ns, fallback.ts_ns, unset.ts_ns) == (_EXACT_NS, _STAMP_NS, None)
+
+
+def test_batch_cancel_triggers_keeps_its_time_to_the_nanosecond() -> None:
+    from polyester.codecs.decode.triggers import batch_cancel_triggers_from_proto
+
+    exact = batch_cancel_triggers_from_proto(
+        triggers_pb2.BatchCancelTriggersResponse(ts_ns=_EXACT_NS, ts=_stamp())
+    )
+    fallback = batch_cancel_triggers_from_proto(
+        triggers_pb2.BatchCancelTriggersResponse(ts=_stamp())
+    )
+    unset = batch_cancel_triggers_from_proto(triggers_pb2.BatchCancelTriggersResponse())
+    assert (exact.ts_ns, fallback.ts_ns, unset.ts_ns) == (_EXACT_NS, _STAMP_NS, None)

@@ -691,12 +691,18 @@ class CreateOcoResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_list_id: str = ""
     take_profit_trigger_id: str = ""
     stop_loss_trigger_id: str = ""
+    # When admission completed, in nanoseconds since the Unix epoch; None when
+    # the server sent no time.
+    accepted_ts_ns: int | None = None
 
 
 class CancelOcoResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_list_id: str = ""
     # Both legs' status after the cancel: ``canceled``.
     status: str = ""
+    # When the cancel was answered, in nanoseconds since the Unix epoch; None
+    # when the server sent no time.
+    ts_ns: int | None = None
 
 
 class BatchCancelTriggerResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -713,6 +719,9 @@ class BatchCancelTriggersResult(msgspec.Struct, kw_only=True, omit_defaults=True
     results: list[BatchCancelTriggerResultItem]
     accepted_count: int = 0
     rejected_count: int = 0
+    # The server time of the answer, in nanoseconds since the Unix epoch; None
+    # when the server sent no time.
+    ts_ns: int | None = None
 
 
 class TransferSide(msgspec.Struct, kw_only=True, omit_defaults=True):

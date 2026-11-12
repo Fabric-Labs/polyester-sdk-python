@@ -167,6 +167,7 @@ async def test_create_oco_sends_the_intent_and_reads_the_legs(oco_client) -> Non
         client_list_id="my-oco-1",
         take_profit_trigger_id=format_id(TP_ID),
         stop_loss_trigger_id=format_id(SL_ID),
+        accepted_ts_ns=1,
     )
     [request] = server.requests("CreateOco")
     assert request.subaccount_id == SUB
@@ -291,7 +292,7 @@ async def test_cancel_oco_sends_the_id_and_reads_the_status(oco_client) -> None:
     result = await client.triggers.cancel_oco(
         order_list_id=format_id(LIST_ID), sub_account_id=format_id(SUB)
     )
-    assert result == CancelOcoResult(order_list_id=format_id(LIST_ID), status="canceled")
+    assert result == CancelOcoResult(order_list_id=format_id(LIST_ID), status="canceled", ts_ns=1)
     [request] = server.requests("CancelOco")
     assert request.order_list_id == LIST_ID
     assert request.subaccount_id == SUB

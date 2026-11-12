@@ -154,6 +154,9 @@ class ExternalAddressBookEntryView(msgspec.Struct, kw_only=True, omit_defaults=T
     address: str = ""
     created_at_ms: int = 0
     updated_at_ms: int = 0
+    # This entry's own revision, for ``expected_revision`` on an update; 0
+    # when the server sends none. Not the view's ``view_revision``.
+    revision: int = 0
 
 
 class InternalAddressBookEntryView(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -171,6 +174,9 @@ class InternalAddressBookEntryView(msgspec.Struct, kw_only=True, omit_defaults=T
     sub_account_label: str = ""
     created_at_ms: int = 0
     updated_at_ms: int = 0
+    # This entry's own revision, for ``expected_revision`` on an update; 0
+    # when the server sends none. Not the view's ``view_revision``.
+    revision: int = 0
 
 
 class AddressBookEntriesView(msgspec.Struct, kw_only=True, omit_defaults=True):

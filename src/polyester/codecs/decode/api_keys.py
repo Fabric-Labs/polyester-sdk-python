@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
+from datetime import UTC
+
+from polyester.codecs.proto_helpers import (
+    format_optional_uint64_id,
+    format_uint64_id,
+    proto_enum_name,
+)
 from polyester.codecs.scalars import timestamp_dict_to_datetime
 from polyester.gen.auth.v1 import api_keys_pb2
 from polyester.models import ApiKeysList, ApiKeySummary
@@ -17,6 +23,11 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
         updated_at=timestamp_dict_to_datetime(msg.updated_at),
         revision=int(msg.revision),
         purpose=proto_enum_name(api_keys_pb2.ApiKeyPurpose, msg.purpose),
+        policy_id=format_optional_uint64_id(msg.policy_id),
+        ip_whitelist=list(msg.ip_whitelist),
+        # Integer arithmetic: the exact time to the microsecond.
+        expires_at=msg.expires_at.ToDatetime(tzinfo=UTC) if msg.HasField("expires_at") else None,
+        public_key_ed25519=msg.public_key_ed25519.hex(),
     )
 
 

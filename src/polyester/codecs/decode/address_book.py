@@ -304,6 +304,7 @@ def external_entry_view_from_proto(
         address=msg.address,
         created_at_ms=timestamp_to_ms(msg.created_at),
         updated_at_ms=timestamp_to_ms(msg.updated_at),
+        revision=int(msg.revision),
     )
 
 
@@ -334,6 +335,7 @@ def internal_entry_view_from_proto(
         sub_account_label=msg.subaccount_label,
         created_at_ms=timestamp_to_ms(msg.created_at),
         updated_at_ms=timestamp_to_ms(msg.updated_at),
+        revision=int(msg.revision),
     )
 
 

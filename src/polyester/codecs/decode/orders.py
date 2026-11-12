@@ -12,6 +12,7 @@ from polyester.codecs.decode.invariants import (
 )
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import (
+    format_optional_uint64_id,
     format_uint64_id,
     has_field,
     proto_enum_name,
@@ -364,6 +365,7 @@ def order_from_proto(
             if "expire_at" in msg.DESCRIPTOR.fields_by_name and msg.HasField("expire_at")
             else None
         ),
+        batch_request_id=format_optional_uint64_id(msg.batch_request_id),
         reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else None,
         cancel_reason=cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else None,
         avg_price=(

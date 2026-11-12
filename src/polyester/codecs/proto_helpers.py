@@ -41,6 +41,13 @@ def format_uint64_id(value: int) -> str:
     return format_id(value)
 
 
+def format_optional_uint64_id(value: int) -> str:
+    """Public ID of ``value``, or "" for 0, the contract's "none"."""
+    if value == 0:
+        return ""
+    return format_id(value)
+
+
 def u128_to_str(hi: int, lo: int) -> str:
     return str((int(hi) << 64) + int(lo))
 

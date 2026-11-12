@@ -331,7 +331,11 @@ subscriptions decode them like every action, as lowercase names (`read_api_keys`
 A policy update that replaces the whole action list must keep the permissions
 it read back, or it removes them. `api_keys.list` and `api_keys.get` give each
 key's `purpose`: `"standard"` for your keys, `"assistant"` for keys of the
-Polyester assistant.
+Polyester assistant. They also give its restrictions: `policy_id`, the public
+ID of the attached API policy as `ApiPolicy.id` (`""` when none is attached,
+and then the key has no permissions), `ip_whitelist` (`[]` for no IP
+restriction), `expires_at`, the exact UTC `datetime` after which the key cannot
+authenticate (`None` when it does not expire), and `public_key_ed25519` as hex.
 
 **Scripts and local tests only:** `AsyncPolyester.from_env()` and
 `Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,
@@ -598,7 +602,10 @@ a batch's status for 60 seconds from acceptance, so the wait stops there (or
 at `timeout=`), even during a read, with `PolyesterBatchReplaceTimeoutError`,
 whose `last_status` is the last status read: a `not_found` proves nothing, so
 reconcile the orders themselves with order reads. `working` means the order is live, not that it is final. Retry an
-ambiguous batch request with the same `request_id`.
+ambiguous batch request with the same `request_id`. An order the batch admitted
+reads back from `orders.get`, `orders.list_open`, `orders.list_history` and
+`orders.subscribe` with `Order.batch_request_id` set to the receipt's
+`batch_request_id`; it is `""` for an order of any other origin.
 
 ```python
 receipt = await client.orders.batch_replace(symbol="BTC-USDT", items=items)
@@ -782,7 +789,9 @@ limits = await client.rate_limits.get_trading_rate_limits()
 Address-book reads (`list_books`, `list_entries`, `get_view`) and writes
 (`create_entry`, `update_entry`, `delete_entry`, tag CRUD) are wrapped.
 `get_view(minimum_view_revision=...)` asks the server for a newer snapshot;
-the view and invalidation events expose `view_revision`.
+the view and invalidation events expose `view_revision`. Each entry of the view
+carries its own `revision`, the `expected_revision` for updating that entry;
+it is not the view's `view_revision`.
 Create and update accept `new_tags` so a tag can be created and attached in
 the same request. Update is a durable PATCH: pass `expected_revision` from a
 prior read and only the fields you set are selected. When `tag_ids` is also

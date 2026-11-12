@@ -791,7 +791,16 @@ class BucketTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
 class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     key_id: str = ""
     label: str = ""
+    # User-chosen icon or emoji and color token for display, as sent (at
+    # most 32 characters each); "" when none is set.
+    icon: str = ""
+    color: str = ""
+    # Read-only label of who created the key, such as a username or account
+    # label; "" when the server sends none.
+    created_by_actor: str = ""
     status: str = ""
+    # Public ID of the sub-account the key is scoped to; "" for a key of the
+    # main account.
     subaccount_id: str = ""
     created_at: datetime | None = None
     last_used_at: datetime | None = None

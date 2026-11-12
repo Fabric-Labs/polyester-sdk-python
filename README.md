@@ -336,6 +336,12 @@ ID of the attached API policy as `ApiPolicy.id` (`""` when none is attached,
 and then the key has no permissions), `ip_whitelist` (`[]` for no IP
 restriction), `expires_at`, the exact UTC `datetime` after which the key cannot
 authenticate (`None` when it does not expire), and `public_key_ed25519` as hex.
+`subaccount_id` is the public ID of the sub-account the key is scoped to, and
+`""` for a key of the main account. `icon` and `color` are the user-chosen icon
+or emoji and color token, and `created_by_actor` is the read-only label of who
+created the key, all as sent and `""` when unset. The API keys of
+`sub_accounts.get(..., include_api_keys=True)` and the API-key subscriptions
+read the same way.
 
 **Scripts and local tests only:** `AsyncPolyester.from_env()` and
 `Polyester.from_env()` load `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`,

@@ -100,6 +100,28 @@ TIMESTAMP_SKEW = "TIMESTAMP_SKEW"
 # ended: filled, expired, canceled, or canceled by an earlier cancel.
 ORDER_ALREADY_TERMINAL = "ERROR_CODE_ORDER_ALREADY_TERMINAL"
 
+# orders.v1.ErrorCode of a cancel, pause, resume or modify of a trigger that
+# has already ended (completed, canceled or failed), for at least 60 s after
+# it ended; later the server may answer ERROR_CODE_TRIGGER_NOT_FOUND instead.
+TRIGGER_STATUS_INVALID = "ERROR_CODE_TRIGGER_STATUS_INVALID"
+
+# orders.v1.ErrorCode values of an order refused for the account's or the API
+# key's permissions. Each raises PolyesterAuthError with this code (HTTP 403)
+# over ConnectRPC and REST alike; none is retryable. POLICY_SPOT_TRADE_DENY is
+# the sub-account's policy lacking spot trading, API_KEY_SPOT_TRADE_DENY the
+# API key's policy; API_KEY_POLICY_REQUIRED is a key with no policy; a
+# main-account key whose market list excludes the pair is API_KEY_MARKET_DENY,
+# a sub-account policy that does is POLICY_MARKET_DENY.
+ORDER_PERMISSION_REFUSAL_CODES = frozenset(
+    {
+        "ERROR_CODE_POLICY_MARKET_DENY",
+        "ERROR_CODE_POLICY_SPOT_TRADE_DENY",
+        "ERROR_CODE_API_KEY_POLICY_REQUIRED",
+        "ERROR_CODE_API_KEY_MARKET_DENY",
+        "ERROR_CODE_API_KEY_SPOT_TRADE_DENY",
+    }
+)
+
 # Suffix of orders.v1.ErrorDetail codes for a mutation that was sent but not
 # confirmed in time (e.g. ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN). The server
 # may still have applied it: read back before retrying. Matching the suffix
@@ -576,6 +598,20 @@ def is_order_already_terminal(err: BaseException) -> bool:
     done" and read the order for how it ended.
     """
     return isinstance(err, PolyesterApiError) and err.code == ORDER_ALREADY_TERMINAL
+
+
+def is_trigger_already_ended(err: BaseException) -> bool:
+    """True when a trigger cancel, pause, resume or modify named a trigger that
+    has already ended (``ERROR_CODE_TRIGGER_STATUS_INVALID``, HTTP 400).
+
+    The server answers it for at least 60 seconds after the trigger ends,
+    including a repeat of a cancel that succeeded. Treat it as "already done"
+    and read the trigger for how it ended. Later the server may answer
+    ``ERROR_CODE_TRIGGER_NOT_FOUND`` instead; this helper is false for that
+    code, which also names an ID that is none of the account's triggers, so
+    treat it as ended only for a trigger you know you created.
+    """
+    return isinstance(err, PolyesterApiError) and err.code == TRIGGER_STATUS_INVALID
 
 
 def is_mfa_enrollment_required(err: BaseException) -> bool:

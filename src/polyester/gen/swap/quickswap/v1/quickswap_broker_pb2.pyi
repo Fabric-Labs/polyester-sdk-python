@@ -70,6 +70,43 @@ class PayoutStepState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PAYOUT_STEP_COMPLETED: _ClassVar[PayoutStepState]
     PAYOUT_STEP_FAILED: _ClassVar[PayoutStepState]
     PAYOUT_STEP_SKIPPED: _ClassVar[PayoutStepState]
+
+class VaultLedgerEntryKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    LEDGER_ENTRY_KIND_UNSPECIFIED: _ClassVar[VaultLedgerEntryKind]
+    FEE_CREDIT: _ClassVar[VaultLedgerEntryKind]
+    PAYOUT_DEBIT: _ClassVar[VaultLedgerEntryKind]
+    PAYOUT_REFUND: _ClassVar[VaultLedgerEntryKind]
+
+class PayoutClose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CLOSE_UNSPECIFIED: _ClassVar[PayoutClose]
+    CLOSE_PAID: _ClassVar[PayoutClose]
+    CLOSE_REFUNDED_TO_SMART_ACCOUNT: _ClassVar[PayoutClose]
+    CLOSE_SENT_TO_RECOVERY: _ClassVar[PayoutClose]
+    CLOSE_UNKNOWN: _ClassVar[PayoutClose]
+
+class AllowlistAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ALLOWLIST_ACTION_UNSPECIFIED: _ClassVar[AllowlistAction]
+    ADD_DESTINATION: _ClassVar[AllowlistAction]
+    REMOVE_DESTINATION: _ClassVar[AllowlistAction]
+
+class AllowlistChangeStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ALLOWLIST_CHANGE_STATUS_UNSPECIFIED: _ClassVar[AllowlistChangeStatus]
+    PENDING: _ClassVar[AllowlistChangeStatus]
+    APPLIED: _ClassVar[AllowlistChangeStatus]
+    NOT_APPLIED: _ClassVar[AllowlistChangeStatus]
+
+class AllowlistChangeFailure(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ALLOWLIST_CHANGE_FAILURE_UNSPECIFIED: _ClassVar[AllowlistChangeFailure]
+    TIMED_OUT: _ClassVar[AllowlistChangeFailure]
+    NOT_LISTED_ON_CHAIN: _ClassVar[AllowlistChangeFailure]
+    LIMIT_REACHED: _ClassVar[AllowlistChangeFailure]
+    REQUESTER_NO_LONGER_ALLOWED: _ClassVar[AllowlistChangeFailure]
+    REFUSED: _ClassVar[AllowlistChangeFailure]
 BROKER_ROLE_UNSPECIFIED: BrokerRole
 OWNER: BrokerRole
 ADMIN: BrokerRole
@@ -105,6 +142,28 @@ PAYOUT_STEP_SUBMITTED: PayoutStepState
 PAYOUT_STEP_COMPLETED: PayoutStepState
 PAYOUT_STEP_FAILED: PayoutStepState
 PAYOUT_STEP_SKIPPED: PayoutStepState
+LEDGER_ENTRY_KIND_UNSPECIFIED: VaultLedgerEntryKind
+FEE_CREDIT: VaultLedgerEntryKind
+PAYOUT_DEBIT: VaultLedgerEntryKind
+PAYOUT_REFUND: VaultLedgerEntryKind
+CLOSE_UNSPECIFIED: PayoutClose
+CLOSE_PAID: PayoutClose
+CLOSE_REFUNDED_TO_SMART_ACCOUNT: PayoutClose
+CLOSE_SENT_TO_RECOVERY: PayoutClose
+CLOSE_UNKNOWN: PayoutClose
+ALLOWLIST_ACTION_UNSPECIFIED: AllowlistAction
+ADD_DESTINATION: AllowlistAction
+REMOVE_DESTINATION: AllowlistAction
+ALLOWLIST_CHANGE_STATUS_UNSPECIFIED: AllowlistChangeStatus
+PENDING: AllowlistChangeStatus
+APPLIED: AllowlistChangeStatus
+NOT_APPLIED: AllowlistChangeStatus
+ALLOWLIST_CHANGE_FAILURE_UNSPECIFIED: AllowlistChangeFailure
+TIMED_OUT: AllowlistChangeFailure
+NOT_LISTED_ON_CHAIN: AllowlistChangeFailure
+LIMIT_REACHED: AllowlistChangeFailure
+REQUESTER_NO_LONGER_ALLOWED: AllowlistChangeFailure
+REFUSED: AllowlistChangeFailure
 
 class Broker(_message.Message):
     __slots__ = ("name", "display_name", "enabled", "root_account_id", "default_vault_account_id", "max_affiliate_vaults", "role", "quote_rps", "create_rps", "read_rps", "max_unfunded_addresses", "max_creates_per_hour")
@@ -659,7 +718,7 @@ class ListVaultBalancesResponse(_message.Message):
     def __init__(self, vaults: _Optional[_Iterable[_Union[VaultBalance, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class PayoutStep(_message.Message):
-    __slots__ = ("asset_id", "destination_chain_id", "destination_address", "state", "reason", "available", "amount", "minimum", "value_usd", "tx_hash", "charged_network_fee")
+    __slots__ = ("asset_id", "destination_chain_id", "destination_address", "state", "reason", "available", "amount", "minimum", "value_usd", "tx_hash", "charged_network_fee", "close", "refunded_amount")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
@@ -671,6 +730,8 @@ class PayoutStep(_message.Message):
     VALUE_USD_FIELD_NUMBER: _ClassVar[int]
     TX_HASH_FIELD_NUMBER: _ClassVar[int]
     CHARGED_NETWORK_FEE_FIELD_NUMBER: _ClassVar[int]
+    CLOSE_FIELD_NUMBER: _ClassVar[int]
+    REFUNDED_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     destination_chain_id: int
     destination_address: str
@@ -682,7 +743,9 @@ class PayoutStep(_message.Message):
     value_usd: _quickswap_pb2.TokenAmount
     tx_hash: str
     charged_network_fee: _quickswap_pb2.TokenAmount
-    def __init__(self, asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., state: _Optional[_Union[PayoutStepState, str]] = ..., reason: _Optional[str] = ..., available: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., minimum: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., tx_hash: _Optional[str] = ..., charged_network_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+    close: PayoutClose
+    refunded_amount: _quickswap_pb2.TokenAmount
+    def __init__(self, asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., state: _Optional[_Union[PayoutStepState, str]] = ..., reason: _Optional[str] = ..., available: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., minimum: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., tx_hash: _Optional[str] = ..., charged_network_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., close: _Optional[_Union[PayoutClose, str]] = ..., refunded_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
 
 class Payout(_message.Message):
     __slots__ = ("run_id", "vault_account_id", "status", "reason", "stage", "rule_version", "scheduled_for", "started_at", "finished_at", "min_usd_value", "steps")
@@ -889,3 +952,205 @@ class ListVaultPayoutRulesResponse(_message.Message):
     rules: _containers.RepeatedCompositeFieldContainer[VaultPayoutRule]
     next_page_token: str
     def __init__(self, rules: _Optional[_Iterable[_Union[VaultPayoutRule, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class VaultLedgerFeeCredit(_message.Message):
+    __slots__ = ("credit_id", "swap_id", "fee_kind", "fee_bps", "source_zipped_asset_id", "destination_zipped_asset_id", "quoted_source_amount", "quoted_destination_amount", "source_amount", "destination_amount")
+    CREDIT_ID_FIELD_NUMBER: _ClassVar[int]
+    SWAP_ID_FIELD_NUMBER: _ClassVar[int]
+    FEE_KIND_FIELD_NUMBER: _ClassVar[int]
+    FEE_BPS_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    QUOTED_SOURCE_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    QUOTED_DESTINATION_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    credit_id: int
+    swap_id: int
+    fee_kind: _quickswap_pb2.FeeKind
+    fee_bps: int
+    source_zipped_asset_id: int
+    destination_zipped_asset_id: int
+    quoted_source_amount: _quickswap_pb2.TokenAmount
+    quoted_destination_amount: _quickswap_pb2.TokenAmount
+    source_amount: _quickswap_pb2.TokenAmount
+    destination_amount: _quickswap_pb2.TokenAmount
+    def __init__(self, credit_id: _Optional[int] = ..., swap_id: _Optional[int] = ..., fee_kind: _Optional[_Union[_quickswap_pb2.FeeKind, str]] = ..., fee_bps: _Optional[int] = ..., source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., quoted_source_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., quoted_destination_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., source_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+
+class VaultLedgerPayoutDebit(_message.Message):
+    __slots__ = ("run_id", "payout_status", "destination_chain_id", "destination_address", "tx_hash", "state", "reason", "close", "charged_network_fee")
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    PAYOUT_STATUS_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    TX_HASH_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    CLOSE_FIELD_NUMBER: _ClassVar[int]
+    CHARGED_NETWORK_FEE_FIELD_NUMBER: _ClassVar[int]
+    run_id: int
+    payout_status: PayoutStatus
+    destination_chain_id: int
+    destination_address: str
+    tx_hash: str
+    state: PayoutStepState
+    reason: str
+    close: PayoutClose
+    charged_network_fee: _quickswap_pb2.TokenAmount
+    def __init__(self, run_id: _Optional[int] = ..., payout_status: _Optional[_Union[PayoutStatus, str]] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., tx_hash: _Optional[str] = ..., state: _Optional[_Union[PayoutStepState, str]] = ..., reason: _Optional[str] = ..., close: _Optional[_Union[PayoutClose, str]] = ..., charged_network_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+
+class VaultLedgerPayoutRefund(_message.Message):
+    __slots__ = ("run_id",)
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    run_id: int
+    def __init__(self, run_id: _Optional[int] = ...) -> None: ...
+
+class VaultLedgerEntry(_message.Message):
+    __slots__ = ("kind", "occurred_at", "vault_account_id", "asset_id", "amount", "fee_credit", "payout_debit", "payout_refund")
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    OCCURRED_AT_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    FEE_CREDIT_FIELD_NUMBER: _ClassVar[int]
+    PAYOUT_DEBIT_FIELD_NUMBER: _ClassVar[int]
+    PAYOUT_REFUND_FIELD_NUMBER: _ClassVar[int]
+    kind: VaultLedgerEntryKind
+    occurred_at: _timestamp_pb2.Timestamp
+    vault_account_id: int
+    asset_id: int
+    amount: _quickswap_pb2.TokenAmount
+    fee_credit: VaultLedgerFeeCredit
+    payout_debit: VaultLedgerPayoutDebit
+    payout_refund: VaultLedgerPayoutRefund
+    def __init__(self, kind: _Optional[_Union[VaultLedgerEntryKind, str]] = ..., occurred_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., vault_account_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., fee_credit: _Optional[_Union[VaultLedgerFeeCredit, _Mapping]] = ..., payout_debit: _Optional[_Union[VaultLedgerPayoutDebit, _Mapping]] = ..., payout_refund: _Optional[_Union[VaultLedgerPayoutRefund, _Mapping]] = ...) -> None: ...
+
+class ListVaultLedgerRequest(_message.Message):
+    __slots__ = ("broker", "vault_account_id", "start_time", "end_time", "limit", "page_token")
+    BROKER_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    START_TIME_FIELD_NUMBER: _ClassVar[int]
+    END_TIME_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    broker: str
+    vault_account_id: int
+    start_time: _timestamp_pb2.Timestamp
+    end_time: _timestamp_pb2.Timestamp
+    limit: int
+    page_token: str
+    def __init__(self, broker: _Optional[str] = ..., vault_account_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListVaultLedgerResponse(_message.Message):
+    __slots__ = ("entries", "next_page_token")
+    ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    entries: _containers.RepeatedCompositeFieldContainer[VaultLedgerEntry]
+    next_page_token: str
+    def __init__(self, entries: _Optional[_Iterable[_Union[VaultLedgerEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class VaultAllowlistEntry(_message.Message):
+    __slots__ = ("destination_chain_id", "destination_address", "label", "created_by_account_id", "listed_at", "payable_from", "cooling_down", "used_by_payout_rule")
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    CREATED_BY_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LISTED_AT_FIELD_NUMBER: _ClassVar[int]
+    PAYABLE_FROM_FIELD_NUMBER: _ClassVar[int]
+    COOLING_DOWN_FIELD_NUMBER: _ClassVar[int]
+    USED_BY_PAYOUT_RULE_FIELD_NUMBER: _ClassVar[int]
+    destination_chain_id: int
+    destination_address: str
+    label: str
+    created_by_account_id: int
+    listed_at: _timestamp_pb2.Timestamp
+    payable_from: _timestamp_pb2.Timestamp
+    cooling_down: bool
+    used_by_payout_rule: bool
+    def __init__(self, destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., label: _Optional[str] = ..., created_by_account_id: _Optional[int] = ..., listed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., payable_from: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., cooling_down: _Optional[bool] = ..., used_by_payout_rule: _Optional[bool] = ...) -> None: ...
+
+class VaultAllowlistChange(_message.Message):
+    __slots__ = ("change_id", "vault_account_id", "action", "destination_chain_id", "destination_address", "label", "requested_by_account_id", "requested_at", "expires_at", "status", "failure", "closed_at")
+    CHANGE_ID_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_BY_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_AT_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    FAILURE_FIELD_NUMBER: _ClassVar[int]
+    CLOSED_AT_FIELD_NUMBER: _ClassVar[int]
+    change_id: int
+    vault_account_id: int
+    action: AllowlistAction
+    destination_chain_id: int
+    destination_address: str
+    label: str
+    requested_by_account_id: int
+    requested_at: _timestamp_pb2.Timestamp
+    expires_at: _timestamp_pb2.Timestamp
+    status: AllowlistChangeStatus
+    failure: AllowlistChangeFailure
+    closed_at: _timestamp_pb2.Timestamp
+    def __init__(self, change_id: _Optional[int] = ..., vault_account_id: _Optional[int] = ..., action: _Optional[_Union[AllowlistAction, str]] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., label: _Optional[str] = ..., requested_by_account_id: _Optional[int] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., status: _Optional[_Union[AllowlistChangeStatus, str]] = ..., failure: _Optional[_Union[AllowlistChangeFailure, str]] = ..., closed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ListVaultAllowlistRequest(_message.Message):
+    __slots__ = ("broker", "vault_account_id", "destination_chain_id")
+    BROKER_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    broker: str
+    vault_account_id: int
+    destination_chain_id: int
+    def __init__(self, broker: _Optional[str] = ..., vault_account_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ...) -> None: ...
+
+class ListVaultAllowlistResponse(_message.Message):
+    __slots__ = ("entries",)
+    ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    entries: _containers.RepeatedCompositeFieldContainer[VaultAllowlistEntry]
+    def __init__(self, entries: _Optional[_Iterable[_Union[VaultAllowlistEntry, _Mapping]]] = ...) -> None: ...
+
+class ListVaultAllowlistChangesRequest(_message.Message):
+    __slots__ = ("broker", "vault_account_id", "limit", "page_token")
+    BROKER_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    broker: str
+    vault_account_id: int
+    limit: int
+    page_token: str
+    def __init__(self, broker: _Optional[str] = ..., vault_account_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListVaultAllowlistChangesResponse(_message.Message):
+    __slots__ = ("changes", "next_page_token")
+    CHANGES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    changes: _containers.RepeatedCompositeFieldContainer[VaultAllowlistChange]
+    next_page_token: str
+    def __init__(self, changes: _Optional[_Iterable[_Union[VaultAllowlistChange, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class RequestVaultAllowlistChangeRequest(_message.Message):
+    __slots__ = ("broker", "vault_account_id", "action", "destination_chain_id", "destination_address", "label")
+    BROKER_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    broker: str
+    vault_account_id: int
+    action: AllowlistAction
+    destination_chain_id: int
+    destination_address: str
+    label: str
+    def __init__(self, broker: _Optional[str] = ..., vault_account_id: _Optional[int] = ..., action: _Optional[_Union[AllowlistAction, str]] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., label: _Optional[str] = ...) -> None: ...
+
+class RequestVaultAllowlistChangeResponse(_message.Message):
+    __slots__ = ("change",)
+    CHANGE_FIELD_NUMBER: _ClassVar[int]
+    change: VaultAllowlistChange
+    def __init__(self, change: _Optional[_Union[VaultAllowlistChange, _Mapping]] = ...) -> None: ...

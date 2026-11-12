@@ -39,7 +39,13 @@ from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
 from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
-from polyester.models.trading import AttachedRisk, OrderFieldViolation, RiskLeg, TrailingStop
+from polyester.models.trading import (
+    AttachedRisk,
+    OrderFieldViolation,
+    OrderPeg,
+    RiskLeg,
+    TrailingStop,
+)
 from polyester.types.money import (
     Quantity,
     resolve_price_ticks,
@@ -51,6 +57,10 @@ ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
 ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
 TIF_TO_PROTO = {"gtc": "GTC", "ioc": "IOC", "fok": "FOK", "gtd": "GTD"}
 FEE_ASSET_TO_PROTO = {"quote": "QUOTE", "base": "BASE"}
+PEG_REFERENCE_TO_PROTO = {"best_bid": "BEST_BID", "best_ask": "BEST_ASK"}
+_PEG_KEYS = frozenset({"reference", "offset_ticks", "offsetTicks"})
+_INT64_MIN = -(1 << 63)
+_INT64_MAX = (1 << 63) - 1
 _GTD_MIN_OFFSET = timedelta(seconds=1)
 _GTD_MAX_OFFSET = timedelta(days=30)
 _TIF_VALUES = "', '".join(TIF_TO_PROTO)
@@ -202,7 +212,14 @@ def normalize_create_order_request(
     except (msgspec.ValidationError, TypeError) as exc:
         raise PolyesterValidationError("Invalid orders.create request") from exc
     # Reject floats even when qty is typed as Any for dual-path inputs.
-    for field_name in ("qty", "max_quote_debit", "price", "market_client_ref_price"):
+    for field_name in (
+        "qty",
+        "max_quote_debit",
+        "quote_proceeds",
+        "display_qty",
+        "price",
+        "market_client_ref_price",
+    ):
         value = getattr(normalized, field_name, None)
         if isinstance(value, float):
             raise PolyesterValidationError(
@@ -281,15 +298,20 @@ def order_intent_from_request(
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
         raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
 
-    if (request.qty is None) == (request.max_quote_debit is None):
+    sizes = [request.qty, request.max_quote_debit, request.quote_proceeds]
+    if sum(size is not None for size in sizes) != 1:
         raise PolyesterValidationError(
-            "orders.create requires exactly one of qty or max_quote_debit"
+            "orders.create requires exactly one of qty, max_quote_debit or quote_proceeds"
         )
-    if request.max_quote_debit is not None and (
-        request.side != "buy" or (request.order_type == "limit" and (request.tif or "gtc") != "ioc")
-    ):
+    is_ioc = request.order_type == "market" or (request.tif or "gtc") == "ioc"
+    if request.max_quote_debit is not None and (request.side != "buy" or not is_ioc):
         raise PolyesterValidationError(
             "max_quote_debit is only valid for buy market or limit IOC orders"
+        )
+    # The contract's order_intent.quote_proceeds_eligibility rule.
+    if request.quote_proceeds is not None and (request.side != "sell" or not is_ioc):
+        raise PolyesterValidationError(
+            "quote_proceeds is only valid for sell market or limit IOC orders"
         )
     if request.symbol_id is None or int(request.symbol_id) == 0:
         raise PolyesterValidationError(
@@ -308,20 +330,23 @@ def order_intent_from_request(
                 symbol_id=request.symbol_id,
             )
     else:
-        if request.side != "buy":
-            raise PolyesterValidationError("max_quote_debit is only valid for buy orders")
+        quote_field = "max_quote_debit" if request.max_quote_debit is not None else "quote_proceeds"
         if quote_quantity_scale is None:
             raise PolyesterValidationError(
-                "quote quantity scale is required for max_quote_debit; "
+                f"quote quantity scale is required for {quote_field}; "
                 "await client.wait_for_catalogs() or pass quote_quantity_scale"
             )
-        intent.max_quote_debit_scaled = resolve_quote_qty_scaled(
-            cast(Any, request.max_quote_debit),
+        quote_scaled = resolve_quote_qty_scaled(
+            cast(Any, getattr(request, quote_field)),
             quote_quantity_scale,
-            "max_quote_debit",
+            quote_field,
             symbol=request.symbol,
             symbol_id=request.symbol_id,
         )
+        if quote_field == "max_quote_debit":
+            intent.max_quote_debit_scaled = quote_scaled
+        else:
+            intent.quote_proceeds_scaled = quote_scaled
     client_order_id = optional_client_id(request.client_order_id)
     if client_order_id:
         intent.client_order_id = client_order_id
@@ -347,6 +372,19 @@ def order_intent_from_request(
     tif = request.tif or "gtc"
     if request.expires_at and tif != "gtd":
         raise PolyesterValidationError("expires_at is only valid for limit GTD orders")
+    display_qty_scaled = _display_qty_scaled(request, tif=tif, quantity_scale=quantity_scale)
+    peg = _static_peg_from_input(request.peg)
+    if peg is not None:
+        if request.order_type == "market":
+            raise PolyesterValidationError(
+                "peg is only valid for limit orders: a market order cannot carry a peg"
+            )
+        if request.max_quote_debit is not None or request.quote_proceeds is not None:
+            raise PolyesterValidationError(
+                "peg is only valid with qty: quote sizing (max_quote_debit or "
+                "quote_proceeds) cannot carry a peg"
+            )
+        intent.peg.CopyFrom(peg)
     if request.order_type == "market":
         # The contract's only market execution is market_ioc: market orders
         # always execute immediate-or-cancel. Any other requested tif is
@@ -389,6 +427,8 @@ def order_intent_from_request(
                 intent.limit_gtc.price_ticks = price_ticks
             if request.post_only:
                 intent.limit_gtc.post_only = True
+            if display_qty_scaled:
+                intent.limit_gtc.display_qty_scaled = display_qty_scaled
         elif tif == "gtd":
             if not request.expires_at:
                 raise PolyesterValidationError("tif='gtd' requires expires_at")
@@ -398,6 +438,8 @@ def order_intent_from_request(
             if request.post_only:
                 intent.limit_gtd.post_only = True
             intent.limit_gtd.expire_at.CopyFrom(parse_gtd_expire_at(request.expires_at))
+            if display_qty_scaled:
+                intent.limit_gtd.display_qty_scaled = display_qty_scaled
         else:
             if request.post_only:
                 raise PolyesterValidationError(
@@ -414,8 +456,70 @@ def order_intent_from_request(
 
     risk = risk_policy_from_dict(request.attached_risk, symbol=request.symbol, side=request.side)
     if risk is not None:
+        if peg is not None:
+            raise PolyesterValidationError("peg cannot be combined with attached_risk")
         intent.attached_risk.CopyFrom(risk)
     return intent
+
+
+def _display_qty_scaled(
+    request: CreateOrderRequest, *, tif: str, quantity_scale: int | None
+) -> int:
+    """The iceberg display, encoded at the pair's base scale as ``qty`` is.
+
+    Only a limit GTC or GTD order has a display. Its other rules (below
+    ``qty``, a step multiple, at least the minimum quantity and ``qty / 100``,
+    no attached risk) are the API's.
+    """
+    if request.display_qty is None:
+        return 0
+    if request.order_type != "limit" or tif not in ("gtc", "gtd"):
+        raise PolyesterValidationError(
+            "display_qty is only valid for limit GTC or GTD orders: market, IOC and "
+            "FOK orders have no display"
+        )
+    return resolve_qty_scaled(
+        request.display_qty,
+        _codec_quantity_scale(request.display_qty, quantity_scale),
+        "display_qty",
+        symbol=request.symbol,
+        symbol_id=request.symbol_id,
+    )
+
+
+def _static_peg_from_input(value: object) -> orders_pb2.StaticPeg | None:
+    """Encode an :class:`OrderPeg` or a ``{"reference", "offset_ticks"}`` dict.
+
+    ``offset_ticks`` is a signed count of the pair's price increments (its
+    tick size), sent as given.
+    """
+    if value is None:
+        return None
+    if isinstance(value, OrderPeg):
+        reference: object = value.reference
+        offset: object = value.offset_ticks
+    elif isinstance(value, Mapping):
+        _reject_unknown_keys(dict(value), _PEG_KEYS, field_name="peg")
+        if "reference" not in value:
+            raise PolyesterValidationError("peg requires reference ('best_bid' or 'best_ask')")
+        reference = value["reference"]
+        offset = _mapping_get(dict(value), "offset_ticks", "offsetTicks")
+        if offset is None:
+            offset = 0
+    else:
+        raise PolyesterValidationError("peg must be an OrderPeg or a dict")
+    key = reference.strip().lower() if isinstance(reference, str) else ""
+    if key not in PEG_REFERENCE_TO_PROTO:
+        raise PolyesterValidationError(
+            f"peg reference must be 'best_bid' or 'best_ask' (got {reference!r})"
+        )
+    if isinstance(offset, bool) or not isinstance(offset, int):
+        raise PolyesterValidationError("peg offset_ticks must be an integer")
+    if not _INT64_MIN <= offset <= _INT64_MAX:
+        raise PolyesterValidationError("peg offset_ticks is outside int64 range")
+    return orders_pb2.StaticPeg(
+        reference=getattr(orders_pb2, PEG_REFERENCE_TO_PROTO[key]), offset_ticks=offset
+    )
 
 
 def create_order_to_proto(
@@ -1358,24 +1462,27 @@ def resolve_quantity_scale(
 def resolve_quote_quantity_scale(
     catalogs: CatalogManager | None,
     symbol: str | None,
-    value: object | None,
-    *,
+    *values: object | None,
     symbol_id: int | None = None,
 ) -> int:
-    """Resolve and validate the catalog scale for a quote-debit budget."""
-    if value is None:
+    """Resolve and validate the catalog scale for quote sizing (a BUY's
+    ``max_quote_debit`` or a SELL's ``quote_proceeds``); 0 when none is set."""
+    present = [value for value in values if value is not None]
+    if not present:
         return 0
     catalog_scale = quote_quantity_scale_for_symbol(catalogs, symbol, symbol_id=symbol_id)
-    if isinstance(value, Quantity):
-        if value.scale is None:
-            raise PolyesterValidationError(
-                "quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal"
-            )
-        if value.scale != catalog_scale:
-            raise PolyesterValidationError(
-                f"quantity scale mismatch: value scale is {value.scale}, "
-                f"destination is {catalog_scale}"
-            )
+    for value in present:
+        if isinstance(value, Quantity):
+            if value.scale is None:
+                raise PolyesterValidationError(
+                    "quote amount scale is required; "
+                    "use Quantity.from_quote_scaled/from_quote_decimal"
+                )
+            if value.scale != catalog_scale:
+                raise PolyesterValidationError(
+                    f"quantity scale mismatch: value scale is {value.scale}, "
+                    f"destination is {catalog_scale}"
+                )
     return catalog_scale
 
 

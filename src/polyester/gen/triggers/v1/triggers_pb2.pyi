@@ -89,7 +89,7 @@ class TriggerFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRIGGER_FAILURE_REASON_MIN_QUANTITY: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_STEP_SIZE: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_INVALID_SIZING: _ClassVar[TriggerFailureReason]
-    TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL: _ClassVar[TriggerFailureReason]
+    TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE: _ClassVar[TriggerFailureReason]
     TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID: _ClassVar[TriggerFailureReason]
@@ -228,7 +228,7 @@ TRIGGER_FAILURE_REASON_STALE_QUOTE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_MIN_QUANTITY: TriggerFailureReason
 TRIGGER_FAILURE_REASON_STEP_SIZE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_INVALID_SIZING: TriggerFailureReason
-TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL: TriggerFailureReason
+TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL: TriggerFailureReason
 TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED: TriggerFailureReason
 TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE: TriggerFailureReason
 TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID: TriggerFailureReason
@@ -464,6 +464,78 @@ class CreateTriggerResponse(_message.Message):
     accepted_at_ts_ns: int
     def __init__(self, trigger_id: _Optional[int] = ..., client_trigger_id: _Optional[str] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ...) -> None: ...
 
+class OcoLeg(_message.Message):
+    __slots__ = ("trigger_price_ticks", "child", "trigger_price_source")
+    TRIGGER_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    CHILD_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
+    trigger_price_ticks: int
+    child: _orders_pb2.RiskExecution
+    trigger_price_source: _orders_pb2.TriggerPriceSource
+    def __init__(self, trigger_price_ticks: _Optional[int] = ..., child: _Optional[_Union[_orders_pb2.RiskExecution, _Mapping]] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ...) -> None: ...
+
+class OcoIntent(_message.Message):
+    __slots__ = ("symbol_id", "side", "qty_scaled", "self_trade_prevention_mode", "client_list_id", "take_profit", "stop_loss")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    SELF_TRADE_PREVENTION_MODE_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    TAKE_PROFIT_FIELD_NUMBER: _ClassVar[int]
+    STOP_LOSS_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: int
+    side: _orders_pb2.Side
+    qty_scaled: int
+    self_trade_prevention_mode: _orders_pb2.SelfTradePreventionMode
+    client_list_id: str
+    take_profit: OcoLeg
+    stop_loss: OcoLeg
+    def __init__(self, symbol_id: _Optional[int] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., qty_scaled: _Optional[int] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., client_list_id: _Optional[str] = ..., take_profit: _Optional[_Union[OcoLeg, _Mapping]] = ..., stop_loss: _Optional[_Union[OcoLeg, _Mapping]] = ...) -> None: ...
+
+class CreateOcoRequest(_message.Message):
+    __slots__ = ("subaccount_id", "oco")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    OCO_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    oco: OcoIntent
+    def __init__(self, subaccount_id: _Optional[int] = ..., oco: _Optional[_Union[OcoIntent, _Mapping]] = ...) -> None: ...
+
+class CreateOcoResponse(_message.Message):
+    __slots__ = ("order_list_id", "client_list_id", "take_profit_trigger_id", "stop_loss_trigger_id", "accepted_at", "accepted_at_ts_ns")
+    ORDER_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    TAKE_PROFIT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
+    STOP_LOSS_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    order_list_id: int
+    client_list_id: str
+    take_profit_trigger_id: int
+    stop_loss_trigger_id: int
+    accepted_at: _timestamp_pb2.Timestamp
+    accepted_at_ts_ns: int
+    def __init__(self, order_list_id: _Optional[int] = ..., client_list_id: _Optional[str] = ..., take_profit_trigger_id: _Optional[int] = ..., stop_loss_trigger_id: _Optional[int] = ..., accepted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., accepted_at_ts_ns: _Optional[int] = ...) -> None: ...
+
+class CancelOcoRequest(_message.Message):
+    __slots__ = ("order_list_id", "subaccount_id")
+    ORDER_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    order_list_id: int
+    subaccount_id: int
+    def __init__(self, order_list_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ...) -> None: ...
+
+class CancelOcoResponse(_message.Message):
+    __slots__ = ("order_list_id", "status", "ts", "ts_ns")
+    ORDER_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    TS_FIELD_NUMBER: _ClassVar[int]
+    TS_NS_FIELD_NUMBER: _ClassVar[int]
+    order_list_id: int
+    status: TriggerStatus
+    ts: _timestamp_pb2.Timestamp
+    ts_ns: int
+    def __init__(self, order_list_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+
 class GetTriggerRequest(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -479,12 +551,14 @@ class GetTriggerResponse(_message.Message):
     def __init__(self, trigger: _Optional[_Union[Trigger, _Mapping]] = ...) -> None: ...
 
 class ListTriggersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "status", "trigger_type", "parent_order_id", "limit", "page_token")
+    __slots__ = ("subaccount_id", "symbol_id", "status", "trigger_type", "parent_order_id", "order_list_id", "client_list_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     TRIGGER_TYPE_FIELD_NUMBER: _ClassVar[int]
     PARENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    ORDER_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_LIST_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
@@ -492,9 +566,11 @@ class ListTriggersRequest(_message.Message):
     status: _containers.RepeatedScalarFieldContainer[TriggerStatus]
     trigger_type: TriggerType
     parent_order_id: int
+    order_list_id: int
+    client_list_id: str
     limit: int
     page_token: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Iterable[_Union[TriggerStatus, str]]] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., parent_order_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Iterable[_Union[TriggerStatus, str]]] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., parent_order_id: _Optional[int] = ..., order_list_id: _Optional[int] = ..., client_list_id: _Optional[str] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListTriggersResponse(_message.Message):
     __slots__ = ("triggers", "next_page_token")
@@ -579,6 +655,50 @@ class CancelTriggerResponse(_message.Message):
     ts: _timestamp_pb2.Timestamp
     ts_ns: int
     def __init__(self, trigger_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+
+class BatchCancelTriggersRequest(_message.Message):
+    __slots__ = ("subaccount_id", "request_id", "trigger_ids")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_IDS_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    request_id: str
+    trigger_ids: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, subaccount_id: _Optional[int] = ..., request_id: _Optional[str] = ..., trigger_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class BatchCancelTriggersResultItem(_message.Message):
+    __slots__ = ("status", "trigger_id", "code", "error")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATUS_UNSPECIFIED: _ClassVar[BatchCancelTriggersResultItem.Status]
+        ACCEPTED: _ClassVar[BatchCancelTriggersResultItem.Status]
+        REJECTED: _ClassVar[BatchCancelTriggersResultItem.Status]
+    STATUS_UNSPECIFIED: BatchCancelTriggersResultItem.Status
+    ACCEPTED: BatchCancelTriggersResultItem.Status
+    REJECTED: BatchCancelTriggersResultItem.Status
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    status: BatchCancelTriggersResultItem.Status
+    trigger_id: int
+    code: str
+    error: _orders_pb2.ErrorDetail
+    def __init__(self, status: _Optional[_Union[BatchCancelTriggersResultItem.Status, str]] = ..., trigger_id: _Optional[int] = ..., code: _Optional[str] = ..., error: _Optional[_Union[_orders_pb2.ErrorDetail, _Mapping]] = ...) -> None: ...
+
+class BatchCancelTriggersResponse(_message.Message):
+    __slots__ = ("results", "accepted_count", "rejected_count", "ts", "ts_ns")
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    REJECTED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    TS_FIELD_NUMBER: _ClassVar[int]
+    TS_NS_FIELD_NUMBER: _ClassVar[int]
+    results: _containers.RepeatedCompositeFieldContainer[BatchCancelTriggersResultItem]
+    accepted_count: int
+    rejected_count: int
+    ts: _timestamp_pb2.Timestamp
+    ts_ns: int
+    def __init__(self, results: _Optional[_Iterable[_Union[BatchCancelTriggersResultItem, _Mapping]]] = ..., accepted_count: _Optional[int] = ..., rejected_count: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class ModifyTriggerRequest(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_price_ticks", "limit_price_ticks", "trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps")
@@ -723,12 +843,13 @@ class LadderDetails(_message.Message):
     def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ..., executed_qty_scaled: _Optional[int] = ..., executed_levels: _Optional[int] = ...) -> None: ...
 
 class Trigger(_message.Message):
-    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "status", "parent_order_id", "cancel_reason", "failure_reason", "qty_scaled", "fee_asset", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "created_at", "updated_at", "armed_at", "completed_at", "version")
+    __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "status", "parent_order_id", "order_list_id", "cancel_reason", "failure_reason", "qty_scaled", "fee_asset", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "client_list_id", "created_at", "updated_at", "armed_at", "completed_at", "version")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     PARENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    ORDER_LIST_ID_FIELD_NUMBER: _ClassVar[int]
     CANCEL_REASON_FIELD_NUMBER: _ClassVar[int]
     FAILURE_REASON_FIELD_NUMBER: _ClassVar[int]
     QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -744,6 +865,7 @@ class Trigger(_message.Message):
     TWAP_STATE_FIELD_NUMBER: _ClassVar[int]
     LADDER_STATE_FIELD_NUMBER: _ClassVar[int]
     CLIENT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_LIST_ID_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     ARMED_AT_FIELD_NUMBER: _ClassVar[int]
@@ -754,6 +876,7 @@ class Trigger(_message.Message):
     symbol_id: int
     status: TriggerStatus
     parent_order_id: int
+    order_list_id: int
     cancel_reason: TriggerCancelReason
     failure_reason: TriggerFailureReason
     qty_scaled: int
@@ -769,9 +892,10 @@ class Trigger(_message.Message):
     twap_state: TwapDetails
     ladder_state: LadderDetails
     client_trigger_id: str
+    client_list_id: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     armed_at: _timestamp_pb2.Timestamp
     completed_at: _timestamp_pb2.Timestamp
     version: int
-    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., parent_order_id: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ..., qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., stop_loss: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., take_profit: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopTrigger, _Mapping]] = ..., twap: _Optional[_Union[TwapTrigger, _Mapping]] = ..., ladder: _Optional[_Union[LadderTrigger, _Mapping]] = ..., stop: _Optional[_Union[StopDetails, _Mapping]] = ..., trailing: _Optional[_Union[TrailingDetails, _Mapping]] = ..., twap_state: _Optional[_Union[TwapDetails, _Mapping]] = ..., ladder_state: _Optional[_Union[LadderDetails, _Mapping]] = ..., client_trigger_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., armed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., version: _Optional[int] = ...) -> None: ...
+    def __init__(self, trigger_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Union[TriggerStatus, str]] = ..., parent_order_id: _Optional[int] = ..., order_list_id: _Optional[int] = ..., cancel_reason: _Optional[_Union[TriggerCancelReason, str]] = ..., failure_reason: _Optional[_Union[TriggerFailureReason, str]] = ..., qty_scaled: _Optional[int] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., stop_loss: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., take_profit: _Optional[_Union[ConditionalTrigger, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopTrigger, _Mapping]] = ..., twap: _Optional[_Union[TwapTrigger, _Mapping]] = ..., ladder: _Optional[_Union[LadderTrigger, _Mapping]] = ..., stop: _Optional[_Union[StopDetails, _Mapping]] = ..., trailing: _Optional[_Union[TrailingDetails, _Mapping]] = ..., twap_state: _Optional[_Union[TwapDetails, _Mapping]] = ..., ladder_state: _Optional[_Union[LadderDetails, _Mapping]] = ..., client_trigger_id: _Optional[str] = ..., client_list_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., armed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., version: _Optional[int] = ...) -> None: ...

@@ -17,6 +17,7 @@ import pytest
 
 from polyester import AsyncPolyester
 from polyester.codecs.address_book import create_entry_to_proto
+from polyester.codecs.oco import create_oco_to_proto
 from polyester.codecs.orders import (
     batch_cancel_orders_to_proto,
     batch_create_orders_to_proto,
@@ -29,7 +30,11 @@ from polyester.codecs.orders import (
     preview_order_to_proto,
 )
 from polyester.codecs.scalars import format_id
-from polyester.codecs.triggers import create_trigger_to_proto, modify_trigger_to_proto
+from polyester.codecs.triggers import (
+    batch_cancel_triggers_to_proto,
+    create_trigger_to_proto,
+    modify_trigger_to_proto,
+)
 from polyester.errors import PolyesterRouteNotFoundError, PolyesterValidationError
 from polyester.models import CreateOrderRequest, OrderId
 from polyester.services._scope import resolve_account_id
@@ -139,6 +144,16 @@ SCOPED_CALLS: dict[str, Call] = {
         trigger_id=TRIGGER, trigger_price="49000", **s
     ),
     "triggers.list_events": lambda c, s: c.triggers.list_events(trigger_id=TRIGGER, **s),
+    "triggers.create_oco": lambda c, s: c.triggers.create_oco(
+        symbol="BTC-USDT",
+        side="sell",
+        qty="0.1",
+        take_profit={"trigger_price": "51000"},
+        stop_loss={"trigger_price": "49000"},
+        **s,
+    ),
+    "triggers.cancel_oco": lambda c, s: c.triggers.cancel_oco(order_list_id=TRIGGER, **s),
+    "triggers.batch_cancel": lambda c, s: c.triggers.batch_cancel(trigger_ids=[TRIGGER], **s),
     "trades.list": lambda c, s: c.trades.list(**s),
     "transfers.list": lambda c, s: c.transfers.list(**s),
     "api_keys.list": lambda c, s: c.api_keys.list(**s),
@@ -258,6 +273,19 @@ CODECS: dict[str, Callable[[Any], Any]] = {
     ),
     "modify_trigger_to_proto": lambda sub: modify_trigger_to_proto(
         trigger_id=TRIGGER, symbol_id=1, sub_account_id=sub, trigger_price="49000"
+    ),
+    "create_oco_to_proto": lambda sub: create_oco_to_proto(
+        symbol="BTC-USDT",
+        symbol_id=1,
+        side="sell",
+        qty="0.1",
+        take_profit={"trigger_price": "51000"},
+        stop_loss={"trigger_price": "49000"},
+        quantity_scale=8,
+        sub_account_id=sub,
+    ),
+    "batch_cancel_triggers_to_proto": lambda sub: batch_cancel_triggers_to_proto(
+        trigger_ids=[TRIGGER], sub_account_id=sub
     ),
 }
 

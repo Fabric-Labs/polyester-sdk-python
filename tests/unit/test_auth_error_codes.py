@@ -206,7 +206,7 @@ async def test_rest_withdraw_policy_refusal_keeps_the_problem_detail(
 
     assert isinstance(error, PolyesterAuthError)
     assert str(error) == message
-    assert error.code == "PERMISSION_DENIED"
+    assert error.code == "ERROR_CODE_PERMISSION_DENIED"
     assert error.status_code == 403
 
 

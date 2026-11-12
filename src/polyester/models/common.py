@@ -5,7 +5,7 @@ from typing import Any, Required, TypedDict
 
 import msgspec
 
-from polyester.models.trading import Order, OrderMutationResult, OrdersList
+from polyester.models.trading import Order, OrderMutationResult, OrderPeg, OrdersList
 from polyester.types.money import Price, Quantity
 
 # Backward-compatible aliases for early alpha imports.
@@ -46,12 +46,38 @@ class ApiData(msgspec.Struct, kw_only=True, omit_defaults=True):
     raw: dict[str, Any]
 
 
+class PriceBand(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """How far from the market a pair's orders may be priced or trade.
+
+    The band's reference price R follows the pair's last trade, updated at
+    most once per ``reference_window_ms`` (zero moves it with every order),
+    and moves to the pair's index price when the two diverge by more than the
+    band; the last trade price is a close estimate of R. The lower limit is
+    ``ceil(R * (1 - lower_bps / 10000) / tick) * tick`` and the upper limit
+    ``floor(R * (1 + upper_bps / 10000) / tick) * tick``, with ``tick`` the
+    pair's tick size (1 bp = 0.01%).
+
+    A limit buy priced above the upper limit, or a limit sell priced below the
+    lower limit, is refused ``PRICE_BAND_VIOLATION``. A market order, or
+    another order whose price the exchange sets, trades only up to the limit,
+    and its unfilled remainder is canceled with cancel reason ``PRICE_BAND``.
+    A resting order is never canceled by the band, and a limit order priced
+    away from the market on the passive side is accepted.
+    """
+
+    lower_bps: int = 0
+    upper_bps: int = 0
+    reference_window_ms: int = 0
+
+
 class PairOrderLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Per-order and open-order limits of one spot pair.
 
     The decimal maxima are ``None`` when the pair has no maximum.
     ``max_open_orders_per_pair`` is the venue default for a typical account
     (``0`` when unpublished); an account may have a lower limit of its own.
+    ``price_band`` is the pair's :class:`PriceBand`, ``None`` when the pair
+    has none.
     """
 
     symbol: str
@@ -70,6 +96,7 @@ class PairOrderLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
     max_market_notional_quote: str | None = None
     # Default resting-order (GTC and GTD) limit on this pair.
     max_open_orders_per_pair: int = 0
+    price_band: PriceBand | None = None
 
 
 class SpotAssetConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -115,6 +142,11 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     # Typed Quantity values must use QuantityDomain.ORDER_QUOTE and embed that
     # same catalog scale (Quantity.from_quote_scaled / from_quote_decimal).
     max_quote_debit: Any | None = None
+    # SELL market-IOC and limit-IOC orders may instead specify a quote
+    # proceeds target: the order sells until its proceeds before fees reach
+    # it, never more. Same accepted types and quote scale as max_quote_debit.
+    # Set exactly one of qty, max_quote_debit and quote_proceeds.
+    quote_proceeds: Any | None = None
     price: Any | None = None
     # A public ID string, or the numeric ID as an int; 0 is refused.
     sub_account_id: str | int | None = None
@@ -135,10 +167,20 @@ class CreateOrderRequest(msgspec.Struct, kw_only=True, omit_defaults=True):
     # pair defaults. Rejected on limit orders. ``max_slippage_bps`` is 1–10000.
     max_slippage_ticks: int | None = None
     max_slippage_bps: int | None = None
-    # ``expire_taker``, ``expire_maker`` or ``expire_both``; omitted keeps the
-    # server default. The order's attached take-profit, stop-loss and trailing
-    # stop exits use the same mode: they have none of their own.
+    # ``expire_taker``, ``expire_maker``, ``expire_both`` or ``decrement``;
+    # omitted keeps the server default. The order's attached take-profit,
+    # stop-loss and trailing stop exits use the same mode: they have none of
+    # their own.
     self_trade_prevention_mode: str | None = None
+    # Iceberg display quantity of a limit GTC or GTD order, in base units
+    # (same accepted types and base scale as qty): the order book shows at
+    # most this much of the order at a time. Positive; omit for a plain order.
+    display_qty: Any | None = None
+    # Static entry peg of a limit order: an OrderPeg or a dict with
+    # ``reference`` and ``offset_ticks``. The order still needs its price
+    # (a BUY's cap, a SELL's floor). Not with market orders, quote sizing or
+    # attached_risk.
+    peg: Any | None = None
 
 
 class CreateOrderItem(TypedDict, total=False):
@@ -154,6 +196,7 @@ class CreateOrderItem(TypedDict, total=False):
     tif: str | None
     qty: Any | None
     max_quote_debit: Any | None
+    quote_proceeds: Any | None
     price: Any | None
     client_order_id: str | None
     post_only: bool
@@ -164,6 +207,8 @@ class CreateOrderItem(TypedDict, total=False):
     max_slippage_ticks: int | None
     max_slippage_bps: int | None
     self_trade_prevention_mode: str | None
+    display_qty: Any | None
+    peg: OrderPeg | dict[str, Any] | None
 
 
 class CreateOrderParams(CreateOrderItem, total=False):
@@ -183,5 +228,6 @@ __all__ = [
     "OrderbookData",
     "OrderbookLevel",
     "PairOrderLimits",
+    "PriceBand",
     "SpotConfig",
 ]

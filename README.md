@@ -425,9 +425,12 @@ detail = await client.orders.get(
 )
 ```
 
-Create sizing is explicit: set exactly one of base `qty` or `max_quote_debit`
-(a hard all-in quote-debit budget). Decimal/str quote budgets use the pair's
-catalog `quote_quantity_scale`. Typed budgets must use
+Create sizing is explicit: set exactly one of base `qty`, `max_quote_debit`
+(a buy's hard all-in quote-debit budget) or `quote_proceeds` (a sell's quote
+proceeds target: "sell 100 USDT worth"). Each quote amount is valid only on a
+market or limit IOC order: `max_quote_debit` on a buy, `quote_proceeds` on a
+sell; anything else raises `PolyesterValidationError` before sending.
+Decimal/str quote amounts use the pair's catalog `quote_quantity_scale`. Typed budgets must use
 `QuantityDomain.ORDER_QUOTE` and embed that scale; construct with
 `Quantity.from_quote_decimal_str` / `from_quote_decimal` / `from_quote_scaled`
 and validate against `client.catalogs.quote_quantity_scale_for_symbol`.
@@ -444,6 +447,59 @@ result = await client.orders.create(
     ),
 )
 ```
+
+A sell sized by `quote_proceeds` sells whole quantity steps until its
+proceeds before fees reach the target, and never receives more; the quote fee
+is charged on those proceeds. It holds the base the target sells at its limit
+price (a market order's maximum slippage price) and is refused
+`INSUFFICIENT_FUNDS` when that base is not free, or `QUOTE_SIZE_TOO_SMALL`
+when the target sells less than the pair's minimums. The create result and
+each accepted batch item echo `submitted_quote_proceeds_scaled` (and
+`submitted_max_quote_debit_scaled` for a buy), and `Order` reads it back;
+`cum_quote()` is then the proceeds received before fees. Attached risk on
+such a sell is refused by the API (`VALIDATION_ERROR`, rule
+`no_attached_risk`).
+
+```python
+result = await client.orders.create(
+    symbol="BTC-USDT", side="sell", order_type="market", quote_proceeds="100"
+)
+print(result.resolved_base_qty, result.submitted_quote_proceeds_scaled)
+```
+
+An iceberg order shows only part of its quantity on the book:
+`display_qty` (base units, the same input types as `qty`) on a limit GTC or
+GTD order. Once the shown part executes, the next part is shown at the same
+price, behind the orders already resting there. A display on a market, IOC or
+FOK order, or one that is not positive, raises `PolyesterValidationError`
+before sending; the API checks the rest (`ICEBERG_DISPLAY_INVALID` at or above
+`qty` or off the quantity step, `ICEBERG_DISPLAY_TOO_SMALL` below the minimum
+quantity or more than 100 parts, `ICEBERG_NOT_ALLOWED` with attached risk).
+`Order.display_qty` reads the display back and `Order.hidden_qty` the part of
+`leaves_qty` the book does not show (the book shows
+`leaves_qty - hidden_qty`); both are zero for a plain order. The display
+cannot be modified; a replace keeps it.
+
+A static entry peg (`peg`) sets a limit order's price once, at entry, from the
+book: a `polyester.models.OrderPeg(reference="best_bid" | "best_ask", offset_ticks=0)` or a
+dict with those keys. `offset_ticks` is a signed count of the pair's tick-size
+increments added to the reference (`-2` is two ticks below it), sent as given;
+it does not count occupied levels. The order still needs its `price`, a buy's
+cap or a sell's floor: a derived price beyond it is refused
+`PEG_LIMIT_VIOLATION`, an empty reference side `PEG_REFERENCE_UNAVAILABLE`.
+A peg on a market order, with quote sizing or with `attached_risk` raises
+`PolyesterValidationError` before sending. The price never follows the book
+afterwards; read the order for the price it got.
+
+```python
+await client.orders.create(
+    symbol="BTC-USDT", side="buy", order_type="limit", qty="1", price="61000",
+    display_qty="0.1", peg=OrderPeg(reference="best_bid", offset_ticks=-1),
+)
+```
+
+`display_qty`, `peg` and `quote_proceeds` work the same on `orders.preview`
+and on every `orders.batch_create` item.
 
 Use `orders.preview(...)` to check current order admissibility and, when
 available, resolved base quantity plus protected price bound before submitting.
@@ -487,11 +543,17 @@ at `order.base_qty_scaled` for the quantity, `ERROR_CODE_PRICE_TICK_SIZE` /
 `tick_size` for the limit price, the attached take-profit and stop-loss
 trigger and limit prices, the attached trailing stop's activation and limit
 prices, and modify's `new_price` (`new_price_ticks`). Other decimals
-(`max_quote_debit`, `market_client_ref_price`) raise it with no `code`.
+(`max_quote_debit`, `quote_proceeds`, `display_qty`, `market_client_ref_price`)
+raise it with no `code`.
 
-`self_trade_prevention_mode` (`expire_taker`, `expire_maker` or
-`expire_both`) sets the order's self-trade prevention on create, preview and
-batch create items; omit it for the server default. The order's attached
+`self_trade_prevention_mode` (`expire_taker`, `expire_maker`, `expire_both`
+or `decrement`) sets the order's self-trade prevention on create, preview and
+batch create items, `triggers.create` and `triggers.create_oco`; omit it for
+the server default. `decrement` trades neither order: both are reduced by the
+quantity that would have traded, and the order left with none is canceled
+with `cancel_reason` `STP_DECREMENT`. A resting order of yours can be reduced
+this way even if you never send `decrement`, when another order of the same
+root account does. The order's attached
 take-profit, stop-loss and trailing stop exits use the same mode: they have
 none of their own. `Order.self_trade_prevention_mode` reads it back (empty
 when unset; a mode newer than this SDK reads as its number), and each leg's
@@ -538,6 +600,14 @@ decimal strings `max_limit_qty_base`, `max_market_qty_base` and
 one market order, valued at a buy's protection price or a sell's reference
 price (`None` means no cap). `client.catalogs.max_open_orders_total` (or
 `SpotConfig.max_open_orders_total`) is the cross-pair resting-order limit.
+`price_band` is the pair's `PriceBand` (`lower_bps`, `upper_bps`,
+`reference_window_ms`), `None` when the pair has none. With R the band's
+reference price (the last trade is a close estimate), the upper limit is
+`floor(R * (1 + upper_bps / 10000) / tick) * tick` and the lower limit
+`ceil(R * (1 - lower_bps / 10000) / tick) * tick`. A limit buy priced above
+the upper limit, or a limit sell below the lower limit, is refused
+`PRICE_BAND_VIOLATION`; a market order trades only up to the band and its rest
+is canceled with `cancel_reason` `PRICE_BAND`.
 `SpotConfig.assets` lists each asset (`SpotAssetConfig`) with
 `included_in_equity`: whether it counts in the account's total equity. Value
 only the assets where it is `True`; list the `False` ones by amount with no
@@ -636,10 +706,13 @@ order's `cancel_reason` is one of `USER_REQUEST`, `IOC_REMAINDER`,
 `REPLACED`, `GTD_EXPIRED`, `QTY_AT_OR_BELOW_FILLED`, `PAIR_DRAIN`,
 `ATTACHED_RISK_REFUSED`, `CANCEL_ALL_AFTER`, `ACCOUNT_REPAIR`,
 `TWAP_ROLLOVER`, `STRATEGY_CANCEL`, `SYSTEM`, `MARKET_HALTED` (the exchange
-halted the market and canceled its open orders) or `ATTACHED_EXIT_FIRED` (its
+halted the market and canceled its open orders), `ATTACHED_EXIT_FIRED` (its
 take-profit, stop-loss or trailing stop fired while it still rested, so its
 unfilled remainder was canceled first; fills before it stand, and it can no
-longer be modified). Both are `None` for every other
+longer be modified), `STP_DECREMENT` (`decrement` self-trade prevention left
+it no quantity), `PRICE_BAND` (the pair's price band stopped it; fills up to
+the band stand) or `CANCEL_ON_DISCONNECT` (the account's trading WebSocket
+connections that opted in to cancel-on-disconnect all closed). Both are `None` for every other
 status. A number this SDK does not know yet reads `UNKNOWN_ERROR_CODE(n)` or
 `UNKNOWN_CANCEL_REASON(n)`; treat it as a generic refusal or end.
 
@@ -649,7 +722,8 @@ if order is not None and order.reject_reason == "POST_ONLY_CROSS":
     ...  # reprice and resend
 ```
 
-A buy sized by a quote amount (`max_quote_debit`) that spends its amount ends
+A buy sized by a quote amount (`max_quote_debit`) that spends its amount, or a
+sell sized by `quote_proceeds` that receives its target, ends
 `filled`, with nothing remaining; `MARKET_REMAINDER` and `IOC_REMAINDER` mean
 the book, its price limit or the market's maximum quantity stopped it first.
 
@@ -902,7 +976,11 @@ the part before the first `-`, the release it follows.
 `client.alerts` manages durable price alerts. Available on devnet; not yet
 routed on testnet. Alerts belong to the main account: a session or an API key
 of the main account manages them, and a key scoped to a sub-account is refused
-with `PolyesterAuthError` (`code` `SUBACCOUNT_KEY_REFUSED`, HTTP 403).
+with `PolyesterAuthError` (`code` `SUBACCOUNT_KEY_REFUSED`, HTTP 403). An API
+key also needs its policy to grant `READ_PRICE_ALERTS` to list alerts and
+`MANAGE_PRICE_ALERTS` to create, update or cancel them; without it the call
+raises `PolyesterApiError` whose `auth_error_code(err)` is
+`AUTH_API_KEY_ACCESS_DENIED` (`permission_denied`), not retryable.
 
 - `create(symbol=, direction=, price=, channels=, price_source=None,
   idempotency_key=None)`: `direction` `"above"` fires at a price >= `price`,
@@ -1175,6 +1253,22 @@ with `MAX_SLIPPAGE_INVALID`. Trailing distance in bps is 1–10000; trigger modi
 accepts `0` to clear. A child's limit price is fixed at create, so `modify`
 takes no `limit_price`: cancel the trigger and create a new one instead.
 
+A cancel, pause, resume or modify of a trigger that has ended (completed,
+canceled or failed) raises `PolyesterApiError`
+`ERROR_CODE_TRIGGER_STATUS_INVALID` (HTTP 400) for at least 60 seconds after
+it ended, a repeat of a cancel that succeeded included;
+`is_trigger_already_ended(err)` tells it apart. Treat it as "already done"
+and read the trigger for how it ended. After that window the server may
+answer `ERROR_CODE_TRIGGER_NOT_FOUND`, which also names an ID that is none of
+the account's triggers: treat it as ended only for a trigger you know you
+created. An ended ladder or TWAP answers the same; a running one still
+answers `ERROR_CODE_TRIGGER_NOT_MODIFIABLE` to anything but a cancel.
+
+Trigger IDs are opaque, per-account values: use one only as the API gave it,
+for the account that owns it, and derive nothing from it. IDs and page tokens
+issued before the public trigger IDs change are refused; list the triggers
+again for their current IDs.
+
 `triggers.modify(...)` and `triggers.resume(...)` do not need a symbol: without
 `symbol` / `symbol_id` they target the trigger's own market. When given, it
 must be that market, and an API key limited to specific markets must give it.
@@ -1216,7 +1310,12 @@ market's minimum, and the trigger fires again once the position changes;
 `rate_limited` or `account_repairing` (an automatic account repair) fires
 again shortly. `fire_refused` is not terminal: the trigger stays `armed` or
 `running`. A refusal that ends the trigger is a `failed` event with
-`failure_reason`. `is_terminal_trigger_event(event_type)` is true only for
+`failure_reason`. A ladder level that the book rejects when it arrives (a
+post-only level that would cross, for example) reads as its `fired` event
+followed by `fire_refused` with the same `child_seq`, its reason and the
+level's price, while the ladder keeps working its other levels: that level was
+not placed, so do not count it. A ladder fails only when every level was
+rejected. `is_terminal_trigger_event(event_type)` is true only for
 `canceled` and `failed`; read the trigger's `status` rather than inferring it
 from its last event. `list_events(event_type="fire_refused")` filters them.
 
@@ -2006,6 +2105,18 @@ A refused call's server message reaches the caller unchanged. An API key whose
 policy lacks the action a withdraw or auto-withdraw read checks raises
 `PolyesterAuthError` with, for example, "api key policy does not allow
 READ_AUTO_WITHDRAW": grant that action in the key's policy.
+
+An order refused for permissions raises `PolyesterAuthError` (HTTP 403, not
+retryable) with the same `ERROR_CODE_` code over ConnectRPC and REST:
+`ERROR_CODE_POLICY_SPOT_TRADE_DENY` when the sub-account's policy lacks spot
+trading (a sub-account without a policy is read-only),
+`ERROR_CODE_API_KEY_SPOT_TRADE_DENY` when the API key's policy lacks it (the
+key is named first when both lack it), `ERROR_CODE_API_KEY_POLICY_REQUIRED`
+for a key with no policy, `ERROR_CODE_POLICY_MARKET_DENY` when the
+sub-account's policy excludes the market and `ERROR_CODE_API_KEY_MARKET_DENY`
+when the key's market list does, a main-account key's included. Every order
+code an HTTP 403 or 401 REST problem carries reads with its `ERROR_CODE_`
+prefix, as the ConnectRPC detail names it.
 
 Other withdrawal refusals raise `PolyesterWithdrawError`, a `PolyesterApiError`
 whose `code` is the `chain.withdraw.v1.ErrorCode` name. `field_path` names the

@@ -83,9 +83,17 @@ class AsyncAlertsService(BaseService):
     (root) account: a session or an API key of the main account manages them,
     and an API key scoped to a sub-account is refused with
     :class:`~polyester.errors.PolyesterAuthError` (``SUBACCOUNT_KEY_REFUSED``,
-    HTTP 403). The exchange evaluates them, so they survive restarts; an alert
-    fires once, when the watched price crosses its price, and is delivered to
-    the in-app inbox and/or the account's linked Telegram account.
+    HTTP 403). An API key also needs its policy to grant the call's
+    permission: ``READ_PRICE_ALERTS`` to list alerts, ``MANAGE_PRICE_ALERTS``
+    to create, update or cancel them (``read_price_alerts`` and
+    ``manage_price_alerts`` in ``ApiPolicy.actions``). Without it the call is
+    refused ``permission_denied`` with ``AUTH_API_KEY_ACCESS_DENIED``, raised
+    as :class:`~polyester.errors.PolyesterApiError` whose
+    :func:`~polyester.errors.auth_error_code` is ``AUTH_API_KEY_ACCESS_DENIED``;
+    it is not retryable. The exchange evaluates alerts, so they survive
+    restarts; an alert fires once, when the watched price crosses its price,
+    and is delivered to the in-app inbox and/or the account's linked Telegram
+    account.
 
     Prices are quote units: a decimal string, a ``Decimal`` or a
     :class:`~polyester.types.money.Price`. Refusals carry the

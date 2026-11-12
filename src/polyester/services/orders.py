@@ -324,10 +324,18 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             label="orders.create",
         )
         quantity_scale = resolve_quantity_scale(
-            self._catalogs, normalized.symbol, normalized.qty, symbol_id=symbol_id
+            self._catalogs,
+            normalized.symbol,
+            normalized.qty,
+            normalized.display_qty,
+            symbol_id=symbol_id,
         )
         quote_quantity_scale = resolve_quote_quantity_scale(
-            self._catalogs, normalized.symbol, normalized.max_quote_debit, symbol_id=symbol_id
+            self._catalogs,
+            normalized.symbol,
+            normalized.max_quote_debit,
+            normalized.quote_proceeds,
+            symbol_id=symbol_id,
         )
         normalized = msgspec.structs.replace(
             normalized, symbol_id=symbol_id, symbol=canonical_symbol
@@ -394,7 +402,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 )
         scale_symbol = self._catalogs.symbol_for_symbol_id(symbol_id)
         quote_quantity_scale = resolve_quote_quantity_scale(
-            self._catalogs, scale_symbol, normalized.max_quote_debit
+            self._catalogs, scale_symbol, normalized.max_quote_debit, normalized.quote_proceeds
         )
         normalized = msgspec.structs.replace(
             normalized, symbol_id=symbol_id, symbol=canonical_symbol
@@ -576,8 +584,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         An error while listing the triggers is raised before anything is
         canceled. A trigger whose cancel fails, for any reason, is recorded in
         ``trigger_failures`` with its error; the other triggers are still
-        canceled and the cancel-all still runs. An error from the cancel-all
-        itself is raised.
+        canceled and the cancel-all still runs. A trigger that ended between
+        the listing and its cancel fails with an error for which
+        :func:`~polyester.errors.is_trigger_already_ended` is true: it is done
+        already. An error from the cancel-all itself is raised.
         """
         if self._triggers is None:
             raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
@@ -842,12 +852,17 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             item_scales.append(
                 (
                     resolve_quantity_scale(
-                        self._catalogs, normalized.symbol, normalized.qty, symbol_id=symbol_id
+                        self._catalogs,
+                        normalized.symbol,
+                        normalized.qty,
+                        normalized.display_qty,
+                        symbol_id=symbol_id,
                     ),
                     resolve_quote_quantity_scale(
                         self._catalogs,
                         normalized.symbol,
                         normalized.max_quote_debit,
+                        normalized.quote_proceeds,
                         symbol_id=symbol_id,
                     ),
                 )

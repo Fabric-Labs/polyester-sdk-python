@@ -46,6 +46,9 @@ class CancelReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CANCEL_REASON_SYSTEM: _ClassVar[CancelReason]
     CANCEL_REASON_MARKET_HALTED: _ClassVar[CancelReason]
     CANCEL_REASON_ATTACHED_EXIT_FIRED: _ClassVar[CancelReason]
+    CANCEL_REASON_STP_DECREMENT: _ClassVar[CancelReason]
+    CANCEL_REASON_PRICE_BAND: _ClassVar[CancelReason]
+    CANCEL_REASON_CANCEL_ON_DISCONNECT: _ClassVar[CancelReason]
 
 class BatchReplacePhase(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -97,6 +100,9 @@ CANCEL_REASON_STRATEGY_CANCEL: CancelReason
 CANCEL_REASON_SYSTEM: CancelReason
 CANCEL_REASON_MARKET_HALTED: CancelReason
 CANCEL_REASON_ATTACHED_EXIT_FIRED: CancelReason
+CANCEL_REASON_STP_DECREMENT: CancelReason
+CANCEL_REASON_PRICE_BAND: CancelReason
+CANCEL_REASON_CANCEL_ON_DISCONNECT: CancelReason
 BATCH_REPLACE_PHASE_UNSPECIFIED: BatchReplacePhase
 BATCH_REPLACE_PHASE_ADMITTED: BatchReplacePhase
 BATCH_REPLACE_PHASE_WORKING: BatchReplacePhase
@@ -217,7 +223,7 @@ class OrderFeeTotal(_message.Message):
     def __init__(self, amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_rebate: _Optional[bool] = ..., qty_scaled: _Optional[int] = ...) -> None: ...
 
 class Order(_message.Message):
-    __slots__ = ("order_id", "symbol_id", "client_order_id", "side", "status", "order_type", "time_in_force", "self_trade_prevention_mode", "fee_asset", "post_only", "orig_qty_scaled", "cum_qty_scaled", "inherited_cum_qty_scaled", "leaves_qty_scaled", "avg_price_ticks", "avg_price_e18", "cum_notional", "fee_total", "price_ticks", "created_ts_ns", "terminal_ts_ns", "reject_reason", "cancel_reason", "attached_risk", "origin", "market_client_ref_price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "version", "batch_request_id", "submitted_max_quote_debit_scaled", "lineage", "expire_at")
+    __slots__ = ("order_id", "symbol_id", "client_order_id", "side", "status", "order_type", "time_in_force", "self_trade_prevention_mode", "fee_asset", "post_only", "orig_qty_scaled", "cum_qty_scaled", "inherited_cum_qty_scaled", "leaves_qty_scaled", "display_qty_scaled", "hidden_qty_scaled", "avg_price_ticks", "avg_price_e18", "cum_notional", "fee_total", "price_ticks", "created_ts_ns", "terminal_ts_ns", "reject_reason", "cancel_reason", "attached_risk", "origin", "market_client_ref_price_ticks", "market_max_slippage_ticks", "market_max_slippage_bps", "version", "batch_request_id", "submitted_max_quote_debit_scaled", "submitted_quote_proceeds_scaled", "lineage", "expire_at")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -232,6 +238,8 @@ class Order(_message.Message):
     CUM_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     INHERITED_CUM_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     LEAVES_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    DISPLAY_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
+    HIDDEN_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     AVG_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     AVG_PRICE_E18_FIELD_NUMBER: _ClassVar[int]
     CUM_NOTIONAL_FIELD_NUMBER: _ClassVar[int]
@@ -249,6 +257,7 @@ class Order(_message.Message):
     VERSION_FIELD_NUMBER: _ClassVar[int]
     BATCH_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     SUBMITTED_MAX_QUOTE_DEBIT_SCALED_FIELD_NUMBER: _ClassVar[int]
+    SUBMITTED_QUOTE_PROCEEDS_SCALED_FIELD_NUMBER: _ClassVar[int]
     LINEAGE_FIELD_NUMBER: _ClassVar[int]
     EXPIRE_AT_FIELD_NUMBER: _ClassVar[int]
     order_id: int
@@ -265,6 +274,8 @@ class Order(_message.Message):
     cum_qty_scaled: int
     inherited_cum_qty_scaled: int
     leaves_qty_scaled: int
+    display_qty_scaled: int
+    hidden_qty_scaled: int
     avg_price_ticks: int
     avg_price_e18: _u128_pb2.U128
     cum_notional: _u128_pb2.U128
@@ -282,9 +293,10 @@ class Order(_message.Message):
     version: int
     batch_request_id: int
     submitted_max_quote_debit_scaled: int
+    submitted_quote_proceeds_scaled: int
     lineage: OrderLineage
     expire_at: _timestamp_pb2.Timestamp
-    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., inherited_cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., avg_price_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., cum_notional: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_total: _Optional[_Union[OrderFeeTotal, _Mapping]] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., reject_reason: _Optional[_Union[_orders_pb2.ErrorCode, str]] = ..., cancel_reason: _Optional[_Union[CancelReason, str]] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ..., batch_request_id: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ..., lineage: _Optional[_Union[OrderLineage, _Mapping]] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., client_order_id: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., status: _Optional[_Union[OrderStatus, str]] = ..., order_type: _Optional[_Union[_orders_pb2.OrderType, str]] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., self_trade_prevention_mode: _Optional[_Union[_orders_pb2.SelfTradePreventionMode, str]] = ..., fee_asset: _Optional[_Union[_orders_pb2.FeeAsset, str]] = ..., post_only: _Optional[bool] = ..., orig_qty_scaled: _Optional[int] = ..., cum_qty_scaled: _Optional[int] = ..., inherited_cum_qty_scaled: _Optional[int] = ..., leaves_qty_scaled: _Optional[int] = ..., display_qty_scaled: _Optional[int] = ..., hidden_qty_scaled: _Optional[int] = ..., avg_price_ticks: _Optional[int] = ..., avg_price_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., cum_notional: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_total: _Optional[_Union[OrderFeeTotal, _Mapping]] = ..., price_ticks: _Optional[int] = ..., created_ts_ns: _Optional[int] = ..., terminal_ts_ns: _Optional[int] = ..., reject_reason: _Optional[_Union[_orders_pb2.ErrorCode, str]] = ..., cancel_reason: _Optional[_Union[CancelReason, str]] = ..., attached_risk: _Optional[_Union[AttachedRisk, _Mapping]] = ..., origin: _Optional[_Union[OrderOrigin, _Mapping]] = ..., market_client_ref_price_ticks: _Optional[int] = ..., market_max_slippage_ticks: _Optional[int] = ..., market_max_slippage_bps: _Optional[int] = ..., version: _Optional[int] = ..., batch_request_id: _Optional[int] = ..., submitted_max_quote_debit_scaled: _Optional[int] = ..., submitted_quote_proceeds_scaled: _Optional[int] = ..., lineage: _Optional[_Union[OrderLineage, _Mapping]] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class UserTrade(_message.Message):
     __slots__ = ("symbol_id", "match_id", "order_id", "side", "is_maker", "price_ticks", "qty_scaled", "fee_amount_e18", "fee_asset", "referral_share_amount_e18", "ts_ns", "fee_is_rebate", "lineage")

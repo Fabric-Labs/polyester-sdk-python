@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from polyester._wire import protobuf_to_public_dict
-from polyester.codecs.proto_helpers import format_uint64_id
-from polyester.codecs.scalars import timestamp_dict_to_datetime
+from polyester.codecs.proto_helpers import format_uint64_id, optional_timestamp
 from polyester.gen.auth.v1 import auth_pb2, profile_pb2
 from polyester.models.auth import (
     MeResult,
@@ -35,8 +34,8 @@ def profile_from_proto(msg: profile_pb2.UserProfile) -> UserProfile:
         discord=msg.discord,
         discord_verified=msg.discord_verified,
         avatar_url=msg.avatar_url,
-        created_at=timestamp_dict_to_datetime(msg.created_at),
-        next_username_change_at=timestamp_dict_to_datetime(msg.next_username_change_at),
+        created_at=optional_timestamp(msg, "created_at"),
+        next_username_change_at=optional_timestamp(msg, "next_username_change_at"),
         vip_tier=msg.vip_tier,
         username_unlocked=msg.username_unlocked,
     )
@@ -49,7 +48,7 @@ def username_history_from_proto(
         history=[
             UsernameHistoryEntry(
                 username=entry.username,
-                set_at=timestamp_dict_to_datetime(entry.set_at),
+                set_at=optional_timestamp(entry, "set_at"),
             )
             for entry in msg.history
         ]

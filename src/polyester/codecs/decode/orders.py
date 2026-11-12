@@ -101,6 +101,14 @@ def _price(ticks: int, *, symbol_id: int | None = None) -> Price:
     return Price.from_ticks(int(ticks), symbol=None)
 
 
+def _optional_scaled(msg: Message, field_name: str) -> str:
+    """An optional int64 echo such as ``submitted_max_quote_debit_scaled`` as
+    its decimal string; empty when absent."""
+    if field_name in msg.DESCRIPTOR.fields_by_name and msg.HasField(field_name):
+        return str(getattr(msg, field_name))
+    return ""
+
+
 def _trigger_price_source_label(value: int) -> str:
     name = proto_enum_name(orders_pb2.TriggerPriceSource, value)
     if name.endswith("_price"):
@@ -316,6 +324,8 @@ def order_from_proto(
             msg.inherited_cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale
         ),
         leaves_qty=_qty(msg.leaves_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        display_qty=_qty(msg.display_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        hidden_qty=_qty(msg.hidden_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         price=_price(msg.price_ticks) if msg.price_ticks else None,
         avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
         created_ts_ns=ts_ns_string_from_response(
@@ -336,14 +346,8 @@ def order_from_proto(
         self_trade_prevention_mode=proto_enum_name(
             orders_pb2.SelfTradePreventionMode, int(msg.self_trade_prevention_mode)
         ),
-        submitted_max_quote_debit_scaled=(
-            str(msg.submitted_max_quote_debit_scaled)
-            if (
-                "submitted_max_quote_debit_scaled" in msg.DESCRIPTOR.fields_by_name
-                and msg.HasField("submitted_max_quote_debit_scaled")
-            )
-            else ""
-        ),
+        submitted_max_quote_debit_scaled=_optional_scaled(msg, "submitted_max_quote_debit_scaled"),
+        submitted_quote_proceeds_scaled=_optional_scaled(msg, "submitted_quote_proceeds_scaled"),
         attached_risk=attached,
         lineage=(
             order_lineage_from_proto(msg.lineage)
@@ -525,14 +529,8 @@ def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> Orde
             if getattr(msg, "resolved_base_qty_scaled", 0)
             else None
         ),
-        submitted_max_quote_debit_scaled=(
-            str(msg.submitted_max_quote_debit_scaled)
-            if (
-                "submitted_max_quote_debit_scaled" in msg.DESCRIPTOR.fields_by_name
-                and msg.HasField("submitted_max_quote_debit_scaled")
-            )
-            else ""
-        ),
+        submitted_max_quote_debit_scaled=_optional_scaled(msg, "submitted_max_quote_debit_scaled"),
+        submitted_quote_proceeds_scaled=_optional_scaled(msg, "submitted_quote_proceeds_scaled"),
         take_profit_trigger_id=_leg_trigger_id(msg, "take_profit_trigger_id"),
         stop_loss_trigger_id=_leg_trigger_id(msg, "stop_loss_trigger_id"),
         trailing_stop_trigger_id=_leg_trigger_id(msg, "trailing_stop_trigger_id"),
@@ -865,6 +863,12 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             take_profit_trigger_id=_leg_trigger_id(item.accepted, "take_profit_trigger_id"),
             stop_loss_trigger_id=_leg_trigger_id(item.accepted, "stop_loss_trigger_id"),
             trailing_stop_trigger_id=_leg_trigger_id(item.accepted, "trailing_stop_trigger_id"),
+            submitted_max_quote_debit_scaled=_optional_scaled(
+                item.accepted, "submitted_max_quote_debit_scaled"
+            ),
+            submitted_quote_proceeds_scaled=_optional_scaled(
+                item.accepted, "submitted_quote_proceeds_scaled"
+            ),
         )
     if item.HasField("rejected"):
         raw_code = int(item.rejected.error.code)

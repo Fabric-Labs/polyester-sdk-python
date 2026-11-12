@@ -167,6 +167,7 @@ async def test_create_oco_sends_the_intent_and_reads_the_legs(oco_client) -> Non
         client_list_id="my-oco-1",
         take_profit_trigger_id=format_id(TP_ID),
         stop_loss_trigger_id=format_id(SL_ID),
+        accepted_ts_ns=1,
     )
     [request] = server.requests("CreateOco")
     assert request.subaccount_id == SUB
@@ -226,7 +227,7 @@ async def test_create_oco_without_an_id_sends_a_generated_one(oco_client, kwargs
         ({"client_list_id": "é" * 19}, "client_list_id must be 1 to 36 bytes in UTF-8; got 38"),
         ({"client_list_id": "\ud800"}, "client_list_id must be valid UTF-8"),
         ({"side": "short"}, "side must be buy or sell"),
-        ({"self_trade_prevention_mode": "decrement"}, "self_trade_prevention_mode"),
+        ({"self_trade_prevention_mode": "decrease"}, "self_trade_prevention_mode"),
         ({"take_profit": {"trigger_price": "110000", "order_type": "limit"}}, "limit_price"),
         ({"stop_loss": {"order_type": "market"}}, "stop_loss requires trigger_price"),
         ({"stop_loss": {"trigger_price": "90000", "tif": "ioc"}}, "unsupported fields"),
@@ -291,7 +292,7 @@ async def test_cancel_oco_sends_the_id_and_reads_the_status(oco_client) -> None:
     result = await client.triggers.cancel_oco(
         order_list_id=format_id(LIST_ID), sub_account_id=format_id(SUB)
     )
-    assert result == CancelOcoResult(order_list_id=format_id(LIST_ID), status="canceled")
+    assert result == CancelOcoResult(order_list_id=format_id(LIST_ID), status="canceled", ts_ns=1)
     [request] = server.requests("CancelOco")
     assert request.order_list_id == LIST_ID
     assert request.subaccount_id == SUB

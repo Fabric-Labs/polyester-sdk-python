@@ -78,15 +78,24 @@ SELF_TRADE_PREVENTION_MODE_TO_PROTO = {
     "expire_taker": "EXPIRE_TAKER",
     "expire_maker": "EXPIRE_MAKER",
     "expire_both": "EXPIRE_BOTH",
+    "decrement": "DECREMENT",
 }
 
 
 def self_trade_prevention_mode_to_proto(value: str) -> orders_pb2.SelfTradePreventionMode:
-    """Wire value of ``expire_taker``, ``expire_maker`` or ``expire_both`` (any case)."""
+    """Wire value of ``expire_taker``, ``expire_maker``, ``expire_both`` or
+    ``decrement`` (any case).
+
+    ``decrement`` reduces both orders by the quantity that would have traded,
+    with no trade; the order left with no quantity is canceled with cancel
+    reason ``STP_DECREMENT``. Orders with attached exits and triggers take it
+    too.
+    """
     key = value.lower() if isinstance(value, str) else ""
     if key not in SELF_TRADE_PREVENTION_MODE_TO_PROTO:
         raise PolyesterValidationError(
-            "self_trade_prevention_mode must be expire_taker, expire_maker, or expire_both"
+            "self_trade_prevention_mode must be expire_taker, expire_maker, expire_both, "
+            "or decrement"
         )
     return getattr(orders_pb2, SELF_TRADE_PREVENTION_MODE_TO_PROTO[key])
 

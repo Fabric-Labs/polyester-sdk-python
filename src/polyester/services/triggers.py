@@ -313,6 +313,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         price a stop-loss, take-profit or trailing stop watches; unset means
         the last trade price.
 
+        ``self_trade_prevention_mode`` is ``expire_taker``, ``expire_maker``
+        (the server's default when unset), ``expire_both`` or ``decrement``,
+        and applies to the orders the trigger places.
+
         ``client_trigger_id`` identifies this create. Left out or empty, the SDK
         generates one, which reads back on the trigger. An ID you choose and
         keep is what lets you find the trigger after an unknown outcome, so set
@@ -376,6 +380,19 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         sub_account_id: str | int | None = None,
     ) -> TriggerMutationResult:
+        """Cancel a trigger (a TWAP's or ladder's open child orders with it).
+
+        A trigger that has ended (completed, canceled or failed) is refused
+        ``ERROR_CODE_TRIGGER_STATUS_INVALID`` (HTTP 400) for at least 60
+        seconds after it ends; after that the server may answer
+        ``ERROR_CODE_TRIGGER_NOT_FOUND`` instead. That includes a repeat of
+        a cancel that succeeded: it no longer returns the canceled trigger.
+        For a trigger you know you created, both mean "already ended": read
+        it with :meth:`get` for how it ended.
+        :func:`~polyester.errors.is_trigger_already_ended` tells the first
+        apart; ``TRIGGER_NOT_FOUND`` also names an ID that is none of the
+        account's triggers, so the helper leaves it out.
+        """
         request = CancelTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -430,7 +447,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``TRIGGER_WOULD_TRIGGER_IMMEDIATELY``: read the legs for their status.
 
         ``self_trade_prevention_mode`` is ``expire_taker``, ``expire_maker``
-        (the server's default when unset) or ``expire_both``.
+        (the server's default when unset), ``expire_both`` or ``decrement``.
 
         ``client_list_id`` identifies this create: 1 to 36 bytes in UTF-8, any
         characters, sent exactly as given. Left out, the SDK generates one,
@@ -584,6 +601,18 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         market child falls back to the pair's default slippage.
         ``trailing_distance_ticks`` is a price delta in 1e-9 quote-unit ticks, as on
         ``create`` (``500_000_000`` is 0.5 quote units).
+
+        A trigger that has ended (completed, canceled or failed) is refused
+        ``ERROR_CODE_TRIGGER_STATUS_INVALID`` (HTTP 400) for at least 60
+        seconds after it ends; after that the server may answer
+        ``ERROR_CODE_TRIGGER_NOT_FOUND`` instead.
+        For a trigger you know you created, both mean "already ended": read
+        it with :meth:`get` for how it ended.
+        :func:`~polyester.errors.is_trigger_already_ended` tells the first
+        apart; ``TRIGGER_NOT_FOUND`` also names an ID that is none of the
+        account's triggers, so the helper leaves it out.
+        An ended ladder or TWAP answers the same; a running one still answers
+        ``ERROR_CODE_TRIGGER_NOT_MODIFIABLE``, since it supports only cancel.
         """
         resolved_symbol_id = await self._optional_control_symbol_id(
             symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
@@ -633,6 +662,18 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         trigger_id: str | int,
         sub_account_id: str | int | None = None,
     ) -> TriggerMutationResult:
+        """Pause a live trigger.
+
+        A trigger that has ended (completed, canceled or failed) is refused
+        ``ERROR_CODE_TRIGGER_STATUS_INVALID`` (HTTP 400) for at least 60
+        seconds after it ends; after that the server may answer
+        ``ERROR_CODE_TRIGGER_NOT_FOUND`` instead.
+        For a trigger you know you created, both mean "already ended": read
+        it with :meth:`get` for how it ended.
+        :func:`~polyester.errors.is_trigger_already_ended` tells the first
+        apart; ``TRIGGER_NOT_FOUND`` also names an ID that is none of the
+        account's triggers, so the helper leaves it out.
+        """
         request = PauseTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
@@ -656,7 +697,18 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         symbol_id: int | None = None,
         sub_account_id: str | int | None = None,
     ) -> TriggerMutationResult:
-        """Resume a paused trigger; ``symbol`` is optional as for :meth:`modify`."""
+        """Resume a paused trigger; ``symbol`` is optional as for :meth:`modify`.
+
+        A trigger that has ended (completed, canceled or failed) is refused
+        ``ERROR_CODE_TRIGGER_STATUS_INVALID`` (HTTP 400) for at least 60
+        seconds after it ends; after that the server may answer
+        ``ERROR_CODE_TRIGGER_NOT_FOUND`` instead.
+        For a trigger you know you created, both mean "already ended": read
+        it with :meth:`get` for how it ended.
+        :func:`~polyester.errors.is_trigger_already_ended` tells the first
+        apart; ``TRIGGER_NOT_FOUND`` also names an ID that is none of the
+        account's triggers, so the helper leaves it out.
+        """
         request = ResumeTriggerRequest(
             trigger_id=id_to_int(trigger_id, "trigger_id"),
             symbol_id=await self._optional_control_symbol_id(

@@ -44,7 +44,17 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
       ``fee_total.qty`` equals ``cum_qty``.
 
     :meth:`quote_used` and :meth:`quote_unspent` tell how much of a buy's
-    quote amount (``submitted_max_quote_debit_scaled``) its fills used.
+    quote amount (``submitted_max_quote_debit_scaled``) its fills used. A sell
+    sized by a quote proceeds target (``submitted_quote_proceeds_scaled``)
+    reads its proceeds before fees from ``cum_notional_scaled``
+    (:meth:`cum_quote`): never above the target, and the target less it is what
+    the order did not receive.
+
+    An iceberg order shows ``display_qty`` (the display it was placed with)
+    on the order book at a time; ``hidden_qty`` is the part of ``leaves_qty``
+    the book does not show, so the book shows ``leaves_qty - hidden_qty``.
+    Both are zero for a plain order, and ``hidden_qty`` is zero once the order
+    has ended. A replace keeps the display.
     """
 
     order_id: str
@@ -58,6 +68,11 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     cum_qty: Quantity | None = None
     inherited_cum_qty: Quantity | None = None
     leaves_qty: Quantity | None = None
+    # Iceberg display quantity, and the part of ``leaves_qty`` the order book
+    # does not show; both zero for a plain order (base quantity, as
+    # ``leaves_qty``).
+    display_qty: Quantity | None = None
+    hidden_qty: Quantity | None = None
     price: Price | None = None
     avg_px: Price | None = None
     created_ts_ns: str = ""
@@ -67,11 +82,16 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     version: int = 0
     post_only: bool = False
     fee_asset: str = ""
-    # ``expire_taker``, ``expire_maker`` or ``expire_both``, which the order's
-    # attached exits use too; empty when unset. A mode newer than this SDK
-    # reads as its number.
+    # ``expire_taker``, ``expire_maker``, ``expire_both`` or ``decrement``,
+    # which the order's attached exits use too; empty when unset. A mode newer
+    # than this SDK reads as its number.
     self_trade_prevention_mode: str = ""
+    # A BUY's submitted all-in quote budget, scaled by the pair's quote
+    # quantity scale; empty when the order was not sized that way.
     submitted_max_quote_debit_scaled: str = ""
+    # A SELL's submitted quote proceeds target, scaled by the pair's quote
+    # quantity scale; empty when the order was not sized that way.
+    submitted_quote_proceeds_scaled: str = ""
     attached_risk: AttachedRisk | None = None
     lineage: OrderLineage | None = None
     # How the order was created; ``None`` when the server does not say.
@@ -323,6 +343,26 @@ class TrailingStop(msgspec.Struct, kw_only=True, omit_defaults=True):
     state: AttachedRiskLegState | None = None
 
 
+class OrderPeg(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A static entry peg: a limit order's price, chosen once at entry.
+
+    ``reference`` is ``"best_bid"`` or ``"best_ask"`` (any case): the highest
+    live bid or lowest live ask when the order arrives. ``offset_ticks`` is a
+    signed count of the pair's price increments (its tick size) added to that
+    reference: ``-2`` is two tick-size increments below it. It is not a count
+    of 1e-9 price ticks, and it does not select occupied book levels. The
+    price never follows later book changes.
+
+    The limit order still needs its ``price``: a BUY's cap or a SELL's floor.
+    A derived price beyond it is refused ``PEG_LIMIT_VIOLATION``, an empty
+    reference side ``PEG_REFERENCE_UNAVAILABLE``, and unsupported terms
+    ``INVALID_PEG``.
+    """
+
+    reference: str
+    offset_ticks: int = 0
+
+
 class AttachedRisk(msgspec.Struct, kw_only=True, omit_defaults=True):
     take_profit: RiskLeg | None = None
     stop_loss: RiskLeg | None = None
@@ -341,7 +381,11 @@ class OrderMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_order_id: str = ""
     resolved_base_qty_scaled: str = ""
     resolved_base_qty: Quantity | None = None
+    # The create's quote sizing echoed back, scaled by the pair's quote
+    # quantity scale: a BUY's all-in budget or a SELL's proceeds target.
+    # Empty when the order was not sized that way.
     submitted_max_quote_debit_scaled: str = ""
+    submitted_quote_proceeds_scaled: str = ""
     # Trigger IDs of the attached-risk legs this order configured; empty for a
     # leg the order does not have.
     take_profit_trigger_id: str = ""
@@ -647,12 +691,18 @@ class CreateOcoResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     client_list_id: str = ""
     take_profit_trigger_id: str = ""
     stop_loss_trigger_id: str = ""
+    # When admission completed, in nanoseconds since the Unix epoch; None when
+    # the server sent no time.
+    accepted_ts_ns: int | None = None
 
 
 class CancelOcoResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     order_list_id: str = ""
     # Both legs' status after the cancel: ``canceled``.
     status: str = ""
+    # When the cancel was answered, in nanoseconds since the Unix epoch; None
+    # when the server sent no time.
+    ts_ns: int | None = None
 
 
 class BatchCancelTriggerResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -669,6 +719,9 @@ class BatchCancelTriggersResult(msgspec.Struct, kw_only=True, omit_defaults=True
     results: list[BatchCancelTriggerResultItem]
     accepted_count: int = 0
     rejected_count: int = 0
+    # The server time of the answer, in nanoseconds since the Unix epoch; None
+    # when the server sent no time.
+    ts_ns: int | None = None
 
 
 class TransferSide(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -697,6 +750,13 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     account_code: int = 0
     timestamp: int = 0
     pending: bool = False
+    # The transfer's lifecycle flow ID (the contract's ``flow_id``), for
+    # ``client.lifecycle.get_flow(flow_id=...)``; empty when it has none. The
+    # ``withdraw_failed`` (1075) debit of a failed withdrawal carries its
+    # withdrawal's flow ID in ``transfers.list``, joined when read, so an
+    # early read may still show it empty; the realtime transfer stream does
+    # not carry it for that debit. A new Trading-to-Funding transfer carries
+    # it on its first realtime update.
     tx_id: str = ""
     is_debit: bool = False
     source: TransferSide | None = None
@@ -764,7 +824,14 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     the attempt placed an order that self-trade prevention expired against
     another of the account's resting orders: ``child_seq`` names that order,
     which ends ``canceled`` with ``STP_EXPIRE_TAKER`` or ``STP_EXPIRE_BOTH``.
-    Every other refusal placed no order. See
+    Every other refusal placed no order. A ladder keeps working when the
+    order book rejects one of its levels on arrival (a post-only level that
+    would cross, for example): that level's ``fired`` event, which names the
+    rejected child order, is followed by a ``fire_refused`` event with the
+    same ``child_seq``, its ``fire_refusal_reason`` and the level's price as
+    ``fire_price``. Such a level was not placed: do not count it among the
+    ladder's placed levels. A ladder ends ``failed`` only when every level was
+    rejected. See
     :func:`polyester.codecs.decode.triggers.is_terminal_trigger_event`.
     """
 
@@ -995,6 +1062,11 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     # Field violations a rejection names, in the order the server sent them;
     # empty for an accepted item or a rejection that names no field.
     violations: list[OrderFieldViolation] = []
+    # An accepted item's quote sizing echoed back, scaled by the pair's quote
+    # quantity scale: a BUY's all-in budget or a SELL's proceeds target.
+    # Empty when the item was not sized that way, and for a rejection.
+    submitted_max_quote_debit_scaled: str = ""
+    submitted_quote_proceeds_scaled: str = ""
 
 
 class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):

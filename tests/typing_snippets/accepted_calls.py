@@ -15,6 +15,7 @@ from polyester.models import (
     GetOrderResult,
     OrderId,
     OrderMutationResult,
+    OrderPeg,
     OrdersList,
     PrivateOrdersEvent,
 )
@@ -98,9 +99,30 @@ async def create_keywords(client: AsyncPolyester) -> None:
         "qty": "0.01",
     }
     await client.orders.create(**params)
+    await client.orders.create(
+        symbol="BTC-USDT",
+        side="buy",
+        order_type="limit",
+        qty="1",
+        price="61000",
+        display_qty="0.1",
+        peg=OrderPeg(reference="best_bid", offset_ticks=-1),
+        self_trade_prevention_mode="decrement",
+    )
+    await client.orders.create(
+        symbol="BTC-USDT", side="sell", order_type="market", quote_proceeds="100"
+    )
     await client.orders.batch_create(
         items=[
             {"symbol": "BTC-USDT", "side": "buy", "order_type": "limit", "qty": "1", "price": "1"},
+            {
+                "symbol": "BTC-USDT",
+                "side": "buy",
+                "order_type": "limit",
+                "qty": "1",
+                "price": "1",
+                "peg": {"reference": "best_ask"},
+            },
             order(),
         ],
         sub_account_id=SUB,

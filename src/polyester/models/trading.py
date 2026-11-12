@@ -630,6 +630,41 @@ class TriggerMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     status: str = ""
 
 
+class CreateOcoResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """An admitted OCO: its ID and the trigger IDs of its two legs.
+
+    ``order_list_id`` is the ID ``triggers.cancel_oco`` takes; both legs carry
+    it. The legs are triggers: read, modify or cancel them by their trigger IDs.
+    """
+
+    order_list_id: str = ""
+    client_list_id: str = ""
+    take_profit_trigger_id: str = ""
+    stop_loss_trigger_id: str = ""
+
+
+class CancelOcoResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    order_list_id: str = ""
+    # Both legs' status after the cancel: ``canceled``.
+    status: str = ""
+
+
+class BatchCancelTriggerResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    status: str = ""
+    trigger_id: str = ""
+    code: str = ""
+    rate_limit: RateLimitDetail | None = None
+    # Field violations a rejection names, in the order the server sent them;
+    # empty for an accepted item or a rejection that names no field.
+    violations: list[OrderFieldViolation] = []
+
+
+class BatchCancelTriggersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    results: list[BatchCancelTriggerResultItem]
+    accepted_count: int = 0
+    rejected_count: int = 0
+
+
 class TransferSide(msgspec.Struct, kw_only=True, omit_defaults=True):
     """One display side of a ledger transfer.
 

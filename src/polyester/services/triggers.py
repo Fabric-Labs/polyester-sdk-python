@@ -3,15 +3,21 @@ from __future__ import annotations
 import functools
 from collections.abc import Sequence
 from decimal import Decimal
+from typing import Any
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.correlation_id import required_client_id
 from polyester.codecs.decode.triggers import (
+    batch_cancel_triggers_from_proto,
+    cancel_oco_from_proto,
+    create_oco_from_proto,
     get_trigger_from_proto,
     trigger_events_list_from_proto,
     trigger_mutation_from_proto,
     trigger_status_from_label,
     triggers_list_from_proto,
 )
+from polyester.codecs.oco import create_oco_to_proto
 from polyester.codecs.orders import (
     catalog_order_scales,
     parse_optional_subaccount_id,
@@ -20,6 +26,7 @@ from polyester.codecs.orders import (
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
+    batch_cancel_triggers_to_proto,
     create_trigger_to_proto,
     modify_trigger_to_proto,
     trigger_type_to_proto,
@@ -27,6 +34,7 @@ from polyester.codecs.triggers import (
 from polyester.errors import PolyesterValidationError
 from polyester.gen.triggers.v1.triggers_connect import TriggersServiceClient
 from polyester.gen.triggers.v1.triggers_pb2 import (
+    CancelOcoRequest,
     CancelTriggerRequest,
     GetTriggerRequest,
     ListTriggerEventsRequest,
@@ -36,6 +44,10 @@ from polyester.gen.triggers.v1.triggers_pb2 import (
     TriggerEventType,
 )
 from polyester.models import (
+    BatchCancelTriggersResult,
+    CancelOcoResult,
+    CreateOcoResult,
+    RiskLeg,
     Trigger,
     TriggerEvent,
     TriggerEventsList,
@@ -124,6 +136,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         page_token: str | None = None,
         trigger_type: str | None = None,
         parent_order_id: str | int | None = None,
+        order_list_id: str | int | None = None,
+        client_list_id: str | None = None,
     ) -> TriggersList:
         """List triggers.
 
@@ -137,6 +151,13 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         triggers of one order (its order ID, base58 or decimal). Either one
         that is not valid raises ``PolyesterValidationError`` before sending;
         left out, the list is not filtered by it.
+
+        ``order_list_id`` keeps the take-profit and the stop-loss of one OCO
+        (the ID :meth:`create_oco` returned), and ``client_list_id`` those of
+        the OCO created with that client list ID: use it to find an OCO whose
+        create raised an error for which ``mutation_outcome_unknown`` is true.
+        An ``order_list_id`` of 0 or a blank ``client_list_id`` raises
+        ``PolyesterValidationError`` before sending.
 
         With the catalogs loaded, each trigger's ``symbol`` names its pair.
 
@@ -170,6 +191,13 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             if parent == 0:
                 raise PolyesterValidationError("parent_order_id must be a non-zero order ID")
             request.parent_order_id = parent
+        if order_list_id is not None:
+            order_list = id_to_int(order_list_id, "order_list_id")
+            if order_list == 0:
+                raise PolyesterValidationError("order_list_id must be a non-zero OCO ID")
+            request.order_list_id = order_list
+        if client_list_id is not None:
+            request.client_list_id = required_client_id(client_list_id, "client_list_id")
         # Decoded with the pair's catalog scales: a load in progress is
         # awaited, and a failed one leaves the quantities unscaled.
         await self._ensure_catalogs(required=False)
@@ -359,6 +387,168 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.cancel_trigger(req),
             request,
             trigger_mutation_from_proto,
+        )
+
+    async def create_oco(
+        self,
+        *,
+        account: AccountScope | None = None,
+        symbol: str,
+        side: str,
+        qty: str,
+        take_profit: RiskLeg | dict[str, Any],
+        stop_loss: RiskLeg | dict[str, Any],
+        client_list_id: str | None = None,
+        self_trade_prevention_mode: str | None = None,
+        sub_account_id: str | int | None = None,
+    ) -> CreateOcoResult:
+        """Create an OCO (one-cancels-the-other): a take-profit and a stop-loss
+        over a quantity the account already holds.
+
+        Both legs trade ``side`` for ``qty``. The quantity is reserved once,
+        when the OCO is created, and both legs share it, so it can be sold or
+        bought only once. A ``sell`` OCO protects a held base position: its
+        take-profit is above the last price and its stop-loss below it. A
+        ``buy`` OCO spends held quote: its take-profit is below the last price
+        and its stop-loss above it.
+
+        ``take_profit`` and ``stop_loss`` each take a ``RiskLeg`` or a dict, as
+        an order's attached take-profit and stop-loss do: ``trigger_price``,
+        ``order_type`` (``market``, the default, places a market order (IOC);
+        ``limit`` places a resting limit order (GTC) at ``limit_price``) and
+        ``trigger_price_source`` (``last``, the default, or ``index``).
+
+        The first leg to reach its trigger price places its order for the
+        OCO's remaining quantity. If that order fills only partly, the other
+        leg keeps protecting the rest. Cancelling either leg with
+        :meth:`cancel`, or the OCO with :meth:`cancel_oco`, cancels both.
+        Cancelling all orders and the cancel-all-after timer leave an OCO with
+        no working order alone; a leg's working order they cancel cancels the
+        OCO. An OCO whose trigger price the last price has already reached is
+        accepted, then both legs are rejected with
+        ``TRIGGER_WOULD_TRIGGER_IMMEDIATELY``: read the legs for their status.
+
+        ``self_trade_prevention_mode`` is ``expire_taker``, ``expire_maker``
+        (the server's default when unset) or ``expire_both``.
+
+        ``client_list_id`` identifies this create. Left out or empty, the SDK
+        generates one, which the result echoes. Sending the same create again
+        with the same ``client_list_id`` returns the same OCO while it is
+        active and for 60 seconds after both legs end; a different create with
+        the same ID is refused ``CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID``. A
+        create not confirmed in time raises an error for which
+        ``mutation_outcome_unknown`` is true (``TRIGGER_CREATE_OUTCOME_UNKNOWN``):
+        the OCO may exist, so look for its legs with
+        ``list(client_list_id=...)`` before retrying. An ID you choose and keep
+        is what lets you do that, so set one when you may need to. A blank one
+        raises ``PolyesterValidationError`` before sending.
+        """
+        await self._ensure_catalogs()
+        symbol_id: int | None = None
+        if self._wait_for_catalogs is not None:
+            # The catalogs are loaded: an unknown symbol is refused as unknown,
+            # not for its scale. Without hydration the scale is checked first.
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create_oco"
+            )
+        scale = resolve_quantity_scale(self._catalogs, symbol, qty)
+        if symbol_id is None:
+            symbol_id = resolve_symbol_id(
+                self._catalogs, symbol=symbol, symbol_id=None, label="triggers.create_oco"
+            )
+        request = create_oco_to_proto(
+            symbol=symbol,
+            symbol_id=symbol_id,
+            side=side,
+            qty=qty,
+            take_profit=take_profit,
+            stop_loss=stop_loss,
+            quantity_scale=scale,
+            client_list_id=client_list_id,
+            self_trade_prevention_mode=self_trade_prevention_mode,
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            TriggersServiceClient,
+            lambda client, req: client.create_oco(req),
+            request,
+            create_oco_from_proto,
+        )
+
+    async def cancel_oco(
+        self,
+        *,
+        account: AccountScope | None = None,
+        order_list_id: str | int,
+        sub_account_id: str | int | None = None,
+    ) -> CancelOcoResult:
+        """Cancel an OCO by the ``order_list_id`` :meth:`create_oco` returned.
+
+        Both legs end canceled and the OCO's reserved quantity is released. An
+        ID that is not an OCO of the account, such as a trigger ID or a leg's
+        ID, is refused ``TRIGGER_NOT_FOUND`` and nothing is canceled. An OCO
+        that has already ended is refused ``TRIGGER_STATUS_INVALID``.
+        """
+        request = CancelOcoRequest(order_list_id=id_to_int(order_list_id, "order_list_id"))
+        parsed_sub = parse_optional_subaccount_id(
+            self._resolve_sub_account_id(sub_account_id, account=account)
+        )
+        if parsed_sub is not None:
+            request.subaccount_id = parsed_sub
+        return await unary_auth_decoded(
+            self._transport,
+            TriggersServiceClient,
+            lambda client, req: client.cancel_oco(req),
+            request,
+            cancel_oco_from_proto,
+        )
+
+    async def batch_cancel(
+        self,
+        *,
+        account: AccountScope | None = None,
+        trigger_ids: Sequence[str | int],
+        sub_account_id: str | int | None = None,
+        request_id: str | None = None,
+    ) -> BatchCancelTriggersResult:
+        """Cancel up to 50 triggers in one request.
+
+        Each trigger is canceled as :meth:`cancel` cancels it (a TWAP's or
+        ladder's open child orders with it) and answered on its own in
+        ``results``, in the order of ``trigger_ids``: ``accepted``, and the
+        trigger's events report when it is canceled, or ``rejected`` with a
+        ``code``. One item's rejection does not stop the others.
+        ``TRIGGER_NOT_FOUND`` names an ID that is none of the account's
+        triggers, and ``TRIGGER_STATUS_INVALID`` a trigger that has already
+        ended: treat it as done. Retry an item rejected
+        ``RATE_LIMIT_EXCEEDED``, ``PAIR_BACKLOGGED`` or
+        ``TRIGGER_CONTROL_IN_PROGRESS`` in a new request with a new
+        ``request_id``. Each trigger counts one against the account's cancel
+        rate limit, as a :meth:`cancel` does.
+
+        ``trigger_ids`` takes 1 to 50 distinct trigger IDs; cancel more with
+        further requests. An empty, longer or repeating list, or an ID of 0,
+        raises ``PolyesterValidationError`` before sending.
+
+        ``request_id`` identifies the request for 2 minutes: sending the same
+        ``trigger_ids`` again with it returns the original results and cancels
+        nothing again, so retry a request that timed out unchanged. The same
+        ``request_id`` with other ``trigger_ids`` rejects every item with
+        ``CONFLICT_IDEMPOTENCY_KEY_REUSE``. Left out or empty, the SDK
+        generates one; set one you keep when you may need to retry.
+        """
+        request = batch_cancel_triggers_to_proto(
+            trigger_ids=trigger_ids,
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
+            request_id=request_id,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            TriggersServiceClient,
+            lambda client, req: client.batch_cancel_triggers(req),
+            request,
+            batch_cancel_triggers_from_proto,
         )
 
     async def modify(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from polyester.catalogs import CatalogManager
@@ -9,9 +10,10 @@ from polyester.codecs.bps import (
     max_slippage_bps_for_side,
     validate_bps,
 )
-from polyester.codecs.correlation_id import required_client_id
+from polyester.codecs.correlation_id import optional_request_id, required_client_id
 from polyester.codecs.scalars import id_to_int, parse_account_id, tick_count
 from polyester.errors import PolyesterValidationError
+from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.types.money import resolve_price_ticks, resolve_qty_scaled
@@ -550,4 +552,55 @@ def modify_trigger_to_proto(
             "max_slippage_bps",
             allow_clear=True,
         )
+    return proto
+
+
+def _contract_max_trigger_ids() -> int:
+    """The ``trigger_ids`` limit the public contract sets on a batch cancel."""
+    field = triggers_pb2.BatchCancelTriggersRequest.DESCRIPTOR.fields_by_name["trigger_ids"]
+    return int(field.GetOptions().Extensions[validate_pb2.field].repeated.max_items)
+
+
+# Trigger IDs one BatchCancelTriggers request accepts, from the contract.
+BATCH_CANCEL_TRIGGERS_MAX_IDS = _contract_max_trigger_ids()
+
+
+def batch_cancel_triggers_to_proto(
+    *,
+    trigger_ids: Sequence[str | int],
+    sub_account_id: str | int | None = None,
+    request_id: str | None = None,
+) -> triggers_pb2.BatchCancelTriggersRequest:
+    """Encode a batch trigger cancel.
+
+    ``trigger_ids`` takes 1 to 50 distinct non-zero trigger IDs (base58 or
+    decimal), sent in the order given. ``request_id`` is the request's
+    idempotency key; left out or empty, one is generated.
+    """
+    if isinstance(trigger_ids, (str, bytes)):
+        raise PolyesterValidationError("trigger_ids must be a list of trigger IDs")
+    count = len(trigger_ids)
+    if count == 0:
+        raise PolyesterValidationError("batch_cancel requires at least one trigger ID")
+    if count > BATCH_CANCEL_TRIGGERS_MAX_IDS:
+        raise PolyesterValidationError(
+            f"batch_cancel accepts at most {BATCH_CANCEL_TRIGGERS_MAX_IDS} trigger IDs; "
+            f"received {count}"
+        )
+    ids: list[int] = []
+    for index, value in enumerate(trigger_ids):
+        parsed = id_to_int(value, f"trigger_ids[{index}]")
+        if parsed == 0:
+            raise PolyesterValidationError(f"trigger_ids[{index}] must be a non-zero trigger ID")
+        if parsed in ids:
+            raise PolyesterValidationError(
+                f"trigger_ids[{index}] repeats trigger ID {value!r}; trigger IDs must be distinct"
+            )
+        ids.append(parsed)
+    proto = triggers_pb2.BatchCancelTriggersRequest(
+        request_id=optional_request_id(request_id) or f"trg-cancel-{uuid.uuid4().hex[:12]}",
+        trigger_ids=ids,
+    )
+    if sub_account_id is not None:
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     return proto

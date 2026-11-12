@@ -4,12 +4,17 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
-from polyester.codecs.decode.orders import OrderScales, pair_scales
+from polyester.codecs.decode.orders import OrderScales, _field_violations_from_proto, pair_scales
+from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import (
+    BatchCancelTriggerResultItem,
+    BatchCancelTriggersResult,
+    CancelOcoResult,
+    CreateOcoResult,
     Trigger,
     TriggerDetails,
     TriggerEvent,
@@ -460,6 +465,69 @@ def trigger_mutation_from_proto(
     return TriggerMutationResult(
         trigger_id=format_uint64_id(msg.trigger_id),
         status=status,
+    )
+
+
+def create_oco_from_proto(msg: triggers_pb2.CreateOcoResponse) -> CreateOcoResult:
+    return CreateOcoResult(
+        order_list_id=format_uint64_id(msg.order_list_id),
+        client_list_id=msg.client_list_id,
+        take_profit_trigger_id=format_uint64_id(msg.take_profit_trigger_id),
+        stop_loss_trigger_id=format_uint64_id(msg.stop_loss_trigger_id),
+    )
+
+
+def cancel_oco_from_proto(msg: triggers_pb2.CancelOcoResponse) -> CancelOcoResult:
+    return CancelOcoResult(
+        order_list_id=format_uint64_id(msg.order_list_id),
+        status=_trigger_status_label(msg.status),
+    )
+
+
+def _batch_cancel_trigger_status(value: int) -> str:
+    name = proto_enum_name(triggers_pb2.BatchCancelTriggersResultItem.Status, value)
+    return name if name in {"accepted", "rejected"} else ""
+
+
+def batch_cancel_triggers_from_proto(
+    msg: triggers_pb2.BatchCancelTriggersResponse,
+) -> BatchCancelTriggersResult:
+    results: list[BatchCancelTriggerResultItem] = []
+    for item in msg.results:
+        status = _batch_cancel_trigger_status(item.status)
+        if not status:
+            raise PolyesterResponseContractError(
+                "BatchCancelTriggers",
+                f"batch trigger cancel response has unknown status: {item.status}",
+            )
+        results.append(
+            BatchCancelTriggerResultItem(
+                status=status,
+                trigger_id=format_uint64_id(item.trigger_id) if item.trigger_id else "",
+                code=item.code,
+                rate_limit=(
+                    rate_limit_detail_from_proto(item.error.rate_limit)
+                    if item.HasField("error") and item.error.HasField("rate_limit")
+                    else None
+                ),
+                violations=_field_violations_from_proto(item.error),
+            )
+        )
+    decoded_accepted = sum(1 for item in results if item.status == "accepted")
+    decoded_rejected = len(results) - decoded_accepted
+    accepted_count = int(msg.accepted_count)
+    rejected_count = int(msg.rejected_count)
+    if accepted_count != decoded_accepted or rejected_count != decoded_rejected:
+        raise PolyesterResponseContractError(
+            "BatchCancelTriggers",
+            "batch trigger cancel response counts do not match decoded outcomes: "
+            f"accepted={accepted_count}/{decoded_accepted} "
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}",
+        )
+    return BatchCancelTriggersResult(
+        results=results,
+        accepted_count=accepted_count,
+        rejected_count=rejected_count,
     )
 
 

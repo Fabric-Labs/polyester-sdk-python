@@ -33,7 +33,8 @@ async def test_poly_8757_rest_service_refusal_keeps_its_code(code: str) -> None:
     err, calls = await _call("write", 403, PROBLEM, body)
     assert calls == 1
     assert isinstance(err, PolyesterAuthError)
-    assert (err.status_code, err.code, str(err)) == (403, code, "not allowed")
+    # The same code as the typed ConnectRPC detail names.
+    assert (err.status_code, err.code, str(err)) == (403, f"ERROR_CODE_{code}", "not allowed")
     assert auth_error_code(err) is None
     assert not is_retryable_error(err)
     assert not mutation_outcome_unknown(err)

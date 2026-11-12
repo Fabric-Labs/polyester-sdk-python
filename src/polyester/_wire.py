@@ -28,6 +28,7 @@ from polyester.errors import (
     AUTH_SESSION_KIND_NOT_ALLOWED,
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
     AUTH_TIMESTAMP_SKEW,
+    ORDER_PERMISSION_REFUSAL_CODES,
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
@@ -246,13 +247,18 @@ def _map_gateway_problem(exc: GatewayProblemError):
         return PolyesterSessionRequiredError(
             exc.detail or "interactive session required", status_code=exc.http_status
         )
-    if code in ("unauthenticated", "permission_denied"):
+    if code in ("unauthenticated", "permission_denied") or (
+        order_code in ORDER_PERMISSION_REFUSAL_CODES
+    ):
         # The detail names what to fix, for example the API-key policy
         # action to grant ("api key policy does not allow READ_AUTO_WITHDRAW").
+        # A service code reads as its typed ConnectRPC detail does
+        # (POLICY_MARKET_DENY is ERROR_CODE_POLICY_MARKET_DENY), whichever
+        # transport answered.
         return PolyesterAuthError(
             message,
             status_code=exc.http_status,
-            code=auth_error_code_from_rest(exc.problem_code) or exc.problem_code or code,
+            code=auth_error_code_from_rest(exc.problem_code) or order_code or code,
         )
     if exc.http_status == 503 and order_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
         return PolyesterApiError(message, code=order_code)
@@ -412,10 +418,14 @@ def _map_connect_error(exc: ConnectError):
                 return _rate_limit_error(error_message, proto_detail=unpacked)
             if full_name == "orders.v1.ErrorDetail":
                 code_name = error_code_name(orders_pb2.ErrorCode, unpacked.code)
+                # A permission refusal raises the same error as its REST
+                # problem (HTTP 403), code included.
                 if (
                     "POLICY" in code_name
                     or "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
+                    or code_name in ORDER_PERMISSION_REFUSAL_CODES
+                    or exc.code.value == "permission_denied"
                 ):
                     return PolyesterAuthError(
                         error_message,

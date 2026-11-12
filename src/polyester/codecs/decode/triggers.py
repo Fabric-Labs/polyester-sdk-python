@@ -2,14 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
-from polyester.codecs.decode.orders import OrderScales, pair_scales
+from polyester.codecs.decode.orders import OrderScales, _field_violations_from_proto, pair_scales
+from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import (
+    BatchCancelTriggerResultItem,
+    BatchCancelTriggersResult,
+    CancelOcoResult,
+    CreateOcoResult,
     Trigger,
     TriggerDetails,
     TriggerEvent,
@@ -361,6 +367,9 @@ def trigger_from_proto(
     parent_order_id = ""
     if has_field(msg, "parent_order_id") and msg.parent_order_id:
         parent_order_id = format_uint64_id(msg.parent_order_id)
+    order_list_id = ""
+    if has_field(msg, "order_list_id") and msg.order_list_id:
+        order_list_id = format_uint64_id(msg.order_list_id)
     return Trigger(
         trigger_id=format_uint64_id(msg.trigger_id),
         subaccount_id=format_uint64_id(msg.subaccount_id) if msg.subaccount_id else "",
@@ -369,6 +378,8 @@ def trigger_from_proto(
         trigger_type=cfg.trigger_type,
         status=_trigger_status_label(msg.status),
         parent_order_id=parent_order_id,
+        order_list_id=order_list_id,
+        client_list_id=msg.client_list_id,
         side=cfg.side,
         order_type=cfg.order_type,
         time_in_force=cfg.time_in_force,
@@ -460,6 +471,87 @@ def trigger_mutation_from_proto(
     return TriggerMutationResult(
         trigger_id=format_uint64_id(msg.trigger_id),
         status=status,
+    )
+
+
+def _paired_ts_ns(msg: Any, ts_ns_field: str, ts_field: str) -> int | None:
+    """A response time in nanoseconds since the Unix epoch: the exact
+    ``*_ts_ns`` field, or its paired ``Timestamp`` when the nanosecond field is
+    unset; ``None`` when the server sent neither (or a time before the epoch).
+    """
+    exact = int(getattr(msg, ts_ns_field))
+    if exact:
+        return exact
+    if not msg.HasField(ts_field):
+        return None
+    ts = getattr(msg, ts_field)
+    nanos = int(ts.seconds) * 1_000_000_000 + int(ts.nanos)
+    return nanos if nanos > 0 else None
+
+
+def create_oco_from_proto(msg: triggers_pb2.CreateOcoResponse) -> CreateOcoResult:
+    return CreateOcoResult(
+        order_list_id=format_uint64_id(msg.order_list_id),
+        client_list_id=msg.client_list_id,
+        take_profit_trigger_id=format_uint64_id(msg.take_profit_trigger_id),
+        stop_loss_trigger_id=format_uint64_id(msg.stop_loss_trigger_id),
+        accepted_ts_ns=_paired_ts_ns(msg, "accepted_at_ts_ns", "accepted_at"),
+    )
+
+
+def cancel_oco_from_proto(msg: triggers_pb2.CancelOcoResponse) -> CancelOcoResult:
+    return CancelOcoResult(
+        order_list_id=format_uint64_id(msg.order_list_id),
+        status=_trigger_status_label(msg.status),
+        ts_ns=_paired_ts_ns(msg, "ts_ns", "ts"),
+    )
+
+
+def _batch_cancel_trigger_status(value: int) -> str:
+    name = proto_enum_name(triggers_pb2.BatchCancelTriggersResultItem.Status, value)
+    return name if name in {"accepted", "rejected"} else ""
+
+
+def batch_cancel_triggers_from_proto(
+    msg: triggers_pb2.BatchCancelTriggersResponse,
+) -> BatchCancelTriggersResult:
+    results: list[BatchCancelTriggerResultItem] = []
+    for item in msg.results:
+        status = _batch_cancel_trigger_status(item.status)
+        if not status:
+            raise PolyesterResponseContractError(
+                "BatchCancelTriggers",
+                f"batch trigger cancel response has unknown status: {item.status}",
+            )
+        results.append(
+            BatchCancelTriggerResultItem(
+                status=status,
+                trigger_id=format_uint64_id(item.trigger_id) if item.trigger_id else "",
+                code=item.code,
+                rate_limit=(
+                    rate_limit_detail_from_proto(item.error.rate_limit)
+                    if item.HasField("error") and item.error.HasField("rate_limit")
+                    else None
+                ),
+                violations=_field_violations_from_proto(item.error),
+            )
+        )
+    decoded_accepted = sum(1 for item in results if item.status == "accepted")
+    decoded_rejected = len(results) - decoded_accepted
+    accepted_count = int(msg.accepted_count)
+    rejected_count = int(msg.rejected_count)
+    if accepted_count != decoded_accepted or rejected_count != decoded_rejected:
+        raise PolyesterResponseContractError(
+            "BatchCancelTriggers",
+            "batch trigger cancel response counts do not match decoded outcomes: "
+            f"accepted={accepted_count}/{decoded_accepted} "
+            f"rejected={rejected_count}/{decoded_rejected} results={len(results)}",
+        )
+    return BatchCancelTriggersResult(
+        results=results,
+        accepted_count=accepted_count,
+        rejected_count=rejected_count,
+        ts_ns=_paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 

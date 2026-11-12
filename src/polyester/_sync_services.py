@@ -559,8 +559,11 @@ class SyncTradesService(_SyncSubscribeService):
 class SyncTriggersService(_SyncSubscribeService):
     """``Polyester`` view of :class:`~polyester.services.AsyncTriggersService`."""
 
+    batch_cancel = call(AsyncTriggersService.batch_cancel)
     cancel = call(AsyncTriggersService.cancel)
+    cancel_oco = call(AsyncTriggersService.cancel_oco)
     create = call(AsyncTriggersService.create)
+    create_oco = call(AsyncTriggersService.create_oco)
     get = call(AsyncTriggersService.get)
     list = call(AsyncTriggersService.list)
     list_events = call(AsyncTriggersService.list_events)

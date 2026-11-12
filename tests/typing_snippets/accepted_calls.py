@@ -9,11 +9,13 @@ from polyester import AsyncPolyester, Polyester
 from polyester.models import (
     BalancesList,
     ChangelogPostSummary,
+    CreateOcoResult,
     CreateOrderParams,
     CreateOrderRequest,
     GetOrderResult,
     OrderId,
     OrderMutationResult,
+    OrderPeg,
     OrdersList,
     PrivateOrdersEvent,
 )
@@ -46,6 +48,8 @@ async def int_sub_account_ids(client: AsyncPolyester) -> None:
     await client.triggers.get(trigger_id=9, sub_account_id=SUB)
     await client.triggers.cancel(trigger_id=9, sub_account_id=SUB)
     await client.triggers.pause(trigger_id=9, sub_account_id=SUB)
+    await client.triggers.cancel_oco(order_list_id=9, sub_account_id=SUB)
+    await client.triggers.batch_cancel(trigger_ids=[9, "2RDF8nT5vTq"], sub_account_id=SUB)
     await client.trades.list(sub_account_id=SUB)
     await client.transfers.list(sub_account_id=SUB)
     await client.balances.list(sub_account_id=SUB)
@@ -95,9 +99,30 @@ async def create_keywords(client: AsyncPolyester) -> None:
         "qty": "0.01",
     }
     await client.orders.create(**params)
+    await client.orders.create(
+        symbol="BTC-USDT",
+        side="buy",
+        order_type="limit",
+        qty="1",
+        price="61000",
+        display_qty="0.1",
+        peg=OrderPeg(reference="best_bid", offset_ticks=-1),
+        self_trade_prevention_mode="decrement",
+    )
+    await client.orders.create(
+        symbol="BTC-USDT", side="sell", order_type="market", quote_proceeds="100"
+    )
     await client.orders.batch_create(
         items=[
             {"symbol": "BTC-USDT", "side": "buy", "order_type": "limit", "qty": "1", "price": "1"},
+            {
+                "symbol": "BTC-USDT",
+                "side": "buy",
+                "order_type": "limit",
+                "qty": "1",
+                "price": "1",
+                "peg": {"reference": "best_ask"},
+            },
             order(),
         ],
         sub_account_id=SUB,
@@ -126,6 +151,16 @@ def sync_calls(client: Polyester) -> None:
     client.triggers.create(
         symbol="BTC-USDT", trigger_type="stop_loss", side="sell", qty="0.01", trigger_price="100"
     )
+    oco: CreateOcoResult = client.triggers.create_oco(
+        symbol="BTC-USDT",
+        side="sell",
+        qty="0.5",
+        take_profit={"trigger_price": "110000", "order_type": "limit", "limit_price": "109500"},
+        stop_loss={"trigger_price": "90000"},
+        client_list_id="my-oco-1",
+    )
+    client.triggers.cancel_oco(order_list_id=oco.order_list_id)
+    client.triggers.batch_cancel(trigger_ids=[oco.take_profit_trigger_id], request_id="r-1")
     client.withdraw.create_api_key_to_funding(asset_id=1, quantity="1", idempotency_key="k")
     posts: list[ChangelogPostSummary] = list(client.changelog.iter_posts(limit=5))
     keypair_hex: str = client.api_keys.generate_keypair().public_key_hex

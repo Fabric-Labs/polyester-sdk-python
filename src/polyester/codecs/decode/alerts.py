@@ -3,6 +3,7 @@ from __future__ import annotations
 from polyester.catalogs import CatalogManager
 from polyester.codecs.proto_helpers import format_uint64_id
 from polyester.codecs.scalars import timestamp_dict_to_datetime
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.alerts.v1 import price_alerts_pb2 as pb
 from polyester.models.alerts import PriceAlert, PriceAlertsPage, PriceAlertUpdate
 from polyester.types.money import Price
@@ -73,10 +74,29 @@ def price_alerts_page_from_proto(
     )
 
 
+def required_price_alert(
+    msg: pb.CreateAlertResponse | pb.UpdateAlertResponse | pb.CancelAlertResponse,
+    context: str,
+    catalogs: CatalogManager | None,
+) -> PriceAlert:
+    """The alert of a create, update or cancel response.
+
+    A response without one, or with an alert that has no ``alert_id``, breaks
+    the response contract: it raises
+    :class:`~polyester.errors.PolyesterResponseContractError` instead of
+    reading as a zero-ID alert.
+    """
+    if not msg.HasField("alert"):
+        raise PolyesterResponseContractError(context, "response has no alert")
+    if not msg.alert.alert_id:
+        raise PolyesterResponseContractError(context, "response alert has no alert_id")
+    return price_alert_from_proto(msg.alert, catalogs)
+
+
 def price_alert_update_from_proto(
     msg: pb.UpdateAlertResponse, catalogs: CatalogManager | None
 ) -> PriceAlertUpdate:
     return PriceAlertUpdate(
-        alert=price_alert_from_proto(msg.alert, catalogs),
+        alert=required_price_alert(msg, "UpdateAlert", catalogs),
         outcome=_label(OUTCOME_LABELS, msg.outcome),
     )

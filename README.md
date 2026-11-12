@@ -911,14 +911,23 @@ with `PolyesterAuthError` (`code` `SUBACCOUNT_KEY_REFUSED`, HTTP 403).
   otherwise. `channels` names one or two of `"in_app"` and `"telegram"`. The
   current price is recorded as `reference_price`; an alert whose condition
   already holds starts with `armed` false and fires only after the price moves
-  back and crosses again.
+  back and crosses again. Name the market with `symbol=`, `symbol_id=` or both.
+  A `Price` bound to a market (`Price.from_ticks(..., symbol="ETH-USDT")`) is
+  checked against the catalogs' name for the market's `symbol_id`; when the
+  catalogs don't know that ID (not loaded, failed to load, or not listed) the
+  call raises `PolyesterValidationError` before sending, whatever `symbol=`
+  says. An unbound price or a decimal string works with any `symbol_id`.
 - `list(statuses=, symbol=, limit=, page_token=)` returns one page, newest
   first (`limit` 50 by default, at most 200); `iter_alerts(...)` yields every
   match across pages.
 - `update(alert_id=, expected_revision=, direction=, price=, channels=,
   idempotency_key=)` changes only the fields you pass. With none it changes no
   field: it sets a triggered alert again, and changes nothing on an active one.
-  `outcome` is `"applied"`, `"unchanged"` or `"replayed"`.
+  `outcome` is `"applied"`, `"unchanged"` or `"replayed"`. Pass `price` as a
+  decimal string, a `Decimal` or an unbound `Price.from_ticks(ticks)`: a `Price`
+  bound to a market (including an alert's own `price`) raises
+  `PolyesterValidationError` before sending, since the update names the alert,
+  not its market.
 - `cancel(alert_id=)` cancels an active alert; a cancelled alert is returned
   unchanged.
 
@@ -936,6 +945,10 @@ read it (read it again); `IDEMPOTENCY_CONFLICT` means the key was used for
 another request; `ALERT_LIMIT_REACHED`, `ALERT_UPDATE_LIMIT_REACHED`,
 `ALERT_CANCELLED`, `ALERT_TRIGGERED`, `ALERT_NOT_FOUND`, `UNKNOWN_SYMBOL` and
 `PRICE_SOURCE_UNSUPPORTED` raise `PolyesterApiError`.
+A create, update or cancel answer without the alert, or with an alert that
+has no `alert_id`, raises `PolyesterResponseContractError` (its
+`mutation_outcome_unknown` is true): read the alerts back rather than trusting
+a zero-ID alert.
 
 ```python
 alert = await client.alerts.create(

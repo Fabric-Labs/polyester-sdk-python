@@ -236,6 +236,160 @@ async def test_create_refuses_bad_input_before_sending(kwargs: dict, match: str)
     assert capture.calls == 0
 
 
+ETH_BOUND = Price.from_ticks(3_000_000_000_000, symbol="ETH-USDT")
+
+
+def _empty_catalogs() -> CatalogManager:
+    return CatalogManager()
+
+
+@pytest.mark.parametrize(
+    "catalogs",
+    [pytest.param(_empty_catalogs, id="empty"), pytest.param(lambda: None, id="none")],
+)
+@pytest.mark.parametrize(
+    "selector",
+    [
+        pytest.param({"symbol_id": 1}, id="id-only"),
+        pytest.param({"symbol": "ETH-USDT", "symbol_id": 1}, id="matching-symbol-wrong-id"),
+        pytest.param({"symbol": "BTC-USDT", "symbol_id": 1}, id="other-symbol"),
+    ],
+)
+async def test_create_refuses_a_bound_price_the_catalogs_cannot_check(
+    catalogs: Any, selector: dict[str, Any]
+) -> None:
+    # Without the catalogs nothing proves which market symbol_id 1 is: a
+    # caller's symbol beside it is a claim, not proof, so the ETH-bound price
+    # is not sent for it.
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert()))
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="ETH-USDT"),
+    ):
+        await AsyncAlertsService(MagicMock(), catalogs()).create(
+            **selector, direction="below", price=ETH_BOUND, channels=["in_app"]
+        )
+    assert capture.calls == 0
+
+
+async def test_create_refuses_a_bound_price_after_a_failed_catalog_load() -> None:
+    async def failed_load() -> None:
+        raise RuntimeError("spot config unavailable")
+
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert()))
+    service = AsyncAlertsService(MagicMock(), CatalogManager(), wait_for_catalogs=failed_load)
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="symbol_id 1"),
+    ):
+        await service.create(symbol_id=1, direction="below", price=ETH_BOUND, channels=["in_app"])
+    assert capture.calls == 0
+
+
+async def test_create_waits_for_a_pending_catalog_load_to_check_a_bound_price() -> None:
+    catalogs = CatalogManager()
+
+    async def load() -> None:
+        catalogs.hydrate_spot_config(
+            {
+                "pairs": [
+                    {"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8},
+                    {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 8},
+                ]
+            }
+        )
+
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert(symbol_id=2)))
+    service = AsyncAlertsService(MagicMock(), catalogs, wait_for_catalogs=load)
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="ETH-USDT"),
+    ):
+        await service.create(symbol_id=1, direction="below", price=ETH_BOUND, channels=["in_app"])
+    assert capture.calls == 0
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await service.create(symbol_id=2, direction="below", price=ETH_BOUND, channels=["in_app"])
+    assert capture.request.symbol_id == 2
+    assert capture.request.price_ticks == 3_000_000_000_000
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [
+        pytest.param({"symbol_id": 1}, id="id-only"),
+        pytest.param({"symbol": "ETH-USDT", "symbol_id": 1}, id="conflicting"),
+    ],
+)
+async def test_create_refuses_a_bound_price_for_another_catalogued_market(
+    selector: dict[str, Any],
+) -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert()))
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError),
+    ):
+        await _service().create(**selector, direction="below", price=ETH_BOUND, channels=["in_app"])
+    assert capture.calls == 0
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [
+        pytest.param({"symbol_id": 2}, id="id-only"),
+        pytest.param({"symbol": "ETH-USDT"}, id="symbol-only"),
+        pytest.param({"symbol": "ETH-USDT", "symbol_id": 2}, id="both"),
+    ],
+)
+async def test_create_sends_a_bound_price_for_its_own_catalogued_market(
+    selector: dict[str, Any],
+) -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert(symbol_id=2)))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await _service().create(**selector, direction="below", price=ETH_BOUND, channels=["in_app"])
+    assert capture.calls == 1
+    assert capture.request.symbol_id == 2
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [
+        pytest.param({"symbol_id": 1}, id="id-only"),
+        pytest.param({"symbol": "ETH-USDT", "symbol_id": 1}, id="symbol-and-id"),
+    ],
+)
+async def test_create_keeps_an_unbound_price_with_empty_catalogs(selector: dict[str, Any]) -> None:
+    capture = CaptureUnary(pb.CreateAlertResponse(alert=_alert()))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await AsyncAlertsService(MagicMock(), CatalogManager()).create(
+            **selector,
+            direction="below",
+            price=Price.from_ticks(3_000_000_000_000),
+            channels=["in_app"],
+        )
+    assert capture.request.symbol_id == 1
+    assert capture.request.price_ticks == 3_000_000_000_000
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        pytest.param(pb.CreateAlertResponse(), id="missing"),
+        pytest.param(pb.CreateAlertResponse(alert=pb.PriceAlert()), id="empty"),
+    ],
+)
+async def test_create_refuses_a_response_without_an_alert(response: Any) -> None:
+    capture = CaptureUnary(response)
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterResponseContractError, match="CreateAlert") as raised,
+    ):
+        await _service().create(
+            symbol="BTC-USDT", direction="above", price="1000000", channels=["in_app"]
+        )
+    assert capture.calls == 1
+    assert mutation_outcome_unknown(raised.value)
+
+
 # --- list -------------------------------------------------------------------------------------
 
 
@@ -412,6 +566,81 @@ async def test_update_refuses_bad_input(kwargs: dict, match: str) -> None:
         await _service().update(**args)
 
 
+@pytest.mark.parametrize(
+    "price",
+    [
+        pytest.param(Price.from_ticks(3_000_000_000_000, symbol="ETH-USDT"), id="other-market"),
+        pytest.param(Price.from_ticks(90_000 * 10**9, symbol="BTC-USDT"), id="alert-market"),
+    ],
+)
+async def test_update_refuses_a_market_bound_price(price: Price) -> None:
+    # The update names the alert, not its market: nothing proves a bound
+    # price is for the alert's market without reading the alert.
+    capture = CaptureUnary(pb.UpdateAlertResponse(alert=_alert(), outcome=pb.APPLIED))
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterValidationError, match="unbound price"),
+    ):
+        await _service().update(alert_id=ALERT_ID, expected_revision=1, price=price)
+    assert capture.calls == 0
+
+
+@pytest.mark.parametrize(
+    "price",
+    [
+        pytest.param(Price.from_ticks(91_000 * 10**9), id="unbound-price"),
+        pytest.param(Decimal("91000"), id="decimal"),
+        pytest.param("91000", id="string"),
+    ],
+)
+async def test_update_sends_an_unbound_price(price: Any) -> None:
+    capture = CaptureUnary(pb.UpdateAlertResponse(alert=_alert(), outcome=pb.APPLIED))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        await _service().update(alert_id=ALERT_ID, expected_revision=1, price=price)
+    assert capture.request.update.price_ticks == 91_000 * 10**9
+
+
+_OUTCOMES = [pb.UPDATE_OUTCOME_UNSPECIFIED, pb.APPLIED, pb.UNCHANGED, pb.REPLAYED]
+
+
+@pytest.mark.parametrize("outcome", _OUTCOMES)
+@pytest.mark.parametrize(
+    "alert",
+    [pytest.param(None, id="missing"), pytest.param(pb.PriceAlert(), id="empty")],
+)
+async def test_update_refuses_a_response_without_an_alert(
+    alert: pb.PriceAlert | None, outcome: int
+) -> None:
+    response = pb.UpdateAlertResponse(outcome=outcome)
+    if alert is not None:
+        response.alert.CopyFrom(alert)
+    capture = CaptureUnary(response)
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterResponseContractError, match="UpdateAlert") as raised,
+    ):
+        await _service().update(alert_id=123, expected_revision=1, price="1000000")
+    assert capture.calls == 1
+    assert mutation_outcome_unknown(raised.value)
+
+
+@pytest.mark.parametrize("outcome", _OUTCOMES)
+async def test_update_reads_a_populated_alert_for_every_outcome(outcome: int) -> None:
+    capture = CaptureUnary(pb.UpdateAlertResponse(alert=_alert(revision=2), outcome=outcome))
+    with patch("polyester.services.alerts.unary_auth_decoded", capture):
+        result = await _service().update(alert_id=123, expected_revision=1, price="1000000")
+    assert result.alert.alert_id == format_id(ALERT_ID)
+    assert result.alert.symbol_id == 1
+    assert result.alert.revision == 2
+    labels = {
+        pb.UPDATE_OUTCOME_UNSPECIFIED: "unspecified",
+        pb.APPLIED: "applied",
+        pb.UNCHANGED: "unchanged",
+        pb.REPLAYED: "replayed",
+    }
+    assert result.outcome == labels[outcome]
+
+
 # --- cancel -----------------------------------------------------------------------------------
 
 
@@ -422,6 +651,24 @@ async def test_cancel_sends_the_alert_id_and_reads_the_alert() -> None:
     assert isinstance(capture.request, pb.CancelAlertRequest)
     assert capture.request.alert_id == ALERT_ID
     assert alert.status == "cancelled"
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        pytest.param(pb.CancelAlertResponse(), id="missing"),
+        pytest.param(pb.CancelAlertResponse(alert=pb.PriceAlert()), id="empty"),
+    ],
+)
+async def test_cancel_refuses_a_response_without_an_alert(response: Any) -> None:
+    capture = CaptureUnary(response)
+    with (
+        patch("polyester.services.alerts.unary_auth_decoded", capture),
+        pytest.raises(PolyesterResponseContractError, match="CancelAlert") as raised,
+    ):
+        await _service().cancel(alert_id=123)
+    assert capture.calls == 1
+    assert mutation_outcome_unknown(raised.value)
 
 
 # --- refusals ---------------------------------------------------------------------------------

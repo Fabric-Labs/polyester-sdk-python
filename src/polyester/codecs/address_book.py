@@ -9,45 +9,46 @@ from polyester.gen.auth.v1 import address_book_pb2
 from polyester.models.address_book import AddressBookTagInput
 from polyester.patch import UNSET, field_mask, is_set, require_positive_revision
 
+_ENTRY_KIND_LABELS: dict[str, int] = {
+    "external": address_book_pb2.EXTERNAL_CHAIN,
+    "external_chain": address_book_pb2.EXTERNAL_CHAIN,
+    "internal": address_book_pb2.INTERNAL_ACCOUNT,
+    "internal_account": address_book_pb2.INTERNAL_ACCOUNT,
+}
+
+_DIRECTION_LABELS: dict[str, int] = {
+    "deposit_from": address_book_pb2.DEPOSIT_FROM,
+    "withdraw_to": address_book_pb2.WITHDRAW_TO,
+    "internal_transfer_from": address_book_pb2.INTERNAL_TRANSFER_FROM,
+    "internal_transfer_to": address_book_pb2.INTERNAL_TRANSFER_TO,
+}
+
+
+def _label_key(value: str) -> str:
+    return value.strip().lower().replace("-", "_")
+
 
 def address_book_entry_kind_from_label(kind: str) -> Any:
-    aliases = {
-        "external": address_book_pb2.EXTERNAL_CHAIN,
-        "external_chain": address_book_pb2.EXTERNAL_CHAIN,
-        "internal": address_book_pb2.INTERNAL_ACCOUNT,
-        "internal_account": address_book_pb2.INTERNAL_ACCOUNT,
-    }
-    key = kind.lower().replace("-", "_")
-    if key in aliases:
-        return aliases[key]
-    enum_name = key.upper()
-    if not enum_name.startswith("ENTRY_KIND_") and enum_name not in (
-        "EXTERNAL_CHAIN",
-        "INTERNAL_ACCOUNT",
-    ):
-        enum_name = f"ENTRY_KIND_{enum_name}" if enum_name != "EXTERNAL_CHAIN" else enum_name
-    value = getattr(address_book_pb2, enum_name, None)
-    if value is None and not enum_name.startswith("ENTRY_KIND_"):
-        value = getattr(address_book_pb2, f"ENTRY_KIND_{enum_name}", None)
+    """Entry kind for a label: external, external_chain, internal or internal_account.
+
+    Any other label is refused before sending: the unspecified kind would
+    read as no filter.
+    """
+    value = _ENTRY_KIND_LABELS.get(_label_key(kind))
     if value is None:
-        raise PolyesterValidationError("kind must be 'external' or 'internal'")
+        raise PolyesterValidationError(
+            f"kind must be one of {', '.join(_ENTRY_KIND_LABELS)}; got {kind!r}"
+        )
     return value
 
 
 def transfer_counterparty_direction_from_label(direction: str) -> Any:
-    aliases = {
-        "deposit_from": address_book_pb2.DEPOSIT_FROM,
-        "withdraw_to": address_book_pb2.WITHDRAW_TO,
-        "internal_transfer_from": address_book_pb2.INTERNAL_TRANSFER_FROM,
-        "internal_transfer_to": address_book_pb2.INTERNAL_TRANSFER_TO,
-    }
-    key = direction.lower().replace("-", "_")
-    if key in aliases:
-        return aliases[key]
-    enum_name = key.upper()
-    value = getattr(address_book_pb2, enum_name, None)
+    """Counterparty direction for a label; any other label is refused before sending."""
+    value = _DIRECTION_LABELS.get(_label_key(direction))
     if value is None:
-        raise PolyesterValidationError(f"Unknown transfer counterparty direction: {direction}")
+        raise PolyesterValidationError(
+            f"direction must be one of {', '.join(_DIRECTION_LABELS)}; got {direction!r}"
+        )
     return value
 
 

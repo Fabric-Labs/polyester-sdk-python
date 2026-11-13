@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from polyester.codecs.proto_helpers import has_field, proto_enum_name
+from polyester.codecs.proto_helpers import timestamp_to_datetime as _timestamp
 from polyester.gen.vip.v1 import vip_pb2
 from polyester.models.vip import (
     NextVIPTierThresholds,
@@ -11,16 +10,6 @@ from polyester.models.vip import (
     VIPTier,
     VIPTiersList,
 )
-
-
-def _timestamp(ts) -> datetime | None:
-    if ts is None:
-        return None
-    seconds = int(getattr(ts, "seconds", 0) or 0)
-    nanos = int(getattr(ts, "nanos", 0) or 0)
-    if seconds == 0 and nanos == 0:
-        return None
-    return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
 
 
 def vip_tier_from_proto(msg: vip_pb2.VIPTier) -> VIPTier:

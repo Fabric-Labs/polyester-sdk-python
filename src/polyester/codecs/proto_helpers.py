@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 from google.protobuf.message import Message
 
-from polyester.codecs.scalars import format_id
+from polyester.codecs.scalars import format_id, timestamp_parts_to_datetime
 
 _ENUM_PREFIXES = (
     "SIDE_",
@@ -111,6 +111,18 @@ def timestamp_to_ms(msg: Message | None) -> int:
     return seconds * 1000 + nanos // 1_000_000
 
 
+def timestamp_to_datetime(msg: Message | None) -> datetime | None:
+    """A proto ``Timestamp`` as an aware UTC datetime exact to the microsecond,
+    or ``None`` when it is missing or zero."""
+    if msg is None:
+        return None
+    seconds = int(getattr(msg, "seconds", 0) or 0)
+    nanos = int(getattr(msg, "nanos", 0) or 0)
+    if seconds == 0 and nanos == 0:
+        return None
+    return timestamp_parts_to_datetime(seconds, nanos)
+
+
 def timestamp_to_rfc3339(msg: Message | None) -> str | None:
     """Encode a proto Timestamp as RFC3339 UTC, or None when unset/zero."""
     if msg is None:
@@ -119,9 +131,7 @@ def timestamp_to_rfc3339(msg: Message | None) -> str | None:
     nanos = int(getattr(msg, "nanos", 0) or 0)
     if seconds == 0 and nanos == 0:
         return None
-    from datetime import UTC, datetime
-
-    dt = datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
+    dt = timestamp_parts_to_datetime(seconds, nanos)
     if nanos == 0:
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{nanos:09d}Z"

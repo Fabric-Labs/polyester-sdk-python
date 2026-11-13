@@ -796,10 +796,13 @@ class SyncChangelogService(_SyncService):
 
     action_required_since = call(AsyncChangelogService.action_required_since)
     breaking_changes_since = call(AsyncChangelogService.breaking_changes_since)
+    get_deployment_group = call(AsyncChangelogService.get_deployment_group)
     get_post = call(AsyncChangelogService.get_post)
     iter_changes = iterate(AsyncChangelogService.iter_changes)
+    iter_deployment_groups = iterate(AsyncChangelogService.iter_deployment_groups)
     iter_posts = iterate(AsyncChangelogService.iter_posts)
     list_changes = call(AsyncChangelogService.list_changes)
+    list_deployment_groups = call(AsyncChangelogService.list_deployment_groups)
     list_posts = call(AsyncChangelogService.list_posts)
 
 

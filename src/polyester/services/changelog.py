@@ -9,6 +9,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs.decode.changelog import (
     changelog_changes_page_from_proto,
+    changelog_deployment_group_from_proto,
+    changelog_deployment_groups_page_from_proto,
     changelog_post_from_proto,
     changelog_posts_page_from_proto,
 )
@@ -20,6 +22,9 @@ from polyester.models.changelog import (
     CHANGELOG_CATEGORY_BREAKING_CHANGE,
     ChangelogChangeEntry,
     ChangelogChangesPage,
+    ChangelogDeploymentGroup,
+    ChangelogDeploymentGroupsPage,
+    ChangelogDeploymentGroupSummary,
     ChangelogPost,
     ChangelogPostsPage,
     ChangelogPostSummary,
@@ -77,6 +82,59 @@ class AsyncChangelogService(BaseService):
             changelog_pb2.GetPostRequest(slug=slug),
             changelog_post_from_proto,
         )
+
+    async def list_deployment_groups(
+        self,
+        *,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> ChangelogDeploymentGroupsPage:
+        """One page of this environment's deployment groups, newest deployment
+        first: each deployment that brought new releases, with the release
+        posts it brought. ``limit`` defaults to 20 on the server (maximum
+        100); ``page_token`` is an opaque cursor bound to deployment time and
+        slug. The list is empty until the environment publishes release
+        posts."""
+        request = changelog_pb2.ListDeploymentGroupsRequest(
+            limit=validate_limit(limit, allow_none=True) or 0,
+            page_token=page_token or "",
+        )
+        return await unary_public_decoded(
+            self._transport,
+            ChangelogServiceClient,
+            lambda client, req: client.list_deployment_groups(req),
+            request,
+            changelog_deployment_groups_page_from_proto,
+        )
+
+    async def get_deployment_group(self, slug: str) -> ChangelogDeploymentGroup:
+        """One deployment group by slug, such as ``"testnet-v0.92.9"``, with
+        the changes that need attention and the highlights of its release
+        posts. An unknown slug raises ``PolyesterApiError`` with code
+        ``not_found`` (see ``is_not_found``)."""
+        return await unary_public_decoded(
+            self._transport,
+            ChangelogServiceClient,
+            lambda client, req: client.get_deployment_group(req),
+            changelog_pb2.GetDeploymentGroupRequest(slug=slug),
+            changelog_deployment_group_from_proto,
+        )
+
+    async def iter_deployment_groups(
+        self,
+        *,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> AsyncIterator[ChangelogDeploymentGroupSummary]:
+        """Every deployment group summary from ``page_token`` (or the newest
+        deployment) to the oldest, fetching pages as needed."""
+
+        async def fetch(token: str | None) -> tuple[list[ChangelogDeploymentGroupSummary], str]:
+            page = await self.list_deployment_groups(limit=limit, page_token=token)
+            return page.groups, page.next_page_token
+
+        async for group in _paginate("ListDeploymentGroups", page_token, fetch):
+            yield group
 
     async def list_changes(
         self,

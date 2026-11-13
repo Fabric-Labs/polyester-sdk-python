@@ -3,7 +3,7 @@ from __future__ import annotations
 import operator
 import re
 from collections.abc import Iterable, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -358,6 +358,17 @@ def format_id(value: str | int) -> str:
 
 
 _UNIX_EPOCH = datetime(1970, 1, 1)
+_UNIX_EPOCH_UTC = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def timestamp_parts_to_datetime(seconds: int, nanos: int) -> datetime:
+    """Aware UTC datetime for protobuf ``Timestamp`` fields, exact to the microsecond.
+
+    Integer arithmetic, as protobuf's ``ToDatetime``: the nanoseconds below a
+    microsecond are truncated. A float of ``seconds + nanos / 1e9`` would
+    round a time in the last nanoseconds of a second up to the next second.
+    """
+    return _UNIX_EPOCH_UTC + timedelta(seconds=int(seconds), microseconds=int(nanos) // 1000)
 
 
 def datetime_to_timestamp_dict(value: datetime) -> dict[str, int]:
@@ -384,7 +395,7 @@ def timestamp_dict_to_datetime(value: Any) -> datetime | None:
         nanos = value.get("nanos", 0)
     if seconds is None:
         return None
-    return datetime.fromtimestamp(int(seconds) + int(nanos) / 1_000_000_000, tz=UTC)
+    return timestamp_parts_to_datetime(int(seconds), int(nanos or 0))
 
 
 def omit_none(data: dict[str, Any]) -> dict[str, Any]:

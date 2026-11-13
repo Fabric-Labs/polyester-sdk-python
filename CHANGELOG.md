@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** The address-book filters accept only their documented labels and refuse any other before sending, with a `PolyesterValidationError` that lists the accepted ones. `kind` accepts `external`, `external_chain`, `internal` and `internal_account`; `direction` accepts `deposit_from`, `withdraw_to`, `internal_transfer_from` and `internal_transfer_to`; any case, with `-` or `_`. Labels such as `unspecified` or `transfer_counterparty_direction_unspecified` were sent as the unspecified value, which the server reads as no filter, so the call returned every entry, and other names of the generated module (`scope_root`) were sent as an unrelated value. Affected: `address_book.list_entries` (`kind`), `address_book.list_transfer_counterparties` (`direction`, `kind`) and `address_book.list_transfer_destinations` (`kind`), on `AsyncPolyester` and `Polyester`; `polyester.codecs.address_book.address_book_entry_kind_from_label` and `transfer_counterparty_direction_from_label`. Migration: pass one of the listed labels, or leave the filter out to list everything.
+- Protobuf times decode exactly. A time in the last nanoseconds of a second (999,999,404 or more) read one second late: an order's `expire_at` of `18:00:00.999999999Z` read `18:00:01.999999999Z`. `datetime` values also rounded to the nearest microsecond and now truncate the nanoseconds below it, as the other `datetime` fields already did, so a time can read one microsecond earlier than before. Affected: `Order.expire_at`; `PriceAlert.created_at`, `updated_at` and `triggered_at`; `Trigger.created_at`, `updated_at`, `armed_at` and `completed_at`; the changelog's `published_at`, `updated_at` and `coverage_cutoff`; the VIP tiers' and VIP status times; the trading rate-limit `effective_from`; and `polyester.codecs.timestamp_dict_to_datetime`.
+
 ## 0.27.0
 
 Git tag: `v0.27.0`. Released 2026-11-13. Built on public contract `78792a5`.

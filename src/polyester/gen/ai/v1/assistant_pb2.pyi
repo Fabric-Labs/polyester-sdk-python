@@ -79,6 +79,18 @@ class AssistantKeyState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTIVE: _ClassVar[AssistantKeyState]
     DISABLED: _ClassVar[AssistantKeyState]
 
+class DisplaySetting(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SETTING_UNSPECIFIED: _ClassVar[DisplaySetting]
+    APPEARANCE: _ClassVar[DisplaySetting]
+    LANGUAGE: _ClassVar[DisplaySetting]
+    CURRENCY: _ClassVar[DisplaySetting]
+    DATE_FORMAT: _ClassVar[DisplaySetting]
+    TIME_FORMAT: _ClassVar[DisplaySetting]
+    NUMBER_FORMAT: _ClassVar[DisplaySetting]
+    WEEK_START: _ClassVar[DisplaySetting]
+    SOUNDS: _ClassVar[DisplaySetting]
+
 class ReferencePriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     PRICE_SOURCE_UNSPECIFIED: _ClassVar[ReferencePriceSource]
@@ -168,6 +180,15 @@ PROFILE: MemoryKind
 KEY_STATE_UNSPECIFIED: AssistantKeyState
 ACTIVE: AssistantKeyState
 DISABLED: AssistantKeyState
+SETTING_UNSPECIFIED: DisplaySetting
+APPEARANCE: DisplaySetting
+LANGUAGE: DisplaySetting
+CURRENCY: DisplaySetting
+DATE_FORMAT: DisplaySetting
+TIME_FORMAT: DisplaySetting
+NUMBER_FORMAT: DisplaySetting
+WEEK_START: DisplaySetting
+SOUNDS: DisplaySetting
 PRICE_SOURCE_UNSPECIFIED: ReferencePriceSource
 BEST_BID: ReferencePriceSource
 BEST_ASK: ReferencePriceSource
@@ -430,6 +451,16 @@ class DestinationsSuggested(_message.Message):
     tool_call_id: str
     destination_ids: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, tool_call_id: _Optional[str] = ..., destination_ids: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class DisplaySettingAction(_message.Message):
+    __slots__ = ("tool_call_id", "setting", "value")
+    TOOL_CALL_ID_FIELD_NUMBER: _ClassVar[int]
+    SETTING_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    tool_call_id: str
+    setting: DisplaySetting
+    value: str
+    def __init__(self, tool_call_id: _Optional[str] = ..., setting: _Optional[_Union[DisplaySetting, str]] = ..., value: _Optional[str] = ...) -> None: ...
 
 class SkillLoaded(_message.Message):
     __slots__ = ("name",)
@@ -932,7 +963,7 @@ class RunFailed(_message.Message):
     def __init__(self, category: _Optional[_Union[FailureCategory, str]] = ..., message: _Optional[str] = ..., usage: _Optional[_Union[Usage, _Mapping]] = ...) -> None: ...
 
 class RunEvent(_message.Message):
-    __slots__ = ("seq", "created_at", "text_delta", "discard_partial", "tool_started", "tool_finished", "skill_loaded", "subagent_started", "subagent_finished", "approval_requested", "approval_resolved", "view", "run_completed", "run_failed", "memories_recalled", "destinations_suggested")
+    __slots__ = ("seq", "created_at", "text_delta", "discard_partial", "tool_started", "tool_finished", "skill_loaded", "subagent_started", "subagent_finished", "approval_requested", "approval_resolved", "view", "run_completed", "run_failed", "memories_recalled", "destinations_suggested", "display_setting_action")
     SEQ_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     TEXT_DELTA_FIELD_NUMBER: _ClassVar[int]
@@ -949,6 +980,7 @@ class RunEvent(_message.Message):
     RUN_FAILED_FIELD_NUMBER: _ClassVar[int]
     MEMORIES_RECALLED_FIELD_NUMBER: _ClassVar[int]
     DESTINATIONS_SUGGESTED_FIELD_NUMBER: _ClassVar[int]
+    DISPLAY_SETTING_ACTION_FIELD_NUMBER: _ClassVar[int]
     seq: int
     created_at: _timestamp_pb2.Timestamp
     text_delta: TextDelta
@@ -965,7 +997,8 @@ class RunEvent(_message.Message):
     run_failed: RunFailed
     memories_recalled: MemoriesRecalled
     destinations_suggested: DestinationsSuggested
-    def __init__(self, seq: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., text_delta: _Optional[_Union[TextDelta, _Mapping]] = ..., discard_partial: _Optional[_Union[DiscardPartial, _Mapping]] = ..., tool_started: _Optional[_Union[ToolStarted, _Mapping]] = ..., tool_finished: _Optional[_Union[ToolFinished, _Mapping]] = ..., skill_loaded: _Optional[_Union[SkillLoaded, _Mapping]] = ..., subagent_started: _Optional[_Union[SubagentStarted, _Mapping]] = ..., subagent_finished: _Optional[_Union[SubagentFinished, _Mapping]] = ..., approval_requested: _Optional[_Union[ApprovalRequested, _Mapping]] = ..., approval_resolved: _Optional[_Union[ApprovalResolved, _Mapping]] = ..., view: _Optional[_Union[View, _Mapping]] = ..., run_completed: _Optional[_Union[RunCompleted, _Mapping]] = ..., run_failed: _Optional[_Union[RunFailed, _Mapping]] = ..., memories_recalled: _Optional[_Union[MemoriesRecalled, _Mapping]] = ..., destinations_suggested: _Optional[_Union[DestinationsSuggested, _Mapping]] = ...) -> None: ...
+    display_setting_action: DisplaySettingAction
+    def __init__(self, seq: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., text_delta: _Optional[_Union[TextDelta, _Mapping]] = ..., discard_partial: _Optional[_Union[DiscardPartial, _Mapping]] = ..., tool_started: _Optional[_Union[ToolStarted, _Mapping]] = ..., tool_finished: _Optional[_Union[ToolFinished, _Mapping]] = ..., skill_loaded: _Optional[_Union[SkillLoaded, _Mapping]] = ..., subagent_started: _Optional[_Union[SubagentStarted, _Mapping]] = ..., subagent_finished: _Optional[_Union[SubagentFinished, _Mapping]] = ..., approval_requested: _Optional[_Union[ApprovalRequested, _Mapping]] = ..., approval_resolved: _Optional[_Union[ApprovalResolved, _Mapping]] = ..., view: _Optional[_Union[View, _Mapping]] = ..., run_completed: _Optional[_Union[RunCompleted, _Mapping]] = ..., run_failed: _Optional[_Union[RunFailed, _Mapping]] = ..., memories_recalled: _Optional[_Union[MemoriesRecalled, _Mapping]] = ..., destinations_suggested: _Optional[_Union[DestinationsSuggested, _Mapping]] = ..., display_setting_action: _Optional[_Union[DisplaySettingAction, _Mapping]] = ...) -> None: ...
 
 class AssistantKey(_message.Message):
     __slots__ = ("subaccount_id", "key_id", "public_key_ed25519", "state")
@@ -1007,19 +1040,33 @@ class Destination(_message.Message):
     description: str
     def __init__(self, id: _Optional[str] = ..., title: _Optional[str] = ..., description: _Optional[str] = ...) -> None: ...
 
+class CurrentPage(_message.Message):
+    __slots__ = ("destination_id", "route", "title")
+    DESTINATION_ID_FIELD_NUMBER: _ClassVar[int]
+    ROUTE_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    destination_id: str
+    route: str
+    title: str
+    def __init__(self, destination_id: _Optional[str] = ..., route: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
+
 class SendMessageRequest(_message.Message):
-    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations")
+    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATIONS_FIELD_NUMBER: _ClassVar[int]
+    PAGE_FIELD_NUMBER: _ClassVar[int]
+    DISPLAY_SETTINGS_FIELD_NUMBER: _ClassVar[int]
     conversation_id: int
     text: str
     idempotency_key: str
     subaccount_id: int
     destinations: _containers.RepeatedCompositeFieldContainer[Destination]
-    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ...) -> None: ...
+    page: CurrentPage
+    display_settings: _containers.RepeatedScalarFieldContainer[DisplaySetting]
+    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ...) -> None: ...
 
 class SendMessageResponse(_message.Message):
     __slots__ = ("run_id", "conversation_id")

@@ -45,6 +45,20 @@ class Surface(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     REWARDS: _ClassVar[Surface]
     ASSISTANT: _ClassVar[Surface]
 
+class Environment(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ENVIRONMENT_UNSPECIFIED: _ClassVar[Environment]
+    DEVNET: _ClassVar[Environment]
+    TESTNET: _ClassVar[Environment]
+    MAINNET: _ClassVar[Environment]
+
+class ChangeAvailability(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AVAILABILITY_UNSPECIFIED: _ClassVar[ChangeAvailability]
+    AHEAD: _ClassVar[ChangeAvailability]
+    PENDING: _ClassVar[ChangeAvailability]
+    UNAVAILABLE: _ClassVar[ChangeAvailability]
+
 class SortDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SORT_DIRECTION_UNSPECIFIED: _ClassVar[SortDirection]
@@ -72,12 +86,38 @@ MARKET_DATA: Surface
 QUICKSWAP: Surface
 REWARDS: Surface
 ASSISTANT: Surface
+ENVIRONMENT_UNSPECIFIED: Environment
+DEVNET: Environment
+TESTNET: Environment
+MAINNET: Environment
+AVAILABILITY_UNSPECIFIED: ChangeAvailability
+AHEAD: ChangeAvailability
+PENDING: ChangeAvailability
+UNAVAILABLE: ChangeAvailability
 SORT_DIRECTION_UNSPECIFIED: SortDirection
 SORT_ASC: SortDirection
 SORT_DESC: SortDirection
 
+class EnvironmentStatus(_message.Message):
+    __slots__ = ("environment", "live_at")
+    ENVIRONMENT_FIELD_NUMBER: _ClassVar[int]
+    LIVE_AT_FIELD_NUMBER: _ClassVar[int]
+    environment: Environment
+    live_at: _timestamp_pb2.Timestamp
+    def __init__(self, environment: _Optional[_Union[Environment, str]] = ..., live_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ChangeException(_message.Message):
+    __slots__ = ("environment", "availability", "live_at")
+    ENVIRONMENT_FIELD_NUMBER: _ClassVar[int]
+    AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
+    LIVE_AT_FIELD_NUMBER: _ClassVar[int]
+    environment: Environment
+    availability: ChangeAvailability
+    live_at: _timestamp_pb2.Timestamp
+    def __init__(self, environment: _Optional[_Union[Environment, str]] = ..., availability: _Optional[_Union[ChangeAvailability, str]] = ..., live_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
 class Change(_message.Message):
-    __slots__ = ("id", "title", "summary", "details", "category", "action_required", "migration_guidance", "audiences", "surfaces")
+    __slots__ = ("id", "title", "summary", "details", "category", "action_required", "migration_guidance", "audiences", "surfaces", "environment_exceptions")
     ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     SUMMARY_FIELD_NUMBER: _ClassVar[int]
@@ -87,6 +127,7 @@ class Change(_message.Message):
     MIGRATION_GUIDANCE_FIELD_NUMBER: _ClassVar[int]
     AUDIENCES_FIELD_NUMBER: _ClassVar[int]
     SURFACES_FIELD_NUMBER: _ClassVar[int]
+    ENVIRONMENT_EXCEPTIONS_FIELD_NUMBER: _ClassVar[int]
     id: int
     title: str
     summary: str
@@ -96,7 +137,8 @@ class Change(_message.Message):
     migration_guidance: str
     audiences: _containers.RepeatedScalarFieldContainer[Audience]
     surfaces: _containers.RepeatedScalarFieldContainer[Surface]
-    def __init__(self, id: _Optional[int] = ..., title: _Optional[str] = ..., summary: _Optional[str] = ..., details: _Optional[str] = ..., category: _Optional[_Union[ChangeCategory, str]] = ..., action_required: _Optional[bool] = ..., migration_guidance: _Optional[str] = ..., audiences: _Optional[_Iterable[_Union[Audience, str]]] = ..., surfaces: _Optional[_Iterable[_Union[Surface, str]]] = ...) -> None: ...
+    environment_exceptions: _containers.RepeatedCompositeFieldContainer[ChangeException]
+    def __init__(self, id: _Optional[int] = ..., title: _Optional[str] = ..., summary: _Optional[str] = ..., details: _Optional[str] = ..., category: _Optional[_Union[ChangeCategory, str]] = ..., action_required: _Optional[bool] = ..., migration_guidance: _Optional[str] = ..., audiences: _Optional[_Iterable[_Union[Audience, str]]] = ..., surfaces: _Optional[_Iterable[_Union[Surface, str]]] = ..., environment_exceptions: _Optional[_Iterable[_Union[ChangeException, _Mapping]]] = ...) -> None: ...
 
 class Section(_message.Message):
     __slots__ = ("heading", "summary", "changes", "surface")
@@ -111,7 +153,7 @@ class Section(_message.Message):
     def __init__(self, heading: _Optional[str] = ..., summary: _Optional[str] = ..., changes: _Optional[_Iterable[_Union[Change, _Mapping]]] = ..., surface: _Optional[_Union[Surface, str]] = ...) -> None: ...
 
 class PostSummary(_message.Message):
-    __slots__ = ("slug", "title", "introduction", "published_at", "coverage_cutoff", "change_count", "breaking_change_count", "action_required_count", "new_feature_count", "improvement_count", "bug_fix_count", "updated_at", "revision")
+    __slots__ = ("slug", "title", "introduction", "published_at", "coverage_cutoff", "change_count", "breaking_change_count", "action_required_count", "new_feature_count", "improvement_count", "bug_fix_count", "updated_at", "revision", "release_version", "environments", "deployment_group_slug")
     SLUG_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     INTRODUCTION_FIELD_NUMBER: _ClassVar[int]
@@ -125,6 +167,9 @@ class PostSummary(_message.Message):
     BUG_FIX_COUNT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    RELEASE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    ENVIRONMENTS_FIELD_NUMBER: _ClassVar[int]
+    DEPLOYMENT_GROUP_SLUG_FIELD_NUMBER: _ClassVar[int]
     slug: str
     title: str
     introduction: str
@@ -138,7 +183,10 @@ class PostSummary(_message.Message):
     bug_fix_count: int
     updated_at: _timestamp_pb2.Timestamp
     revision: int
-    def __init__(self, slug: _Optional[str] = ..., title: _Optional[str] = ..., introduction: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., coverage_cutoff: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., change_count: _Optional[int] = ..., breaking_change_count: _Optional[int] = ..., action_required_count: _Optional[int] = ..., new_feature_count: _Optional[int] = ..., improvement_count: _Optional[int] = ..., bug_fix_count: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
+    release_version: str
+    environments: _containers.RepeatedCompositeFieldContainer[EnvironmentStatus]
+    deployment_group_slug: str
+    def __init__(self, slug: _Optional[str] = ..., title: _Optional[str] = ..., introduction: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., coverage_cutoff: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., change_count: _Optional[int] = ..., breaking_change_count: _Optional[int] = ..., action_required_count: _Optional[int] = ..., new_feature_count: _Optional[int] = ..., improvement_count: _Optional[int] = ..., bug_fix_count: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., release_version: _Optional[str] = ..., environments: _Optional[_Iterable[_Union[EnvironmentStatus, _Mapping]]] = ..., deployment_group_slug: _Optional[str] = ...) -> None: ...
 
 class Post(_message.Message):
     __slots__ = ("summary", "sections")
@@ -219,3 +267,97 @@ class ListChangesResponse(_message.Message):
     changes: _containers.RepeatedCompositeFieldContainer[ChangeEntry]
     next_page_token: str
     def __init__(self, changes: _Optional[_Iterable[_Union[ChangeEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class DeploymentGroupPost(_message.Message):
+    __slots__ = ("slug", "release_version", "title", "published_at", "revision", "updated_at")
+    SLUG_FIELD_NUMBER: _ClassVar[int]
+    RELEASE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    PUBLISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    slug: str
+    release_version: str
+    title: str
+    published_at: _timestamp_pb2.Timestamp
+    revision: int
+    updated_at: _timestamp_pb2.Timestamp
+    def __init__(self, slug: _Optional[str] = ..., release_version: _Optional[str] = ..., title: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class DeploymentGroupSummary(_message.Message):
+    __slots__ = ("slug", "environment", "occurred_at", "release_version", "release_tag", "previous_release_version", "versions", "posts")
+    SLUG_FIELD_NUMBER: _ClassVar[int]
+    ENVIRONMENT_FIELD_NUMBER: _ClassVar[int]
+    OCCURRED_AT_FIELD_NUMBER: _ClassVar[int]
+    RELEASE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    RELEASE_TAG_FIELD_NUMBER: _ClassVar[int]
+    PREVIOUS_RELEASE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    VERSIONS_FIELD_NUMBER: _ClassVar[int]
+    POSTS_FIELD_NUMBER: _ClassVar[int]
+    slug: str
+    environment: Environment
+    occurred_at: _timestamp_pb2.Timestamp
+    release_version: str
+    release_tag: str
+    previous_release_version: str
+    versions: _containers.RepeatedScalarFieldContainer[str]
+    posts: _containers.RepeatedCompositeFieldContainer[DeploymentGroupPost]
+    def __init__(self, slug: _Optional[str] = ..., environment: _Optional[_Union[Environment, str]] = ..., occurred_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., release_version: _Optional[str] = ..., release_tag: _Optional[str] = ..., previous_release_version: _Optional[str] = ..., versions: _Optional[_Iterable[str]] = ..., posts: _Optional[_Iterable[_Union[DeploymentGroupPost, _Mapping]]] = ...) -> None: ...
+
+class DeploymentGroupAttention(_message.Message):
+    __slots__ = ("post_slug", "release_version", "change")
+    POST_SLUG_FIELD_NUMBER: _ClassVar[int]
+    RELEASE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    CHANGE_FIELD_NUMBER: _ClassVar[int]
+    post_slug: str
+    release_version: str
+    change: Change
+    def __init__(self, post_slug: _Optional[str] = ..., release_version: _Optional[str] = ..., change: _Optional[_Union[Change, _Mapping]] = ...) -> None: ...
+
+class DeploymentGroupHighlight(_message.Message):
+    __slots__ = ("post_slug", "release_version", "text")
+    POST_SLUG_FIELD_NUMBER: _ClassVar[int]
+    RELEASE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    post_slug: str
+    release_version: str
+    text: str
+    def __init__(self, post_slug: _Optional[str] = ..., release_version: _Optional[str] = ..., text: _Optional[str] = ...) -> None: ...
+
+class DeploymentGroup(_message.Message):
+    __slots__ = ("summary", "attention", "highlights")
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    ATTENTION_FIELD_NUMBER: _ClassVar[int]
+    HIGHLIGHTS_FIELD_NUMBER: _ClassVar[int]
+    summary: DeploymentGroupSummary
+    attention: _containers.RepeatedCompositeFieldContainer[DeploymentGroupAttention]
+    highlights: _containers.RepeatedCompositeFieldContainer[DeploymentGroupHighlight]
+    def __init__(self, summary: _Optional[_Union[DeploymentGroupSummary, _Mapping]] = ..., attention: _Optional[_Iterable[_Union[DeploymentGroupAttention, _Mapping]]] = ..., highlights: _Optional[_Iterable[_Union[DeploymentGroupHighlight, _Mapping]]] = ...) -> None: ...
+
+class ListDeploymentGroupsRequest(_message.Message):
+    __slots__ = ("limit", "page_token")
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    limit: int
+    page_token: str
+    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListDeploymentGroupsResponse(_message.Message):
+    __slots__ = ("groups", "next_page_token")
+    GROUPS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    groups: _containers.RepeatedCompositeFieldContainer[DeploymentGroupSummary]
+    next_page_token: str
+    def __init__(self, groups: _Optional[_Iterable[_Union[DeploymentGroupSummary, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class GetDeploymentGroupRequest(_message.Message):
+    __slots__ = ("slug",)
+    SLUG_FIELD_NUMBER: _ClassVar[int]
+    slug: str
+    def __init__(self, slug: _Optional[str] = ...) -> None: ...
+
+class GetDeploymentGroupResponse(_message.Message):
+    __slots__ = ("group",)
+    GROUP_FIELD_NUMBER: _ClassVar[int]
+    group: DeploymentGroup
+    def __init__(self, group: _Optional[_Union[DeploymentGroup, _Mapping]] = ...) -> None: ...

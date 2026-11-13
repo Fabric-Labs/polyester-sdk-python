@@ -60,12 +60,31 @@ def _free_port() -> int:
 
 
 def _start(host: str, port: int) -> HTTPServer:
+    """A test server on ``host:port``; the case is skipped when this host
+    cannot listen there, as macOS cannot on 127.0.0.2 by default."""
+    # Probe first: on a bind failure the werkzeug server prints the error and
+    # calls sys.exit, which an OSError handler does not catch.
+    try:
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            probe.bind((host, port))
+    except OSError as exc:
+        pytest.skip(f"cannot listen on {host}:{port}: {exc}")
     server = HTTPServer(host=host, port=port)
     try:
         server.start()
-    except OSError as exc:  # pragma: no cover - depends on the loopback setup
-        pytest.skip(f"cannot listen on {host}:{port}: {exc}")
+    except (OSError, SystemExit) as exc:  # pragma: no cover - lost a race for the port
+        pytest.skip(f"cannot listen on {host}:{port}: {exc!r}")
     return server
+
+
+def test_start_skips_an_address_this_host_cannot_bind() -> None:
+    """A host without the address (macOS assigns only 127.0.0.1 to loopback)
+    skips the case; the test server must not exit the test process."""
+    # TEST-NET-1 (RFC 5737) is assigned to no interface here, as 127.0.0.2 is
+    # not on macOS: binding it fails with "Can't assign requested address".
+    with pytest.raises(pytest.skip.Exception, match="cannot listen on 192.0.2.1"):
+        _start("192.0.2.1", _free_port())
 
 
 @pytest.fixture(params=["port-only", "host-only"])

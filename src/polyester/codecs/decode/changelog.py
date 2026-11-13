@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
+from polyester.codecs.proto_helpers import timestamp_to_datetime as _timestamp
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.changelog.v1 import changelog_pb2
 from polyester.models.changelog import (
@@ -22,14 +23,6 @@ from polyester.models.changelog import (
     ChangelogPostSummary,
     ChangelogSection,
 )
-
-
-def _timestamp(ts) -> datetime | None:
-    seconds = int(getattr(ts, "seconds", 0) or 0)
-    nanos = int(getattr(ts, "nanos", 0) or 0)
-    if seconds == 0 and nanos == 0:
-        return None
-    return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
 
 
 def _optional_timestamp(msg, field: str) -> datetime | None:

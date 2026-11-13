@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
 from polyester.codecs.decode.orders import OrderScales, _field_violations_from_proto, pair_scales
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
+from polyester.codecs.proto_helpers import timestamp_to_datetime as _timestamp
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
@@ -129,16 +129,6 @@ def _trigger_price_source_label(value: int) -> str:
     if name.endswith("_price"):
         return name.removesuffix("_price")
     return name
-
-
-def _timestamp(ts) -> datetime | None:
-    if ts is None:
-        return None
-    seconds = int(getattr(ts, "seconds", 0) or 0)
-    nanos = int(getattr(ts, "nanos", 0) or 0)
-    if seconds == 0 and nanos == 0:
-        return None
-    return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
 
 
 def _trigger_details(

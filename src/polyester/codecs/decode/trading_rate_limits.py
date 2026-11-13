@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from polyester.codecs.proto_helpers import has_field
+from polyester.codecs.proto_helpers import timestamp_to_datetime as _timestamp
 from polyester.gen.ratelimit.v1 import ratelimit_pb2
 from polyester.models.trading_rate_limits import (
     RateLimitConfig,
@@ -16,16 +15,6 @@ def _enum_label(enum_cls: object, raw: int, *, unknown_prefix: str) -> str:
         return enum_cls.Name(raw)  # type: ignore[attr-defined]
     except (ValueError, TypeError):
         return f"{unknown_prefix}({raw})"
-
-
-def _timestamp(ts) -> datetime | None:
-    if ts is None:
-        return None
-    seconds = int(getattr(ts, "seconds", 0) or 0)
-    nanos = int(getattr(ts, "nanos", 0) or 0)
-    if seconds == 0 and nanos == 0:
-        return None
-    return datetime.fromtimestamp(seconds + nanos / 1_000_000_000, tz=UTC)
 
 
 def trading_rate_limit_rule_from_proto(

@@ -112,7 +112,7 @@ async def test_subscription_book_follows_snapshot_availability(monkeypatch) -> N
     emitted = await _subscription_emits(
         monkeypatch,
         orderbook_pb2.GetOrderBookResponse(book_seq=5, available=True, bids=[_level(100, 1)]),
-        [OrderBookDeltaUpdate(book_seq_start=6, book_seq_end=6, bids=[[99, 3]])],
+        [OrderBookDeltaUpdate(book_seq_start=5, book_seq_end=6, bids=[[99, 3]])],
     )
     assert [book.available for book in emitted] == [True, True]
 
@@ -138,9 +138,9 @@ async def test_subscription_book_keeps_the_snapshot_available_through_deltas(
             book_seq=5, available=snapshot_available, bids=[_level(100, 1)]
         ),
         [
-            OrderBookDeltaUpdate(book_seq_start=6, book_seq_end=6, reset=reset, asks=[[101, 1]]),
-            OrderBookDeltaUpdate(book_seq_start=7, book_seq_end=7, asks=[[102, 1]]),
-            OrderBookDeltaUpdate(book_seq_start=8, book_seq_end=8, reset=True, bids=[[99, 2]]),
+            OrderBookDeltaUpdate(book_seq_start=5, book_seq_end=6, reset=reset, asks=[[101, 1]]),
+            OrderBookDeltaUpdate(book_seq_start=6, book_seq_end=7, asks=[[102, 1]]),
+            OrderBookDeltaUpdate(book_seq_start=0, book_seq_end=8, reset=True, bids=[[99, 2]]),
         ],
     )
     assert [book.available for book in emitted] == [snapshot_available] * 4

@@ -59,7 +59,7 @@ def test_build_orderbook_data_trims_to_nonnegative_depth(depth: int) -> None:
     assert len(data.bids) == len(data.asks) == depth
 
 
-def _delta(bids=(), asks=(), *, start="11", end="11", reset=False) -> OrderBookDeltaUpdate:
+def _delta(bids=(), asks=(), *, start="10", end="11", reset=False) -> OrderBookDeltaUpdate:
     return OrderBookDeltaUpdate(
         book_seq_start=start,
         book_seq_end=end,
@@ -220,7 +220,7 @@ async def test_managed_snapshot_and_delta_views_are_bound_to_their_market(monkey
         await queue.put(
             OrderBookDeltaUpdate(
                 symbol_id=3,
-                book_seq_start="2",
+                book_seq_start="1",
                 book_seq_end="2",
                 bids=[["52310000000", "9"]],
                 asks=[],

@@ -180,7 +180,18 @@ def apply_delta(
     current_book_seq: int,
     delta: OrderBookDeltaUpdate,
 ) -> tuple[int, bool]:
-    """Apply one delta. Returns (new_book_seq, needs_snapshot_refresh)."""
+    """Apply one delta. Returns ``(new_book_seq, out_of_sync)``.
+
+    Each update is the difference between two published views of the tier's
+    top levels: ``book_seq_start`` is the sequence of the view it applies to
+    (the previous update's ``book_seq_end``) and ``book_seq_end`` that of the
+    view after it. An update whose ``book_seq_end`` is at most
+    ``current_book_seq`` is already in the book and is dropped. Any other
+    update applies only to a book at exactly ``book_seq_start``; one that
+    starts anywhere else, before or after, cannot be applied and leaves the
+    book out of sync (``out_of_sync`` true, the book unchanged) until a
+    ``reset`` replaces it. A malformed update is out of sync too.
+    """
     # Reject the whole update atomically. Skipping corrupt rows while advancing
     # the sequence permanently leaves stale quantity in the local book. A
     # positive quantity at price zero is a level bucket_side refuses to render,
@@ -197,19 +208,17 @@ def apply_delta(
     if seq_start < 0 or seq_end < seq_start:
         return current_book_seq, True
 
-    # A reset is a complete replacement through seq_end. A snapshot at the
-    # same or newer sequence is already authoritative, so a buffered reset
-    # must not clear or rewind it. A reset that reaches a newer sequence can
-    # safely replace the book even if its range starts before or after the
-    # current sequence.
-    if delta.reset and seq_end <= current_book_seq:
+    # An update that ends at or before the book's sequence is already in it. A
+    # reset is a complete replacement through seq_end, so one that does not
+    # advance the sequence must not clear or rewind a newer snapshot.
+    if seq_end <= current_book_seq:
         return current_book_seq, False
 
-    if not delta.reset and seq_start > current_book_seq + 1:
+    # A diff applies only to the exact view it was computed from: one that
+    # starts after the book skipped a view, and one that starts before it
+    # overlaps views the book already holds.
+    if not delta.reset and seq_start != current_book_seq:
         return current_book_seq, True
-
-    if not delta.reset and seq_end <= current_book_seq:
-        return current_book_seq, False
 
     if delta.reset:
         bids.clear()

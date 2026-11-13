@@ -125,6 +125,12 @@ class AsyncOrderbookService(BaseService):
         ``depth`` is any level count from 1 to the deepest published stream tier. The book
         rides the smallest tier covering it, snapshot included, and each view is trimmed to
         ``depth``; a depth no tier covers is refused before connecting.
+
+        Each delta applies only to a book at exactly its ``book_seq_start``. After a
+        sequence gap or a malformed delta, ``on_sequence_gap`` runs once, the book keeps
+        its levels and its next view reads ``available=False``, and it waits for the
+        stream's next reset (or a new snapshot from ``refresh_snapshot`` or a reconnect)
+        instead of fetching snapshots.
         """
         stream_depth = orderbook_stream_tier(depth)
         # Views report a plain int, also for a NumPy depth.
@@ -164,6 +170,9 @@ class AsyncOrderbookService(BaseService):
         current_book_seq = 0
         # The last snapshot's wire ``available``; deltas, resets included, never change it.
         book_available = True
+        # After a sequence gap the book no longer matches the stream: it waits for the
+        # next reset (or a new snapshot), and its views read unavailable meanwhile.
+        awaiting_reset = False
         # Pacing for requests of a snapshot that came back unavailable.
         last_view_unavailable = False
         recheck_delay = _UNAVAILABLE_SNAPSHOT_INITIAL_DELAY
@@ -177,7 +186,8 @@ class AsyncOrderbookService(BaseService):
             nonlocal last_view_unavailable
             if close.is_set():
                 return
-            last_view_unavailable = not book_available
+            available = book_available and not awaiting_reset
+            last_view_unavailable = not available
             data = build_orderbook_data(
                 symbol=symbol,
                 depth=depth,
@@ -186,7 +196,7 @@ class AsyncOrderbookService(BaseService):
                 asks=asks_map,
                 bucket_ticks=bucket_ticks,
                 quantity_scale=self._require_quantity_scale(symbol),
-                available=book_available,
+                available=available,
             )
             if on_event is not None:
                 on_event(data)
@@ -228,22 +238,23 @@ class AsyncOrderbookService(BaseService):
             )
 
         def apply_snapshot(snapshot, buffered_deltas: list[OrderBookDeltaUpdate]) -> None:
-            nonlocal bids_map, asks_map, current_book_seq, book_available
+            nonlocal bids_map, asks_map, current_book_seq, book_available, awaiting_reset
             bids_map = levels_from_proto_levels(snapshot.bids)
             asks_map = levels_from_proto_levels(snapshot.asks)
             current_book_seq = int(snapshot.book_seq or 0)
             book_available = bool(snapshot.available)
+            # A new snapshot is a known book state again.
+            awaiting_reset = False
             # The snapshot and the deltas buffered behind it are one book state, so they
-            # add one view: a view per delta would queue copies of superseded states.
-            applied_all = True
+            # add one view: a view per delta would queue copies of superseded states. A
+            # buffered delta that does not line up with the snapshot leaves the book
+            # waiting for a reset, which a later buffered delta may already be.
             for delta in buffered_deltas:
                 if close.is_set():
                     return
-                if not apply_one(delta):
-                    applied_all = False
-                    break
-            # A repeated unavailable answer adds no view; a gap's refresh adds the next.
-            if applied_all and (book_available or not last_view_unavailable or buffered_deltas):
+                apply_one(delta)
+            # A repeated unavailable answer adds no view.
+            if book_available or not last_view_unavailable or buffered_deltas:
                 emit()
             recheck_unavailable_snapshot()
 
@@ -287,20 +298,34 @@ class AsyncOrderbookService(BaseService):
                 handle_delta(delta)
 
         def apply_one(delta: OrderBookDeltaUpdate) -> bool:
-            """Apply ``delta`` without a view; on a sequence gap, request a refresh."""
-            nonlocal current_book_seq
-            current_book_seq, needs_refresh = apply_delta(
+            """Apply ``delta`` without a view. Returns whether it changed what a view
+            shows: the book, or the start of a wait for a reset.
+
+            On a sequence gap the book stops taking diffs and waits for the next reset
+            rather than refetching snapshots: a snapshot need not line up with the
+            stream, while a reset always does.
+            """
+            nonlocal current_book_seq, awaiting_reset
+            if awaiting_reset and not delta.reset:
+                return False
+            previous_seq = current_book_seq
+            current_book_seq, out_of_sync = apply_delta(
                 bids=bids_map,
                 asks=asks_map,
                 current_book_seq=current_book_seq,
                 delta=delta,
             )
-            if needs_refresh:
+            if out_of_sync:
+                if awaiting_reset:
+                    return False
+                awaiting_reset = True
                 if on_sequence_gap is not None:
                     on_sequence_gap()
-                stream = stream_holder["stream"]
-                if stream is not None and not stream.is_disposed():
-                    stream.request_refresh()
+                return True
+            if delta.reset and current_book_seq > previous_seq:
+                awaiting_reset = False
+            elif awaiting_reset:
+                # A reset the book already holds does not end the wait.
                 return False
             return True
 

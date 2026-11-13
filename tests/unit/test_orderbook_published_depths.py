@@ -349,25 +349,46 @@ async def test_levels_outside_the_view_stay_tracked() -> None:
         await sub.aclose()
 
 
-async def test_gap_in_a_delta_outside_the_view_refreshes_at_the_tier() -> None:
+async def _reset_to_the_market(h, *, end: int) -> None:
+    """Publish the tier's whole current view as a reset ending at ``end``."""
+    h.market.seq = end
+    bids, asks = h.market._view(20)
+    await h.market.send(20, start=0, end=end, reset=True, bids=bids, asks=asks)
+
+
+async def test_gap_in_a_delta_outside_the_view_waits_for_the_next_reset() -> None:
     async with harness() as h:
         gaps: list[str] = []
         sub = await h.client.orderbook.create_subscription(
             symbol="BTC-USDT", depth=10, on_sequence_gap=lambda: gaps.append("gap")
         )
-        await next_view(sub, what="first view")
+        first = await next_view(sub, what="first view")
         deep = BEST_BID - 14 * UNIT
 
         # Sequences from the snapshot's 100, skipping ahead; only level 15 changes.
         h.market.bids[deep] = 44
-        h.market.seq = 200
         await h.market.send(20, start=150, end=200, bids={deep: 44})
-        refreshed = await next_view(sub, what="view after the gap refresh")
+        stale = await next_view(sub, what="view after the gap")
 
+        # The book is kept as it was, marked unknown, and no snapshot is fetched:
+        # a snapshot need not line up with the stream, the next reset does.
         assert gaps == ["gap"]
-        assert h.market.snapshot_requests == ["DEPTH_20", "DEPTH_20"]
-        assert refreshed.book_seq == "200"
-        assert len(refreshed.bids) == 10
+        assert stale.available is False
+        assert stale.book_seq == first.book_seq == "100"
+        assert bid_ticks(stale) == bid_ticks(first)
+        assert h.market.snapshot_requests == ["DEPTH_20"]
+
+        # Later diffs cannot apply to the book either and add no view.
+        await h.market.send(20, start=200, end=201, bids={BEST_BID: 9})
+        await _reset_to_the_market(h, end=300)
+        recovered = await next_view(sub, what="view after the reset")
+
+        assert recovered.available is True
+        assert recovered.book_seq == "300"
+        assert len(recovered.bids) == 10
+        assert recovered.bids[0].qty.scaled == 5
+        assert gaps == ["gap"]
+        assert h.market.snapshot_requests == ["DEPTH_20"]
         await sub.aclose()
 
 
@@ -382,13 +403,13 @@ async def test_sequence_zero_snapshot_still_detects_a_gap_at_a_trimmed_depth() -
         assert first.book_seq == "0"
         assert len(first.bids) == 10
 
-        h.market.seq = 6
         await h.market.send(20, start=5, end=6, bids={BEST_BID: 8})
-        refreshed = await next_view(sub, what="view after the gap refresh")
+        stale = await next_view(sub, what="view after the gap")
 
         assert gaps == ["gap"]
-        assert refreshed.book_seq == "6"
-        assert refreshed.bids[0].qty.scaled == 5, "the gapped delta must not be applied"
+        assert (stale.available, stale.book_seq) == (False, "0")
+        assert stale.bids[0].qty.scaled == 5, "the gapped delta must not be applied"
+        assert h.market.snapshot_requests == ["DEPTH_20"]
         await sub.aclose()
 
 
@@ -401,11 +422,48 @@ async def test_sequence_zero_snapshot_applies_the_next_contiguous_delta() -> Non
         )
         await next_view(sub, what="first view")
 
-        await h.market.send(20, start=1, end=1, bids={BEST_BID: 8})
+        await h.market.send(20, start=0, end=1, bids={BEST_BID: 8})
         updated = await next_view(sub, what="view after a delta")
 
         assert gaps == []
         assert (updated.book_seq, updated.bids[0].qty.scaled) == ("1", 8)
+        assert updated.available is True
+        assert h.market.snapshot_requests == ["DEPTH_20"]
+        await sub.aclose()
+
+
+async def test_delta_one_past_the_book_is_a_gap_not_the_next_view() -> None:
+    # Each update starts at the sequence of the view it applies to, the previous
+    # update's end; one that starts one past the book skipped a view.
+    async with harness() as h:
+        gaps: list[str] = []
+        sub = await h.client.orderbook.create_subscription(
+            symbol="BTC-USDT", depth=10, on_sequence_gap=lambda: gaps.append("gap")
+        )
+        await next_view(sub, what="first view")
+
+        await h.market.send(20, start=101, end=102, bids={BEST_BID: 8})
+        stale = await next_view(sub, what="view after the gap")
+
+        assert gaps == ["gap"]
+        assert (stale.available, stale.book_seq, stale.bids[0].qty.scaled) == (False, "100", 5)
+        assert h.market.snapshot_requests == ["DEPTH_20"]
+        await sub.aclose()
+
+
+async def test_delta_overlapping_the_book_is_a_gap() -> None:
+    async with harness() as h:
+        gaps: list[str] = []
+        sub = await h.client.orderbook.create_subscription(
+            symbol="BTC-USDT", depth=10, on_sequence_gap=lambda: gaps.append("gap")
+        )
+        await next_view(sub, what="first view")
+
+        await h.market.send(20, start=90, end=110, bids={BEST_BID: 8})
+        stale = await next_view(sub, what="view after the gap")
+
+        assert gaps == ["gap"]
+        assert (stale.available, stale.book_seq, stale.bids[0].qty.scaled) == (False, "100", 5)
         assert h.market.snapshot_requests == ["DEPTH_20"]
         await sub.aclose()
 
@@ -473,8 +531,9 @@ async def test_coarse_bucket_above_the_price_shows_the_zero_bid_at_a_trimmed_dep
         await sub.aclose()
 
 
-async def test_zero_price_outside_the_trimmed_view_resyncs_at_the_tier() -> None:
-    # Refused before it reaches the book: rebuilt from a fresh tier snapshot, still open.
+async def test_zero_price_outside_the_trimmed_view_waits_for_the_next_reset() -> None:
+    # Refused before it reaches the book: kept as it was, marked unknown, still open,
+    # and rebuilt by the next reset.
     async with harness() as h:
         errors: list[Exception] = []
         gaps: list[str] = []
@@ -486,11 +545,17 @@ async def test_zero_price_outside_the_trimmed_view_resyncs_at_the_tier() -> None
         )
         first = await next_view(sub, what="first view")
         await h.market.send(20, start=100, end=101, bids={0: 5})
-        refreshed = await next_view(sub, what="view after the refused delta")
-        assert refreshed.book_seq == first.book_seq
-        assert bid_ticks(refreshed) == bid_ticks(first)
-        assert h.market.snapshot_requests == ["DEPTH_20", "DEPTH_20"]
+        stale = await next_view(sub, what="view after the refused delta")
+        assert stale.available is False
+        assert stale.book_seq == first.book_seq
+        assert bid_ticks(stale) == bid_ticks(first)
+        assert h.market.snapshot_requests == ["DEPTH_20"]
         assert gaps == ["gap"]
+
+        await _reset_to_the_market(h, end=102)
+        recovered = await next_view(sub, what="view after the reset")
+        assert (recovered.available, recovered.book_seq) == (True, "102")
+        assert bid_ticks(recovered) == bid_ticks(first)
         assert errors == []
         assert sub.last_error is None
         await sub.aclose()

@@ -26,7 +26,7 @@ BID = 71_600_000
 
 
 def _delta(seq: int, qty: int) -> bytes:
-    delta = orderbook_pb2.OrderBookDelta(symbol_id=1, book_seq_start=seq, book_seq_end=seq)
+    delta = orderbook_pb2.OrderBookDelta(symbol_id=1, book_seq_start=seq - 1, book_seq_end=seq)
     delta.bids.add(price_ticks=BID, qty_scaled=qty)
     return publication(delta.SerializeToString())
 

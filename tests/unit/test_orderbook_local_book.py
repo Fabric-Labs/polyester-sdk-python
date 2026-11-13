@@ -36,7 +36,7 @@ def test_apply_delta_updates_and_deletes_levels() -> None:
         asks=asks,
         current_book_seq=1,
         delta=OrderBookDeltaUpdate(
-            book_seq_start="2",
+            book_seq_start="1",
             book_seq_end="2",
             bids=[("100500", "25"), ("100", "0")],
             asks=[("101", "0"), ("102", "4")],
@@ -125,6 +125,68 @@ def test_apply_delta_detects_sequence_gap() -> None:
     assert refresh is True
     assert seq == 1
     assert bids == {100: 5}
+
+
+@pytest.mark.parametrize(
+    ("seq_start", "seq_end"),
+    [
+        # The next sequence number: the book skipped the view it applies to.
+        ("11", "12"),
+        # Starts before the book: overlaps views the book already holds.
+        ("9", "12"),
+    ],
+    ids=["skips a view", "overlaps the book"],
+)
+def test_apply_delta_applies_only_to_the_exact_view_it_starts_from(
+    seq_start: str, seq_end: str
+) -> None:
+    bids = {100: 5}
+    asks = {101: 2}
+    seq, out_of_sync = apply_delta(
+        bids=bids,
+        asks=asks,
+        current_book_seq=10,
+        delta=OrderBookDeltaUpdate(
+            book_seq_start=seq_start, book_seq_end=seq_end, bids=[("100", "0"), ("99", "7")]
+        ),
+    )
+    assert out_of_sync is True
+    assert seq == 10
+    assert bids == {100: 5}
+    assert asks == {101: 2}
+
+
+def test_apply_delta_chains_updates_that_start_where_the_last_ended() -> None:
+    bids = {100: 5}
+    asks: dict[int, int] = {}
+    seq = 10
+    for start, end, qty in (("10", "17", "6"), ("17", "18", "7"), ("18", "25", "8")):
+        seq, out_of_sync = apply_delta(
+            bids=bids,
+            asks=asks,
+            current_book_seq=seq,
+            delta=OrderBookDeltaUpdate(book_seq_start=start, book_seq_end=end, bids=[("100", qty)]),
+        )
+        assert out_of_sync is False
+    assert seq == 25
+    assert bids == {100: 8}
+
+
+def test_apply_delta_reset_replaces_a_book_whatever_its_sequence() -> None:
+    bids = {100: 5}
+    asks = {101: 2}
+    seq, out_of_sync = apply_delta(
+        bids=bids,
+        asks=asks,
+        current_book_seq=10,
+        delta=OrderBookDeltaUpdate(
+            reset=True, book_seq_start="0", book_seq_end="40", asks=[("103", "1")]
+        ),
+    )
+    assert out_of_sync is False
+    assert seq == 40
+    assert bids == {}
+    assert asks == {103: 1}
 
 
 def test_apply_delta_ignores_stale_updates() -> None:

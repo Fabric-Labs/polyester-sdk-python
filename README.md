@@ -1503,7 +1503,9 @@ while True:
 unknown, not empty, so do not read the empty sides as no liquidity; request
 the snapshot again later. Only a snapshot carries `available`: books from
 `orderbook.create_subscription(...)` report the value of the last snapshot the
-subscription applied, and deltas, resets included, do not change it. A managed
+subscription applied, and deltas, resets included, do not change it, except
+that a book waiting for a reset after a sequence gap reads `False` until the
+reset arrives. A managed
 subscription requests an unavailable snapshot again by itself, after 1 s doubling
 to 8 s, until the book is available or the subscription stops; repeated
 unavailable answers add no view. A market whose book stays unavailable keeps being
@@ -1625,9 +1627,17 @@ the list; a root key cannot subscribe to a sub-account's channels.
 - Reconnects use capped exponential backoff with per-subscription jitter.
   `set_on_error(...)` observes background feed interruptions; async iteration
   still raises terminal failures.
-- Orderbook sequence gaps trigger a REST snapshot refresh. Use
-  `on_sequence_gap` / `on_reconnect` / `on_snapshot_refresh` on
-  `orderbook.create_subscription(...)` for recovery observability.
+- A managed order book follows the depth stream's rule: each update is the
+  difference between two published views of the tier, and applies only to a
+  book at exactly its `book_seq_start` (the previous update's `book_seq_end`).
+  After a sequence gap, or a malformed update, the book keeps its levels,
+  its next view reads `available=False`, and it waits for the stream's next
+  `reset` (sent about every 30 seconds and after a gap) instead of
+  refetching snapshots, which need not line up with the stream; the reset
+  makes it available again. Use `on_sequence_gap` (once per gap) /
+  `on_reconnect` / `on_snapshot_refresh` on
+  `orderbook.create_subscription(...)` for recovery observability, and
+  `refresh_snapshot()` to rebuild from a snapshot at once.
 - Managed snapshot-then-stream subscriptions disable transport auto-reconnect
   so they can rebuild REST state between reconnect attempts. Buffered
   publications survive a failed snapshot retry and are merged exactly once

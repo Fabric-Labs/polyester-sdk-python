@@ -195,7 +195,7 @@ async def test_managed_book_coarse_buckets_snapshot_change_and_delta(
         await queue.put(
             OrderBookDeltaUpdate(
                 symbol_id=1,
-                book_seq_start="2",
+                book_seq_start="1",
                 book_seq_end="2",
                 bids=[[str(bid), "5"]],
                 asks=[[str(ask), "0"]],
@@ -318,7 +318,7 @@ async def test_raw_zero_delta_never_becomes_a_display_bucket(monkeypatch, bucket
         initial = await asyncio.wait_for(anext(sub), 3)
         assert initial.book_seq == "1"
         assert len(initial.bids) == len(initial.asks) == 1
-        wire = orderbook_pb2.OrderBookDelta(symbol_id=1, book_seq_start=2, book_seq_end=2)
+        wire = orderbook_pb2.OrderBookDelta(symbol_id=1, book_seq_start=1, book_seq_end=2)
         # An omitted proto3 price is zero; positive quantity must never materialize it.
         getattr(wire, side).add(qty_scaled=quantity)
         decode = realtime.subscribe_proto.call_args.kwargs["decode"]
@@ -330,20 +330,19 @@ async def test_raw_zero_delta_never_becomes_a_display_bucket(monkeypatch, bucket
         assert view.asks == initial.asks
         assert sub.last_error is None
         assert errors == []
+        fetch.assert_awaited_once()
         if quantity:
-            # Refused like any malformed delta: rebuilt from a fresh snapshot.
-            assert view.book_seq == "1"
-            assert fetch.await_count == 2
+            # Refused like any malformed delta: kept, marked unknown until a reset.
+            assert (view.book_seq, view.available) == ("1", False)
         else:
-            assert view.book_seq == "2"
-            fetch.assert_awaited_once()
+            assert (view.book_seq, view.available) == ("2", True)
         realtime.subscribe_proto.assert_awaited_once()
     finally:
         await sub.aclose()
 
 
 @pytest.mark.parametrize("bucket", [None, "0.001", "0.1"])
-async def test_raw_zero_bid_outside_the_requested_depth_resyncs(monkeypatch, bucket):
+async def test_raw_zero_bid_outside_the_requested_depth_waits_for_a_reset(monkeypatch, bucket):
     catalogs = CatalogManager()
     catalogs.hydrate_spot_config(
         {"pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]}
@@ -374,16 +373,18 @@ async def test_raw_zero_bid_outside_the_requested_depth_resyncs(monkeypatch, buc
         await queue.put(
             OrderBookDeltaUpdate(
                 symbol_id=1,
-                book_seq_start="2",
+                book_seq_start="1",
                 book_seq_end="2",
                 bids=[["0", "9"]],
                 asks=[],
             )
         )
         view = await asyncio.wait_for(anext(sub), 3)
+        # Refused whole: the book is kept, marked unknown until the next reset.
         assert view.book_seq == "1"
         assert view.bids == initial.bids
-        assert fetch.await_count == 2
+        assert view.available is False
+        assert fetch.await_count == 1
         assert sub.last_error is None
         assert errors == []
     finally:

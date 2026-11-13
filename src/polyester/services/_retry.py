@@ -14,6 +14,8 @@ from google.protobuf.message import Message
 
 from polyester._wire import map_connect_error
 from polyester.errors import (
+    AUTH_TEMPORARILY_UNAVAILABLE,
+    PolyesterApiError,
     PolyesterRateLimitError,
     PolyesterServerError,
     PolyesterTransportError,
@@ -58,6 +60,9 @@ def _is_real_unavailability(exc: ConnectError) -> bool:
     mapped = map_connect_error(exc)
     if isinstance(mapped, PolyesterRateLimitError):
         return False
+    if isinstance(mapped, PolyesterApiError) and mapped.code == AUTH_TEMPORARILY_UNAVAILABLE:
+        # Authentication could not run; the read was not processed.
+        return True
     return isinstance(
         mapped, (PolyesterServerError, PolyesterTransportError)
     ) or mutation_outcome_unknown(mapped)

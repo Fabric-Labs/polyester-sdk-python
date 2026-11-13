@@ -105,6 +105,15 @@ ORDER_ALREADY_TERMINAL = "ERROR_CODE_ORDER_ALREADY_TERMINAL"
 # it ended; later the server may answer ERROR_CODE_TRIGGER_NOT_FOUND instead.
 TRIGGER_STATUS_INVALID = "ERROR_CODE_TRIGGER_STATUS_INVALID"
 
+# orders.v1.ErrorCode of a trigger modify that sets a new or different nonzero
+# activation price after the trailing stop started tracking (315; REST 400
+# ``TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE``, ConnectRPC ``failed_precondition``),
+# paused or not. The whole modify is refused and the trigger is unchanged; the
+# same edit is refused again. Clearing the activation price with zero and
+# repeating the current one stay accepted. To wait for a new activation price,
+# cancel the trigger and create a new one.
+TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE = "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE"
+
 # orders.v1.ErrorCode values of an order refused for the account's or the API
 # key's permissions. Each raises PolyesterAuthError with this code (HTTP 403)
 # over ConnectRPC and REST alike; none is retryable. POLICY_SPOT_TRADE_DENY is

@@ -21,8 +21,11 @@ from polyester import (
 )
 from polyester._contract_codes import is_recognised_rest_code
 from polyester._wire import map_connect_error
+from polyester.codecs.decode.lifecycle import flow_summary_from_proto
 from polyester.errors import TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE, is_not_found
 from polyester.gen.auth.v1 import auth_pb2
+from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
+from polyester.gen.chain.zipper.v1 import reason_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from tests.unit.test_readable_error_bodies import PROBLEM, _call
@@ -169,3 +172,31 @@ async def test_rest_unknown_procedure_problem_is_not_found() -> None:
     assert not is_retryable_error(err)
     # A documented NOT_FOUND names a refusal, not an unknown outcome.
     assert not mutation_outcome_unknown(err)
+
+
+# --- lifecycle: a withdrawal under the bridge operator's review ---------------------------------
+
+
+@pytest.mark.parametrize("code", [None, 3001], ids=["no code", "bridge code"])
+def test_withdraw_execution_failed_keeps_the_review_reason_as_sent(code: int | None) -> None:
+    reason = reason_pb2.ZipperReasonDetails(
+        reason_id="withdrawal.execution_failed.under_review",
+        message=(
+            "Failed, under review by the bridge operator. "
+            "The funds were not returned to your account."
+        ),
+    )
+    if code is not None:
+        reason.code = code
+    flow = flow_summary_from_proto(
+        lifecycle_read_pb2.FlowSummaryView(
+            flow_id="flow_1",
+            lifecycle_reason=types_pb2.ZIPPER_WITHDRAW_EXECUTION_FAILED,
+            zipper_reason=reason,
+        )
+    )
+    assert flow.lifecycle_reason == "zipper_withdraw_execution_failed"
+    assert flow.zipper_reason is not None
+    assert flow.zipper_reason.code == (code or 0)
+    assert flow.zipper_reason.reason_id == "withdrawal.execution_failed.under_review"
+    assert flow.zipper_reason.message == reason.message

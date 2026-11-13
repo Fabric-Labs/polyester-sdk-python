@@ -464,6 +464,19 @@ class BalancesList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class ZipperReasonDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The bridge's reason on a lifecycle flow, as the server sent it.
+
+    ``code`` is the bridge's code (0 when it gave none), ``reason_id`` a stable
+    identifier to localize, and ``message`` English text to show. Prefer
+    ``reason_id`` or ``message`` over text keyed by ``code``: a withdrawal
+    whose execution failed (lifecycle reason
+    ``zipper_withdraw_execution_failed``) reads ``reason_id``
+    ``withdrawal.execution_failed.under_review`` whatever its code, and its
+    ``message`` says it is under review by the bridge operator and its funds
+    were not returned to the account. It is not a refund, and the user may
+    have received the funds on the destination chain.
+    """
+
     code: int = 0
     reason_id: str = ""
     message: str = ""

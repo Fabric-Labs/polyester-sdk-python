@@ -746,6 +746,12 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     # 0 when the server names none or a name this SDK does not know. It names
     # the reason, not the direction: read ``is_debit``. A system adjustment
     # can credit (account seeding) or debit (a correction) the account.
+    # 1065 (TRADING_WITHDRAW_REQUEST_FEE) and 1075 (WITHDRAW_FAILED) are the
+    # debit of a withdrawal that was rejected or failed to execute, from the
+    # Trading and the Funding account respectively: its whole amount, request
+    # fee included, not a fee. A rejected withdrawal is refunded less the
+    # request fee to the account's own wallet; one that failed to execute is
+    # not refunded.
     transfer_type: int = 0
     account_code: int = 0
     timestamp: int = 0

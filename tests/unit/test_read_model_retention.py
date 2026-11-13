@@ -287,3 +287,35 @@ def test_order_stream_keeps_batch_request_id(
         private_ws_pb2.Unit(orders=[_order(batch_id)]), scales=None
     )
     _assert_batch(unit.orders[0], expected)
+
+
+# The admission identity outlives the order: a filled or canceled order, and
+# one a trigger generated, keep the batch replace that admitted it.
+@pytest.mark.asyncio
+@WIRES
+@pytest.mark.parametrize("status", [orders_read_pb2.FILLED, orders_read_pb2.CANCELED])
+@pytest.mark.parametrize("from_trigger", [False, True], ids=["plain", "trigger-generated"])
+async def test_terminal_orders_keep_their_admission_batch(
+    json_wire: bool, status: int, from_trigger: bool
+) -> None:
+    order = _order(18_446_744_073_709_551_614)
+    order.status = status
+    if from_trigger:
+        order.origin.trigger_id = 77
+    responses: dict[str, Message] = {
+        "GetOrder": orders_read_pb2.GetOrderResponse(order=order),
+        "GetOrderHistory": orders_read_pb2.GetOrderHistoryResponse(orders=[order]),
+    }
+    client, http = await _client(responses, json_wire)
+    try:
+        got = (await client.orders.get(key=OrderId(901))).order
+        history = (await client.orders.list_history()).orders
+    finally:
+        await client.aclose()
+        await http.aclose()
+
+    for read in (got, history[0]):
+        _assert_batch(read, "jpXCZedGfVP")
+        assert read is not None
+        assert read.status == orders_read_pb2.OrderStatus.Name(status).lower()
+        assert (read.origin is not None) is from_trigger

@@ -235,6 +235,28 @@ def test_statement_csv_refuses_what_it_cannot_read(text: str) -> None:
         parse_statement_csv(text)
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Content after a closing quote; a lenient reader reads 1000.
+        HEADER + '2026-10-03T08:12:45Z,1,trade,trading,BTC,"100"0,0,1.1,77,\r\n',
+        # An unterminated quoted field; a lenient reader swallows the rest.
+        HEADER + '2026-10-03T08:12:45Z,1,trade,trading,BTC,"0.1,0,1.1,77,\r\n',
+    ],
+)
+def test_statement_csv_refuses_malformed_quoting(text: str) -> None:
+    with pytest.raises(PolyesterResponseContractError, match="not valid CSV"):
+        parse_statement_csv(text)
+
+
+def test_statement_csv_reads_an_escaped_quote() -> None:
+    (row,) = parse_statement_csv(
+        HEADER + '2026-10-03T08:12:45Z,1,trade,trading,"B""TC",0.1,0,"1,1",77,\r\n'
+    )
+    assert row.asset == 'B"TC'
+    assert row.balance == "1,1"
+
+
 def test_sync_client_exports_statements() -> None:
     from polyester._sync_services import SyncStatementsService
 

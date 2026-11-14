@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import msgspec
@@ -86,12 +87,22 @@ def parse_statement_csv(text: str) -> list[StatementRow]:
 
     Columns are read by header name: their order does not matter, and columns
     this SDK does not know are ignored. A statement without a ``flow_id``
-    column reads it as "". A missing required column, a row whose field count
-    differs from the header's, or an unreadable ``time`` raises
-    :class:`~polyester.errors.PolyesterResponseContractError`. Empty text
-    yields no rows.
+    column reads it as "". Fields are read strictly as RFC 4180: content after
+    a closing quote or an unterminated quoted field, a missing required column,
+    a row whose field count differs from the header's, or an unreadable
+    ``time`` raises :class:`~polyester.errors.PolyesterResponseContractError`.
+    Empty text yields no rows.
     """
-    reader = csv.reader(io.StringIO(text, newline=""))
+    reader = csv.reader(io.StringIO(text, newline=""), strict=True)
+    try:
+        return _statement_rows(reader)
+    except csv.Error as exc:
+        raise PolyesterResponseContractError(
+            "ExportStatement", f"statement line {reader.line_num} is not valid CSV: {exc}"
+        ) from exc
+
+
+def _statement_rows(reader: Iterator[list[str]]) -> list[StatementRow]:
     header: list[str] | None = None
     index: dict[str, int] = {}
     rows: list[StatementRow] = []

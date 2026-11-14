@@ -25,6 +25,7 @@ from polyester.models.address_book import (
     TransferCounterparty,
     WithdrawWhitelistView,
 )
+from polyester.models.asset_info import AssetEditorialInfo, AssetInfo, AssetIssuePrice
 from polyester.models.auth import (
     Ed25519Keypair,
     MeResult,
@@ -119,6 +120,12 @@ from polyester.models.private_orders import (
 )
 from polyester.models.ratelimit import RateLimitDetail
 from polyester.models.secret import Secret
+from polyester.models.statements import (
+    Statement,
+    StatementPage,
+    StatementRow,
+    parse_statement_csv,
+)
 from polyester.models.sub_accounts import (
     CreateSubaccountResult,
     GetSubaccountResult,
@@ -131,7 +138,7 @@ from polyester.models.sub_accounts import (
     SubAccountMembersList,
     SubAccountsList,
 )
-from polyester.models.system import ServerVersion
+from polyester.models.system import ServerVersion, StatusEvent, StatusEventsPage, StatusEventUpdate
 from polyester.models.trading import (
     ApiKeysList,
     ApiKeySummary,
@@ -223,6 +230,7 @@ from polyester.models.zipper import (
     DepositWithdrawConfig,
     ZippedAssetSupplyBatch,
     ZippedAssetSupplyUpdate,
+    ZipperAssetChainVariant,
     ZipperAssetConfig,
     ZipperCatalogData,
     ZipperChainConfig,
@@ -414,6 +422,16 @@ __all__ = [
     "ChangelogEnvironmentStatus",
     "ChangelogPost",
     "ServerVersion",
+    "Statement",
+    "StatementPage",
+    "StatementRow",
+    "StatusEvent",
+    "StatusEventUpdate",
+    "StatusEventsPage",
+    "parse_statement_csv",
+    "AssetEditorialInfo",
+    "AssetInfo",
+    "AssetIssuePrice",
     "ChangelogPostSummary",
     "ChangelogPostsPage",
     "ChangelogSection",
@@ -429,6 +447,7 @@ __all__ = [
     "WithdrawDestinationValidation",
     "WithdrawIntentResult",
     "WithdrawWhitelistView",
+    "ZipperAssetChainVariant",
     "ZipperAssetConfig",
     "ZipperCatalogData",
     "ZipperChainConfig",

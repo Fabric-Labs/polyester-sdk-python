@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.asset_info import asset_info_list_from_proto
 from polyester.codecs.decode.market_data import (
     candles_columns_from_proto,
     candles_from_proto,
@@ -15,7 +17,7 @@ from polyester.codecs.realtime_decode import decode_candle_point_bytes
 from polyester.codecs.scalars import UINT64_MAX
 from polyester.codecs.spot_config import spot_config_from_dict
 from polyester.errors import PolyesterValidationError
-from polyester.gen.marketdata.v1 import marketdata_pb2
+from polyester.gen.marketdata.v1 import asset_info_pb2, marketdata_pb2
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import (
     GetCandlesRequest,
@@ -23,6 +25,7 @@ from polyester.gen.marketdata.v1.marketdata_pb2 import (
     GetTradesRequest,
 )
 from polyester.models import Candle, CandlesResult, MarketTradesResult, SpotConfig
+from polyester.models.asset_info import AssetInfo
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public, unary_public_decoded
@@ -84,6 +87,33 @@ class AsyncMarketDataService(BaseService):
             GetSpotConfigRequest(),
         )
         return spot_config_from_dict(data)
+
+    async def list_asset_info(self, asset_ids: Sequence[int] | None = None) -> list[AssetInfo]:
+        """Team-maintained asset information: descriptions, official links and
+        known launch dates and prices, ordered by ascending ``asset_id``.
+
+        ``asset_ids`` (the ``ledger_id`` of the spot and deposit/withdraw
+        configs) keeps those assets; ``None`` or empty returns every saved
+        entry. The server accepts at most 1000 positive IDs and ignores
+        duplicate and unknown ones. Assets never edited are omitted. The
+        result is complete: there is no paging. Public, never signed.
+        """
+        if isinstance(asset_ids, (str, bytes)):
+            raise PolyesterValidationError("asset_ids must be a sequence of integers")
+        ids: list[int] = []
+        for value in asset_ids or ():
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < 2**32:
+                raise PolyesterValidationError(
+                    f"asset_ids: {value!r} is not an integer between 0 and 2**32 - 1"
+                )
+            ids.append(value)
+        return await unary_public_decoded(
+            self._transport,
+            MarketDataServiceClient,
+            lambda client, request: client.list_asset_info(request),
+            asset_info_pb2.ListAssetInfoRequest(asset_ids=ids),
+            asset_info_list_from_proto,
+        )
 
     async def get_trades(
         self,

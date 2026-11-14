@@ -16,10 +16,19 @@ class MemoRequirement(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     REQUIRED: _ClassVar[MemoRequirement]
     OPTIONAL: _ClassVar[MemoRequirement]
     NOT_SUPPORTED: _ClassVar[MemoRequirement]
+
+class RouteStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    STATUS_UNSPECIFIED: _ClassVar[RouteStatus]
+    NORMAL: _ClassVar[RouteStatus]
+    SUSPENDED: _ClassVar[RouteStatus]
 MEMO_UNSPECIFIED: MemoRequirement
 REQUIRED: MemoRequirement
 OPTIONAL: MemoRequirement
 NOT_SUPPORTED: MemoRequirement
+STATUS_UNSPECIFIED: RouteStatus
+NORMAL: RouteStatus
+SUSPENDED: RouteStatus
 
 class ChainConfig(_message.Message):
     __slots__ = ("chain_id", "code", "name", "native_chain_id", "native_currency_symbol", "explorer_url", "icon", "required_confirmations", "confirmation_time_seconds", "is_case_sensitive", "min_address_length", "max_address_length", "memo_requirement", "memo_label", "memo_format_hint")
@@ -56,7 +65,7 @@ class ChainConfig(_message.Message):
     def __init__(self, chain_id: _Optional[int] = ..., code: _Optional[str] = ..., name: _Optional[str] = ..., native_chain_id: _Optional[str] = ..., native_currency_symbol: _Optional[str] = ..., explorer_url: _Optional[str] = ..., icon: _Optional[str] = ..., required_confirmations: _Optional[int] = ..., confirmation_time_seconds: _Optional[int] = ..., is_case_sensitive: _Optional[bool] = ..., min_address_length: _Optional[int] = ..., max_address_length: _Optional[int] = ..., memo_requirement: _Optional[_Union[MemoRequirement, str]] = ..., memo_label: _Optional[str] = ..., memo_format_hint: _Optional[str] = ...) -> None: ...
 
 class AssetChainVariant(_message.Message):
-    __slots__ = ("zipped_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount", "supply_q")
+    __slots__ = ("zipped_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount", "supply_q", "deposit_status", "withdrawal_status")
     ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     IS_NATIVE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -68,6 +77,8 @@ class AssetChainVariant(_message.Message):
     DEPOSIT_MIN_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     WITHDRAW_MIN_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     SUPPLY_Q_FIELD_NUMBER: _ClassVar[int]
+    DEPOSIT_STATUS_FIELD_NUMBER: _ClassVar[int]
+    WITHDRAWAL_STATUS_FIELD_NUMBER: _ClassVar[int]
     zipped_asset_id: int
     chain_id: int
     is_native_asset: bool
@@ -79,7 +90,9 @@ class AssetChainVariant(_message.Message):
     deposit_min_amount: str
     withdraw_min_amount: str
     supply_q: int
-    def __init__(self, zipped_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., is_native_asset: _Optional[bool] = ..., network_fee: _Optional[str] = ..., ztoken_address: _Optional[str] = ..., source_address: _Optional[str] = ..., source_decimals: _Optional[int] = ..., ztoken_decimals: _Optional[int] = ..., deposit_min_amount: _Optional[str] = ..., withdraw_min_amount: _Optional[str] = ..., supply_q: _Optional[int] = ...) -> None: ...
+    deposit_status: RouteStatus
+    withdrawal_status: RouteStatus
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., is_native_asset: _Optional[bool] = ..., network_fee: _Optional[str] = ..., ztoken_address: _Optional[str] = ..., source_address: _Optional[str] = ..., source_decimals: _Optional[int] = ..., ztoken_decimals: _Optional[int] = ..., deposit_min_amount: _Optional[str] = ..., withdraw_min_amount: _Optional[str] = ..., supply_q: _Optional[int] = ..., deposit_status: _Optional[_Union[RouteStatus, str]] = ..., withdrawal_status: _Optional[_Union[RouteStatus, str]] = ...) -> None: ...
 
 class ZippedAssetSupplyUpdate(_message.Message):
     __slots__ = ("zipped_asset_id", "supply_q")

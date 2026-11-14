@@ -6,6 +6,7 @@ import math
 import os
 import threading
 import time
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any, Literal, NoReturn
 
 from google.protobuf.message import Message
@@ -36,7 +37,9 @@ from polyester._sync_services import (
     SyncRateLimitService,
     SyncRealtimeClient,
     SyncSocialVerificationService,
+    SyncStatementsService,
     SyncSubAccountsService,
+    SyncSystemService,
     SyncTradesService,
     SyncTransfersService,
     SyncTriggersService,
@@ -71,7 +74,7 @@ from polyester.gen.chain.zipper.v1.zipper_connect import ZipperServiceClient
 from polyester.gen.chain.zipper.v1.zipper_pb2 import GetDepositWithdrawConfigRequest
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import GetSpotConfigRequest
-from polyester.models.system import ServerVersion
+from polyester.models.system import ServerVersion, StatusEvent, StatusEventsPage
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -94,6 +97,7 @@ from polyester.services import (
     AsyncPoliciesService,
     AsyncRateLimitService,
     AsyncSocialVerificationService,
+    AsyncStatementsService,
     AsyncSubAccountsService,
     AsyncTradesService,
     AsyncTransfersService,
@@ -312,6 +316,7 @@ class AsyncPolyester:
         self.internal_transfers = AsyncInternalTransfersService(
             self._transport, self.catalogs, default_sub_account_id
         )
+        self.statements = AsyncStatementsService(self._transport, default_sub_account_id)
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
         self.fees = AsyncFeeService(
             self._transport,
@@ -423,6 +428,37 @@ class AsyncPolyester:
         """The build the API serves: its ``version``, source ``commit`` and
         ``environment``. Needs no API key and sends none."""
         return await self._system.get_version()
+
+    async def list_status_events(
+        self,
+        *,
+        states: Sequence[str] | None = None,
+        kinds: Sequence[str] | None = None,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> StatusEventsPage:
+        """One page of the environment's scheduled maintenance and incidents,
+        the latest start first; no ``states`` lists current and upcoming
+        events. Needs no API key and sends none. See
+        :meth:`AsyncSystemService.list_status_events`."""
+        return await self._system.list_status_events(
+            states=states, kinds=kinds, limit=limit, page_token=page_token
+        )
+
+    async def iter_status_events(
+        self,
+        *,
+        states: Sequence[str] | None = None,
+        kinds: Sequence[str] | None = None,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> AsyncIterator[StatusEvent]:
+        """Every status event matching ``states`` and ``kinds``, fetching pages
+        as needed with the same filters. Needs no API key and sends none."""
+        async for event in self._system.iter_status_events(
+            states=states, kinds=kinds, limit=limit, page_token=page_token
+        ):
+            yield event
 
     async def wait_for_catalogs(self) -> None:
         """Wait until the spot config, which every spot trading call needs, is ready.
@@ -623,6 +659,8 @@ class Polyester:
         self.triggers = SyncTriggersService(loop, client.triggers, subscriptions)
         self.transfers = SyncTransfersService(loop, client.transfers, subscriptions)
         self.internal_transfers = SyncInternalTransfersService(loop, client.internal_transfers)
+        self.statements = SyncStatementsService(loop, client.statements)
+        self._system = SyncSystemService(loop, client._system)
         self.deposit = SyncDepositService(loop, client.deposit)
         self.fees = SyncFeeService(loop, client.fees)
         self.api_keys = SyncApiKeysService(loop, client.api_keys, subscriptions)
@@ -648,6 +686,35 @@ class Polyester:
         ``environment``. Needs no API key and sends none."""
         return run_on_loop(
             self._loop, self._client.get_version, what="Polyester.get_version()"
+        )
+
+    def list_status_events(
+        self,
+        *,
+        states: Sequence[str] | None = None,
+        kinds: Sequence[str] | None = None,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> StatusEventsPage:
+        """One page of the environment's scheduled maintenance and incidents,
+        the latest start first; no ``states`` lists current and upcoming
+        events. Needs no API key and sends none."""
+        return self._system.list_status_events(
+            states=states, kinds=kinds, limit=limit, page_token=page_token
+        )
+
+    def iter_status_events(
+        self,
+        *,
+        states: Sequence[str] | None = None,
+        kinds: Sequence[str] | None = None,
+        limit: int | None = None,
+        page_token: str | None = None,
+    ) -> Iterator[StatusEvent]:
+        """Every status event matching ``states`` and ``kinds``, fetching pages
+        as needed with the same filters. Needs no API key and sends none."""
+        return self._system.iter_status_events(
+            states=states, kinds=kinds, limit=limit, page_token=page_token
         )
 
     def wait_for_funding_catalog(self) -> None:

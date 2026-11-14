@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import msgspec
 
+# Route status labels of ``deposit_status`` and ``withdrawal_status``.
+ROUTE_STATUS_NORMAL = "normal"
+ROUTE_STATUS_SUSPENDED = "suspended"
+
 
 class ZippedAssetSupplyUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):
     zipped_asset_id: int
@@ -28,6 +32,21 @@ class ZipperAssetChainVariant(msgspec.Struct, kw_only=True, omit_defaults=True):
     supply: str = "0"
     source_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     z_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
+    # Whether this route accepts new deposits and new withdrawals: "normal",
+    # "suspended", or "" while availability is not known, which is not
+    # available. A status this SDK does not know reads as its decimal string.
+    # A suspension can stop one direction and not the other; funds sent to a
+    # deposit address while deposits are suspended are delayed, not lost.
+    deposit_status: str = ""
+    withdrawal_status: str = ""
+
+    def accepts_deposits(self) -> bool:
+        """True only while the route's deposit status is ``"normal"``."""
+        return self.deposit_status == ROUTE_STATUS_NORMAL
+
+    def accepts_withdrawals(self) -> bool:
+        """True only while the route's withdrawal status is ``"normal"``."""
+        return self.withdrawal_status == ROUTE_STATUS_NORMAL
 
 
 class ZipperChainConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -102,6 +121,21 @@ class ZipperEnrichedAssetChain(msgspec.Struct, kw_only=True, omit_defaults=True)
     supply: str = "0"
     source_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     z_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
+    # Whether this route accepts new deposits and new withdrawals: "normal",
+    # "suspended", or "" while availability is not known, which is not
+    # available. A status this SDK does not know reads as its decimal string.
+    # A suspension can stop one direction and not the other; funds sent to a
+    # deposit address while deposits are suspended are delayed, not lost.
+    deposit_status: str = ""
+    withdrawal_status: str = ""
+
+    def accepts_deposits(self) -> bool:
+        """True only while the route's deposit status is ``"normal"``."""
+        return self.deposit_status == ROUTE_STATUS_NORMAL
+
+    def accepts_withdrawals(self) -> bool:
+        """True only while the route's withdrawal status is ``"normal"``."""
+        return self.withdrawal_status == ROUTE_STATUS_NORMAL
 
 
 class ZipperEnrichedAssetConfig(msgspec.Struct, kw_only=True, omit_defaults=True):

@@ -69,6 +69,8 @@ def _enrich_asset_chains(
                 supply=variant.supply,
                 source_token=variant.source_token,
                 z_token=variant.z_token,
+                deposit_status=variant.deposit_status,
+                withdrawal_status=variant.withdrawal_status,
             )
         )
     return enriched

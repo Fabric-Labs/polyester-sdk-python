@@ -2,6 +2,7 @@ import datetime
 
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
+from polyester.gen.marketdata.v1 import asset_info_pb2 as _asset_info_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper

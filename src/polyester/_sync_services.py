@@ -41,7 +41,9 @@ from polyester.services import (
     AsyncProfileService,
     AsyncRateLimitService,
     AsyncSocialVerificationService,
+    AsyncStatementsService,
     AsyncSubAccountsService,
+    AsyncSystemService,
     AsyncTradesService,
     AsyncTransfersService,
     AsyncTriggersService,
@@ -268,6 +270,7 @@ class SyncMarketDataService(_SyncSubscribeService):
     get_current_candle = call(AsyncMarketDataService.get_current_candle)
     get_spot_config = call(AsyncMarketDataService.get_spot_config)
     get_trades = call(AsyncMarketDataService.get_trades)
+    list_asset_info = call(AsyncMarketDataService.list_asset_info)
     subscribe_candles = call(AsyncMarketDataService.subscribe_candles)
     subscribe_trades = plain(AsyncMarketDataService.subscribe_trades)
 
@@ -609,6 +612,21 @@ class SyncTransfersService(_SyncSubscribeService):
         account_id: str | int | None = None,
     ) -> SyncSubscription:
         return self._subscribe_sync("subscribe", on_event, on_error, account_id=account_id)
+
+
+class SyncStatementsService(_SyncService):
+    """``Polyester`` view of :class:`~polyester.services.AsyncStatementsService`."""
+
+    export = call(AsyncStatementsService.export)
+    export_page = call(AsyncStatementsService.export_page)
+
+
+class SyncSystemService(_SyncService):
+    """``Polyester`` view of :class:`~polyester.services.AsyncSystemService`."""
+
+    get_version = call(AsyncSystemService.get_version)
+    iter_status_events = iterate(AsyncSystemService.iter_status_events)
+    list_status_events = call(AsyncSystemService.list_status_events)
 
 
 class SyncInternalTransfersService(_SyncService):

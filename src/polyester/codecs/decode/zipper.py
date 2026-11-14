@@ -41,6 +41,8 @@ def _variant_from_proto(
         supply=format_ledger_u128(msg.supply_q, scale=quantity_scale),
         source_token=_token_config(msg.source_address, msg.source_decimals),
         z_token=_token_config(msg.ztoken_address, msg.ztoken_decimals),
+        deposit_status=proto_enum_name(zipper_pb2.RouteStatus, int(msg.deposit_status)),
+        withdrawal_status=proto_enum_name(zipper_pb2.RouteStatus, int(msg.withdrawal_status)),
     )
 
 

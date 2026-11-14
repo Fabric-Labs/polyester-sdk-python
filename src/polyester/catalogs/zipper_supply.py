@@ -57,6 +57,8 @@ def patch_zipper_catalog_supply(
                     supply=supply,
                     source_token=chain.source_token,
                     z_token=chain.z_token,
+                    deposit_status=chain.deposit_status,
+                    withdrawal_status=chain.withdrawal_status,
                 )
             )
         if asset_changed:

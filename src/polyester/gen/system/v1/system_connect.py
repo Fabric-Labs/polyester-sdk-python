@@ -21,6 +21,9 @@ class SystemService(Protocol):
     async def get_version(self, request: system_dot_v1_dot_system__pb2.GetVersionRequest, ctx: RequestContext) -> system_dot_v1_dot_system__pb2.GetVersionResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_status_events(self, request: system_dot_v1_dot_system__pb2.ListStatusEventsRequest, ctx: RequestContext) -> system_dot_v1_dot_system__pb2.ListStatusEventsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class SystemServiceASGIApplication(ConnectASGIApplication[SystemService]):
     def __init__(self, service: SystemService | AsyncGenerator[SystemService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -36,6 +39,16 @@ class SystemServiceASGIApplication(ConnectASGIApplication[SystemService]):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.get_version,
+                ),
+                "/system.v1.SystemService/ListStatusEvents": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListStatusEvents",
+                        service_name="system.v1.SystemService",
+                        input=system_dot_v1_dot_system__pb2.ListStatusEventsRequest,
+                        output=system_dot_v1_dot_system__pb2.ListStatusEventsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_status_events,
                 ),
             },
             interceptors=interceptors,
@@ -73,12 +86,36 @@ class SystemServiceClient(ConnectClient):
             use_get=use_get,
         )
 
+    async def list_status_events(
+        self,
+        request: system_dot_v1_dot_system__pb2.ListStatusEventsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> system_dot_v1_dot_system__pb2.ListStatusEventsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListStatusEvents",
+                service_name="system.v1.SystemService",
+                input=system_dot_v1_dot_system__pb2.ListStatusEventsRequest,
+                output=system_dot_v1_dot_system__pb2.ListStatusEventsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
 
 
 
 
 class SystemServiceSync(Protocol):
     def get_version(self, request: system_dot_v1_dot_system__pb2.GetVersionRequest, ctx: RequestContext) -> system_dot_v1_dot_system__pb2.GetVersionResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_status_events(self, request: system_dot_v1_dot_system__pb2.ListStatusEventsRequest, ctx: RequestContext) -> system_dot_v1_dot_system__pb2.ListStatusEventsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -95,6 +132,16 @@ class SystemServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.get_version,
+                ),
+                "/system.v1.SystemService/ListStatusEvents": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListStatusEvents",
+                        service_name="system.v1.SystemService",
+                        input=system_dot_v1_dot_system__pb2.ListStatusEventsRequest,
+                        output=system_dot_v1_dot_system__pb2.ListStatusEventsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_status_events,
                 ),
             },
             interceptors=interceptors,
@@ -125,6 +172,28 @@ class SystemServiceClientSync(ConnectClientSync):
                 service_name="system.v1.SystemService",
                 input=system_dot_v1_dot_system__pb2.GetVersionRequest,
                 output=system_dot_v1_dot_system__pb2.GetVersionResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def list_status_events(
+        self,
+        request: system_dot_v1_dot_system__pb2.ListStatusEventsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> system_dot_v1_dot_system__pb2.ListStatusEventsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListStatusEvents",
+                service_name="system.v1.SystemService",
+                input=system_dot_v1_dot_system__pb2.ListStatusEventsRequest,
+                output=system_dot_v1_dot_system__pb2.ListStatusEventsResponse,
                 idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,

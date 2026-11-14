@@ -315,7 +315,9 @@ Deposit addresses, sub-accounts and Guard Signer status need one too:
 `READ_SUBACCOUNT_MEMBERS` (`sub_accounts.list_members`, and the members of
 `sub_accounts.get`), `READ_SUBACCOUNT_INVITES` (`sub_accounts.list_invites`, and
 the invites of `sub_accounts.get`) and `READ_GUARD_SIGNER_STATUS`
-(`guard_signer.get_status`). A key scoped to the main account reaches the main
+(`guard_signer.get_status`). Account statements need `READ_STATEMENTS`
+(`statements.export`, `statements.export_page`); `READ_BALANCES` and
+`READ_INTERNAL_TRANSFERS` do not grant it. A key scoped to the main account reaches the main
 account and the sub-accounts it owns; a key scoped to a sub-account reaches only
 that sub-account. `sub_accounts.get` leaves out the members and invites a key
 may not read instead of failing. The main account's address book needs
@@ -1000,6 +1002,64 @@ sent). It needs no API key and sends none. A build made after a release reads
 like `0.10.0-12-g4e21a2f09670`, which is not a semantic version: `release` is
 the part before the first `-`, the release it follows.
 
+## Status events
+
+`await client.list_status_events()` returns the environment's scheduled
+maintenance and incidents as `StatusEventsPage`, the latest start first, and
+`client.iter_status_events(...)` follows every page with the same filters.
+With no `states` the server lists current and upcoming events (`scheduled` and
+`in_progress`); pass `states` (`"scheduled"`, `"in_progress"`, `"completed"`,
+`"cancelled"`) and `kinds` (`"maintenance"`, `"incident"`) to choose. An
+unknown label raises `PolyesterValidationError` before anything is sent. It
+needs no API key and sends none; answers can be up to 10 seconds old.
+
+```python
+async for event in client.iter_status_events(kinds=["maintenance"]):
+    print(event.id, event.state, event.title, event.start_time, event.end_time)
+```
+
+Each `StatusEvent` has a base58 `id`, `kind`, `state`, `title`, `message`, the
+`start_time`/`end_time` window (`end_time` is `None` for an incident without an
+expected end), the affected `services` (`"trading"`, `"market_data"`,
+`"deposits"`, `"withdrawals"`, `"transfers"`, `"accounts"`, `"api"`,
+`"quickswap"`, `"app"`), `markets` and `assets` (empty when not limited to
+particular ones), the incident `impact` (`"degraded"`, `"partial_outage"`,
+`"major_outage"`, `""` when not given), progress notes in `updates`,
+`cancelled_at`, `updated_at` and `details_url` (`None` when the event links no
+announcement). To keep a banner current, poll at most every 10 seconds and
+compare `updated_at` per `id`; a state that moves only with the clock does not
+change it.
+
+## Account statements
+
+`client.statements` exports an account's balance movements for a period as
+CSV, for reconciliation and tax reporting. `await client.statements.export(
+start_time=..., end_time=...)` follows every page and returns the whole
+`Statement`; `export_page` returns one `StatementPage` (`csv`,
+`next_page_token`) for callers that stream pages. `start_time` is inclusive and
+`end_time` exclusive, both timezone-aware; the server allows at most 366 days.
+`asset_id` keeps one asset, and `account` / `sub_account_id` choose the account
+as for `transfers.list`, the client's default sub-account included. The call is
+signed; an API key needs `READ_STATEMENTS`.
+
+```python
+from datetime import UTC, datetime
+
+statement = await client.statements.export(
+    start_time=datetime(2026, 10, 1, tzinfo=UTC),
+    end_time=datetime(2026, 11, 1, tzinfo=UTC),
+)
+for row in statement.rows():
+    print(row.time, row.type, row.account, row.asset, row.amount, row.fee, row.balance)
+```
+
+`statement.csv` is RFC 4180 CSV in UTF-8 with CRLF line endings: save it as
+is. Only the first page carries the header row, so the pages concatenate into
+one file. `rows()` (and `parse_statement_csv`) read the columns by header name,
+so the columns a later release appends are ignored, and a statement without
+`flow_id` reads it as `""`. Amounts, fees and balances stay exact decimal
+strings; never parse them as floats.
+
 ## Price alerts (devnet)
 
 `client.alerts` manages durable price alerts. Available on devnet; not yet
@@ -1269,7 +1329,12 @@ reached now ends `FAILED` with reason
 `ModifyTrigger` and order modifies that would make it act at once are refused
 with `ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (302), leaving the
 existing state unchanged. To start trailing from the market, clear the
-activation price with a present zero.
+activation price with a present zero. A stop-loss or take-profit created with a
+trigger price the watched price has already reached, the last or the index
+price alike, ends the same way: `FAILED` with reason 244, never armed and no
+order placed. `triggers.create` returns before that, so read the trigger with
+`triggers.get` for its outcome, and place the order directly if you meant it to
+run at once.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
@@ -1476,6 +1541,19 @@ from polyester import format_ledger_u128
 print(format_ledger_u128(balance.funding), format_ledger_u128(balance.trading))
 ```
 
+### Deposit and withdrawal routes
+
+Each chain variant of `zipper.get_deposit_withdraw_config()` says whether its
+route accepts new deposits and new withdrawals: `deposit_status` and
+`withdrawal_status` read `"normal"`, `"suspended"`, or `""` while availability
+is not known yet, which is not available. `variant.accepts_deposits()` and
+`variant.accepts_withdrawals()` are true only for `"normal"`; the enriched
+chains of `client.catalogs.zipper` carry the same fields. A suspension can stop
+one direction and not the other, and requests made before it continue. Funds
+sent to a deposit address while deposits are suspended are delayed, not lost.
+The config is cacheable for 10 seconds; read it again to see a suspension start
+or end.
+
 ## Public market data
 
 Public endpoints do not require an API key. Authenticated endpoints use the
@@ -1526,6 +1604,17 @@ while True:
         break  # caught up; resume later from `after`
     after = page.next_after_trade_id
 ```
+
+`market_data.list_asset_info(asset_ids=None)` returns team-maintained asset
+information as `AssetInfo` entries, ordered by `asset_id` (the `ledger_id` of
+the spot and deposit/withdraw configs), complete and without paging. Each has
+an `editorial` with `description` (plain text), `website_url`,
+`whitepaper_url`, `explorer_urls`, `x_url`, `telegram_url`, `discord_url`,
+`github_url`, `issue_date` (`YYYY-MM-DD`, kept as text) and `issue_price`
+(`AssetIssuePrice` with an exact decimal `amount` and `currency` `"USD"`;
+`None` when unknown, distinct from a known zero), and `editorial_updated_at`.
+Empty strings and lists mean unknown. Assets never edited are omitted. It is
+public and sends no API key.
 
 `orderbook.get(symbol=...)` returns a depth snapshot. When its `available` is
 `False`, the server is building the book or invalidated it: its levels are

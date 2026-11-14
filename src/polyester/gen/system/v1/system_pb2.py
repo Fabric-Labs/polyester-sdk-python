@@ -25,31 +25,58 @@ _sym_db = _symbol_database.Default()
 from polyester.gen.buf.validate import validate_pb2 as buf_dot_validate_dot_validate__pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as gnostic_dot_openapi_dot_v3_dot_annotations__pb2
 from polyester.gen.google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from polyester.gen.polyester.api import options_pb2 as polyester_dot_api_dot_options__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16system/v1/system.proto\x12\tsystem.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bpolyester/api/options.proto\"\x13\n\x11GetVersionRequest\"\x91\x02\n\x12GetVersionResponse\x12\x81\x01\n\x07version\x18\x01 \x01(\tBg\xbaHdrb2`^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})(-[1-9][0-9]{0,8}-g[0-9a-f]{12})?$R\x07version\x12-\n\x06\x63ommit\x18\x02 \x01(\tB\x15\xbaH\x12r\x10\x32\x0e^[0-9a-f]{40}$R\x06\x63ommit\x12H\n\x0b\x65nvironment\x18\x03 \x01(\tB&\xbaH#r!R\x06\x64\x65vnetR\x07testnetR\x07mainnetR\x05localR\x0b\x65nvironment2\xfa\x01\n\rSystemService\x12\xd9\x01\n\nGetVersion\x12\x1c.system.v1.GetVersionRequest\x1a\x1d.system.v1.GetVersionResponse\"\x8d\x01\x90\x02\x01\xbaGi\n\x0eSystem Service\x12\x0bGet Version\x1aHGet the version and source revision of the build the environment serves.Z\x00\x88\xb5\x18\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/system/version\x1a\r\x8a\xb5\x18\tchangelogBwZ>github.com/Fabric-Labs/polyester-sdk-go/gen/system/v1;systemv1\xbaG4:2\n\x0eSystem Service\x12 The build an environment serves.b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16system/v1/system.proto\x12\tsystem.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\"\x13\n\x11GetVersionRequest\"\x91\x02\n\x12GetVersionResponse\x12\x81\x01\n\x07version\x18\x01 \x01(\tBg\xbaHdrb2`^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})(-[1-9][0-9]{0,8}-g[0-9a-f]{12})?$R\x07version\x12-\n\x06\x63ommit\x18\x02 \x01(\tB\x15\xbaH\x12r\x10\x32\x0e^[0-9a-f]{40}$R\x06\x63ommit\x12H\n\x0b\x65nvironment\x18\x03 \x01(\tB&\xbaH#r!R\x06\x64\x65vnetR\x07testnetR\x07mainnetR\x05localR\x0b\x65nvironment\"x\n\x11StatusEventUpdate\x12\x0e\n\x02id\x18\x01 \x01(\rR\x02id\x12\x18\n\x07message\x18\x02 \x01(\tR\x07message\x12\x39\n\ncreated_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tcreatedAt\"\xaa\x05\n\x0bStatusEvent\x12\x0e\n\x02id\x18\x01 \x01(\x06R\x02id\x12.\n\x04kind\x18\x02 \x01(\x0e\x32\x1a.system.v1.StatusEventKindR\x04kind\x12\x31\n\x05state\x18\x03 \x01(\x0e\x32\x1b.system.v1.StatusEventStateR\x05state\x12\x14\n\x05title\x18\x04 \x01(\tR\x05title\x12\x18\n\x07message\x18\x05 \x01(\tR\x07message\x12\x39\n\nstart_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tstartTime\x12\x35\n\x08\x65nd_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x07\x65ndTime\x12\x36\n\x08services\x18\x08 \x03(\x0e\x32\x1a.system.v1.AffectedServiceR\x08services\x12\x18\n\x07markets\x18\t \x03(\tR\x07markets\x12\x39\n\nupdated_at\x18\n \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x34\n\x06impact\x18\x0b \x01(\x0e\x32\x1c.system.v1.StatusEventImpactR\x06impact\x12\x16\n\x06\x61ssets\x18\x0c \x03(\tR\x06\x61ssets\x12=\n\x0c\x63\x61ncelled_at\x18\r \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x0b\x63\x61ncelledAt\x12\x36\n\x07updates\x18\x0e \x03(\x0b\x32\x1c.system.v1.StatusEventUpdateR\x07updates\x12$\n\x0b\x64\x65tails_url\x18\x0f \x01(\tH\x00R\ndetailsUrl\x88\x01\x01\x42\x0e\n\x0c_details_url\"\xf3\x01\n\x17ListStatusEventsRequest\x12H\n\x06states\x18\x01 \x03(\x0e\x32\x1b.system.v1.StatusEventStateB\x13\xbaH\x10\x92\x01\r\x10\x04\x18\x01\"\x07\x82\x01\x04\x10\x01 \x00R\x06states\x12\x45\n\x05kinds\x18\x02 \x03(\x0e\x32\x1a.system.v1.StatusEventKindB\x13\xbaH\x10\x92\x01\r\x10\x02\x18\x01\"\x07\x82\x01\x04\x10\x01 \x00R\x05kinds\x12\x1e\n\x05limit\x18\x03 \x01(\rB\x08\xbaH\x05*\x03\x18\xc8\x01R\x05limit\x12\'\n\npage_token\x18\x04 \x01(\tB\x08\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"r\n\x18ListStatusEventsResponse\x12.\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x16.system.v1.StatusEventR\x06\x65vents\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*F\n\x0fStatusEventKind\x12\x14\n\x10KIND_UNSPECIFIED\x10\x00\x12\x0f\n\x0bMAINTENANCE\x10\x01\x12\x0c\n\x08INCIDENT\x10\x02*g\n\x10StatusEventState\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\r\n\tSCHEDULED\x10\x01\x12\x0f\n\x0bIN_PROGRESS\x10\x02\x12\r\n\tCOMPLETED\x10\x03\x12\r\n\tCANCELLED\x10\x04*_\n\x11StatusEventImpact\x12\x16\n\x12IMPACT_UNSPECIFIED\x10\x00\x12\x0c\n\x08\x44\x45GRADED\x10\x01\x12\x12\n\x0ePARTIAL_OUTAGE\x10\x02\x12\x10\n\x0cMAJOR_OUTAGE\x10\x03*\xa5\x01\n\x0f\x41\x66\x66\x65\x63tedService\x12\x17\n\x13SERVICE_UNSPECIFIED\x10\x00\x12\x0b\n\x07TRADING\x10\x01\x12\x0f\n\x0bMARKET_DATA\x10\x02\x12\x0c\n\x08\x44\x45POSITS\x10\x03\x12\x0f\n\x0bWITHDRAWALS\x10\x04\x12\r\n\tTRANSFERS\x10\x05\x12\x0c\n\x08\x41\x43\x43OUNTS\x10\x06\x12\x07\n\x03\x41PI\x10\x07\x12\r\n\tQUICKSWAP\x10\x08\x12\x07\n\x03\x41PP\x10\t2\xa5\x04\n\rSystemService\x12\xd9\x01\n\nGetVersion\x12\x1c.system.v1.GetVersionRequest\x1a\x1d.system.v1.GetVersionResponse\"\x8d\x01\x90\x02\x01\xbaGi\n\x0eSystem Service\x12\x0bGet Version\x1aHGet the version and source revision of the build the environment serves.Z\x00\x88\xb5\x18\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/system/version\x12\xa8\x02\n\x10ListStatusEvents\x12\".system.v1.ListStatusEventsRequest\x1a#.system.v1.ListStatusEventsResponse\"\xca\x01\x90\x02\x01\xbaG\x9f\x01\n\x0eSystem Service\x12\x12List Status Events\x1awList scheduled maintenance and incidents, the latest start first. With no states, it lists current and upcoming events.Z\x00\x88\xb5\x18\x01\x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/system/status-events\x1a\r\x8a\xb5\x18\tchangelogB\xa4\x01Z>github.com/Fabric-Labs/polyester-sdk-go/gen/system/v1;systemv1\xbaGa:_\n\x0eSystem Service\x12MThe build an environment serves, and its scheduled maintenance and incidents.b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'system.v1.system_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'Z>github.com/Fabric-Labs/polyester-sdk-go/gen/system/v1;systemv1\272G4:2\n\016System Service\022 The build an environment serves.'
+  _globals['DESCRIPTOR']._serialized_options = b'Z>github.com/Fabric-Labs/polyester-sdk-go/gen/system/v1;systemv1\272Ga:_\n\016System Service\022MThe build an environment serves, and its scheduled maintenance and incidents.'
   _globals['_GETVERSIONRESPONSE'].fields_by_name['version']._loaded_options = None
   _globals['_GETVERSIONRESPONSE'].fields_by_name['version']._serialized_options = b'\272Hdrb2`^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})(-[1-9][0-9]{0,8}-g[0-9a-f]{12})?$'
   _globals['_GETVERSIONRESPONSE'].fields_by_name['commit']._loaded_options = None
   _globals['_GETVERSIONRESPONSE'].fields_by_name['commit']._serialized_options = b'\272H\022r\0202\016^[0-9a-f]{40}$'
   _globals['_GETVERSIONRESPONSE'].fields_by_name['environment']._loaded_options = None
   _globals['_GETVERSIONRESPONSE'].fields_by_name['environment']._serialized_options = b'\272H#r!R\006devnetR\007testnetR\007mainnetR\005local'
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['states']._loaded_options = None
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['states']._serialized_options = b'\272H\020\222\001\r\020\004\030\001\"\007\202\001\004\020\001 \000'
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['kinds']._loaded_options = None
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['kinds']._serialized_options = b'\272H\020\222\001\r\020\002\030\001\"\007\202\001\004\020\001 \000'
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['limit']._loaded_options = None
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['limit']._serialized_options = b'\272H\005*\003\030\310\001'
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['page_token']._loaded_options = None
+  _globals['_LISTSTATUSEVENTSREQUEST'].fields_by_name['page_token']._serialized_options = b'\272H\005r\003\030\200\004'
   _globals['_SYSTEMSERVICE']._loaded_options = None
   _globals['_SYSTEMSERVICE']._serialized_options = b'\212\265\030\tchangelog'
   _globals['_SYSTEMSERVICE'].methods_by_name['GetVersion']._loaded_options = None
   _globals['_SYSTEMSERVICE'].methods_by_name['GetVersion']._serialized_options = b'\220\002\001\272Gi\n\016System Service\022\013Get Version\032HGet the version and source revision of the build the environment serves.Z\000\210\265\030\001\202\323\344\223\002\024\022\022/v1/system/version'
-  _globals['_GETVERSIONREQUEST']._serialized_start=163
-  _globals['_GETVERSIONREQUEST']._serialized_end=182
-  _globals['_GETVERSIONRESPONSE']._serialized_start=185
-  _globals['_GETVERSIONRESPONSE']._serialized_end=458
-  _globals['_SYSTEMSERVICE']._serialized_start=461
-  _globals['_SYSTEMSERVICE']._serialized_end=711
+  _globals['_SYSTEMSERVICE'].methods_by_name['ListStatusEvents']._loaded_options = None
+  _globals['_SYSTEMSERVICE'].methods_by_name['ListStatusEvents']._serialized_options = b'\220\002\001\272G\237\001\n\016System Service\022\022List Status Events\032wList scheduled maintenance and incidents, the latest start first. With no states, it lists current and upcoming events.Z\000\210\265\030\001\202\323\344\223\002\032\022\030/v1/system/status-events'
+  _globals['_STATUSEVENTKIND']._serialized_start=1662
+  _globals['_STATUSEVENTKIND']._serialized_end=1732
+  _globals['_STATUSEVENTSTATE']._serialized_start=1734
+  _globals['_STATUSEVENTSTATE']._serialized_end=1837
+  _globals['_STATUSEVENTIMPACT']._serialized_start=1839
+  _globals['_STATUSEVENTIMPACT']._serialized_end=1934
+  _globals['_AFFECTEDSERVICE']._serialized_start=1937
+  _globals['_AFFECTEDSERVICE']._serialized_end=2102
+  _globals['_GETVERSIONREQUEST']._serialized_start=196
+  _globals['_GETVERSIONREQUEST']._serialized_end=215
+  _globals['_GETVERSIONRESPONSE']._serialized_start=218
+  _globals['_GETVERSIONRESPONSE']._serialized_end=491
+  _globals['_STATUSEVENTUPDATE']._serialized_start=493
+  _globals['_STATUSEVENTUPDATE']._serialized_end=613
+  _globals['_STATUSEVENT']._serialized_start=616
+  _globals['_STATUSEVENT']._serialized_end=1298
+  _globals['_LISTSTATUSEVENTSREQUEST']._serialized_start=1301
+  _globals['_LISTSTATUSEVENTSREQUEST']._serialized_end=1544
+  _globals['_LISTSTATUSEVENTSRESPONSE']._serialized_start=1546
+  _globals['_LISTSTATUSEVENTSRESPONSE']._serialized_end=1660
+  _globals['_SYSTEMSERVICE']._serialized_start=2105
+  _globals['_SYSTEMSERVICE']._serialized_end=2654
 # @@protoc_insertion_point(module_scope)

@@ -14,10 +14,14 @@ from connectrpc.interceptor import Interceptor, InterceptorSync
 from connectrpc.method import IdempotencyLevel, MethodInfo
 from connectrpc.request import Headers, RequestContext
 from connectrpc.server import ConnectASGIApplication, ConnectWSGIApplication, Endpoint, EndpointSync
+import polyester.gen.marketdata.v1.asset_info_pb2 as marketdata_dot_v1_dot_asset__info__pb2
 import polyester.gen.marketdata.v1.marketdata_pb2 as marketdata_dot_v1_dot_marketdata__pb2
 
 
 class MarketDataService(Protocol):
+    async def list_asset_info(self, request: marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_trades(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetTradesRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetTradesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -36,6 +40,16 @@ class MarketDataServiceASGIApplication(ConnectASGIApplication[MarketDataService]
         super().__init__(
             service=service,
             endpoints=lambda svc: {
+                "/marketdata.v1.MarketDataService/ListAssetInfo": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListAssetInfo",
+                        service_name="marketdata.v1.MarketDataService",
+                        input=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest,
+                        output=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_asset_info,
+                ),
                 "/marketdata.v1.MarketDataService/GetTrades": Endpoint.unary(
                     method=MethodInfo(
                         name="GetTrades",
@@ -90,6 +104,28 @@ class MarketDataServiceASGIApplication(ConnectASGIApplication[MarketDataService]
 
 
 class MarketDataServiceClient(ConnectClient):
+    async def list_asset_info(
+        self,
+        request: marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListAssetInfo",
+                service_name="marketdata.v1.MarketDataService",
+                input=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest,
+                output=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     async def get_trades(
         self,
         request: marketdata_dot_v1_dot_marketdata__pb2.GetTradesRequest,
@@ -175,6 +211,8 @@ class MarketDataServiceClient(ConnectClient):
 
 
 class MarketDataServiceSync(Protocol):
+    def list_asset_info(self, request: marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_trades(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetTradesRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetTradesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_candles(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetCandlesRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetCandlesResponse:
@@ -189,6 +227,16 @@ class MarketDataServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: MarketDataServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
+                "/marketdata.v1.MarketDataService/ListAssetInfo": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListAssetInfo",
+                        service_name="marketdata.v1.MarketDataService",
+                        input=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest,
+                        output=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_asset_info,
+                ),
                 "/marketdata.v1.MarketDataService/GetTrades": EndpointSync.unary(
                     method=MethodInfo(
                         name="GetTrades",
@@ -243,6 +291,28 @@ class MarketDataServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class MarketDataServiceClientSync(ConnectClientSync):
+    def list_asset_info(
+        self,
+        request: marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListAssetInfo",
+                service_name="marketdata.v1.MarketDataService",
+                input=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoRequest,
+                output=marketdata_dot_v1_dot_asset__info__pb2.ListAssetInfoResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     def get_trades(
         self,
         request: marketdata_dot_v1_dot_marketdata__pb2.GetTradesRequest,

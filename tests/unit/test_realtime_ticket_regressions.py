@@ -147,7 +147,9 @@ async def test_sequence_zero_and_availability_are_independent(monkeypatch, seq, 
 
 @pytest.mark.parametrize("mode", ["refresh", "transport", "close", "recover"])
 async def test_managed_book_terminal_receiver_lifecycle(monkeypatch, mode):
-    harness = BookHarness(monkeypatch)
+    # In refresh mode the book is unavailable, so the managed book asks again for its
+    # snapshot through bounded refreshes.
+    harness = BookHarness(monkeypatch, available=mode != "refresh")
     errors = []
     sub = await harness.service.create_subscription(symbol="BTC-USDT", on_error=errors.append)
     assert (await asyncio.wait_for(anext(sub), 10)).book_seq == "1"
@@ -155,14 +157,20 @@ async def test_managed_book_terminal_receiver_lifecycle(monkeypatch, mode):
     try:
         if mode in ("refresh", "recover"):
             harness.fetch.side_effect = PolyesterRealtimeError("snapshot unavailable")
-            # A real gap requests bounded refreshes through the managed book.
-            await harness.queue.put(OrderBookDeltaUpdate(book_seq_start="3", book_seq_end="3"))
             if mode == "recover":
+                # A gap waits for the next reset: it refreshes nothing and adds one
+                # view of the book it keeps, marked unavailable.
+                await harness.queue.put(OrderBookDeltaUpdate(book_seq_start="3", book_seq_end="4"))
+                stale = await asyncio.wait_for(pending, 10)
+                assert (stale.book_seq, stale.available) == ("1", False)
+                assert harness.fetch.call_count == 1
+                pending = asyncio.create_task(anext(sub))
                 # Explicit failed refresh provides a deterministic barrier; recover via public API.
                 await sub.refresh_snapshot()
                 harness.fetch.side_effect = None
                 await sub.refresh_snapshot()
-                assert (await asyncio.wait_for(pending, 10)).book_seq == "1"
+                recovered = await asyncio.wait_for(pending, 10)
+                assert (recovered.book_seq, recovered.available) == ("1", True)
                 assert sub.last_error is None
                 assert errors
                 return
@@ -210,7 +218,7 @@ async def test_zero_sequence_keeps_ordering(monkeypatch, mode):
         assert (await anext(sub)).book_seq == "0"
         await harness.queue.put(
             OrderBookDeltaUpdate(
-                book_seq_start="5" if mode != "contiguous" else "1",
+                book_seq_start="5" if mode == "gap" else "0",
                 book_seq_end="5" if mode != "contiguous" else "1",
                 reset=mode == "reset",
                 bids=[["100", "1"]],
@@ -218,8 +226,9 @@ async def test_zero_sequence_keeps_ordering(monkeypatch, mode):
         )
         view = await asyncio.wait_for(anext(sub), 10)
         if mode == "gap":
-            assert view.book_seq == "0" and not view.bids
-            assert harness.fetch.call_count == 2 and gaps == [True]
+            # Kept as it was, marked unknown, until the next reset: no snapshot.
+            assert view.book_seq == "0" and not view.bids and view.available is False
+            assert harness.fetch.call_count == 1 and gaps == [True]
         else:
             assert view.book_seq == ("1" if mode == "contiguous" else "5")
             assert len(view.bids) == 1
@@ -253,7 +262,7 @@ async def test_book_overflow_closes_resources_and_keeps_error(monkeypatch):
         for seq in range(2, 202):
             await harness.queue.put(
                 OrderBookDeltaUpdate(
-                    book_seq_start=str(seq),
+                    book_seq_start=str(seq - 1),
                     book_seq_end=str(seq),
                 )
             )

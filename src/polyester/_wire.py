@@ -27,6 +27,7 @@ from polyester.errors import (
     AUTH_REPLAY_CAPACITY_EXHAUSTED,
     AUTH_SESSION_KIND_NOT_ALLOWED,
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
+    AUTH_TEMPORARILY_UNAVAILABLE,
     AUTH_TIMESTAMP_SKEW,
     ORDER_PERMISSION_REFUSAL_CODES,
     TIMESTAMP_SKEW,
@@ -262,6 +263,11 @@ def _map_gateway_problem(exc: GatewayProblemError):
         )
     if exc.http_status == 503 and order_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID":
         return PolyesterApiError(message, code=order_code)
+    if exc.problem_code == AUTH_TEMPORARILY_UNAVAILABLE:
+        # Authentication could not run, so nothing was processed: the same
+        # retryable refusal as the ConnectRPC AuthErrorDetail, never an
+        # unknown outcome.
+        return PolyesterApiError(message, code=AUTH_TEMPORARILY_UNAVAILABLE)
     if code in ("unavailable", "internal"):
         return PolyesterServerError(
             message,

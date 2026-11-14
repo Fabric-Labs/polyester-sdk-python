@@ -27,6 +27,12 @@ class ChangelogService(Protocol):
     async def list_changes(self, request: changelog_dot_v1_dot_changelog__pb2.ListChangesRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.ListChangesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_deployment_groups(self, request: changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_deployment_group(self, request: changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class ChangelogServiceASGIApplication(ConnectASGIApplication[ChangelogService]):
     def __init__(self, service: ChangelogService | AsyncGenerator[ChangelogService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -62,6 +68,26 @@ class ChangelogServiceASGIApplication(ConnectASGIApplication[ChangelogService]):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.list_changes,
+                ),
+                "/changelog.v1.ChangelogService/ListDeploymentGroups": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListDeploymentGroups",
+                        service_name="changelog.v1.ChangelogService",
+                        input=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest,
+                        output=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_deployment_groups,
+                ),
+                "/changelog.v1.ChangelogService/GetDeploymentGroup": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetDeploymentGroup",
+                        service_name="changelog.v1.ChangelogService",
+                        input=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest,
+                        output=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_deployment_group,
                 ),
             },
             interceptors=interceptors,
@@ -143,6 +169,50 @@ class ChangelogServiceClient(ConnectClient):
             use_get=use_get,
         )
 
+    async def list_deployment_groups(
+        self,
+        request: changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListDeploymentGroups",
+                service_name="changelog.v1.ChangelogService",
+                input=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest,
+                output=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def get_deployment_group(
+        self,
+        request: changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetDeploymentGroup",
+                service_name="changelog.v1.ChangelogService",
+                input=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest,
+                output=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
 
 
 
@@ -153,6 +223,10 @@ class ChangelogServiceSync(Protocol):
     def get_post(self, request: changelog_dot_v1_dot_changelog__pb2.GetPostRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.GetPostResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_changes(self, request: changelog_dot_v1_dot_changelog__pb2.ListChangesRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.ListChangesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_deployment_groups(self, request: changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_deployment_group(self, request: changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest, ctx: RequestContext) -> changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -189,6 +263,26 @@ class ChangelogServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.list_changes,
+                ),
+                "/changelog.v1.ChangelogService/ListDeploymentGroups": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListDeploymentGroups",
+                        service_name="changelog.v1.ChangelogService",
+                        input=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest,
+                        output=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_deployment_groups,
+                ),
+                "/changelog.v1.ChangelogService/GetDeploymentGroup": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetDeploymentGroup",
+                        service_name="changelog.v1.ChangelogService",
+                        input=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest,
+                        output=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_deployment_group,
                 ),
             },
             interceptors=interceptors,
@@ -263,6 +357,50 @@ class ChangelogServiceClientSync(ConnectClientSync):
                 service_name="changelog.v1.ChangelogService",
                 input=changelog_dot_v1_dot_changelog__pb2.ListChangesRequest,
                 output=changelog_dot_v1_dot_changelog__pb2.ListChangesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def list_deployment_groups(
+        self,
+        request: changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListDeploymentGroups",
+                service_name="changelog.v1.ChangelogService",
+                input=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsRequest,
+                output=changelog_dot_v1_dot_changelog__pb2.ListDeploymentGroupsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def get_deployment_group(
+        self,
+        request: changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetDeploymentGroup",
+                service_name="changelog.v1.ChangelogService",
+                input=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupRequest,
+                output=changelog_dot_v1_dot_changelog__pb2.GetDeploymentGroupResponse,
                 idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,

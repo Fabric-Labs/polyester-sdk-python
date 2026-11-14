@@ -936,11 +936,37 @@ needs no API key, and the server rate-limits it per client address.
   first, each change once with the wording last received. They filter on first
   publication, so they don't report an edit to an older post; compare
   `revision` for that.
+- `list_deployment_groups(limit=, page_token=)` returns one page of the
+  environment's deployment groups, newest deployment first (`limit` defaults
+  to 20, at most 100); `iter_deployment_groups(...)` yields every group across
+  pages. A deployment group is one deployment that raised the environment's
+  release version: its `slug` (`"testnet-v0.92.9"`) never changes, and it
+  lists every release it brought (`versions`, ascending) and the published
+  release posts among them (`posts`). `release_tag` and
+  `previous_release_version` are `None` when unknown or for the first group.
+  `get_deployment_group(slug)` adds the changes that need attention
+  (`attention`: breaking or action required, each with its post) and the
+  posts' `highlights`; an unknown slug raises `PolyesterApiError` with code
+  `not_found`. The list is empty, and every slug not found, until the
+  environment publishes release posts.
+- A release post announces one release: its summary has `release_version`
+  (`"0.92.9"`; slug `v0.92.9`, the same content in every environment),
+  `environments` (the release's status on devnet, testnet and mainnet, in
+  that order: `live_at` is `None` while pending there) and
+  `deployment_group_slug` (the group that brought it here, `None` while it
+  is pending here). These are `None` or empty on any other post. A change's
+  `environment_exceptions` names the environments where it differs from its
+  release: `ahead` (already available while its release is pending there,
+  with `live_at`), `pending` or `unavailable`. `environments` changes when a
+  release goes live without a new `revision`: compare the whole summary to
+  notice it.
 
 Categories (`breaking_change`, `new_feature`, `improvement`, `bug_fix`),
 audiences (`all_users`, `traders`, `market_makers`, `developers`) and surfaces
 (`trading`, `funding`, `accounts`, `api`, `explorer`, `documentation`,
-`platform`, `market_data`, `quickswap`, `rewards`) are lowercase labels. A
+`platform`, `market_data`, `quickswap`, `rewards`, `assistant`),
+environments (`devnet`, `testnet`, `mainnet`) and change availabilities
+(`ahead`, `pending`, `unavailable`) are lowercase labels. A
 value newer than this SDK reads as its number instead of failing. Each
 section's `surface` is the product area it covers, or `""` for a section not
 tied to one, such as the changes that need your attention; a change keeps its
@@ -957,6 +983,9 @@ async for post in client.changelog.iter_posts():
 post = await client.changelog.get_post("2026-09-24")
 for entry in await client.changelog.breaking_changes_since(datetime(2026, 9, 1, tzinfo=UTC)):
     print(entry.post_slug, entry.change.id, entry.change.title, entry.change.migration_guidance)
+async for group in client.changelog.iter_deployment_groups():
+    detail = await client.changelog.get_deployment_group(group.slug)
+    print(group.slug, group.versions, [a.change.title for a in detail.attention])
 ```
 
 The sync `Polyester` client returns plain iterators:
@@ -1503,7 +1532,9 @@ while True:
 unknown, not empty, so do not read the empty sides as no liquidity; request
 the snapshot again later. Only a snapshot carries `available`: books from
 `orderbook.create_subscription(...)` report the value of the last snapshot the
-subscription applied, and deltas, resets included, do not change it. A managed
+subscription applied, and deltas, resets included, do not change it, except
+that a book waiting for a reset after a sequence gap reads `False` until the
+reset arrives. A managed
 subscription requests an unavailable snapshot again by itself, after 1 s doubling
 to 8 s, until the book is available or the subscription stops; repeated
 unavailable answers add no view. A market whose book stays unavailable keeps being
@@ -1625,9 +1656,17 @@ the list; a root key cannot subscribe to a sub-account's channels.
 - Reconnects use capped exponential backoff with per-subscription jitter.
   `set_on_error(...)` observes background feed interruptions; async iteration
   still raises terminal failures.
-- Orderbook sequence gaps trigger a REST snapshot refresh. Use
-  `on_sequence_gap` / `on_reconnect` / `on_snapshot_refresh` on
-  `orderbook.create_subscription(...)` for recovery observability.
+- A managed order book follows the depth stream's rule: each update is the
+  difference between two published views of the tier, and applies only to a
+  book at exactly its `book_seq_start` (the previous update's `book_seq_end`).
+  After a sequence gap, or a malformed update, the book keeps its levels,
+  its next view reads `available=False`, and it waits for the stream's next
+  `reset` (sent about every 30 seconds and after a gap) instead of
+  refetching snapshots, which need not line up with the stream; the reset
+  makes it available again. Use `on_sequence_gap` (once per gap) /
+  `on_reconnect` / `on_snapshot_refresh` on
+  `orderbook.create_subscription(...)` for recovery observability, and
+  `refresh_snapshot()` to rebuild from a snapshot at once.
 - Managed snapshot-then-stream subscriptions disable transport auto-reconnect
   so they can rebuild REST state between reconnect attempts. Buffered
   publications survive a failed snapshot retry and are merged exactly once

@@ -29,6 +29,12 @@ class ApiKeyPurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PURPOSE_UNSPECIFIED: _ClassVar[ApiKeyPurpose]
     STANDARD: _ClassVar[ApiKeyPurpose]
     ASSISTANT: _ClassVar[ApiKeyPurpose]
+
+class AssistantKeyPreset(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    PRESET_UNSPECIFIED: _ClassVar[AssistantKeyPreset]
+    READ_ONLY: _ClassVar[AssistantKeyPreset]
+    TRADE_WITH_APPROVAL: _ClassVar[AssistantKeyPreset]
 API_KEY_STATUS_UNSPECIFIED: ApiKeyStatus
 ACTIVE: ApiKeyStatus
 REVOKED: ApiKeyStatus
@@ -36,6 +42,9 @@ DISABLED: ApiKeyStatus
 PURPOSE_UNSPECIFIED: ApiKeyPurpose
 STANDARD: ApiKeyPurpose
 ASSISTANT: ApiKeyPurpose
+PRESET_UNSPECIFIED: AssistantKeyPreset
+READ_ONLY: AssistantKeyPreset
+TRADE_WITH_APPROVAL: AssistantKeyPreset
 
 class ApiKey(_message.Message):
     __slots__ = ("key_id", "label", "icon", "color", "ip_whitelist", "status", "subaccount_id", "policy_id", "created_at", "last_used_at", "public_key_ed25519", "expires_at", "created_by_actor", "updated_at", "revision", "purpose")
@@ -164,18 +173,20 @@ class UpdateApiKeyResponse(_message.Message):
     def __init__(self, api_key: _Optional[_Union[ApiKey, _Mapping]] = ...) -> None: ...
 
 class AssistantKeySpec(_message.Message):
-    __slots__ = ("subaccount_id", "public_key_ed25519", "policy_id", "registration_deadline", "registration_proof")
+    __slots__ = ("subaccount_id", "public_key_ed25519", "policy_id", "registration_deadline", "registration_proof", "preset")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_ED25519_FIELD_NUMBER: _ClassVar[int]
     POLICY_ID_FIELD_NUMBER: _ClassVar[int]
     REGISTRATION_DEADLINE_FIELD_NUMBER: _ClassVar[int]
     REGISTRATION_PROOF_FIELD_NUMBER: _ClassVar[int]
+    PRESET_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     public_key_ed25519: bytes
     policy_id: int
     registration_deadline: _timestamp_pb2.Timestamp
     registration_proof: bytes
-    def __init__(self, subaccount_id: _Optional[int] = ..., public_key_ed25519: _Optional[bytes] = ..., policy_id: _Optional[int] = ..., registration_deadline: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., registration_proof: _Optional[bytes] = ...) -> None: ...
+    preset: AssistantKeyPreset
+    def __init__(self, subaccount_id: _Optional[int] = ..., public_key_ed25519: _Optional[bytes] = ..., policy_id: _Optional[int] = ..., registration_deadline: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., registration_proof: _Optional[bytes] = ..., preset: _Optional[_Union[AssistantKeyPreset, str]] = ...) -> None: ...
 
 class SetAssistantKeysRequest(_message.Message):
     __slots__ = ("keys",)

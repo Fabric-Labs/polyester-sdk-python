@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 
 import pytest
+from google.protobuf import json_format
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.scalars import format_id
@@ -19,6 +21,7 @@ from polyester.services.triggers import AsyncTriggersService
 from polyester.services.withdraw import AsyncWithdrawService
 from polyester.transport import TransportConfig, TransportFactory
 from tests.hardening_support import (
+    HttpScript,
     MockHttpServer,
     ParsedRequest,
     connect_proto_response,
@@ -71,8 +74,61 @@ async def test_poly_8471_since_is_inclusive_microsecond_lower_bound(since):
     assert requests[0].path.endswith("/ListTransfers")
     request = ledger_read_pb2.ListTransfersRequest.FromString(requests[0].body)
     assert request.ts_min_us == (since or 0)
-    assert request.ts_max_us == 0
+    # ts_max_us has explicit presence: a sent 0 is an epoch upper bound that
+    # answers an empty page. The SDK sets no upper bound, so it is absent.
+    assert not request.HasField("ts_max_us")
     assert request.limit == 50
+
+
+@pytest.mark.parametrize("wire_format", ["binary", "json"])
+@pytest.mark.parametrize("since", [None, 0, 1_793_922_052_911_123])
+async def test_transfers_list_never_sends_an_upper_time_bound(wire_format, since):
+    """An omitted upper bound is unbounded; a sent ``tsMaxUs: 0`` (or a binary
+    field 5 holding 0) would ask for an empty, epoch-bounded result."""
+    requests: list[ParsedRequest] = []
+
+    async def handler(req: ParsedRequest) -> HttpScript:
+        requests.append(req)
+        if wire_format == "json":
+            return HttpScript.json(200, {})
+        return connect_proto_response(b"")
+
+    http = await MockHttpServer.spawn(handler)
+    transport = TransportFactory(
+        TransportConfig(api_url=http.base_url, wire_format=wire_format),
+        credentials=make_test_credentials(),
+    )
+    try:
+        await AsyncTransfersService(transport, None).list(since=since)
+    finally:
+        await transport.aclose()
+        await http.aclose()
+
+    (sent,) = requests
+    if wire_format == "json":
+        body = json.loads(sent.body)
+        assert "tsMaxUs" not in body
+        request = json_format.Parse(sent.body, ledger_read_pb2.ListTransfersRequest())
+    else:
+        request = ledger_read_pb2.ListTransfersRequest.FromString(sent.body)
+    assert not request.HasField("ts_max_us")
+    assert request.ts_min_us == (since or 0)
+
+
+def test_transfers_request_keeps_an_explicit_zero_upper_bound_apart_from_none():
+    """The generated request preserves the distinction on both wires: an
+    explicit 0 is sent and read back as set, an unset bound is not sent."""
+    explicit = ledger_read_pb2.ListTransfersRequest(ts_max_us=0)
+    unset = ledger_read_pb2.ListTransfersRequest()
+    assert explicit.SerializeToString() == b"\x28\x00"
+    assert unset.SerializeToString() == b""
+    assert ledger_read_pb2.ListTransfersRequest.FromString(b"\x28\x00").HasField("ts_max_us")
+    as_json = json_format.MessageToDict(explicit)
+    assert as_json == {"tsMaxUs": "0"}
+    assert json_format.ParseDict(as_json, ledger_read_pb2.ListTransfersRequest()).HasField(
+        "ts_max_us"
+    )
+    assert json_format.MessageToDict(unset) == {}
 
 
 @pytest.mark.parametrize("since", [-1, -(2**100), 2**64, 1.5, "5", True, False])

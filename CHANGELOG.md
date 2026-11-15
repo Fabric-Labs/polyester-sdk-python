@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.30.0
+
+Git tag: `v0.30.0`. Released 2026-11-15. Built on public contract `ebbbeac`.
 
 - **Breaking:** `account="main"` always addresses the main account. With `default_sub_account_id` set, `"main"` resolved like `"active"` and the call went to the default sub-account: a key scoped to the main account was refused (`api_key_root_scope_only`), and a key that may act on the sub-account read balances, or placed and canceled orders, there with no error. Only an unset `account` (`None`) and `"active"` take the default; `""` is the main account, as before, as is `sub_account_id=""`. The README lists every accepted `account` value. Without a default nothing changes. Affected: every call that takes `account=`, such as `balances.list`, `orders.create`, `orders.cancel`, `orders.modify`, `triggers.create`, `transfers.list`, `statements.export` and `stop_all_trading`. Migration: pass `account=None` or `account="active"` where you relied on `"main"` taking the default sub-account.
 - **Breaking:** An empty attached risk is refused before sending. `orders.modify(new_price=..., new_attached_risk={})` sent the new price and dropped the empty risk, so the order kept its take-profit and stop-loss and the call succeeded; `orders.create(attached_risk={})` and a `batch_replace` item with `new_attached_risk={}` dropped it the same way. `{}` and `AttachedRisk()` now raise `PolyesterValidationError` everywhere. Affected: `orders.create`, `orders.preview`, `orders.batch_create`, `orders.modify`, `orders.batch_replace`. Migration: pass `None` for no attached risk, or `clear_attached_risk=True` to remove an order's legs.

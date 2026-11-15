@@ -344,18 +344,19 @@ def test_trigger_create_takes_decrement() -> None:
     assert proto.trigger.self_trade_prevention_mode == orders_pb2.DECREMENT
 
 
-def test_oco_create_passes_decrement_through() -> None:
-    proto = create_oco_to_proto(
-        symbol="BTC-USDT",
-        symbol_id=1,
-        side="sell",
-        qty="0.1",
-        take_profit={"trigger_price": "70000"},
-        stop_loss={"trigger_price": "55000"},
-        quantity_scale=BASE_SCALE,
-        self_trade_prevention_mode="decrement",
-    )
-    assert proto.oco.self_trade_prevention_mode == orders_pb2.DECREMENT
+def test_oco_create_refuses_decrement() -> None:
+    # The contract does not support DECREMENT on an OCO.
+    with pytest.raises(PolyesterValidationError, match="not supported on an OCO"):
+        create_oco_to_proto(
+            symbol="BTC-USDT",
+            symbol_id=1,
+            side="sell",
+            qty="0.1",
+            take_profit={"trigger_price": "70000"},
+            stop_loss={"trigger_price": "55000"},
+            quantity_scale=BASE_SCALE,
+            self_trade_prevention_mode="decrement",
+        )
 
 
 def test_unknown_mode_error_lists_decrement() -> None:

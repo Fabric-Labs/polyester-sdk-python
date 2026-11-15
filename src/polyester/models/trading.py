@@ -980,9 +980,12 @@ class BatchReplaceItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     """One item of ``orders.batch_replace``.
 
     ``new_attached_risk`` replaces the order's attached risk, as on
-    ``orders.modify``. A trailing stop's ``limit_price`` is sent as given: the
-    request does not carry the order's side, so the server applies the side
-    rule and answers ``ERROR_CODE_BAD_PRICE`` when it is broken.
+    ``orders.modify``; an empty one raises ``PolyesterValidationError``. A
+    trailing stop's ``limit_price`` is sent as given: the request does not
+    carry the order's side, so the server applies the side rule and answers
+    ``ERROR_CODE_BAD_PRICE`` when it is broken. ``clear_attached_risk=True``
+    removes the order's take-profit, stop-loss and trailing stop, alone or
+    with a new price or quantity; with ``new_attached_risk`` it raises.
     """
 
     key: OrderKey
@@ -990,6 +993,7 @@ class BatchReplaceItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     new_qty: Any | None = None
     new_client_order_id: str | None = None
     new_attached_risk: AttachedRisk | dict[str, Any] | None = None
+    clear_attached_risk: bool = False
 
 
 class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True):

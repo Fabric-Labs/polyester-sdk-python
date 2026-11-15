@@ -447,7 +447,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``TRIGGER_WOULD_TRIGGER_IMMEDIATELY``: read the legs for their status.
 
         ``self_trade_prevention_mode`` is ``expire_taker``, ``expire_maker``
-        (the server's default when unset), ``expire_both`` or ``decrement``.
+        (the server's default when unset) or ``expire_both``. ``decrement`` is
+        not supported on an OCO and raises :class:`PolyesterValidationError`
+        before sending, as a leg's ``trigger_price_source`` ``mark`` does.
 
         ``client_list_id`` identifies this create: 1 to 36 bytes in UTF-8, any
         characters, sent exactly as given. Left out, the SDK generates one,

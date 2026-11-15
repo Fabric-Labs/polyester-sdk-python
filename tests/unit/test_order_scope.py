@@ -160,7 +160,7 @@ WRITE_HELPERS = {
 @pytest.mark.parametrize("helper", sorted(WRITE_HELPERS))
 @pytest.mark.parametrize("scope,expected", [
     ({}, "default"),
-    ({"account": "main"}, "default"),
+    ({"account": "main"}, None),
     ({"account": "active"}, "default"),
     ({"sub_account_id": ""}, None),
     ({"account": ""}, None),
@@ -221,7 +221,8 @@ async def test_typed_order_requests_refuse_selector_conflicts(helper, account, o
 @pytest.mark.parametrize("helper", ["create", "preview"])
 @pytest.mark.parametrize("request_scope,account,want", [
     (None, None, 42),
-    (None, "main", 42),
+    (None, "main", None),
+    (None, "active", 42),
     (None, format_id(44), 44),
     ("", None, None),
     (format_id(44), None, 44),

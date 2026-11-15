@@ -3,7 +3,7 @@ from __future__ import annotations
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.internal_transfers import internal_transfer_from_proto
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.scalars import parse_account_id
+from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
@@ -59,6 +59,7 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
             raise PolyesterValidationError(
                 "create requires a non-empty idempotency_key reused across retries"
             )
+        asset_id = exact_integer(asset_id, "asset_id", min_value=1, max_value=UINT32_MAX)
         request = CreateInternalTransferRequest(
             asset_id=asset_id,
             amount_e18=str_to_u128_proto(quantity, scale=quantity_scale, asset_id=asset_id),

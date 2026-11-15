@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -37,6 +38,8 @@ def _require_scaled_int(value: int, field_name: str, *, allow_u128: bool = False
     _reject_bool(value, field_name)
     if not isinstance(value, int):
         raise PolyesterValidationError(f"{field_name} must be an int")
+    # operator.index, not the object: an int subclass may override __int__.
+    value = operator.index(value)
     if value < 0:
         raise PolyesterValidationError(f"{field_name} must be non-negative")
     if not allow_u128 and (value < INT64_MIN or value > INT64_MAX):

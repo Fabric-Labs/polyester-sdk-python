@@ -11,6 +11,7 @@ from polyester.codecs.decode.withdraw import (
     withdraw_intent_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.scalars import UINT64_MAX, exact_integer
 from polyester.codecs.withdraw import (
     new_trading_withdraw_nonce,
     trading_withdraw_payload_to_proto,
@@ -45,7 +46,7 @@ def _validate_prepared_request(request: withdraw_pb2.CreateTradingWithdrawReques
         raise PolyesterValidationError("prepared withdraw request has invalid deadline_ts_sec")
     if not payload.HasField("nonce") or _u128_value(payload.nonce) <= 0:
         raise PolyesterValidationError("prepared withdraw request has invalid nonce")
-    if not payload.idempotency_key.strip():
+    if not payload.idempotency_key:
         raise PolyesterValidationError("prepared withdraw request is missing idempotency_key")
     if payload.action == withdraw_pb2.TO_FUNDING and payload.destination_chain_id != 0:
         raise PolyesterValidationError(
@@ -165,7 +166,14 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         deadline_ts_sec: int | None = None,
         nonce: str | int | None = None,
     ) -> PreparedTradingWithdraw:
-        """Build and sign once; persist before submission or retry."""
+        """Build and sign once; persist before submission or retry.
+
+        ``nonce`` (1 to 2**128 - 1) and ``deadline_ts_sec`` (Unix seconds, 1 to
+        2**64 - 1) are an ``int`` or a string of decimal digits, signed exactly
+        as given. A ``float``, ``bool``, ``Decimal`` or any other string raises
+        ``PolyesterValidationError`` before anything is signed. Left out, the
+        nonce is random and the deadline is five minutes from now.
+        """
         return self._prepare_api_key(
             action="to_funding",
             asset_id=asset_id,
@@ -279,12 +287,17 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         its policy; ``EXTERNAL_WITHDRAW`` alone no longer allows this check.
         It moves no value, so retrying it is safe.
         """
-        if int(destination_chain_id) <= 0:
-            raise PolyesterValidationError("destination_chain_id must be non-zero")
+        chain_id = exact_integer(
+            destination_chain_id,
+            "destination_chain_id",
+            min_value=1,
+            max_value=UINT64_MAX,
+            allow_str=True,
+        )
         if not str(destination_address or "").strip():
             raise PolyesterValidationError("destination_address is required")
         request = withdraw_pb2.ValidateWithdrawDestinationRequest(
-            destination_chain_id=int(destination_chain_id),
+            destination_chain_id=chain_id,
             destination_address=str(destination_address),
         )
         return await unary_auth_decoded(
@@ -347,7 +360,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         self._validate_api_key_scope(account, sub_account_id)
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")
-        if deadline_ts_sec is None or deadline_ts_sec <= 0:
+        if deadline_ts_sec is None:
             raise PolyesterValidationError(
                 "deadline_ts_sec is required when payload_signature is precomputed"
             )
@@ -386,7 +399,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         self._validate_api_key_scope(account, sub_account_id)
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")
-        if deadline_ts_sec is None or deadline_ts_sec <= 0:
+        if deadline_ts_sec is None:
             raise PolyesterValidationError(
                 "deadline_ts_sec is required when payload_signature is precomputed"
             )
@@ -442,7 +455,7 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
     ) -> WithdrawIntentResult:
         if not payload_signature:
             raise PolyesterValidationError("payload_signature is required for trading withdraw")
-        if deadline_ts_sec is None or deadline_ts_sec <= 0:
+        if deadline_ts_sec is None:
             raise PolyesterValidationError(
                 "deadline_ts_sec is required when payload_signature is precomputed"
             )

@@ -969,7 +969,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         """Arm the dead-man switch: cancel open orders after ``timeout_sec``
         unless it is armed again. Like :meth:`cancel_all` it leaves triggers
         running, and an attached leg whose exit order it cancels ends (with its
-        OCO siblings); cancel triggers first to stop all automated trading."""
+        OCO siblings); cancel triggers first to stop all automated trading.
+
+        ``timeout_sec`` is an ``int``, 10 to 120, or 0 to disarm the switch;
+        any other value raises ``PolyesterValidationError`` before sending."""
         if symbol:
             await self._ensure_catalogs()
         proto_request = cancel_all_after_to_proto(

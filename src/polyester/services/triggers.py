@@ -287,6 +287,12 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``activation_price`` apply only to ``trailing_stop``; TWAP and ladder
         settings apply only to their respective strategies.
 
+        A TWAP requires ``twap_duration_ms`` (at least 1000) and
+        ``twap_slice_interval_ms`` (at least 100, and no longer than the
+        duration); a ladder requires ``ladder_levels`` (2 to 100). Each is an
+        ``int``: a value outside the contract's range, a ``float`` or a
+        ``bool`` raises ``PolyesterValidationError`` before sending.
+
         ``trailing_distance_ticks`` is a price delta in 1e-9 quote-unit ticks, the
         scale of every price tick: on BTC-USDT, 50 USDT is ``50_000_000_000`` and
         0.5 USDT is ``500_000_000`` (``int(Decimal("0.5").scaleb(9))``). It is not a

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.32.0
+
+Git tag: `v0.32.0`. Released 2026-11-16. Built on public contract `1945423`.
 
 - **Breaking:** Balance history is exact at 18 decimals. Each `BalanceHistorySeries` (from `balances.get_balance_history`) carries `balance`, one `AssetAmount` per point at scale 18 (domain `ledger_e18`, the series' `asset_id`), decoded exactly from the contract's `U128` and never through a float; `balance_q`, the 7-decimal integers, is removed. Balances above 1,844,674,407,370.9551615 whole units, which used to fail the whole response, now read. A series whose number of balances differs from the response's `points` raises `PolyesterResponseContractError`, so a server on the previous contract, whose balances this SDK no longer reads, is refused instead of read as a history without balances. `codecs.wire_decode.decode_balance_history` reads the same field from proto JSON. Migration: read `series.balance[i]` instead of `series.balance_q[i]`, and `balance[i].as_decimal()` (or `.format()`) instead of dividing by 10**7.
 - **Breaking:** Lifecycle flows no longer name or select the Polyester account behind them. `LifecycleFlowSummary.owner_account_id` is removed, and `lifecycle.list_flows` no longer takes `owner_account_id`. The public reads (`list_flows`, `get_flow`, `list_flows_by_tx`) return only flows a chain transaction started and identify an account by `smart_account_address`. Migration: identify an account by `smart_account_address`; replace `list_flows(owner_account_id=...)` with the new `lifecycle.list_account_flows(...)`, signed as the account.

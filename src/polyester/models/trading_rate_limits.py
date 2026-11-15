@@ -24,7 +24,16 @@ class RateLimitConfig(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class TradingRateLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """Effective trading limits for one account target and caller."""
+    """Effective trading limits for one account target and caller.
+
+    Trading limits apply per account: the root account and each sub-account
+    have their own, and every API key and session that trades for an account
+    shares them. ``rules`` are the enforced placement and cancellation rules
+    for the selected account (placement first, cancellation second): budget
+    against them. ``api_key_rules``, present only for an API-key caller, are
+    the rules resolved for that key and are informational only: trading
+    requests are not limited per API key, so adding keys adds no capacity.
+    """
 
     policy_version: int = 0
     effective_from: datetime | None = None

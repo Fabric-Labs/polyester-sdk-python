@@ -65,6 +65,15 @@ from polyester.models.common import (
     SpotAssetConfig,
     SpotConfig,
 )
+from polyester.models.dust import (
+    DustAssetPrice,
+    DustBalance,
+    DustBalances,
+    DustConversion,
+    DustConversionsPage,
+    DustQuote,
+    DustSource,
+)
 from polyester.models.fees import (
     SpotFeeDiscount,
     SpotFeeMultiplier,
@@ -122,6 +131,8 @@ from polyester.models.ratelimit import RateLimitDetail
 from polyester.models.secret import Secret
 from polyester.models.statements import (
     Statement,
+    StatementExport,
+    StatementExportsPage,
     StatementPage,
     StatementRow,
     parse_statement_csv,
@@ -171,6 +182,9 @@ from polyester.models.trading import (
     EquityHistory,
     EquityHistorySeries,
     GetOrderResult,
+    InternalTransferBatchLegResult,
+    InternalTransferBatchResult,
+    InternalTransferLeg,
     InternalTransferResult,
     LedgerTransfer,
     LifecycleFlowsList,
@@ -239,6 +253,13 @@ from polyester.models.zipper import (
 )
 
 __all__ = [
+    "DustAssetPrice",
+    "DustBalance",
+    "DustBalances",
+    "DustConversion",
+    "DustConversionsPage",
+    "DustQuote",
+    "DustSource",
     "AccountScope",
     "AddressBookEntriesList",
     "AddressBookEntriesView",
@@ -307,6 +328,9 @@ __all__ = [
     "InternalAddressBookEntryView",
     "InternalRecentDestination",
     "InternalTransferAccount",
+    "InternalTransferBatchLegResult",
+    "InternalTransferBatchResult",
+    "InternalTransferLeg",
     "InternalTransferResult",
     "InternalTransferWhitelistEntriesList",
     "InternalTransferWhitelistEntry",
@@ -423,6 +447,8 @@ __all__ = [
     "ChangelogPost",
     "ServerVersion",
     "Statement",
+    "StatementExport",
+    "StatementExportsPage",
     "StatementPage",
     "StatementRow",
     "StatusEvent",

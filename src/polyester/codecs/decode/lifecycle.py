@@ -40,6 +40,10 @@ _LIFECYCLE_REASON_BY_CODE: dict[int, str] = {
     ),
     int(types_pb2.DEPOSIT_SOURCE_NOT_CONFIRMED): "deposit_source_not_confirmed",
     int(types_pb2.ZIPPER_COMPLIANCE_TRANSFERRED): "zipper_compliance_transferred",
+    # A completed outcome, not a failure: the deposit was delivered to the
+    # account's own Polyester Chain wallet and no Funding or Trading balance
+    # was credited.
+    int(types_pb2.ZIPPER_DEPOSIT_DELIVERED_TO_WALLET): "zipper_deposit_delivered_to_wallet",
 }
 
 
@@ -96,7 +100,6 @@ def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> Lifecycl
         latest_step=_flow_step_label(msg.current_step),
         is_open=bool(msg.is_open),
         is_terminal=bool(msg.is_terminal),
-        owner_account_id=account_fields.get("owner_account_id", ""),
         smart_account_address=account_fields.get("smart_account_address", ""),
         lifecycle_reason=lifecycle_reason_from_code(int(msg.lifecycle_reason)),
         zipper_reason=_zipper_reason_if_present(msg),
@@ -115,7 +118,6 @@ def flow_tx_match_from_proto(msg: FlowTxMatchView) -> LifecycleFlowSummary:
         latest_step=_flow_step_label(msg.current_step),
         is_open=bool(msg.is_open),
         is_terminal=bool(msg.is_terminal),
-        owner_account_id=account_fields.get("owner_account_id", ""),
         smart_account_address=account_fields.get("smart_account_address", ""),
         lifecycle_reason=lifecycle_reason_from_code(int(msg.lifecycle_reason)),
         zipper_reason=_zipper_reason_if_present(msg),
@@ -167,3 +169,25 @@ def flow_from_get_by_tx_response(
     lookups are one-to-many and must not silently discard bundled flows.
     """
     return flows_by_tx_list_from_proto(msg)
+
+
+def account_flows_list_from_proto(
+    msg: lifecycle_read_pb2.ListAccountFlowsResponse,
+) -> LifecycleFlowsList:
+    for item in msg.flows:
+        require_id("ListAccountFlows", "flow_id", item.flow_id)
+    return LifecycleFlowsList(
+        flows=[flow_summary_from_proto(item) for item in msg.flows],
+        next_page_token=msg.next_page_token,
+    )
+
+
+def flow_from_get_account_flow_response(
+    msg: lifecycle_read_pb2.GetAccountFlowResponse,
+) -> LifecycleFlowSummary:
+    if not msg.HasField("flow"):
+        raise PolyesterResponseContractError("GetAccountFlow", "missing flow")
+    if not msg.flow.HasField("summary"):
+        raise PolyesterResponseContractError("GetAccountFlow", "missing flow summary")
+    require_id("GetAccountFlow", "flow_id", msg.flow.summary.flow_id)
+    return flow_detail_from_proto(msg.flow)

@@ -7,6 +7,7 @@ from polyester.codecs.proto_helpers import format_uint64_id
 from polyester.codecs.scalars import format_id
 from polyester.codecs.wire_decode import decode_equity_history_series
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
+from polyester.gen.polyester.type.v1 import u128_pb2
 
 
 def test_asset_balance_from_proto_preserves_uint64_revisions() -> None:
@@ -31,7 +32,7 @@ def test_balance_history_from_proto() -> None:
             ledger_read_pb2.BalanceSeries(
                 asset_id=1,
                 account_code=10,
-                balance_q=[100, 200],
+                balance=[u128_pb2.U128(lo=100), u128_pb2.U128(hi=1, lo=200)],
             )
         ],
     )
@@ -39,7 +40,8 @@ def test_balance_history_from_proto() -> None:
     assert result.range == "7d"
     assert result.bucket == "1h"
     assert len(result.series) == 1
-    assert result.series[0].balance_q == [100, 200]
+    assert [b.scaled for b in result.series[0].balance] == [100, (1 << 64) + 200]
+    assert all(b.scale == 18 and b.asset_id == 1 for b in result.series[0].balance)
 
 
 def test_equity_history_from_proto() -> None:

@@ -131,6 +131,23 @@ ORDER_PERMISSION_REFUSAL_CODES = frozenset(
     }
 )
 
+# chain.withdraw.v1.ErrorCode of a new withdrawal to an external network whose
+# withdrawals of the asset are temporarily suspended (50; REST 400
+# ``ROUTE_SUSPENDED``, ConnectRPC ``failed_precondition``). Nothing was
+# reserved for the refused request, so a fresh request is safe: submit a new
+# one once the route's ``withdrawal_status`` in the deposit and withdraw config
+# is ``"normal"`` again. Final, not retryable as is. Repeating an accepted
+# request with the same idempotency key still returns the accepted withdrawal.
+ROUTE_SUSPENDED = "ERROR_CODE_ROUTE_SUSPENDED"
+
+# auth.v1.AuthErrorCode values of a refused X/Twitter or Discord link change
+# (HTTP 412). ``PolyesterApiError.retry_at`` says when the same request may
+# succeed. AUTH_SOCIAL_ACCOUNT_COOLDOWN: the provider account was unlinked from
+# another Polyester account less than 30 days ago. AUTH_SOCIAL_CHANGE_LIMIT_REACHED:
+# the account changed or unlinked that provider's account less than 30 days ago.
+AUTH_SOCIAL_ACCOUNT_COOLDOWN = "AUTH_SOCIAL_ACCOUNT_COOLDOWN"
+AUTH_SOCIAL_CHANGE_LIMIT_REACHED = "AUTH_SOCIAL_CHANGE_LIMIT_REACHED"
+
 # Suffix of orders.v1.ErrorDetail codes for a mutation that was sent but not
 # confirmed in time (e.g. ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN). The server
 # may still have applied it: read back before retrying. Matching the suffix
@@ -318,11 +335,18 @@ class PolyesterRateLimitError(PolyesterTransportError):
         retry_after: float | None = None,
         detail: object | None = None,
         code: str | None = None,
+        cause_code: str | None = None,
+        level_index: int | None = None,
     ) -> None:
         super().__init__(message)
         self.retry_after = retry_after
         self.detail = detail
         self.code = code
+        # A ladder refused because one of its orders ran out of request quota
+        # (ERROR_CODE_LADDER_LEVEL_REJECTED with cause ERROR_CODE_RATE_LIMIT_EXCEEDED,
+        # ConnectRPC only), as on PolyesterApiError; None otherwise.
+        self.cause_code = cause_code
+        self.level_index = level_index
 
 
 class PolyesterServerError(PolyesterTransportError):
@@ -395,6 +419,18 @@ class PolyesterTimestampSkewError(PolyesterTransportError):
 class PolyesterApiError(PolyesterError):
     """Raised for structured Connect/API errors.
 
+    ``cause_code`` and ``level_index`` explain a trigger create refused with
+    ``ERROR_CODE_LADDER_LEVEL_REJECTED``: ``cause_code`` is the code the
+    ladder's refused order would return as a single order (for example
+    ``ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR``), and ``level_index`` is that
+    order's zero-based index among the ladder's orders, so ``0`` is the first
+    order. Both are ``None`` for every other error. Over REST they come from
+    the problem's ``causeCode`` and ``levelIndex``.
+
+    ``retry_at`` is when the same request may succeed, an aware UTC datetime,
+    on ``AUTH_SOCIAL_ACCOUNT_COOLDOWN`` and ``AUTH_SOCIAL_CHANGE_LIMIT_REACHED``
+    (``auth.v1.AuthErrorDetail.retry_after``); ``None`` otherwise.
+
     ``existing_order_id`` is set on an ``ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID``
     order rejection: the public ID of the order that already holds the client
     order ID, when the server knows it.
@@ -415,6 +451,9 @@ class PolyesterApiError(PolyesterError):
         raw: object | None = None,
         existing_order_id: str | None = None,
         violations: list[OrderFieldViolation] | None = None,
+        cause_code: str | None = None,
+        level_index: int | None = None,
+        retry_at: datetime | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
@@ -422,6 +461,9 @@ class PolyesterApiError(PolyesterError):
         self.raw = raw
         self.existing_order_id = existing_order_id
         self.violations = list(violations or [])
+        self.cause_code = cause_code
+        self.level_index = level_index
+        self.retry_at = retry_at
 
 
 class PolyesterWithdrawError(PolyesterApiError):
@@ -441,6 +483,13 @@ class PolyesterWithdrawError(PolyesterApiError):
     reserved: send it again at ``payable_from``, which is ``None`` when that
     time is not known yet. :func:`is_retryable_error` reports ``False``, since
     an immediate retry is refused the same way.
+
+    ``ERROR_CODE_ROUTE_SUSPENDED`` (:data:`ROUTE_SUSPENDED`) refuses a new
+    withdrawal to an external network whose withdrawals of the asset are
+    temporarily suspended. Nothing was reserved for the refused request, so a
+    fresh request is safe: submit a new one once the route's
+    ``withdrawal_status`` in ``zipper.get_deposit_withdraw_config()`` is
+    ``"normal"`` again. :func:`is_retryable_error` reports ``False``.
     """
 
     def __init__(
@@ -590,6 +639,14 @@ def is_request_deadline_exceeded(err: BaseException) -> bool:
     """True when a write's receive window ended before admission
     (``ERROR_CODE_REQUEST_DEADLINE_EXCEEDED``). Nothing changed; retryable."""
     return isinstance(err, PolyesterApiError) and err.code == REQUEST_DEADLINE_EXCEEDED
+
+
+def is_route_suspended(err: BaseException) -> bool:
+    """Whether ``err`` refuses a withdrawal because its route's withdrawals are
+    temporarily suspended (:data:`ROUTE_SUSPENDED`). Nothing was reserved:
+    submit a new request once the route's ``withdrawal_status`` is
+    ``"normal"`` again."""
+    return isinstance(err, PolyesterApiError) and err.code == ROUTE_SUSPENDED
 
 
 def is_request_too_large(err: BaseException) -> bool:

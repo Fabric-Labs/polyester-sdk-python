@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
-from polyester.codecs.decode.invariants import ts_ns_string_from_response
+from polyester.codecs.decode.invariants import paired_ts_ns, ts_ns_string_from_response
 from polyester.codecs.decode.orders import OrderScales, _field_violations_from_proto, pair_scales
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
@@ -464,28 +463,13 @@ def trigger_mutation_from_proto(
     )
 
 
-def _paired_ts_ns(msg: Any, ts_ns_field: str, ts_field: str) -> int | None:
-    """A response time in nanoseconds since the Unix epoch: the exact
-    ``*_ts_ns`` field, or its paired ``Timestamp`` when the nanosecond field is
-    unset; ``None`` when the server sent neither (or a time before the epoch).
-    """
-    exact = int(getattr(msg, ts_ns_field))
-    if exact:
-        return exact
-    if not msg.HasField(ts_field):
-        return None
-    ts = getattr(msg, ts_field)
-    nanos = int(ts.seconds) * 1_000_000_000 + int(ts.nanos)
-    return nanos if nanos > 0 else None
-
-
 def create_oco_from_proto(msg: triggers_pb2.CreateOcoResponse) -> CreateOcoResult:
     return CreateOcoResult(
         order_list_id=format_uint64_id(msg.order_list_id),
         client_list_id=msg.client_list_id,
         take_profit_trigger_id=format_uint64_id(msg.take_profit_trigger_id),
         stop_loss_trigger_id=format_uint64_id(msg.stop_loss_trigger_id),
-        accepted_ts_ns=_paired_ts_ns(msg, "accepted_at_ts_ns", "accepted_at"),
+        accepted_ts_ns=paired_ts_ns(msg, "accepted_at_ts_ns", "accepted_at"),
     )
 
 
@@ -493,7 +477,7 @@ def cancel_oco_from_proto(msg: triggers_pb2.CancelOcoResponse) -> CancelOcoResul
     return CancelOcoResult(
         order_list_id=format_uint64_id(msg.order_list_id),
         status=_trigger_status_label(msg.status),
-        ts_ns=_paired_ts_ns(msg, "ts_ns", "ts"),
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 
@@ -541,7 +525,7 @@ def batch_cancel_triggers_from_proto(
         results=results,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
-        ts_ns=_paired_ts_ns(msg, "ts_ns", "ts"),
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 

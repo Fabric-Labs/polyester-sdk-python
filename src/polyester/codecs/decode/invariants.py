@@ -40,3 +40,18 @@ def ts_ns_string_from_response(
     if parsed == 0 and empty_when_zero:
         return ""
     return str(parsed)
+
+
+def paired_ts_ns(msg: Any, ts_ns_field: str, ts_field: str) -> int | None:
+    """A response time in nanoseconds since the Unix epoch: the exact
+    ``*_ts_ns`` field, or its paired ``Timestamp`` when the nanosecond field is
+    unset; ``None`` when the server sent neither (or a time before the epoch).
+    """
+    exact = int(getattr(msg, ts_ns_field))
+    if exact:
+        return exact
+    if not msg.HasField(ts_field):
+        return None
+    ts = getattr(msg, ts_field)
+    nanos = int(ts.seconds) * 1_000_000_000 + int(ts.nanos)
+    return nanos if nanos > 0 else None

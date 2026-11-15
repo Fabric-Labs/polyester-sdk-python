@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.30.1
+
+Git tag: `v0.30.1`. Released 2026-11-15. Built on public contract `ebbbeac`.
 
 - The README's examples match the current API. Fragments that used `OrderId`, `ClientOrderId`, `Quantity`, `OrderPeg`, `PolyesterAuthError` or `PolyesterCatalogHydrationError` import them; the order reads check that `GetOrderResult.order` is not `None`; the batch replace example builds its `BatchReplaceItem`; the sync subscription example calls `subscribe_trades_sync` on the sync `Polyester` client; and the changelog example reads a full post's title from `summary`. Order end reasons are written as the lowercase labels the SDK returns (`market_remainder`, `ioc_remainder`), a trigger refused for acting at once reads `failed` with `failure_reason` `trigger_would_trigger_immediately`, `trading_withdraws.get_wallet_balances` documents `account=`, and a refused batch replace item's `existing_order_id` is listed. Nothing changes in the SDK.
 - Tests compile every Python block of the README and type-check it with mypy against the SDK, and run its `pycon` examples as doctests, so an example that drifts from the API fails CI. No example is run against the network.

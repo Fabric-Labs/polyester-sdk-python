@@ -54,7 +54,11 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     on the order book at a time; ``hidden_qty`` is the part of ``leaves_qty``
     the book does not show, so the book shows ``leaves_qty - hidden_qty``.
     Both are zero for a plain order, and ``hidden_qty`` is zero once the order
-    has ended. A replace keeps the display.
+    has ended. Lowering an iceberg's quantity in place to its display or below
+    keeps its queue priority and shows all of it (``hidden_qty`` zero). A
+    replace keeps the display while the new quantity is above it; otherwise
+    the new order is a plain limit order with ``display_qty`` zero, and it
+    stays plain.
     """
 
     order_id: str

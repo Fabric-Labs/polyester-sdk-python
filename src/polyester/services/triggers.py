@@ -155,9 +155,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         (the ID :meth:`create_oco` returned), and ``client_list_id`` those of
         the OCO created with that client list ID: use it to find an OCO whose
         create raised an error for which ``mutation_outcome_unknown`` is true.
-        ``client_list_id`` is 1 to 36 bytes in UTF-8, any characters, and is
-        sent unchanged. An ``order_list_id`` of 0, or an empty or longer
-        ``client_list_id``, raises ``PolyesterValidationError`` before sending.
+        ``client_list_id`` follows the client order ID rule, 1 to 36 ASCII
+        letters, digits, ``.``, ``_``, ``:``, ``/`` or ``-``, and is sent
+        unchanged. An ``order_list_id`` of 0, or a ``client_list_id`` outside
+        that rule (empty, longer, with spaces or other characters), raises
+        ``PolyesterValidationError`` before sending.
         Each trigger reads back its ``order_list_id`` and ``client_list_id``.
 
         With the catalogs loaded, each trigger's ``symbol`` names its pair.
@@ -457,8 +459,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         not supported on an OCO and raises :class:`PolyesterValidationError`
         before sending, as a leg's ``trigger_price_source`` ``mark`` does.
 
-        ``client_list_id`` identifies this create: 1 to 36 bytes in UTF-8, any
-        characters, sent exactly as given. Left out, the SDK generates one,
+        ``client_list_id`` identifies this create: 1 to 36 ASCII letters,
+        digits, ``.``, ``_``, ``:``, ``/`` or ``-``, the client order ID rule,
+        sent exactly as given. Left out, the SDK generates one,
         which the result echoes. Both legs read the OCO back on
         ``Trigger.order_list_id`` and ``Trigger.client_list_id``. Sending the
         same create again with the same ``client_list_id`` returns the same
@@ -469,8 +472,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         (``TRIGGER_CREATE_OUTCOME_UNKNOWN``): the OCO may exist, so look for
         its legs with ``list(client_list_id=...)`` before retrying. An ID you
         choose and keep is what lets you do that, so set one when you may need
-        to. An empty one, or one over 36 bytes, raises
-        ``PolyesterValidationError`` before sending.
+        to. One outside that rule (empty, over 36 characters, with spaces or
+        other characters) raises ``PolyesterValidationError`` before sending.
         """
         await self._ensure_catalogs()
         symbol_id: int | None = None

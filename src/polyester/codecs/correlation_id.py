@@ -8,18 +8,22 @@ _ALLOWED_PUNCTUATION = "._:/-"
 
 
 def validate_correlation_id(value: str, field: str, max_len: int) -> str:
-    trimmed = value.strip()
-    if not trimmed or len(trimmed) > max_len:
+    return check_correlation_id(value.strip(), field, max_len)
+
+
+def check_correlation_id(value: str, field: str, max_len: int) -> str:
+    """Check ``value`` as given, untrimmed: 1 to ``max_len`` ASCII letters,
+    digits, ``.``, ``_``, ``:``, ``/`` or ``-``, the client order ID rule."""
+    if not value or len(value) > max_len:
         raise PolyesterValidationError(f"{field} must be 1 to {max_len} characters")
     valid_chars = (
-        char.isascii() and (char.isalnum() or char in _ALLOWED_PUNCTUATION)
-        for char in trimmed
+        char.isascii() and (char.isalnum() or char in _ALLOWED_PUNCTUATION) for char in value
     )
     if not all(valid_chars):
         raise PolyesterValidationError(
             f"{field} contains invalid characters; allowed: A-Z a-z 0-9 . _ : / -"
         )
-    return trimmed
+    return value
 
 
 def optional_client_id(value: str | None, field: str = "client_order_id") -> str | None:

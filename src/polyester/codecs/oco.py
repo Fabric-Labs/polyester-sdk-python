@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from polyester.codecs.correlation_id import check_correlation_id
 from polyester.codecs.orders import _risk_leg_from_dict, _risk_leg_model_to_dict
 from polyester.codecs.scalars import parse_account_id
 from polyester.codecs.triggers import self_trade_prevention_mode_to_proto
@@ -16,32 +17,25 @@ from polyester.models.trading import RiskLeg
 from polyester.types.money import resolve_qty_scaled
 
 
-def _contract_client_list_id_max_bytes() -> int:
-    """The ``client_list_id`` byte limit the public contract sets."""
+def _contract_client_list_id_max_len() -> int:
+    """The ``client_list_id`` length limit the public contract sets."""
     field = triggers_pb2.OcoIntent.DESCRIPTOR.fields_by_name["client_list_id"]
-    return int(field.GetOptions().Extensions[validate_pb2.field].string.max_bytes)
+    return int(field.GetOptions().Extensions[validate_pb2.field].string.max_len)
 
 
-CLIENT_LIST_ID_MAX_BYTES = _contract_client_list_id_max_bytes()
+CLIENT_LIST_ID_MAX_LEN = _contract_client_list_id_max_len()
 
 
 def validate_client_list_id(value: object, field_name: str = "client_list_id") -> str:
-    """Check a client list ID as the contract does: 1 to 36 bytes in UTF-8.
+    """Check a client list ID as the contract does, with the client order ID
+    rule: 1 to 36 ASCII letters, digits, ``.``, ``_``, ``:``, ``/`` or ``-``.
 
-    Any characters are allowed. The ID is returned, and sent, exactly as given:
-    it is not stripped or normalized.
+    The ID is returned, and sent, exactly as given: it is not stripped or
+    normalized, so an ID with outer spaces is refused.
     """
     if not isinstance(value, str):
         raise PolyesterValidationError(f"{field_name} must be a string")
-    try:
-        size = len(value.encode("utf-8"))
-    except UnicodeEncodeError as exc:
-        raise PolyesterValidationError(f"{field_name} must be valid UTF-8 text") from exc
-    if size == 0 or size > CLIENT_LIST_ID_MAX_BYTES:
-        raise PolyesterValidationError(
-            f"{field_name} must be 1 to {CLIENT_LIST_ID_MAX_BYTES} bytes in UTF-8; got {size}"
-        )
-    return value
+    return check_correlation_id(value, field_name, CLIENT_LIST_ID_MAX_LEN)
 
 
 def _oco_leg(leg: RiskLeg | dict[str, Any], *, field_name: str, symbol: str) -> triggers_pb2.OcoLeg:
@@ -79,8 +73,9 @@ def create_oco_to_proto(
     ``client_list_id`` is the create's idempotency key; left out (``None``),
     one is generated. ``self_trade_prevention_mode`` ``decrement`` and a leg's
     ``trigger_price_source`` ``mark``, which the contract does not support on an
-    OCO, raise ``PolyesterValidationError``. Given, it must be 1 to 36 bytes in UTF-8, any
-    characters, and is sent unchanged; otherwise ``PolyesterValidationError``.
+    OCO, raise ``PolyesterValidationError``. A given ``client_list_id`` must follow
+    the client order ID rule (1 to 36 ASCII letters, digits, ``.``, ``_``, ``:``,
+    ``/`` or ``-``) and is sent unchanged; otherwise ``PolyesterValidationError``.
     """
     if symbol_id <= 0:
         raise PolyesterValidationError("create OCO requires a resolved symbol_id")

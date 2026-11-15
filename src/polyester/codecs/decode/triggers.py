@@ -441,10 +441,12 @@ def get_trigger_from_proto(
     scales: OrderScales | None = None,
     symbols: TriggerSymbols | None = None,
 ) -> Trigger | None:
-    if has_field(msg, "trigger"):
-        require_id("GetTrigger", "trigger_id", msg.trigger.trigger_id)
-        return scaled_trigger_from_proto(msg.trigger, scales, symbols)
-    return None
+    # A trigger that does not exist is refused by the API with its own error,
+    # never answered with an empty success.
+    if not has_field(msg, "trigger"):
+        raise PolyesterResponseContractError("GetTrigger", "missing trigger")
+    require_id("GetTrigger", "trigger_id", msg.trigger.trigger_id)
+    return scaled_trigger_from_proto(msg.trigger, scales, symbols)
 
 
 def trigger_mutation_from_proto(

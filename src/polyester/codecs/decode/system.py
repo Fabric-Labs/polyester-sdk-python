@@ -48,6 +48,8 @@ def status_event_from_proto(msg: system_pb2.StatusEvent) -> StatusEvent:
 def status_events_page_from_proto(msg: system_pb2.ListStatusEventsResponse) -> StatusEventsPage:
     for event in msg.events:
         require_id("ListStatusEvents", "id", event.id)
+        for update in event.updates:
+            require_id("ListStatusEvents", "update id", update.id)
     return StatusEventsPage(
         events=[status_event_from_proto(event) for event in msg.events],
         next_page_token=msg.next_page_token,

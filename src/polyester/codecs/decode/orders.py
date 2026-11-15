@@ -475,8 +475,9 @@ def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> Us
 def get_order_from_proto(
     msg: GetOrderResponse, *, scales: OrderScales | None = None
 ) -> GetOrderResult:
-    if msg.HasField("order"):
-        _require_order_ids("GetOrder", msg.order)
+    if not msg.HasField("order"):
+        raise PolyesterResponseContractError("GetOrder", "missing order")
+    _require_order_ids("GetOrder", msg.order)
     for item in msg.trades:
         _require_lineage_id("GetOrder", item)
     order = scaled_order_from_proto(msg.order, scales) if msg.HasField("order") else None

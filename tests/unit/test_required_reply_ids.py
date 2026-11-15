@@ -43,9 +43,11 @@ from polyester.codecs.decode.orders import (
     orders_list_from_proto,
     user_trades_list_from_proto,
 )
+from polyester.codecs.decode.resolve import resolved_accounts_from_proto
 from polyester.codecs.decode.sub_accounts import (
     get_subaccount_from_proto,
     subaccount_invites_list_from_proto,
+    subaccount_members_list_from_proto,
     subaccounts_list_from_proto,
 )
 from polyester.codecs.decode.system import status_events_page_from_proto
@@ -67,6 +69,7 @@ from polyester.gen.auth.v1 import api_keys_pb2 as api_keys
 from polyester.gen.auth.v1 import auth_pb2 as auth
 from polyester.gen.auth.v1 import mfa_pb2 as mfa
 from polyester.gen.auth.v1 import policies_pb2 as policies
+from polyester.gen.auth.v1 import resolve_pb2 as resolve
 from polyester.gen.auth.v1 import subaccounts_pb2 as subaccounts
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2 as analytics
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2 as lifecycle
@@ -432,7 +435,9 @@ READ_REPLIES: dict[str, tuple[Callable[[Any], Any], int | str, int | str]] = {
     ),
     "GetSubaccount api_keys key_id": (
         lambda v: get_subaccount_from_proto(
-            subaccounts.GetSubaccountResponse(api_keys=[api_keys.ApiKey(key_id=v)])
+            subaccounts.GetSubaccountResponse(
+                subaccount=subaccounts.Subaccount(id=4), api_keys=[api_keys.ApiKey(key_id=v)]
+            )
         ),
         "",
         "key-1",
@@ -464,14 +469,18 @@ READ_REPLIES: dict[str, tuple[Callable[[Any], Any], int | str, int | str]] = {
     # Q
     "GetSubaccount invites.id": (
         lambda v: get_subaccount_from_proto(
-            subaccounts.GetSubaccountResponse(invites=[_invite(invite_id=v)])
+            subaccounts.GetSubaccountResponse(
+                subaccount=subaccounts.Subaccount(id=4), invites=[_invite(invite_id=v)]
+            )
         ),
         0,
         7,
     ),
     "GetSubaccount invites.subaccount_id": (
         lambda v: get_subaccount_from_proto(
-            subaccounts.GetSubaccountResponse(invites=[_invite(subaccount_id=v)])
+            subaccounts.GetSubaccountResponse(
+                subaccount=subaccounts.Subaccount(id=4), invites=[_invite(subaccount_id=v)]
+            )
         ),
         0,
         8,
@@ -493,7 +502,9 @@ READ_REPLIES: dict[str, tuple[Callable[[Any], Any], int | str, int | str]] = {
     # R
     "GetSubaccount policy.id": (
         lambda v: get_subaccount_from_proto(
-            subaccounts.GetSubaccountResponse(policy=policies.SubaccountPolicyView(id=v))
+            subaccounts.GetSubaccountResponse(
+                subaccount=subaccounts.Subaccount(id=4), policy=policies.SubaccountPolicyView(id=v)
+            )
         ),
         0,
         7,
@@ -578,12 +589,90 @@ def test_read_reply_with_required_id_decodes(name: str) -> None:
 
 
 def test_absent_optional_nested_messages_are_not_checked() -> None:
-    assert get_trigger_from_proto(triggers.GetTriggerResponse()) is None
     assert me_from_proto(auth.MeResponse(account_id=7)).session is None
-    assert get_order_from_proto(orders_read.GetOrderResponse(order=_order())).order is not None
     destinations = list_destinations_from_proto(
         ab.ListTransferDestinationsResponse(destinations=[ab.TransferDestination()])
     )
     assert destinations.destinations[0].address_book_entry is None
-    subaccount = get_subaccount_from_proto(subaccounts.GetSubaccountResponse())
-    assert (subaccount.subaccount, subaccount.policy) == (None, None)
+    subaccount = get_subaccount_from_proto(
+        subaccounts.GetSubaccountResponse(subaccount=subaccounts.Subaccount(id=4))
+    )
+    assert subaccount.policy is None
+
+
+# A successful get without the object it exists to return breaks the contract:
+# it is refused, never read as "none" (a real not-found is an API error).
+MISSING_OBJECT_REPLIES: dict[str, Callable[[], Any]] = {
+    "GetTrigger": lambda: get_trigger_from_proto(triggers.GetTriggerResponse()),
+    "GetOrder": lambda: get_order_from_proto(orders_read.GetOrderResponse()),
+    "GetApiKey": lambda: api_key_from_get_proto(api_keys.GetApiKeyResponse()),
+    "GetSubaccount": lambda: get_subaccount_from_proto(subaccounts.GetSubaccountResponse()),
+    "GetFlowById": lambda: flow_from_get_response(lifecycle.GetFlowResponse()),
+    "GetFlowById summary": lambda: flow_from_get_response(
+        lifecycle.GetFlowResponse(flow=lifecycle.FlowDetailView())
+    ),
+    "GetPost": lambda: changelog_post_from_proto(changelog.GetPostResponse()),
+    "GetDeploymentGroup": lambda: changelog_deployment_group_from_proto(
+        changelog.GetDeploymentGroupResponse()
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(MISSING_OBJECT_REPLIES))
+def test_get_reply_without_its_object_is_refused(name: str) -> None:
+    with pytest.raises(PolyesterResponseContractError, match=name.split(" ", 1)[0]):
+        MISSING_OBJECT_REPLIES[name]()
+
+
+NEW_READ_REPLIES: dict[str, tuple[Callable[[Any], Any], int, int]] = {
+    "GetAddressBookView tag_id": (
+        lambda v: address_book_view_from_proto(
+            ab.GetAddressBookViewResponse(tags=[ab.AddressBookTagSummary(tag_id=v)])
+        ),
+        0,
+        7,
+    ),
+    "ListStatusEvents update id": (
+        lambda v: status_events_page_from_proto(
+            system.ListStatusEventsResponse(
+                events=[system.StatusEvent(id=7, updates=[system.StatusEventUpdate(id=v)])]
+            )
+        ),
+        0,
+        1,
+    ),
+    "GetSubaccount member account_id": (
+        lambda v: get_subaccount_from_proto(
+            subaccounts.GetSubaccountResponse(
+                subaccount=subaccounts.Subaccount(id=4),
+                members=[subaccounts.SubaccountMemberView(account_id=v)],
+            )
+        ),
+        0,
+        8,
+    ),
+    "ListSubaccountMembers member account_id": (
+        lambda v: subaccount_members_list_from_proto(
+            subaccounts.ListSubaccountMembersResponse(
+                members=[subaccounts.SubaccountMemberView(account_id=v)]
+            )
+        ),
+        0,
+        8,
+    ),
+    "ResolveAccount account_id": (
+        lambda v: resolved_accounts_from_proto(
+            resolve.ResolveAccountResponse(matches=[resolve.ResolvedAccount(account_id=v)])
+        ),
+        0,
+        8,
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(NEW_READ_REPLIES))
+def test_more_read_replies_refuse_a_zero_required_id(name: str) -> None:
+    decode, missing, real = NEW_READ_REPLIES[name]
+    with pytest.raises(PolyesterResponseContractError, match=name.split(" ", 1)[0]):
+        decode(missing)
+    decode(real)

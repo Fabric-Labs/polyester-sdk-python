@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import has_field, proto_enum_name
-from polyester.errors import PolyesterTransportError
+from polyester.errors import PolyesterResponseContractError, PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
 from polyester.gen.chain.zipper.v1 import reason_pb2
 from polyester.models import LifecycleFlowsList, LifecycleFlowSummary, ZipperReasonDetails
@@ -149,12 +149,13 @@ def flows_by_tx_list_from_proto(
 
 
 def flow_from_get_response(msg: lifecycle_read_pb2.GetFlowResponse) -> LifecycleFlowSummary:
-    if msg.HasField("flow"):
-        # The flow detail decoder is shared with the flow stream: check here.
-        if msg.flow.HasField("summary"):
-            require_id("GetFlowById", "flow_id", msg.flow.summary.flow_id)
-        return flow_detail_from_proto(msg.flow)
-    raise PolyesterTransportError("get flow response is missing flow")
+    # The flow detail decoder is shared with the flow stream: check here.
+    if not msg.HasField("flow"):
+        raise PolyesterResponseContractError("GetFlowById", "missing flow")
+    if not msg.flow.HasField("summary"):
+        raise PolyesterResponseContractError("GetFlowById", "missing flow summary")
+    require_id("GetFlowById", "flow_id", msg.flow.summary.flow_id)
+    return flow_detail_from_proto(msg.flow)
 
 
 def flow_from_get_by_tx_response(

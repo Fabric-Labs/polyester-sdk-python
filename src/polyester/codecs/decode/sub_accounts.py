@@ -10,6 +10,7 @@ from polyester.codecs.proto_helpers import (
     optional_timestamp,
     proto_enum_name,
 )
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.models.sub_accounts import (
     GetSubaccountResult,
@@ -88,6 +89,8 @@ def subaccount_member_from_proto(msg: subaccounts_pb2.SubaccountMemberView) -> S
 def subaccount_members_list_from_proto(
     msg: subaccounts_pb2.ListSubaccountMembersResponse,
 ) -> SubAccountMembersList:
+    for item in msg.members:
+        require_id("ListSubaccountMembers", "member account_id", item.account_id)
     return SubAccountMembersList(
         members=[subaccount_member_from_proto(item) for item in msg.members]
     )
@@ -158,8 +161,11 @@ def subaccount_activity_list_from_proto(
 
 
 def get_subaccount_from_proto(msg: subaccounts_pb2.GetSubaccountResponse) -> GetSubaccountResult:
-    if has_field(msg, "subaccount"):
-        require_id("GetSubaccount", "subaccount.id", msg.subaccount.id)
+    if not has_field(msg, "subaccount"):
+        raise PolyesterResponseContractError("GetSubaccount", "missing subaccount")
+    require_id("GetSubaccount", "subaccount.id", msg.subaccount.id)
+    for member in msg.members:
+        require_id("GetSubaccount", "member account_id", member.account_id)
     for key in msg.api_keys:
         require_id("GetSubaccount", "key_id", key.key_id)
     for invite in msg.invites:

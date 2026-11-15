@@ -8,6 +8,7 @@ from polyester.codecs.proto_helpers import (
     optional_timestamp,
     proto_enum_name,
 )
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import api_keys_pb2
 from polyester.models import ApiKeysList, ApiKeySummary
 
@@ -41,11 +42,11 @@ def api_keys_list_from_proto(msg: api_keys_pb2.ListApiKeysResponse) -> ApiKeysLi
     return ApiKeysList(api_keys=[api_key_from_proto(item) for item in msg.api_keys])
 
 
-def api_key_from_get_proto(msg: api_keys_pb2.GetApiKeyResponse) -> ApiKeySummary | None:
-    if msg.HasField("api_key"):
-        require_id("GetApiKey", "key_id", msg.api_key.key_id)
-        return api_key_from_proto(msg.api_key)
-    return None
+def api_key_from_get_proto(msg: api_keys_pb2.GetApiKeyResponse) -> ApiKeySummary:
+    if not msg.HasField("api_key"):
+        raise PolyesterResponseContractError("GetApiKey", "missing api_key")
+    require_id("GetApiKey", "key_id", msg.api_key.key_id)
+    return api_key_from_proto(msg.api_key)
 
 
 get_api_key_from_proto = api_key_from_get_proto

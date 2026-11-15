@@ -436,6 +436,8 @@ def address_book_view_from_proto(
                 "GetAddressBookView", "address_book_entry_id", internal_entry.address_book_entry_id
             )
         entries = entries_view_from_proto(msg.entries)
+    for tag in msg.tags:
+        require_id("GetAddressBookView", "tag_id", tag.tag_id)
     if msg.HasField("recent_destinations"):
         recent = recent_destinations_view_from_proto(msg.recent_destinations)
     if msg.HasField("withdraw_whitelist"):

@@ -198,6 +198,55 @@ def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
     return scaled
 
 
+_DECIMAL_INTEGER = re.compile(r"[0-9]+")
+
+
+def exact_integer(
+    value: object,
+    field_name: str,
+    *,
+    min_value: int,
+    max_value: int,
+    allow_str: bool = False,
+) -> int:
+    """Return ``value`` as the exact integer it is, or refuse it.
+
+    Accepts an ``int`` (or another exact integer type implementing
+    ``__index__``, as NumPy integers do) and, with ``allow_str``, a string of
+    ASCII decimal digits. Everything else is refused with
+    :class:`PolyesterValidationError`, never converted: a ``bool``, a ``float``
+    (even ``2.0``), a ``Decimal``, and any other string (``"42.0"``,
+    ``"0x10"``, ``" 42"``, ``"-1"``). So a signed or sent value is always the
+    one the caller gave. Values outside ``min_value..max_value`` are refused.
+    """
+    expected = "an integer or a decimal-integer string" if allow_str else "an integer"
+    if isinstance(value, bool):
+        raise PolyesterValidationError(f"{field_name} must be {expected}, not bool")
+    if isinstance(value, str):
+        if not allow_str or _DECIMAL_INTEGER.fullmatch(value) is None:
+            raise PolyesterValidationError(
+                f"{field_name} must be {expected}, not {_error_value(repr(value))}"
+            )
+        digits = value.lstrip("0") or "0"
+        if len(digits) > len(str(max_value)):
+            raise PolyesterValidationError(
+                f"{field_name} {_error_value(digits)} is outside {min_value}..{max_value}"
+            )
+        parsed = int(digits)
+    else:
+        try:
+            parsed = operator.index(value)  # type: ignore[arg-type]
+        except TypeError:
+            raise PolyesterValidationError(
+                f"{field_name} must be {expected}, not {type(value).__name__}"
+            ) from None
+    if parsed < min_value or parsed > max_value:
+        # str() of a huge int is slow or refused, so a huge value is not repeated.
+        shown = f" {_error_value(str(parsed))}" if parsed.bit_length() <= 512 else ""
+        raise PolyesterValidationError(f"{field_name}{shown} is outside {min_value}..{max_value}")
+    return parsed
+
+
 def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> int:
     """Validate a caller-supplied integer tick count for an int64 wire field.
 

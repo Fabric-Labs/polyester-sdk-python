@@ -11,7 +11,13 @@ from polyester.codecs.bps import (
     validate_bps,
 )
 from polyester.codecs.correlation_id import optional_request_id, required_client_id
-from polyester.codecs.scalars import id_to_int, parse_account_id, tick_count
+from polyester.codecs.scalars import (
+    INT64_MAX,
+    exact_integer,
+    id_to_int,
+    parse_account_id,
+    tick_count,
+)
 from polyester.errors import PolyesterValidationError
 from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
@@ -31,6 +37,40 @@ TRIGGER_PRICE_SOURCE_TO_PROTO = {
     "index": "INDEX_PRICE",
     "index_price": "INDEX_PRICE",
 }
+
+
+def _contract_int_range(message: Any, name: str, kind: str, wire_max: int) -> tuple[int, int]:
+    """The ``gte``/``gt`` and ``lte``/``lt`` bounds the contract sets on an integer field.
+
+    A bound the contract leaves out is the wire type's own.
+    """
+    field = message.DESCRIPTOR.fields_by_name[name]
+    rules = getattr(field.GetOptions().Extensions[validate_pb2.field], kind)
+    low = -wire_max - 1
+    if rules.HasField("gte"):
+        low = rules.gte
+    elif rules.HasField("gt"):
+        low = rules.gt + 1
+    high = wire_max
+    if rules.HasField("lte"):
+        high = rules.lte
+    elif rules.HasField("lt"):
+        high = rules.lt - 1
+    return low, high
+
+
+_INT32_MAX = 2**31 - 1
+# TWAP and ladder ranges, read from the contract's validation rules.
+TWAP_DURATION_MS_MIN, TWAP_DURATION_MS_MAX = _contract_int_range(
+    triggers_pb2.TwapTrigger, "duration_ms", "int64", INT64_MAX
+)
+TWAP_SLICE_INTERVAL_MS_MIN, TWAP_SLICE_INTERVAL_MS_MAX = _contract_int_range(
+    triggers_pb2.TwapTrigger, "slice_interval_ms", "int64", INT64_MAX
+)
+LADDER_LEVELS_MIN, LADDER_LEVELS_MAX = _contract_int_range(
+    triggers_pb2.LadderTrigger, "levels", "int32", _INT32_MAX
+)
+
 _TRIGGER_TYPE_LABELS = "stop_loss, take_profit, trailing_stop, twap, or ladder"
 
 
@@ -393,10 +433,29 @@ def create_trigger_to_proto(
     elif type_key == "twap":
         twap = intent.twap
         twap.side = side_proto
-        if twap_duration_ms is not None:
-            twap.duration_ms = twap_duration_ms
-        if twap_slice_interval_ms is not None:
-            twap.slice_interval_ms = twap_slice_interval_ms
+        # Left out, either is 0 on the wire, which the contract refuses.
+        for option, value in (
+            ("twap_duration_ms", twap_duration_ms),
+            ("twap_slice_interval_ms", twap_slice_interval_ms),
+        ):
+            if value is None:
+                raise PolyesterValidationError(f"{option} is required for a twap")
+        twap.duration_ms = exact_integer(
+            twap_duration_ms,
+            "twap_duration_ms",
+            min_value=TWAP_DURATION_MS_MIN,
+            max_value=TWAP_DURATION_MS_MAX,
+        )
+        twap.slice_interval_ms = exact_integer(
+            twap_slice_interval_ms,
+            "twap_slice_interval_ms",
+            min_value=TWAP_SLICE_INTERVAL_MS_MIN,
+            max_value=TWAP_SLICE_INTERVAL_MS_MAX,
+        )
+        if twap.slice_interval_ms > twap.duration_ms:
+            raise PolyesterValidationError(
+                "twap_slice_interval_ms must not exceed twap_duration_ms"
+            )
         # TWAP children are market-IOC or limit-GTC only.
         if order_key == "limit":
             if limit_price is not None:
@@ -451,8 +510,15 @@ def create_trigger_to_proto(
             ladder.price_min_ticks = price_min_ticks
         if price_max_ticks is not None:
             ladder.price_max_ticks = price_max_ticks
-        if ladder_levels is not None:
-            ladder.levels = ladder_levels
+        # Left out, levels is 0 on the wire, which the contract refuses.
+        if ladder_levels is None:
+            raise PolyesterValidationError("ladder_levels is required for a ladder")
+        ladder.levels = exact_integer(
+            ladder_levels,
+            "ladder_levels",
+            min_value=LADDER_LEVELS_MIN,
+            max_value=LADDER_LEVELS_MAX,
+        )
         if post_only:
             ladder.post_only = True
 

@@ -5,6 +5,7 @@ import time
 import uuid
 from decimal import Decimal
 
+from polyester.codecs.scalars import UINT32_MAX, UINT64_MAX, exact_integer
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
@@ -14,6 +15,7 @@ from polyester.types.money import (
 )
 
 DEFAULT_TRADING_WITHDRAW_DEADLINE_SECONDS = 5 * 60
+UINT128_MAX = 2**128 - 1
 
 
 def str_to_u128_proto(
@@ -34,12 +36,15 @@ def str_to_u128_proto(
 
 
 def _nonce_to_u128(value: str | int) -> u128_pb2.U128:
-    big = int(value)
-    if big <= 0:
-        raise PolyesterValidationError("nonce must be non-zero")
-    if big >= 1 << 128:
-        raise PolyesterValidationError("nonce exceeds uint128 range")
+    big = exact_integer(value, "nonce", min_value=1, max_value=UINT128_MAX, allow_str=True)
     return u128_pb2.U128(hi=big >> 64, lo=big & ((1 << 64) - 1))
+
+
+def trading_withdraw_deadline(value: str | int) -> int:
+    """A caller's ``deadline_ts_sec``: an integer or decimal-integer string, 1 to 2**64 - 1."""
+    return exact_integer(
+        value, "deadline_ts_sec", min_value=1, max_value=UINT64_MAX, allow_str=True
+    )
 
 
 def _default_deadline_ts_sec() -> int:
@@ -56,7 +61,7 @@ def trading_withdraw_payload_to_proto(
     amount: str | Decimal | AssetAmount,
     idempotency_key: str,
     destination_chain_id: int = 0,
-    deadline_ts_sec: int | None = None,
+    deadline_ts_sec: str | int | None = None,
     nonce: str | int,
     destination_address: str = "",
     amount_scale: int | None = None,
@@ -71,18 +76,25 @@ def trading_withdraw_payload_to_proto(
     action_enum = action_aliases.get(action_key)
     if action_enum is None:
         raise PolyesterValidationError(f"unknown trading withdraw action: {action}")
-    resolved_deadline = (
-        _default_deadline_ts_sec() if deadline_ts_sec is None else int(deadline_ts_sec)
+    # Every integer the payload signs is exactly the caller's: never truncated
+    # or cast (nonce 1.5 must not sign as nonce 1).
+    resolved_asset_id = exact_integer(asset_id, "asset_id", min_value=1, max_value=UINT32_MAX)
+    resolved_chain_id = exact_integer(
+        destination_chain_id, "destination_chain_id", min_value=0, max_value=UINT64_MAX
     )
-    if resolved_deadline <= 0:
-        raise PolyesterValidationError("deadline_ts_sec must be non-zero")
+    resolved_deadline = (
+        _default_deadline_ts_sec()
+        if deadline_ts_sec is None
+        else trading_withdraw_deadline(deadline_ts_sec)
+    )
+    resolved_nonce = _nonce_to_u128(nonce)
     return withdraw_pb2.TradingWithdrawIntentPayload(
         action=action_enum,
-        asset_id=asset_id,
-        destination_chain_id=destination_chain_id,
-        amount_e18=str_to_u128_proto(amount, scale=amount_scale, asset_id=asset_id),
+        asset_id=resolved_asset_id,
+        destination_chain_id=resolved_chain_id,
+        amount_e18=str_to_u128_proto(amount, scale=amount_scale, asset_id=resolved_asset_id),
         deadline_ts_sec=resolved_deadline,
-        nonce=_nonce_to_u128(nonce),
+        nonce=resolved_nonce,
         destination_address=destination_address,
         idempotency_key=idempotency_key,
     )

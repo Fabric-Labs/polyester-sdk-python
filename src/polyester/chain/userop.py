@@ -15,6 +15,7 @@ from polyester.chain.calldata import ChainCall
 from polyester.chain.environment import POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment
 from polyester.chain.rpc import JsonRpcClient
 from polyester.chain.safe import predict_safe_address_with_data
+from polyester.codecs.scalars import exact_integer
 
 USER_OPERATION_GAS_BUFFER_BPS = 2_000
 USER_OPERATION_MIN_GAS_BUFFER = 50_000
@@ -198,10 +199,13 @@ class PolyesterSmartAccount:
         timestamp-based nonce key (``Date.now()``) so ops are not stuck on
         key ``0`` (Polyester's bundler rejects some key-0 mempool submissions).
         """
-        nonce_key = int(time.time() * 1000) if key is None else int(key)
-        # uint192 key fits; keep within 2^192-1.
-        if nonce_key < 0 or nonce_key >= (1 << 192):
-            raise ValueError("nonce key out of uint192 range")
+        nonce_key = (
+            int(time.time() * 1000)
+            if key is None
+            else exact_integer(
+                key, "nonce key", min_value=0, max_value=(1 << 192) - 1, allow_str=True
+            )
+        )
         ep = self.environment.account_abstraction.entry_point.address
         data = _GET_NONCE_SELECTOR + encode(
             ["address", "uint192"],

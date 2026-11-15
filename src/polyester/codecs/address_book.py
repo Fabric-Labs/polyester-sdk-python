@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from polyester.codecs.scalars import id_to_int, parse_account_id
+from polyester.codecs.scalars import UINT32_MAX, exact_integer, id_to_int, parse_account_id
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import address_book_pb2
 from polyester.models.address_book import AddressBookTagInput
@@ -116,9 +116,13 @@ def create_entry_to_proto(
             raise PolyesterValidationError("address is required for an external entry")
         external = address_book_pb2.ExternalWithdrawAddress(address=address)
         if polychain_chain_id is not None:
-            if int(polychain_chain_id) <= 0:
-                raise PolyesterValidationError("polychain_chain_id must be positive")
-            external.polychain_chain_id = int(polychain_chain_id)
+            external.polychain_chain_id = exact_integer(
+                polychain_chain_id,
+                "polychain_chain_id",
+                min_value=1,
+                max_value=UINT32_MAX,
+                allow_str=True,
+            )
         request.external.CopyFrom(external)
     else:
         if not isinstance(smart_account_address, str) or not smart_account_address:

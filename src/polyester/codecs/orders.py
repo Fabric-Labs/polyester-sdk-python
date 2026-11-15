@@ -21,7 +21,9 @@ from polyester.codecs.correlation_id import (
     required_client_id,
 )
 from polyester.codecs.scalars import (
+    UINT32_MAX,
     FractionalDigitsError,
+    exact_integer,
     id_to_int,
     market_id,
     market_ids,
@@ -1275,6 +1277,13 @@ def batch_cancel_orders_to_proto(
     return proto
 
 
+# Dead-man-switch timeouts the contract accepts besides 0 (which disarms it).
+# The contract states the range only as a CEL rule on CancelAllAfterRequest;
+# a unit test rebuilds that rule from these constants.
+CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC = 10
+CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC = 120
+
+
 def cancel_all_after_to_proto(
     *,
     sub_account_id: str | int | None = None,
@@ -1283,9 +1292,23 @@ def cancel_all_after_to_proto(
     side: str | None = None,
     request_id: str | None = None,
 ) -> orders_pb2.CancelAllAfterRequest:
+    timeout = exact_integer(
+        timeout_sec,
+        "cancel_all_after timeout_sec",
+        min_value=0,
+        max_value=UINT32_MAX,
+    )
+    if timeout != 0 and not (
+        CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC <= timeout <= CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC
+    ):
+        raise PolyesterValidationError(
+            f"cancel_all_after timeout_sec must be 0 or between "
+            f"{CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC} and {CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC}; "
+            f"received {timeout}"
+        )
     proto = orders_pb2.CancelAllAfterRequest(
         request_id=optional_request_id(request_id) or f"cancel-after-{uuid.uuid4().hex[:12]}",
-        timeout_sec=timeout_sec,
+        timeout_sec=timeout,
     )
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")

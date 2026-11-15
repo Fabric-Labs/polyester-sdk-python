@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numbers
+import operator
 import re
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
@@ -50,7 +51,8 @@ def market_id(value: object, label: str) -> int:
         raise PolyesterValidationError(
             f"{label} must be an integer market ID, not {type(value).__name__}"
         )
-    parsed = int(value)
+    # operator.index, not int(): an int subclass may override __int__.
+    parsed = operator.index(value)
     if parsed < 0 or parsed > UINT32_MAX:
         raise PolyesterValidationError(f"{label} {parsed} is outside 0..{UINT32_MAX}")
     return parsed
@@ -81,6 +83,7 @@ def validate_protocol_scale(scale: int, *, field_name: str = "scale") -> int:
     """Reject scales that would panic or allocate pathological padding."""
     if isinstance(scale, bool) or not isinstance(scale, int):
         raise PolyesterValidationError(f"{field_name} must be an int")
+    scale = operator.index(scale)
     if scale < 0:
         raise PolyesterValidationError(f"{field_name} must be non-negative")
     if scale > MAX_PROTOCOL_SCALE:
@@ -237,7 +240,9 @@ def exact_integer(
             )
         parsed = int(digits)
     elif isinstance(value, numbers.Integral):
-        parsed = int(value)
+        # operator.index, not int(): an int subclass may override __int__
+        # (an override returning 1 would sign nonce 42 as nonce 1).
+        parsed = operator.index(value)
     else:
         raise PolyesterValidationError(
             f"{field_name} must be {expected}, not {type(value).__name__}"
@@ -259,7 +264,7 @@ def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> i
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         raise PolyesterValidationError(f"{field_name} must be an integer")
     try:
-        parsed = int(value)
+        parsed = operator.index(value) if isinstance(value, int) else int(value)
     except ValueError as exc:
         raise PolyesterValidationError(f"{field_name} must be an integer") from exc
     if parsed < 0 or (parsed == 0 and not allow_zero):
@@ -364,7 +369,7 @@ def id_to_int(value: str | int, label: str = "id") -> int:
     if isinstance(value, bool):
         raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if isinstance(value, int):
-        parsed = value
+        parsed = operator.index(value)
     elif isinstance(value, str):
         if not value.strip():
             raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")

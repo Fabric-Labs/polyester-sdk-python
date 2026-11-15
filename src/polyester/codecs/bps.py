@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import operator
+
 from polyester.errors import PolyesterValidationError
 
 MAX_BPS = 10_000
@@ -19,7 +21,8 @@ def validate_bps(
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         raise PolyesterValidationError(f"{field_name} must be an integer")
     try:
-        parsed = int(value)
+        # operator.index, not int(): an int subclass may override __int__.
+        parsed = operator.index(value) if isinstance(value, int) else int(value)
     except ValueError as exc:
         raise PolyesterValidationError(f"{field_name} must be an integer") from exc
     if allow_clear and parsed == 0:

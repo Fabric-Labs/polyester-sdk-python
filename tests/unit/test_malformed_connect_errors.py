@@ -50,7 +50,7 @@ async def _status_error(status: int, body: object) -> tuple[BaseException, int]:
     )
     try:
         with pytest.raises(BaseException) as raised:
-            await client.orders.get_batch_replace_status(batch_request_id="1")
+            await client.orders.get_batch_replace_status(batch_request_id="2")
         return raised.value, calls
     finally:
         await client.aclose()

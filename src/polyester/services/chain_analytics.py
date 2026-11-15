@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from polyester.codecs.decode.common import api_data_from_proto
+from polyester.codecs.decode.common import api_data_from_proto, require_id
 from polyester.codecs.enums import resolve_proto_enum
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2
@@ -28,6 +28,13 @@ def _analytics_range(value: str) -> Any:
         aliases=_ANALYTICS_RANGE_ALIASES,
         field_name="range",
     )
+
+
+def zipped_asset_supply_group_from_proto(
+    msg: analytics_read_pb2.GetZippedAssetSupplyGroupResponse,
+) -> ApiData:
+    require_id("GetZippedAssetSupplyGroup", "group_id", msg.group_id)
+    return api_data_from_proto(msg)
 
 
 class AsyncChainAnalyticsService(BaseService):
@@ -76,7 +83,7 @@ class AsyncChainAnalyticsService(BaseService):
             ChainAnalyticsServiceClient,
             lambda client, req: client.get_zipped_asset_supply_group(req),
             request,
-            api_data_from_proto,
+            zipped_asset_supply_group_from_proto,
         )
 
     async def get_unified_asset_balances(

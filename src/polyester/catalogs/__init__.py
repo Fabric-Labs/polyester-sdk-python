@@ -576,11 +576,31 @@ class CatalogManager:
         return None
 
 
+# 2**53 - 1: below it every integer has an exact float.
+_MAX_EXACT_FLOAT_INTEGER = 2**53 - 1
+
+
 def _optional_int(row: dict[str, Any], *keys: str) -> int | None:
+    """The first of ``keys`` ``row`` sets, as a non-negative integer.
+
+    A value that is not an exact non-negative integer is reported missing,
+    never truncated: ``1.9`` and a float above 2**53 - 1 read as ``None``.
+    """
     for key in keys:
         if key not in row or row[key] is None:
             continue
-        return int(row[key])
+        value = row[key]
+        if isinstance(value, float):
+            if not value.is_integer() or not 0 <= value <= _MAX_EXACT_FLOAT_INTEGER:
+                return None
+            return int(value)
+        if isinstance(value, bool):
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
     return None
 
 

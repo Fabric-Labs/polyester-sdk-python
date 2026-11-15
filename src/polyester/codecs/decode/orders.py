@@ -6,6 +6,7 @@ from decimal import Decimal
 from google.protobuf.message import Message
 
 from polyester.codecs.decode.balances import u128_from_proto
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.invariants import (
     paired_ts_ns,
     ts_ns_from_response,
@@ -398,11 +399,25 @@ def order_from_proto(
     )
 
 
+def _require_lineage_id(operation: str, msg: Order | UserTrade) -> None:
+    # A lineage is optional; when present it must name its lineage.
+    if msg.HasField("lineage"):
+        require_id(operation, "lineage.id", msg.lineage.id)
+
+
+def _require_order_ids(operation: str, msg: Order) -> None:
+    require_id(operation, "order_id", msg.order_id)
+    _require_lineage_id(operation, msg)
+
+
 def orders_list_from_proto(
     msg: GetOpenOrdersResponse | GetOrderHistoryResponse,
     *,
     scales: OrderScales | None = None,
 ) -> OrdersList:
+    operation = msg.DESCRIPTOR.name.removesuffix("Response")
+    for item in msg.orders:
+        _require_order_ids(operation, item)
     return OrdersList(
         orders=[scaled_order_from_proto(item, scales) for item in msg.orders],
         next_page_token=msg.next_page_token,
@@ -448,6 +463,8 @@ def scaled_user_trade_from_proto(msg: UserTrade, scales: OrderScales | None) -> 
 
 
 def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> UserTradesList:
+    for item in msg.trades:
+        _require_lineage_id("GetUserTrades", item)
     return UserTradesList(
         trades=[scaled_user_trade_from_proto(item, scales) for item in msg.trades],
         transfers=[order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])],
@@ -458,6 +475,11 @@ def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> Us
 def get_order_from_proto(
     msg: GetOrderResponse, *, scales: OrderScales | None = None
 ) -> GetOrderResult:
+    if not msg.HasField("order"):
+        raise PolyesterResponseContractError("GetOrder", "missing order")
+    _require_order_ids("GetOrder", msg.order)
+    for item in msg.trades:
+        _require_lineage_id("GetOrder", item)
     order = scaled_order_from_proto(msg.order, scales) if msg.HasField("order") else None
     trades = [scaled_user_trade_from_proto(item, scales) for item in msg.trades]
     transfers = [order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])]
@@ -672,6 +694,8 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
             "CancelAllOrders",
             "dry_run response unexpectedly reports submitted or failed cancels",
         )
+    for item in msg.cancelled_orders:
+        require_id("CancelAllOrders", "order_id", item.order_id)
     return CancelAllOrdersResult(
         status=status,
         matched_orders=int(msg.matched_orders),
@@ -883,10 +907,11 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
 def _batch_create_result_item(item, quantity_scale: int | None) -> BatchCreateResultItem:
     # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
+        require_id("BatchCreateOrders", "order_id", item.accepted.order_id)
         resolved = int(item.accepted.resolved_base_qty_scaled)
         return BatchCreateResultItem(
             status="accepted",
-            order_id=(format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""),
+            order_id=format_uint64_id(item.accepted.order_id),
             client_order_id=item.client_order_id,
             take_profit_trigger_id=_leg_trigger_id(item.accepted, "take_profit_trigger_id"),
             stop_loss_trigger_id=_leg_trigger_id(item.accepted, "stop_loss_trigger_id"),

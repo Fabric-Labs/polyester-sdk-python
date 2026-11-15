@@ -12,7 +12,7 @@ from typing import Any, Literal, NoReturn
 from google.protobuf.message import Message
 
 from polyester._catalog_startup import CatalogSource, load_catalog
-from polyester._redact import register_url_secrets
+from polyester._redact import register, url_secrets
 from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
@@ -212,7 +212,9 @@ class AsyncPolyester:
         self.environment = resolved
         self.api_url = api_url if api_url is not None else resolved.api_url
         self.ws_url = ws_url if ws_url is not None else resolved.websocket_url
-        register_url_secrets(self.ws_url)
+        _refuse_query_or_fragment("api_url", self.api_url)
+        _refuse_query_or_fragment("ws_url", self.ws_url)
+        self._release_ws_secrets = register(*url_secrets(self.ws_url))
         self.default_sub_account_id = default_sub_account_id
         self.default_account_id = default_account_id
         self.catalogs = CatalogManager()
@@ -514,6 +516,18 @@ class AsyncPolyester:
                     await task
         await self.realtime.aclose()
         await self._transport.aclose()
+        self._release_ws_secrets()
+
+
+def _refuse_query_or_fragment(field: str, url: str) -> None:
+    """Refuse a base URL, ``api_url`` or ``ws_url``, holding a query or fragment.
+
+    The SDK appends paths to it and sends it on every request or connection,
+    outside any signature. The text is checked, as ``urlsplit`` drops an empty
+    ``?`` or ``#``; percent-escaped ``%3F`` and ``%23`` stay legal.
+    """
+    if "?" in url or "#" in url:
+        raise PolyesterValidationError(f"{field} must not contain a query string or fragment")
 
 
 def _catalog_timeout(catalog_timeout: object, timeout: float) -> float:

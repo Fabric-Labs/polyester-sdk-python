@@ -45,7 +45,7 @@ def test_ledger_transfer_from_proto() -> None:
 
 def test_transfers_list_from_proto_parses_cursor() -> None:
     msg = ledger_read_pb2.ListTransfersResponse(
-        transfers=[ledger_read_pb2.TransferRow(asset_id=1)],
+        transfers=[ledger_read_pb2.TransferRow(transfer_id="7", asset_id=1)],
         next_page_token="12345",
     )
     result = transfers_list_from_proto(msg)

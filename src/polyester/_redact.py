@@ -7,6 +7,8 @@ import dataclasses
 import inspect
 import os
 import threading
+from collections import Counter
+from collections.abc import Callable
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 import msgspec
@@ -55,33 +57,51 @@ PROXY_PLACEHOLDER = "[proxy]"
 SECRET_PLACEHOLDER = "[REDACTED]"
 # A client-held secret shorter than this is too common to replace in text.
 _MIN_SECRET_LENGTH = 4
-_known_secrets: set[str] = set()
+# Each client-held secret with the number of live registrations holding it: a
+# secret two clients share stays redacted until both are closed.
+_known_secrets: Counter[str] = Counter()
 _known_secrets_lock = threading.Lock()
 
 
-def register_secret(secret: str) -> None:
-    """Remember a client-held secret so :func:`redact_text` removes it anywhere."""
-    if len(secret) >= _MIN_SECRET_LENGTH:
+def register(*secrets: str) -> Callable[[], None]:
+    """Remember client-held secrets so :func:`redact_text` removes them anywhere.
+
+    Returns a function that forgets them again: each secret stays registered
+    while any other registration holds it. Calling it again does nothing.
+    """
+    held = [secret for secret in secrets if len(secret) >= _MIN_SECRET_LENGTH]
+    with _known_secrets_lock:
+        _known_secrets.update(held)
+    released = False
+
+    def release() -> None:
+        nonlocal released
         with _known_secrets_lock:
-            _known_secrets.add(secret)
+            if released:
+                return
+            released = True
+            _known_secrets.subtract(held)
+            for secret in held:
+                if _known_secrets[secret] <= 0:
+                    del _known_secrets[secret]
+
+    return release
 
 
-def register_url_secrets(url: str) -> None:
-    """Remember the userinfo of a URL the client holds, and its password.
+def url_secrets(url: str) -> list[str]:
+    """The userinfo of a URL the client holds, and its password, raw and decoded.
 
-    Both, raw and decoded, are removed wherever they appear in error text,
-    however the URL around them was quoted or mangled.
+    Registered, they are removed wherever they appear in error text, however
+    the URL around them was quoted or mangled.
     """
     netloc = url.partition("://")[2].split("/", 1)[0]
     userinfo, at, _host = netloc.rpartition("@")
     if not at or not userinfo:
-        return
+        return []
     # The exact userinfo and the password: a user name alone is not secret
     # and too common to replace in text.
     password = userinfo.partition(":")[2]
-    for part in (userinfo, password):
-        register_secret(part)
-        register_secret(unquote(part))
+    return [form for part in (userinfo, password) for form in (part, unquote(part))]
 
 
 def _secrets_in_effect() -> list[str]:
@@ -94,7 +114,7 @@ def _secrets_in_effect() -> list[str]:
         userinfo, at, _host = netloc.rpartition("@")
         if at and userinfo:
             password = userinfo.partition(":")[2]
-            # Raw and decoded, as register_url_secrets does.
+            # Raw and decoded, as url_secrets returns them.
             secrets.update(
                 form
                 for part in (userinfo, password)
@@ -118,7 +138,7 @@ def redact_text(text: str) -> str:
     next ``?`` or ``#`` on (the query and fragment) is dropped. A proxy
     URL from the environment becomes ``[proxy]``, a URL the old parser would
     refuse becomes ``[REDACTED INVALID URL]``, and every client-held secret
-    (see :func:`register_url_secrets` and :func:`register_secret`) and the
+    (see :func:`register` and :func:`url_secrets`) and the
     userinfo of the environment's proxies become ``[REDACTED]``.
     """
     for name in _PROXY_ENV:

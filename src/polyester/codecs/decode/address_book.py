@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import address_book_pb2
@@ -127,9 +128,17 @@ def list_books_from_proto(msg: address_book_pb2.ListAddressBooksResponse) -> Add
     return AddressBooksList(books=[address_book_summary_from_proto(item) for item in msg.books])
 
 
+def _require_entry_ids(operation: str, msg: address_book_pb2.AddressBookEntry) -> None:
+    require_id(operation, "address_book_entry_id", msg.address_book_entry_id)
+    for tag in msg.tags:
+        require_id(operation, "tag_id", tag.tag_id)
+
+
 def list_entries_from_proto(
     msg: address_book_pb2.ListAddressBookEntriesResponse,
 ) -> AddressBookEntriesList:
+    for item in msg.entries:
+        _require_entry_ids("ListAddressBookEntries", item)
     return AddressBookEntriesList(
         entries=[address_book_entry_from_proto(item) for item in msg.entries],
         next_page_token=msg.next_page_token,
@@ -169,6 +178,8 @@ def transfer_counterparty_from_proto(
 def list_counterparties_from_proto(
     msg: address_book_pb2.ListTransferCounterpartiesResponse,
 ) -> TransferCounterpartiesList:
+    for item in msg.counterparties:
+        require_id("ListTransferCounterparties", "counterparty_id", item.counterparty_id)
     return TransferCounterpartiesList(
         counterparties=[transfer_counterparty_from_proto(item) for item in msg.counterparties],
         truncated=bool(msg.truncated),
@@ -209,6 +220,9 @@ def transfer_destination_from_proto(
 def list_destinations_from_proto(
     msg: address_book_pb2.ListTransferDestinationsResponse,
 ) -> AddressBookTransferDestinationsList:
+    for item in msg.destinations:
+        if item.HasField("address_book_entry"):
+            _require_entry_ids("ListTransferDestinations", item.address_book_entry)
     return AddressBookTransferDestinationsList(
         destinations=[transfer_destination_from_proto(item) for item in msg.destinations],
         next_page_token=msg.next_page_token,
@@ -245,6 +259,8 @@ def internal_whitelist_entry_from_proto(
 def list_internal_whitelist_from_proto(
     msg: address_book_pb2.ListInternalTransferWhitelistEntriesResponse,
 ) -> InternalTransferWhitelistEntriesList:
+    for item in msg.entries:
+        require_id("ListInternalTransferWhitelistEntries", "entry_id", item.entry_id)
     return InternalTransferWhitelistEntriesList(
         entries=[internal_whitelist_entry_from_proto(item) for item in msg.entries],
         next_page_token=msg.next_page_token,
@@ -411,7 +427,17 @@ def address_book_view_from_proto(
     recent = None
     withdraw = None
     if msg.HasField("entries"):
+        for external_entry in msg.entries.external:
+            require_id(
+                "GetAddressBookView", "address_book_entry_id", external_entry.address_book_entry_id
+            )
+        for internal_entry in msg.entries.internal:
+            require_id(
+                "GetAddressBookView", "address_book_entry_id", internal_entry.address_book_entry_id
+            )
         entries = entries_view_from_proto(msg.entries)
+    for tag in msg.tags:
+        require_id("GetAddressBookView", "tag_id", tag.tag_id)
     if msg.HasField("recent_destinations"):
         recent = recent_destinations_view_from_proto(msg.recent_destinations)
     if msg.HasField("withdraw_whitelist"):
@@ -432,6 +458,7 @@ def entry_from_create_proto(
 ) -> AddressBookEntry:
     if not msg.HasField("entry"):
         raise PolyesterResponseContractError("CreateAddressBookEntry", "missing entry")
+    _require_entry_ids("CreateAddressBookEntry", msg.entry)
     return address_book_entry_from_proto(msg.entry)
 
 
@@ -440,16 +467,19 @@ def entry_from_update_proto(
 ) -> AddressBookEntry:
     if not msg.HasField("entry"):
         raise PolyesterResponseContractError("UpdateAddressBookEntry", "missing entry")
+    _require_entry_ids("UpdateAddressBookEntry", msg.entry)
     return address_book_entry_from_proto(msg.entry)
 
 
 def tag_from_create_proto(msg: address_book_pb2.CreateAddressBookTagResponse) -> AddressBookTag:
     if not msg.HasField("tag"):
         raise PolyesterResponseContractError("CreateAddressBookTag", "missing tag")
+    require_id("CreateAddressBookTag", "tag_id", msg.tag.tag_id)
     return address_book_tag_from_proto(msg.tag)
 
 
 def tag_from_update_proto(msg: address_book_pb2.UpdateAddressBookTagResponse) -> AddressBookTag:
     if not msg.HasField("tag"):
         raise PolyesterResponseContractError("UpdateAddressBookTag", "missing tag")
+    require_id("UpdateAddressBookTag", "tag_id", msg.tag.tag_id)
     return address_book_tag_from_proto(msg.tag)

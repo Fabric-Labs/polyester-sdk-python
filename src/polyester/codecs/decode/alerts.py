@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import format_uint64_id
 from polyester.codecs.scalars import timestamp_dict_to_datetime
 from polyester.errors import PolyesterResponseContractError
@@ -68,6 +69,8 @@ def price_alert_from_proto(msg: pb.PriceAlert, catalogs: CatalogManager | None) 
 def price_alerts_page_from_proto(
     msg: pb.ListAlertsResponse, catalogs: CatalogManager | None
 ) -> PriceAlertsPage:
+    for alert in msg.alerts:
+        require_id("ListAlerts", "alert_id", alert.alert_id)
     return PriceAlertsPage(
         alerts=[price_alert_from_proto(alert, catalogs) for alert in msg.alerts],
         next_page_token=msg.next_page_token,

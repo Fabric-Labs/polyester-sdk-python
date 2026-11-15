@@ -143,7 +143,7 @@ async def test_create_and_modify_accept_the_same_buy_cap() -> None:
             order_type="market",
             max_slippage_bps=10000,
         )
-    assert modify_trigger_to_proto(trigger_id="1", max_slippage_bps=10000).max_slippage_bps == (
+    assert modify_trigger_to_proto(trigger_id="2", max_slippage_bps=10000).max_slippage_bps == (
         10000
     )
 

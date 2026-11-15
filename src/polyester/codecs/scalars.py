@@ -366,6 +366,19 @@ def _base58_to_int(value: str) -> int:
 
 
 def id_to_int(value: str | int, label: str = "id") -> int:
+    """Decode a base58 or decimal uint64 public ID, refusing one that decodes to 0.
+
+    On the wire 0 is unset and names nothing, so ``"1"`` (``format_id(0)``),
+    ``"0"``, ``"00"`` or ``0`` would send a request for an ID the caller did
+    not mean.
+    """
+    parsed = _parse_id(value, label)
+    if parsed == 0:
+        raise PolyesterValidationError(f"{label} must be a non-zero ID, not 0")
+    return parsed
+
+
+def _parse_id(value: str | int, label: str) -> int:
     if isinstance(value, bool):
         raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if isinstance(value, int):
@@ -396,21 +409,18 @@ def id_to_int(value: str | int, label: str = "id") -> int:
 
 
 def parse_account_id(value: str | int, label: str) -> int:
-    """Decode an account or sub-account ID as ``id_to_int`` does, refusing 0.
+    """Decode an account or sub-account ID as ``id_to_int`` does, which refuses 0.
 
     On the wire 0 is unset: a sub-account ID of 0 is the main account, and an
     account ID of 0 names no account. So ``"1"`` (``format_id(0)``), ``"0"``,
     ``"00"`` or ``0`` would address another account than the one named. Omit
     a sub-account ID to address the main account.
     """
-    parsed = id_to_int(value, label)
-    if parsed == 0:
-        raise PolyesterValidationError(f"{label} must be a non-zero ID, not 0")
-    return parsed
+    return id_to_int(value, label)
 
 
 def format_id(value: str | int) -> str:
-    return _encode_id(id_to_int(value))
+    return _encode_id(_parse_id(value, "id"))
 
 
 _UNIX_EPOCH = datetime(1970, 1, 1)

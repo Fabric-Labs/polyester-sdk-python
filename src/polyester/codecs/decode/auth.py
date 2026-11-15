@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester._wire import protobuf_to_public_dict
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import format_uint64_id, optional_timestamp
 from polyester.gen.auth.v1 import auth_pb2, profile_pb2
 from polyester.models.auth import (
@@ -12,11 +13,13 @@ from polyester.models.auth import (
 
 
 def me_from_proto(msg: auth_pb2.MeResponse) -> MeResult:
+    require_id("Me", "account_id", msg.account_id)
     session = None
     if msg.HasField("session"):
+        require_id("Me", "session.session_id", msg.session.session_id)
         session = protobuf_to_public_dict(msg.session)
     return MeResult(
-        account_id=format_uint64_id(msg.account_id) if msg.account_id else "",
+        account_id=format_uint64_id(msg.account_id),
         api_key_id=(msg.api_key_id or "").strip(),
         username=msg.username,
         root_smart_account_address=msg.root_smart_account_address,

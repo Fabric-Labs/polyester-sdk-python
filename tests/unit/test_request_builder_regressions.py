@@ -53,6 +53,13 @@ async def capture_transport():
                     intent_id="intent-local"
                 ).SerializeToString()
             )
+        if req.path.endswith(("/CreateTrigger", "/ModifyTrigger")):
+            # A trigger write answers with the trigger's ID.
+            return connect_proto_response(
+                triggers_pb2.ModifyTriggerResponse(
+                    trigger_id=5, status=triggers_pb2.TriggerStatus.STATUS_ARMED
+                ).SerializeToString()
+            )
         return connect_proto_response(b"")
 
     http = await MockHttpServer.spawn(handler)

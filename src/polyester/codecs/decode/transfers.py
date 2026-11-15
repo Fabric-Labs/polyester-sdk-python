@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.balances import u128_from_proto
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import format_uint64_id
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.models import LedgerTransfer, TransferSide, TransfersList
@@ -54,5 +55,7 @@ def ledger_transfer_from_proto(msg: ledger_read_pb2.TransferRow) -> LedgerTransf
 
 
 def transfers_list_from_proto(msg: ledger_read_pb2.ListTransfersResponse) -> TransfersList:
+    for item in msg.transfers:
+        require_id("ListTransfers", "transfer_id", item.transfer_id)
     transfers = [ledger_transfer_from_proto(item) for item in msg.transfers]
     return TransfersList(transfers=transfers, next_page_token=msg.next_page_token)

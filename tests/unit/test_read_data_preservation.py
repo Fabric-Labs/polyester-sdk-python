@@ -24,7 +24,8 @@ from tests.hardening_support import (
 @pytest.mark.parametrize("json_wire", [False, True])
 def test_transfer_token_is_opaque(token, json_wire):
     raw = ledger.ListTransfersResponse(
-        transfers=[ledger.TransferRow(asset_id=1, ts_us=999)], next_page_token=token
+        transfers=[ledger.TransferRow(transfer_id="7", asset_id=1, ts_us=999)],
+        next_page_token=token,
     )
     raw = (
         ParseDict(MessageToDict(raw), ledger.ListTransfersResponse())

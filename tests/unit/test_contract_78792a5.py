@@ -1010,13 +1010,23 @@ def test_create_oco_keeps_accepted_time_to_the_nanosecond() -> None:
 
     exact = create_oco_from_proto(
         triggers_pb2.CreateOcoResponse(
-            order_list_id=1, accepted_at_ts_ns=_EXACT_NS, accepted_at=_stamp()
+            order_list_id=1,
+            take_profit_trigger_id=2,
+            stop_loss_trigger_id=3,
+            accepted_at_ts_ns=_EXACT_NS,
+            accepted_at=_stamp(),
         )
     )
     fallback = create_oco_from_proto(
-        triggers_pb2.CreateOcoResponse(order_list_id=1, accepted_at=_stamp())
+        triggers_pb2.CreateOcoResponse(
+            order_list_id=1, take_profit_trigger_id=2, stop_loss_trigger_id=3, accepted_at=_stamp()
+        )
     )
-    unset = create_oco_from_proto(triggers_pb2.CreateOcoResponse(order_list_id=1))
+    unset = create_oco_from_proto(
+        triggers_pb2.CreateOcoResponse(
+            order_list_id=1, take_profit_trigger_id=2, stop_loss_trigger_id=3
+        )
+    )
     assert (exact.accepted_ts_ns, fallback.accepted_ts_ns, unset.accepted_ts_ns) == (
         _EXACT_NS,
         _STAMP_NS,

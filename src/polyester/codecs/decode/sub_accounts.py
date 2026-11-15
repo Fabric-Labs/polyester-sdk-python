@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.balances import balances_list_from_proto
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.policies import subaccount_policy_from_proto
 from polyester.codecs.proto_helpers import (
     format_uint64_id,
@@ -9,6 +10,7 @@ from polyester.codecs.proto_helpers import (
     optional_timestamp,
     proto_enum_name,
 )
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.models.sub_accounts import (
     GetSubaccountResult,
@@ -65,6 +67,8 @@ def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
 
 
 def subaccounts_list_from_proto(msg: subaccounts_pb2.ListSubaccountsResponse) -> SubAccountsList:
+    for item in msg.subaccounts:
+        require_id("ListSubaccounts", "subaccounts.id", item.id)
     return SubAccountsList(
         subaccounts=[subaccount_from_proto(item) for item in msg.subaccounts],
         total_created=int(msg.total_created),
@@ -85,6 +89,8 @@ def subaccount_member_from_proto(msg: subaccounts_pb2.SubaccountMemberView) -> S
 def subaccount_members_list_from_proto(
     msg: subaccounts_pb2.ListSubaccountMembersResponse,
 ) -> SubAccountMembersList:
+    for item in msg.members:
+        require_id("ListSubaccountMembers", "member account_id", item.account_id)
     return SubAccountMembersList(
         members=[subaccount_member_from_proto(item) for item in msg.members]
     )
@@ -109,9 +115,16 @@ def subaccount_invite_from_proto(msg: subaccounts_pb2.SubaccountInvite) -> SubAc
     )
 
 
+def _require_invite_ids(operation: str, msg: subaccounts_pb2.SubaccountInvite) -> None:
+    require_id(operation, "invites.id", msg.id)
+    require_id(operation, "invites.subaccount_id", msg.subaccount_id)
+
+
 def subaccount_invites_list_from_proto(
     msg: subaccounts_pb2.ListSubaccountInvitesResponse,
 ) -> SubAccountInvitesList:
+    for item in msg.invites:
+        _require_invite_ids("ListSubaccountInvites", item)
     return SubAccountInvitesList(
         invites=[subaccount_invite_from_proto(item) for item in msg.invites]
     )
@@ -148,6 +161,17 @@ def subaccount_activity_list_from_proto(
 
 
 def get_subaccount_from_proto(msg: subaccounts_pb2.GetSubaccountResponse) -> GetSubaccountResult:
+    if not has_field(msg, "subaccount"):
+        raise PolyesterResponseContractError("GetSubaccount", "missing subaccount")
+    require_id("GetSubaccount", "subaccount.id", msg.subaccount.id)
+    for member in msg.members:
+        require_id("GetSubaccount", "member account_id", member.account_id)
+    for key in msg.api_keys:
+        require_id("GetSubaccount", "key_id", key.key_id)
+    for invite in msg.invites:
+        _require_invite_ids("GetSubaccount", invite)
+    if has_field(msg, "policy"):
+        require_id("GetSubaccount", "policy.id", msg.policy.id)
     subaccount = subaccount_from_proto(msg.subaccount) if has_field(msg, "subaccount") else None
     policy = subaccount_policy_from_proto(msg.policy) if has_field(msg, "policy") else None
     return GetSubaccountResult(

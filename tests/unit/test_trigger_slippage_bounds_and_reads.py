@@ -103,17 +103,17 @@ def test_trigger_create_tick_counts_are_int64_bounded(case: dict[str, object]) -
 
 @pytest.mark.parametrize("field", ["trailing_distance_ticks", "max_slippage_ticks"])
 def test_trigger_modify_tick_counts_are_int64_bounded(field: str) -> None:
-    proto = modify_trigger_to_proto(trigger_id="1", symbol_id=1, **{field: INT64_MAX})
+    proto = modify_trigger_to_proto(trigger_id="2", symbol_id=1, **{field: INT64_MAX})
     assert getattr(proto, field) == INT64_MAX
     with pytest.raises(PolyesterValidationError, match="exceeds int64 range"):
-        modify_trigger_to_proto(trigger_id="1", symbol_id=1, **{field: OVERFLOW})
+        modify_trigger_to_proto(trigger_id="2", symbol_id=1, **{field: OVERFLOW})
 
 
 def test_trigger_modify_still_clears_a_cap_with_zero() -> None:
-    proto = modify_trigger_to_proto(trigger_id="1", symbol_id=1, max_slippage_ticks=0)
+    proto = modify_trigger_to_proto(trigger_id="2", symbol_id=1, max_slippage_ticks=0)
     assert proto.WhichOneof("max_slippage") == "max_slippage_ticks"
     with pytest.raises(PolyesterValidationError, match="non-negative"):
-        modify_trigger_to_proto(trigger_id="1", symbol_id=1, max_slippage_ticks=-1)
+        modify_trigger_to_proto(trigger_id="2", symbol_id=1, max_slippage_ticks=-1)
 
 
 def test_order_market_cap_is_int64_bounded() -> None:

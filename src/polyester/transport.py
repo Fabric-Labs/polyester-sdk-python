@@ -33,8 +33,8 @@ from polyester._contract_codes import (
 from polyester._problem import decode_http_problem
 from polyester._redact import (
     redact_exception_chain,
-    register_secret,
-    register_url_secrets,
+    register,
+    url_secrets,
     url_without_userinfo,
 )
 from polyester._redirects import carries_api_key, redirect_refusal
@@ -554,11 +554,12 @@ class TransportFactory:
     ) -> None:
         self.config = config
         self.credentials = credentials
-        # Client-held secrets never reach an error's text (see _redact).
-        register_url_secrets(config.api_url)
+        # Client-held secrets never reach an error's text (see _redact), until
+        # aclose forgets them.
+        secrets = url_secrets(config.api_url)
         if credentials is not None:
-            register_secret(credentials.private_key.hex())
-            register_secret(credentials.private_key[:32].hex())
+            secrets += [credentials.private_key.hex(), credentials.private_key[:32].hex()]
+        self._release_secrets = register(*secrets)
         self.public_http = httpx.AsyncClient(
             base_url=config.api_url,
             timeout=config.timeout,
@@ -634,6 +635,7 @@ class TransportFactory:
         )
 
     async def aclose(self) -> None:
+        self._release_secrets()
         await self.public_http.aclose()
 
 

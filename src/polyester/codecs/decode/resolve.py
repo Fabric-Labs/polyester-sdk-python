@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
 from polyester.gen.auth.v1 import resolve_pb2
 from polyester.models import ResolvedAccount, ResolvedAccountsList
@@ -16,4 +17,6 @@ def resolved_account_from_proto(msg: resolve_pb2.ResolvedAccount) -> ResolvedAcc
 
 
 def resolved_accounts_from_proto(msg: resolve_pb2.ResolveAccountResponse) -> ResolvedAccountsList:
+    for item in msg.matches:
+        require_id("ResolveAccount", "account_id", item.account_id)
     return ResolvedAccountsList(matches=[resolved_account_from_proto(item) for item in msg.matches])

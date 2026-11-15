@@ -957,6 +957,9 @@ def _decode_batch_replace_item(item: dict[str, Any]) -> BatchReplaceAdmissionIte
         ),
         action_taken=_batch_replace_action_taken(item),
         violations=_field_violations_from_proto(error),
+        existing_order_id=(
+            format_id(error.existing_order_id) if error.existing_order_id else ""
+        ),
     )
 
 

@@ -6,9 +6,9 @@ from collections.abc import Iterable
 
 from polyester.codecs.decode.orders import (
     OrderScales,
-    _error_code_label,
     cancel_reason_label,
     pair_scales,
+    reject_reason_label,
     scaled_order_from_proto,
 )
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name
@@ -50,7 +50,7 @@ def _order_event_from_proto(
         order_id=format_uint64_id(msg.order_id),
         version=int(msg.version),
         kind=proto_enum_name(private_ws_pb2.OrderEvent.Kind, msg.kind),
-        reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else None,
+        reject_reason=reject_reason_label(int(msg.reject_reason)) if msg.reject_reason else None,
         cancel_reason=cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else None,
         replacement_order_id=(
             format_uint64_id(msg.replacement_order_id) if msg.replacement_order_id else ""
@@ -69,7 +69,7 @@ def _command_outcome_from_proto(msg: private_ws_pb2.CommandOutcome) -> PrivateOr
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
         new_order_id=format_uint64_id(msg.new_order_id) if msg.new_order_id else "",
         client_order_id=msg.client_order_id,
-        reason=_error_code_label(int(msg.reason)) if msg.reason else "",
+        reason=reject_reason_label(int(msg.reason)) if msg.reason else "",
     )
 
 

@@ -54,10 +54,10 @@ def test_new_codes_follow_contract_retry_guidance(code: int, connect_code: Code)
 @pytest.mark.parametrize(
     ("code", "label"),
     [
-        (orders_pb2.ERROR_CODE_ATTACHED_LEGS_EXCEEDED, "ATTACHED_LEGS_EXCEEDED"),
-        (orders_pb2.ERROR_CODE_TWAP_CAPACITY_REACHED, "TWAP_CAPACITY_REACHED"),
-        (orders_pb2.ERROR_CODE_CHILD_ORDER_INCONSISTENT, "CHILD_ORDER_INCONSISTENT"),
-        (orders_pb2.ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED, "TRIGGER_FIRE_LIMIT_REACHED"),
+        (orders_pb2.ERROR_CODE_ATTACHED_LEGS_EXCEEDED, "attached_legs_exceeded"),
+        (orders_pb2.ERROR_CODE_TWAP_CAPACITY_REACHED, "twap_capacity_reached"),
+        (orders_pb2.ERROR_CODE_CHILD_ORDER_INCONSISTENT, "child_order_inconsistent"),
+        (orders_pb2.ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED, "trigger_fire_limit_reached"),
     ],
 )
 def test_rejected_order_names_a_new_code(code: int, label: str) -> None:

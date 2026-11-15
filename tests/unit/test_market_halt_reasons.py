@@ -31,7 +31,7 @@ def test_order_read_and_stream_label_the_market_halt() -> None:
         status=orders_read_pb2.CANCELED,
         cancel_reason=orders_read_pb2.CANCEL_REASON_MARKET_HALTED,
     )
-    assert order_from_proto(halted).cancel_reason == "MARKET_HALTED"
+    assert order_from_proto(halted).cancel_reason == "market_halted"
 
     unit = private_orders_unit_from_proto(
         pb.Unit(
@@ -55,10 +55,10 @@ def test_order_read_and_stream_label_the_market_halt() -> None:
             ],
         )
     )
-    assert unit.orders[0].cancel_reason == "MARKET_HALTED"
+    assert unit.orders[0].cancel_reason == "market_halted"
     assert [(e.cancel_reason, e.reject_reason) for e in unit.events] == [
-        ("MARKET_HALTED", None),
-        (None, "MARKET_HALTED"),
+        ("market_halted", None),
+        (None, "market_halted"),
     ]
 
 

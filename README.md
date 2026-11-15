@@ -553,7 +553,7 @@ or `decrement`) sets the order's self-trade prevention on create, preview and
 batch create items, `triggers.create` and `triggers.create_oco`; omit it for
 the server default. `decrement` trades neither order: both are reduced by the
 quantity that would have traded, and the order left with none is canceled
-with `cancel_reason` `STP_DECREMENT`. A resting order of yours can be reduced
+with `cancel_reason` `stp_decrement`. A resting order of yours can be reduced
 this way even if you never send `decrement`, when another order of the same
 root account does. The order's attached
 take-profit, stop-loss and trailing stop exits use the same mode: they have
@@ -609,7 +609,7 @@ reference price (the last trade is a close estimate), the upper limit is
 `ceil(R * (1 - lower_bps / 10000) / tick) * tick`. A limit buy priced above
 the upper limit, or a limit sell below the lower limit, is refused
 `PRICE_BAND_VIOLATION`; a market order trades only up to the band and its rest
-is canceled with `cancel_reason` `PRICE_BAND`.
+is canceled with `cancel_reason` `price_band`.
 `SpotConfig.assets` lists each asset (`SpotAssetConfig`) with
 `included_in_equity`: whether it counts in the account's total equity. Value
 only the assets where it is `True`; list the `False` ones by amount with no
@@ -700,27 +700,28 @@ A replacement order's `cum_qty` includes the quantity filled by its
 predecessors; `Order.inherited_cum_qty` is that carried-over part (zero for an
 order never replaced).
 
-An order says why it ended. A `rejected` order's `reject_reason` is the error
-code the Orders API returns for the same refusal, without the `ERROR_CODE_`
-prefix (for example `POST_ONLY_CROSS` or `INSUFFICIENT_FUNDS`). A `canceled`
-order's `cancel_reason` is one of `USER_REQUEST`, `IOC_REMAINDER`,
-`MARKET_REMAINDER`, `STP_EXPIRE_MAKER`, `STP_EXPIRE_TAKER`, `STP_EXPIRE_BOTH`,
-`REPLACED`, `GTD_EXPIRED`, `QTY_AT_OR_BELOW_FILLED`, `PAIR_DRAIN`,
-`ATTACHED_RISK_REFUSED`, `CANCEL_ALL_AFTER`, `ACCOUNT_REPAIR`,
-`TWAP_ROLLOVER`, `STRATEGY_CANCEL`, `SYSTEM`, `MARKET_HALTED` (the exchange
-halted the market and canceled its open orders), `ATTACHED_EXIT_FIRED` (its
+An order says why it ended, with the same short lowercase labels the other
+Polyester SDKs use. A `rejected` order's `reject_reason` is the error code the
+Orders API returns for the same refusal, in lower case without the
+`ERROR_CODE_` prefix (for example `post_only_cross` or `insufficient_funds`).
+A `canceled` order's `cancel_reason` is one of `user_request`,
+`ioc_remainder`, `market_remainder`, `stp_expire_maker`, `stp_expire_taker`,
+`stp_expire_both`, `replaced`, `gtd_expired`, `qty_at_or_below_filled`,
+`pair_drain`, `attached_risk_refused`, `cancel_all_after`, `account_repair`,
+`twap_rollover`, `strategy_cancel`, `system`, `market_halted` (the exchange
+halted the market and canceled its open orders), `attached_exit_fired` (its
 take-profit, stop-loss or trailing stop fired while it still rested, so its
 unfilled remainder was canceled first; fills before it stand, and it can no
-longer be modified), `STP_DECREMENT` (`decrement` self-trade prevention left
-it no quantity), `PRICE_BAND` (the pair's price band stopped it; fills up to
-the band stand) or `CANCEL_ON_DISCONNECT` (the account's trading WebSocket
+longer be modified), `stp_decrement` (`decrement` self-trade prevention left
+it no quantity), `price_band` (the pair's price band stopped it; fills up to
+the band stand) or `cancel_on_disconnect` (the account's trading WebSocket
 connections that opted in to cancel-on-disconnect all closed). Both are `None` for every other
 status. A number this SDK does not know yet reads `UNKNOWN_ERROR_CODE(n)` or
 `UNKNOWN_CANCEL_REASON(n)`; treat it as a generic refusal or end.
 
 ```python
 order = (await client.orders.get(key=ClientOrderId(client_order_id))).order
-if order is not None and order.reject_reason == "POST_ONLY_CROSS":
+if order is not None and order.reject_reason == "post_only_cross":
     ...  # reprice and resend
 ```
 
@@ -1394,7 +1395,7 @@ takes the next number) and `fire_refusal_reason` says why, with the
 `failure_reason` labels. `self_trade_prevented` means self-trade prevention
 (`expire_taker` or `expire_both`) expired the exit's order against another of
 the account's resting orders: `child_seq` names that order, which ends
-`canceled` with `STP_EXPIRE_TAKER` or `STP_EXPIRE_BOTH`, and the trigger
+`canceled` with `stp_expire_taker` or `stp_expire_both`, and the trigger
 records it once per blocked episode and fires again at a new trade at or
 beyond its trigger price, or once the blocking order is gone or no longer at
 the best price. Every other refusal placed no order. `market_halted` or `pair_post_only`
@@ -1819,7 +1820,7 @@ async with subscription:
   and keep the higher version of each order.
 - A `PrivateOrderEvent` says why an order ended, as the order's own fields
   do: `reject_reason` on `rejected`, and `cancel_reason` on `canceled` and on
-  the `replaced` event of the order a replace ended (`REPLACED`). Both are
+  the `replaced` event of the order a replace ended (`replaced`). Both are
   `None` otherwise, including on the `replaced` event that installs the
   successor.
 - `PrivateOrdersReady` means the subscription reached the account's read

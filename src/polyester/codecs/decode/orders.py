@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from decimal import Decimal
 
 from google.protobuf.message import Message
 
 from polyester.codecs.decode.balances import u128_from_proto
 from polyester.codecs.decode.invariants import (
+    paired_ts_ns,
     ts_ns_from_response,
     ts_ns_string_from_response,
 )
@@ -370,7 +371,7 @@ def order_from_proto(
             else None
         ),
         batch_request_id=format_optional_uint64_id(msg.batch_request_id),
-        reject_reason=_error_code_label(int(msg.reject_reason)) if msg.reject_reason else None,
+        reject_reason=reject_reason_label(int(msg.reject_reason)) if msg.reject_reason else None,
         cancel_reason=cancel_reason_label(int(msg.cancel_reason)) if msg.cancel_reason else None,
         avg_price=(
             Decimal(format_qty_scaled(int(u128_from_proto(msg.avg_price_e18)), _E18))
@@ -534,6 +535,11 @@ def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> Orde
         take_profit_trigger_id=_leg_trigger_id(msg, "take_profit_trigger_id"),
         stop_loss_trigger_id=_leg_trigger_id(msg, "stop_loss_trigger_id"),
         trailing_stop_trigger_id=_leg_trigger_id(msg, "trailing_stop_trigger_id"),
+        accepted_ts_ns=(
+            paired_ts_ns(msg, "accepted_at_ts_ns", "accepted_at")
+            if message_name == "CreateOrderResponse"
+            else None
+        ),
     )
 
 
@@ -549,12 +555,26 @@ def _error_code_label(raw_code: int) -> str:
     return code.removeprefix("ERROR_CODE_")
 
 
+def reject_reason_label(raw_code: int) -> str:
+    """An order's or order event's ``reject_reason``, and an order command
+    outcome's ``reason``: the Orders API error code in lower case without its
+    ``ERROR_CODE_`` prefix (``post_only_cross``). A code this SDK does not know
+    reads ``UNKNOWN_ERROR_CODE(n)``."""
+    label = _error_code_label(raw_code)
+    if label.startswith("UNKNOWN_ERROR_CODE("):
+        return label
+    return label.lower()
+
+
 def cancel_reason_label(raw: int) -> str:
+    """Why a canceled order ended, in lower case without the
+    ``CANCEL_REASON_`` prefix (``user_request``). A reason this SDK does not
+    know reads ``UNKNOWN_CANCEL_REASON(n)``."""
     try:
         name = orders_read_pb2.CancelReason.Name(raw)
     except ValueError:
         return f"UNKNOWN_CANCEL_REASON({raw})"
-    return name.removeprefix("CANCEL_REASON_")
+    return name.removeprefix("CANCEL_REASON_").lower()
 
 
 def _field_violations_from_proto(msg: orders_pb2.ErrorDetail) -> list[OrderFieldViolation]:
@@ -628,6 +648,7 @@ def modify_order_from_proto(msg: orders_pb2.ModifyOrderResponse) -> ModifyOrderR
         take_profit_trigger_id=_leg_trigger_id(msg, "take_profit_trigger_id"),
         stop_loss_trigger_id=_leg_trigger_id(msg, "stop_loss_trigger_id"),
         trailing_stop_trigger_id=_leg_trigger_id(msg, "trailing_stop_trigger_id"),
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 
@@ -740,6 +761,11 @@ def batch_replace_from_proto(
             ),
             action_taken=proto_enum_name(orders_pb2.ModifyActionTaken, item.action_taken),
             violations=_field_violations_from_proto(item.error),
+            existing_order_id=(
+                format_uint64_id(item.error.existing_order_id)
+                if item.error.existing_order_id
+                else ""
+            ),
         )
         for item in msg.results
     ]
@@ -762,8 +788,9 @@ def batch_replace_from_proto(
         results=results,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
+        # The exact nanoseconds, or the paired Timestamp when only that is sent.
         accepted_ts_ns=ts_ns_from_response(
-            msg.accepted_ts_ns,
+            paired_ts_ns(msg, "accepted_ts_ns", "accepted_ts") or 0,
             context="BatchReplaceOrders",
             field_name="accepted_ts_ns",
         ),
@@ -853,9 +880,10 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
     )
 
 
-def _batch_create_result_item(item) -> BatchCreateResultItem:
+def _batch_create_result_item(item, quantity_scale: int | None) -> BatchCreateResultItem:
     # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
+        resolved = int(item.accepted.resolved_base_qty_scaled)
         return BatchCreateResultItem(
             status="accepted",
             order_id=(format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""),
@@ -868,6 +896,10 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
             ),
             submitted_quote_proceeds_scaled=_optional_scaled(
                 item.accepted, "submitted_quote_proceeds_scaled"
+            ),
+            resolved_base_qty_scaled=str(resolved) if resolved else "",
+            resolved_base_qty=(
+                _qty(resolved, symbol_id=0, scale=quantity_scale) if resolved else None
             ),
         )
     if item.HasField("rejected"):
@@ -900,8 +932,19 @@ def _batch_create_result_item(item) -> BatchCreateResultItem:
     )
 
 
-def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchCreateOrdersResult:
-    results = [_batch_create_result_item(item) for item in msg.results]
+def batch_create_from_proto(
+    msg: orders_pb2.BatchCreateOrdersResponse,
+    *,
+    quantity_scales: Sequence[int | None] | None = None,
+) -> BatchCreateOrdersResult:
+    """Decode a batch create answer. ``quantity_scales`` are the requested
+    items' base quantity scales in request order, the order of the results;
+    an accepted item's ``resolved_base_qty`` carries its item's scale."""
+    scales = list(quantity_scales or [])
+    results = [
+        _batch_create_result_item(item, scales[index] if index < len(scales) else None)
+        for index, item in enumerate(msg.results)
+    ]
     accepted_count = int(msg.accepted_count)
     rejected_count = int(msg.rejected_count)
     decoded_accepted = sum(item.status == "accepted" for item in results)
@@ -921,6 +964,7 @@ def batch_create_from_proto(msg: orders_pb2.BatchCreateOrdersResponse) -> BatchC
         results=results,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 

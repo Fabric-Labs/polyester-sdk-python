@@ -45,7 +45,7 @@ def test_order_read_and_stream_label_the_attached_exit_cancel() -> None:
         status=orders_read_pb2.CANCELED,
         cancel_reason=orders_read_pb2.CANCEL_REASON_ATTACHED_EXIT_FIRED,
     )
-    assert order_from_proto(ended).cancel_reason == "ATTACHED_EXIT_FIRED"
+    assert order_from_proto(ended).cancel_reason == "attached_exit_fired"
 
     unit = private_orders_unit_from_proto(
         pb.Unit(
@@ -61,8 +61,8 @@ def test_order_read_and_stream_label_the_attached_exit_cancel() -> None:
             ],
         )
     )
-    assert unit.orders[0].cancel_reason == "ATTACHED_EXIT_FIRED"
-    assert unit.events[0].cancel_reason == "ATTACHED_EXIT_FIRED"
+    assert unit.orders[0].cancel_reason == "attached_exit_fired"
+    assert unit.events[0].cancel_reason == "attached_exit_fired"
 
 
 def test_unknown_cancel_reason_decodes_to_a_generic_label() -> None:

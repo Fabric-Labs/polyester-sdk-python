@@ -27,9 +27,9 @@ class PrivateOrderEvent:
     ``replaced`` or ``attached_risk``.
 
     ``reject_reason`` names a ``rejected`` order's refusal as the order write API
-    does (for example ``POST_ONLY_CROSS``), the same value as the order's
-    ``reject_reason``. ``cancel_reason`` names why a ``canceled`` order ended
-    (for example ``USER_REQUEST``), and is ``REPLACED`` on the ``replaced`` event
+    does, in lower case (for example ``post_only_cross``), the same value as the
+    order's ``reject_reason``. ``cancel_reason`` names why a ``canceled`` order
+    ended (for example ``user_request``), and is ``replaced`` on the ``replaced`` event
     of the order a replace ended. Both are ``None`` otherwise, including on the
     ``replaced`` event that installs the successor.
     ``replacement_order_id`` is set for ``replaced``; ``fill`` for ``filled``.
@@ -50,7 +50,9 @@ class PrivateOrderCommandOutcome:
     ``cancel_rejected``, ``replace_rejected``, ``rejected`` or ``cancel_all_done``.
 
     ``reason`` is the order error code the Orders API returns for the same
-    refusal (for example ``INSUFFICIENT_BALANCE``); empty when unset.
+    refusal, in lower case without its ``ERROR_CODE_`` prefix (for example
+    ``insufficient_funds``), as an order's ``reject_reason``; empty when unset,
+    and ``UNKNOWN_ERROR_CODE(n)`` for a code this SDK does not know.
     """
 
     kind: str

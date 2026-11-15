@@ -633,9 +633,9 @@ def test_private_order_stream_reads_the_same_fields() -> None:
 @pytest.mark.parametrize(
     ("value", "label"),
     [
-        (orders_read_pb2.CANCEL_REASON_STP_DECREMENT, "STP_DECREMENT"),
-        (orders_read_pb2.CANCEL_REASON_PRICE_BAND, "PRICE_BAND"),
-        (orders_read_pb2.CANCEL_REASON_CANCEL_ON_DISCONNECT, "CANCEL_ON_DISCONNECT"),
+        (orders_read_pb2.CANCEL_REASON_STP_DECREMENT, "stp_decrement"),
+        (orders_read_pb2.CANCEL_REASON_PRICE_BAND, "price_band"),
+        (orders_read_pb2.CANCEL_REASON_CANCEL_ON_DISCONNECT, "cancel_on_disconnect"),
     ],
 )
 def test_new_cancel_reasons_read_by_name(value: int, label: str) -> None:

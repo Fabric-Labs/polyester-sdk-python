@@ -108,12 +108,63 @@ def test_exact_integer_refuses_out_of_range(value: Any) -> None:
         exact_integer(value, "field", min_value=0, max_value=100, allow_str=True)
 
 
-def test_exact_integer_accepts_index_types() -> None:
-    class Index:
-        def __index__(self) -> int:
-            return 7
+class FloatIndex(float):
+    """A float that also claims to be an index: int(1.5) is 1."""
 
-    assert exact_integer(Index(), "field", min_value=0, max_value=10) == 7
+    def __index__(self) -> int:
+        return int(self)
+
+
+class IndexOnly:
+    """Not a number at all, only an __index__ method."""
+
+    def __index__(self) -> int:
+        return 7
+
+
+class IntSubclass(int):
+    pass
+
+
+# Implement __index__ (or convert with int()) without being integers.
+NOT_INTEGRAL: list[Any] = [
+    FloatIndex(1.5),
+    FloatIndex(1.9),
+    FloatIndex(2.0),
+    IndexOnly(),
+    True,
+    False,
+    Decimal("1.9"),
+    Decimal("2"),
+]
+
+
+@pytest.mark.parametrize("value", NOT_INTEGRAL)
+def test_exact_integer_refuses_index_objects_that_are_not_integral(value: Any) -> None:
+    with pytest.raises(PolyesterValidationError, match="must be an integer"):
+        exact_integer(value, "field", min_value=0, max_value=10, allow_str=True)
+
+
+def test_exact_integer_accepts_integral_types() -> None:
+    value = exact_integer(IntSubclass(7), "field", min_value=0, max_value=10)
+    assert value == 7 and type(value) is int
+
+
+def test_exact_integer_accepts_numpy_integers() -> None:
+    numpy = pytest.importorskip("numpy")
+    for value in (numpy.int64(7), numpy.uint8(7), numpy.int32(7)):
+        assert exact_integer(value, "field", min_value=0, max_value=10) == 7
+    for value in (numpy.float64(7.0), numpy.bool_(True)):
+        with pytest.raises(PolyesterValidationError):
+            exact_integer(value, "field", min_value=0, max_value=10)
+
+
+@pytest.mark.parametrize("nonce", NOT_INTEGRAL)
+def test_withdraw_nonce_refuses_index_objects(nonce: Any) -> None:
+    with pytest.raises(PolyesterValidationError, match="nonce"):
+        _client().trading_withdraws.prepare_api_key_to_funding(
+            asset_id=2, quantity="1", idempotency_key="k", deadline_ts_sec=DEADLINE, nonce=nonce
+        )
 
 
 # --- trading withdraw payload: nonce and deadline -----------------------------

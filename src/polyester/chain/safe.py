@@ -14,6 +14,7 @@ from polyester.chain.environment import (
     PolyesterChainEnvironment,
     SafeDeploymentConfig,
 )
+from polyester.codecs.scalars import exact_integer
 
 # SafeProxy creation bytecode from @safe-global/safe-contracts v1.4.1
 # (must match SafeProxyFactory.proxyCreationCode on Polyester).
@@ -122,6 +123,8 @@ def predict_safe_address_with_data(
     require_eth_abi()
     if not owners:
         raise ValueError("owners must be non-empty")
+    # The salt picks the Safe's address: it is used exactly as given.
+    salt_nonce = exact_integer(salt_nonce, "salt_nonce", min_value=0, max_value=2**256 - 1)
     env = environment or POLYESTER_DEVNET_ENVIRONMENT
     cfg = safe or env.account_abstraction.safe
     owners_cs = [to_checksum_address(o) for o in owners]
@@ -134,7 +137,7 @@ def predict_safe_address_with_data(
     deployment_code = SAFE_PROXY_CREATION_CODE + int.from_bytes(
         _addr(cfg.safe_singleton_address), "big"
     ).to_bytes(32, "big")
-    salt = keccak(keccak(initializer) + int(salt_nonce).to_bytes(32, "big"))
+    salt = keccak(keccak(initializer) + salt_nonce.to_bytes(32, "big"))
     address = _create2_address(
         factory=cfg.safe_proxy_factory_address,
         salt=salt,

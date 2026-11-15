@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import operator
+import numbers
 import re
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
@@ -44,12 +44,13 @@ def market_id(value: object, label: str) -> int:
     """
     if isinstance(value, bool):
         raise PolyesterValidationError(f"{label} must be an integer market ID, not bool")
-    try:
-        parsed = operator.index(value)  # type: ignore[arg-type]
-    except TypeError:
+    # numbers.Integral, not __index__: a float subclass may implement
+    # __index__ and would select market 8 for 8.9.
+    if not isinstance(value, numbers.Integral):
         raise PolyesterValidationError(
             f"{label} must be an integer market ID, not {type(value).__name__}"
-        ) from None
+        )
+    parsed = int(value)
     if parsed < 0 or parsed > UINT32_MAX:
         raise PolyesterValidationError(f"{label} {parsed} is outside 0..{UINT32_MAX}")
     return parsed
@@ -211,13 +212,15 @@ def exact_integer(
 ) -> int:
     """Return ``value`` as the exact integer it is, or refuse it.
 
-    Accepts an ``int`` (or another exact integer type implementing
-    ``__index__``, as NumPy integers do) and, with ``allow_str``, a string of
-    ASCII decimal digits. Everything else is refused with
+    Accepts a :class:`numbers.Integral` other than ``bool`` (``int`` and its
+    subclasses, and NumPy integers) and, with ``allow_str``, a string of ASCII
+    decimal digits. Everything else is refused with
     :class:`PolyesterValidationError`, never converted: a ``bool``, a ``float``
-    (even ``2.0``), a ``Decimal``, and any other string (``"42.0"``,
-    ``"0x10"``, ``" 42"``, ``"-1"``). So a signed or sent value is always the
-    one the caller gave. Values outside ``min_value..max_value`` are refused.
+    (even ``2.0``, and a float subclass with ``__index__``), a ``Decimal``, an
+    object that only implements ``__index__``, and any other string
+    (``"42.0"``, ``"0x10"``, ``" 42"``, ``"-1"``). So a signed or sent value is
+    always the one the caller gave. Values outside ``min_value..max_value``
+    are refused.
     """
     expected = "an integer or a decimal-integer string" if allow_str else "an integer"
     if isinstance(value, bool):
@@ -233,13 +236,12 @@ def exact_integer(
                 f"{field_name} {_error_value(digits)} is outside {min_value}..{max_value}"
             )
         parsed = int(digits)
+    elif isinstance(value, numbers.Integral):
+        parsed = int(value)
     else:
-        try:
-            parsed = operator.index(value)  # type: ignore[arg-type]
-        except TypeError:
-            raise PolyesterValidationError(
-                f"{field_name} must be {expected}, not {type(value).__name__}"
-            ) from None
+        raise PolyesterValidationError(
+            f"{field_name} must be {expected}, not {type(value).__name__}"
+        )
     if parsed < min_value or parsed > max_value:
         # str() of a huge int is slow or refused, so a huge value is not repeated.
         shown = f" {_error_value(str(parsed))}" if parsed.bit_length() <= 512 else ""

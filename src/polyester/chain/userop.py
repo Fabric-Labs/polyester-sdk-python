@@ -54,6 +54,11 @@ EIP712_SAFE_OP_V07 = {
 }
 
 
+_UINT48_MAX = 2**48 - 1
+_UINT128_MAX = 2**128 - 1
+_UINT256_MAX = 2**256 - 1
+
+
 @dataclass(frozen=True, slots=True)
 class UserOperationReceipt:
     user_operation_hash: str
@@ -69,7 +74,7 @@ def add_user_operation_gas_buffer(gas: int) -> int:
 
 def encode_execute_user_op_call_data(call: ChainCall) -> bytes:
     """Encode Safe4337Module.executeUserOpWithErrorString for a single call."""
-    value = int(call.value or 0)
+    value = exact_integer(call.value, "call.value", min_value=0, max_value=_UINT256_MAX)
     return _EXECUTE_USER_OP_SELECTOR + encode(
         ["address", "uint256", "bytes", "uint8"],
         [bytes.fromhex(call.to[2:] if call.to.startswith("0x") else call.to), value, call.data, 0],
@@ -86,12 +91,19 @@ def pack_paymaster_and_data(
     if not paymaster:
         return b""
     addr = bytes.fromhex(paymaster[2:] if paymaster.startswith("0x") else paymaster)
-    return (
-        addr
-        + int(paymaster_verification_gas_limit).to_bytes(16, "big")
-        + int(paymaster_post_op_gas_limit).to_bytes(16, "big")
-        + paymaster_data
+    verification = exact_integer(
+        paymaster_verification_gas_limit,
+        "paymaster_verification_gas_limit",
+        min_value=0,
+        max_value=_UINT128_MAX,
     )
+    post_op = exact_integer(
+        paymaster_post_op_gas_limit,
+        "paymaster_post_op_gas_limit",
+        min_value=0,
+        max_value=_UINT128_MAX,
+    )
+    return addr + verification.to_bytes(16, "big") + post_op.to_bytes(16, "big") + paymaster_data
 
 
 def stub_signature() -> bytes:
@@ -115,7 +127,28 @@ def sign_safe_user_operation(
     valid_after: int = 0,
     valid_until: int = 0,
 ) -> bytes:
-    """EIP-712 SafeOp signature packed as uint48/uint48/bytes (single EOA owner)."""
+    """EIP-712 SafeOp signature packed as uint48/uint48/bytes (single EOA owner).
+
+    Every integer is signed exactly as given: a value that is not an exact
+    integer in its field's range raises ``PolyesterValidationError`` before
+    signing.
+    """
+    # Ranges are the SafeOp typed-data field types.
+    nonce = exact_integer(nonce, "nonce", min_value=0, max_value=_UINT256_MAX)
+    pre_verification_gas = exact_integer(
+        pre_verification_gas, "pre_verification_gas", min_value=0, max_value=_UINT256_MAX
+    )
+    call_gas_limit, verification_gas_limit, max_fee_per_gas, max_priority_fee_per_gas = (
+        exact_integer(value, name, min_value=0, max_value=_UINT128_MAX)
+        for name, value in (
+            ("call_gas_limit", call_gas_limit),
+            ("verification_gas_limit", verification_gas_limit),
+            ("max_fee_per_gas", max_fee_per_gas),
+            ("max_priority_fee_per_gas", max_priority_fee_per_gas),
+        )
+    )
+    valid_after = exact_integer(valid_after, "valid_after", min_value=0, max_value=_UINT48_MAX)
+    valid_until = exact_integer(valid_until, "valid_until", min_value=0, max_value=_UINT48_MAX)
     module = environment.account_abstraction.safe.safe_4337_module_address
     typed = {
         **EIP712_SAFE_OP_V07,
@@ -140,11 +173,7 @@ def sign_safe_user_operation(
         },
     }
     signed = owner.sign_message(encode_typed_data(full_message=typed))
-    return (
-        int(valid_after).to_bytes(6, "big")
-        + int(valid_until).to_bytes(6, "big")
-        + bytes(signed.signature)
-    )
+    return valid_after.to_bytes(6, "big") + valid_until.to_bytes(6, "big") + bytes(signed.signature)
 
 
 def _hex_int(value: int) -> str:

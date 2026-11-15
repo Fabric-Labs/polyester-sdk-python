@@ -1142,6 +1142,8 @@ def replacement_risk_policy(
     # The request carries no side: the server applies the side rule to a
     # trailing stop's maximum and answers ERROR_CODE_BAD_PRICE.
     return risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
+
+
 _BATCH_CANCEL_ITEM_KEYS = frozenset({"key", "symbol_id"})
 
 

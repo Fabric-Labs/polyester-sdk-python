@@ -154,7 +154,7 @@ def test_create_trigger_rejects_non_linear_ladder_distribution() -> None:
 
 def test_modify_trigger_omits_unset_fields_and_clears_with_zero() -> None:
     cleared = modify_trigger_to_proto(
-        trigger_id="1",
+        trigger_id="2",
         symbol_id=7,
         activation_price=Price.from_ticks(0),
         max_slippage_bps=0,
@@ -166,7 +166,7 @@ def test_modify_trigger_omits_unset_fields_and_clears_with_zero() -> None:
     assert not cleared.HasField("trigger_price_ticks")
 
     preserved = modify_trigger_to_proto(
-        trigger_id="1",
+        trigger_id="2",
         symbol_id=7,
         trigger_price="101",
     )
@@ -198,8 +198,8 @@ def test_trigger_slippage_bps_cap() -> None:
         )
     # Modify takes the contract's bound; the server refuses 10000 for a
     # trailing stop (POLY-9426).
-    modified = modify_trigger_to_proto(trigger_id="1", symbol_id=7, max_slippage_bps=10000)
+    modified = modify_trigger_to_proto(trigger_id="2", symbol_id=7, max_slippage_bps=10000)
     assert modified.max_slippage_bps == 10000
     with pytest.raises(PolyesterValidationError, match="1 and 10000"):
-        modify_trigger_to_proto(trigger_id="1", symbol_id=7, max_slippage_bps=10001)
-    modify_trigger_to_proto(trigger_id="1", symbol_id=7, max_slippage_bps=0)
+        modify_trigger_to_proto(trigger_id="2", symbol_id=7, max_slippage_bps=10001)
+    modify_trigger_to_proto(trigger_id="2", symbol_id=7, max_slippage_bps=0)

@@ -6,6 +6,7 @@ from decimal import Decimal
 from google.protobuf.message import Message
 
 from polyester.codecs.decode.balances import u128_from_proto
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.invariants import (
     paired_ts_ns,
     ts_ns_from_response,
@@ -672,6 +673,8 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
             "CancelAllOrders",
             "dry_run response unexpectedly reports submitted or failed cancels",
         )
+    for item in msg.cancelled_orders:
+        require_id("CancelAllOrders", "order_id", item.order_id)
     return CancelAllOrdersResult(
         status=status,
         matched_orders=int(msg.matched_orders),
@@ -883,10 +886,11 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
 def _batch_create_result_item(item, quantity_scale: int | None) -> BatchCreateResultItem:
     # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
+        require_id("BatchCreateOrders", "order_id", item.accepted.order_id)
         resolved = int(item.accepted.resolved_base_qty_scaled)
         return BatchCreateResultItem(
             status="accepted",
-            order_id=(format_uint64_id(item.accepted.order_id) if item.accepted.order_id else ""),
+            order_id=format_uint64_id(item.accepted.order_id),
             client_order_id=item.client_order_id,
             take_profit_trigger_id=_leg_trigger_id(item.accepted, "take_profit_trigger_id"),
             stop_loss_trigger_id=_leg_trigger_id(item.accepted, "stop_loss_trigger_id"),

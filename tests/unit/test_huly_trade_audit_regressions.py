@@ -56,14 +56,14 @@ def test_poly_4684_standalone_trailing_slippage_cap_is_retained() -> None:
     # and type (POLY-9426): a trailing stop answers MAX_SLIPPAGE_INVALID.
     assert (
         modify_trigger_to_proto(
-            trigger_id="1", symbol_id=1, max_slippage_bps=10_000
+            trigger_id="2", symbol_id=1, max_slippage_bps=10_000
         ).max_slippage_bps
         == 10_000
     )
     with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*10000"):
-        modify_trigger_to_proto(trigger_id="1", symbol_id=1, max_slippage_bps=10_001)
+        modify_trigger_to_proto(trigger_id="2", symbol_id=1, max_slippage_bps=10_001)
     assert (
-        modify_trigger_to_proto(trigger_id="1", symbol_id=1, max_slippage_bps=0).max_slippage_bps
+        modify_trigger_to_proto(trigger_id="2", symbol_id=1, max_slippage_bps=0).max_slippage_bps
         == 0
     )
 
@@ -336,10 +336,10 @@ def test_poly_4689_standalone_create_distance_bps_is_capped(value: int) -> None:
 @pytest.mark.parametrize("value", [10_001, 10**12])
 def test_poly_4689_standalone_modify_distance_bps_is_capped(value: int) -> None:
     with pytest.raises(PolyesterValidationError, match="trailing_distance_bps.*1.*10000"):
-        modify_trigger_to_proto(trigger_id="1", symbol_id=1, trailing_distance_bps=value)
+        modify_trigger_to_proto(trigger_id="2", symbol_id=1, trailing_distance_bps=value)
     assert (
         modify_trigger_to_proto(
-            trigger_id="1", symbol_id=1, trailing_distance_bps=0
+            trigger_id="2", symbol_id=1, trailing_distance_bps=0
         ).trailing_distance_bps
         == 0
     )

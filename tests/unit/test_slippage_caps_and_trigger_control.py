@@ -128,23 +128,23 @@ def test_buy_trailing_stop_limit_price_must_reach_activation_price() -> None:
 def test_trigger_modify_caps_slippage_at_10000_and_zero_clears() -> None:
     # The contract's modify bound is 0 to 10000 (POLY-9426); the server
     # refuses 10000 for a sell or a trailing stop.
-    assert modify_trigger_to_proto(trigger_id="1", max_slippage_bps=10_000).max_slippage_bps == (
+    assert modify_trigger_to_proto(trigger_id="2", max_slippage_bps=10_000).max_slippage_bps == (
         10_000
     )
-    assert modify_trigger_to_proto(trigger_id="1", max_slippage_bps=0).max_slippage_bps == 0
+    assert modify_trigger_to_proto(trigger_id="2", max_slippage_bps=0).max_slippage_bps == 0
     with pytest.raises(PolyesterValidationError, match="between 1 and 10000"):
-        modify_trigger_to_proto(trigger_id="1", max_slippage_bps=10_001)
+        modify_trigger_to_proto(trigger_id="2", max_slippage_bps=10_001)
 
 
 def test_trigger_modify_no_longer_takes_a_limit_price() -> None:
     assert "limit_price" not in inspect.signature(modify_trigger_to_proto).parameters
     assert "limit_price" not in inspect.signature(AsyncTriggersService.modify).parameters
     with pytest.raises(TypeError):
-        modify_trigger_to_proto(trigger_id="1", limit_price="100")  # type: ignore[call-arg]
+        modify_trigger_to_proto(trigger_id="2", limit_price="100")  # type: ignore[call-arg]
 
 
 def test_trigger_modify_without_symbol_targets_the_triggers_own_market() -> None:
-    proto = modify_trigger_to_proto(trigger_id="1", trigger_price="100")
+    proto = modify_trigger_to_proto(trigger_id="2", trigger_price="100")
     assert proto.symbol_id == 0
     assert proto.trigger_price_ticks == 100_000_000_000
 

@@ -114,10 +114,10 @@ def test_batch_size_guard_follows_each_operation_limit() -> None:
     with pytest.raises(PolyesterValidationError, match="at most 20"):
         batch_create_orders_to_proto(items=[item] * 21, quantity_scale=8)
     with pytest.raises(PolyesterValidationError, match="at most 50"):
-        batch_cancel_orders_to_proto(items=[{"key": OrderId("1")}] * 51)
+        batch_cancel_orders_to_proto(items=[{"key": OrderId("2")}] * 51)
     with pytest.raises(PolyesterValidationError, match="at most 50"):
         batch_replace_orders_to_proto(
-            items=[BatchReplaceItem(key=OrderId("1"), new_qty="0.1") for _ in range(51)],
+            items=[BatchReplaceItem(key=OrderId("2"), new_qty="0.1") for _ in range(51)],
             symbol_id=1,
             quantity_scale=8,
         )
@@ -146,9 +146,9 @@ def test_batch_cancel_item_requires_order_key() -> None:
     with pytest.raises(PolyesterValidationError):
         batch_cancel_orders_to_proto(items=[{}])
     with pytest.raises(PolyesterValidationError, match="not accepted"):
-        batch_cancel_orders_to_proto(items=[{"order_id": "1", "client_order_id": "cid"}])
+        batch_cancel_orders_to_proto(items=[{"order_id": "2", "client_order_id": "cid"}])
     with pytest.raises(PolyesterValidationError, match="not accepted"):
-        batch_cancel_orders_to_proto(items=[{"order_id": "1"}])
+        batch_cancel_orders_to_proto(items=[{"order_id": "2"}])
 
 
 def test_batch_cancel_requires_items() -> None:

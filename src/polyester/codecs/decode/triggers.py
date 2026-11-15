@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.invariants import paired_ts_ns, ts_ns_string_from_response
 from polyester.codecs.decode.orders import OrderScales, _field_violations_from_proto, pair_scales
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
@@ -453,6 +454,7 @@ def trigger_mutation_from_proto(
     # CreateTriggerResponse no longer carries a status field (POLY-3701):
     # reaching the client means the trigger was admitted, so synthesize
     # "accepted". Cancel/Modify/Pause/Resume still return a status enum.
+    require_id(msg.DESCRIPTOR.name.removesuffix("Response"), "trigger_id", msg.trigger_id)
     if any(field.name == "status" for field in msg.DESCRIPTOR.fields):
         status = _trigger_status_label(msg.status)
     else:
@@ -464,6 +466,9 @@ def trigger_mutation_from_proto(
 
 
 def create_oco_from_proto(msg: triggers_pb2.CreateOcoResponse) -> CreateOcoResult:
+    require_id("CreateOco", "order_list_id", msg.order_list_id)
+    require_id("CreateOco", "take_profit_trigger_id", msg.take_profit_trigger_id)
+    require_id("CreateOco", "stop_loss_trigger_id", msg.stop_loss_trigger_id)
     return CreateOcoResult(
         order_list_id=format_uint64_id(msg.order_list_id),
         client_list_id=msg.client_list_id,
@@ -474,6 +479,7 @@ def create_oco_from_proto(msg: triggers_pb2.CreateOcoResponse) -> CreateOcoResul
 
 
 def cancel_oco_from_proto(msg: triggers_pb2.CancelOcoResponse) -> CancelOcoResult:
+    require_id("CancelOco", "order_list_id", msg.order_list_id)
     return CancelOcoResult(
         order_list_id=format_uint64_id(msg.order_list_id),
         status=_trigger_status_label(msg.status),
@@ -497,10 +503,12 @@ def batch_cancel_triggers_from_proto(
                 "BatchCancelTriggers",
                 f"batch trigger cancel response has unknown status: {item.status}",
             )
+        # Each item echoes the trigger ID it was asked to cancel.
+        require_id("BatchCancelTriggers", "trigger_id", item.trigger_id)
         results.append(
             BatchCancelTriggerResultItem(
                 status=status,
-                trigger_id=format_uint64_id(item.trigger_id) if item.trigger_id else "",
+                trigger_id=format_uint64_id(item.trigger_id),
                 code=item.code,
                 rate_limit=(
                     rate_limit_detail_from_proto(item.error.rate_limit)

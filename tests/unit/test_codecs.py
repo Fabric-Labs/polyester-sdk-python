@@ -109,7 +109,7 @@ def test_ledger_range_codecs() -> None:
 
 
 def test_modify_trigger_to_proto() -> None:
-    proto = modify_trigger_to_proto(trigger_id="1", symbol_id=1, trigger_price="100")
+    proto = modify_trigger_to_proto(trigger_id="2", symbol_id=1, trigger_price="100")
     assert proto.trigger_price_ticks == 100_000_000_000
 
 

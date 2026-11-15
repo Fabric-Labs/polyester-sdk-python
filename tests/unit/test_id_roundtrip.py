@@ -8,7 +8,8 @@ from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterValidationError
 
 # Known collisions: format_id(n) is all-digit and must round-trip via id_to_int.
-_KNOWN_ALL_DIGIT_COLLISIONS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 58, 59, 116, 174)
+# 0 (encoded "1") is no public ID: id_to_int refuses it.
+_KNOWN_ALL_DIGIT_COLLISIONS = (1, 2, 3, 4, 5, 6, 7, 8, 58, 59, 116, 174)
 
 
 def test_format_id_4_round_trips_through_id_to_int() -> None:
@@ -25,7 +26,7 @@ def test_known_all_digit_format_id_round_trips(value: int) -> None:
 
 
 def test_format_id_id_to_int_round_trip_0_to_200() -> None:
-    for value in range(0, 201):
+    for value in range(1, 201):
         assert id_to_int(format_id(value)) == value
 
 

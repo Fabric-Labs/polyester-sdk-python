@@ -425,6 +425,8 @@ def triggers_list_from_proto(
     scales: OrderScales | None = None,
     symbols: TriggerSymbols | None = None,
 ) -> TriggersList:
+    for item in msg.triggers:
+        require_id("ListTriggers", "trigger_id", item.trigger_id)
     triggers = [scaled_trigger_from_proto(item, scales, symbols) for item in msg.triggers]
     return TriggersList(
         triggers=triggers,
@@ -440,6 +442,7 @@ def get_trigger_from_proto(
     symbols: TriggerSymbols | None = None,
 ) -> Trigger | None:
     if has_field(msg, "trigger"):
+        require_id("GetTrigger", "trigger_id", msg.trigger.trigger_id)
         return scaled_trigger_from_proto(msg.trigger, scales, symbols)
     return None
 
@@ -577,6 +580,8 @@ def _terminal_reason_label(enum_cls: object, msg: object, field: str) -> str:
 def trigger_events_list_from_proto(
     msg: triggers_pb2.ListTriggerEventsResponse,
 ) -> TriggerEventsList:
+    for item in msg.events:
+        require_id("ListTriggerEvents", "trigger_id", item.trigger_id)
     return TriggerEventsList(
         events=[trigger_event_from_proto(item) for item in msg.events],
         next_page_token=msg.next_page_token,

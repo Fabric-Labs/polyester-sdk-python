@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
 from polyester.codecs.proto_helpers import timestamp_to_datetime as _timestamp
 from polyester.errors import PolyesterResponseContractError
@@ -108,6 +109,9 @@ def changelog_post_from_proto(msg: changelog_pb2.GetPostResponse) -> ChangelogPo
     violation."""
     if not has_field(msg, "post") or not has_field(msg.post, "summary"):
         raise PolyesterResponseContractError("GetPost", "response is missing the post")
+    for section in msg.post.sections:
+        for change in section.changes:
+            require_id("GetPost", "change.id", change.id)
     return ChangelogPost(
         summary=changelog_post_summary_from_proto(msg.post.summary),
         sections=[
@@ -125,6 +129,8 @@ def changelog_post_from_proto(msg: changelog_pb2.GetPostResponse) -> ChangelogPo
 def changelog_changes_page_from_proto(
     msg: changelog_pb2.ListChangesResponse,
 ) -> ChangelogChangesPage:
+    for entry in msg.changes:
+        require_id("ListChanges", "change.id", entry.change.id)
     return ChangelogChangesPage(
         changes=[
             ChangelogChangeEntry(
@@ -185,6 +191,8 @@ def changelog_deployment_group_from_proto(
             "GetDeploymentGroup", "response is missing the deployment group"
         )
     group = msg.group
+    for item in group.attention:
+        require_id("GetDeploymentGroup", "change.id", item.change.id)
     return ChangelogDeploymentGroup(
         summary=changelog_deployment_group_summary_from_proto(group.summary),
         attention=[

@@ -399,11 +399,25 @@ def order_from_proto(
     )
 
 
+def _require_lineage_id(operation: str, msg: Order | UserTrade) -> None:
+    # A lineage is optional; when present it must name its lineage.
+    if msg.HasField("lineage"):
+        require_id(operation, "lineage.id", msg.lineage.id)
+
+
+def _require_order_ids(operation: str, msg: Order) -> None:
+    require_id(operation, "order_id", msg.order_id)
+    _require_lineage_id(operation, msg)
+
+
 def orders_list_from_proto(
     msg: GetOpenOrdersResponse | GetOrderHistoryResponse,
     *,
     scales: OrderScales | None = None,
 ) -> OrdersList:
+    operation = msg.DESCRIPTOR.name.removesuffix("Response")
+    for item in msg.orders:
+        _require_order_ids(operation, item)
     return OrdersList(
         orders=[scaled_order_from_proto(item, scales) for item in msg.orders],
         next_page_token=msg.next_page_token,
@@ -449,6 +463,8 @@ def scaled_user_trade_from_proto(msg: UserTrade, scales: OrderScales | None) -> 
 
 
 def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> UserTradesList:
+    for item in msg.trades:
+        _require_lineage_id("GetUserTrades", item)
     return UserTradesList(
         trades=[scaled_user_trade_from_proto(item, scales) for item in msg.trades],
         transfers=[order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])],
@@ -459,6 +475,10 @@ def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> Us
 def get_order_from_proto(
     msg: GetOrderResponse, *, scales: OrderScales | None = None
 ) -> GetOrderResult:
+    if msg.HasField("order"):
+        _require_order_ids("GetOrder", msg.order)
+    for item in msg.trades:
+        _require_lineage_id("GetOrder", item)
     order = scaled_order_from_proto(msg.order, scales) if msg.HasField("order") else None
     trades = [scaled_user_trade_from_proto(item, scales) for item in msg.trades]
     transfers = [order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])]

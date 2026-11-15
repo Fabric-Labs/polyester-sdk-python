@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import (
     format_optional_uint64_id,
     optional_timestamp,
@@ -35,11 +36,14 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
 
 
 def api_keys_list_from_proto(msg: api_keys_pb2.ListApiKeysResponse) -> ApiKeysList:
+    for item in msg.api_keys:
+        require_id("ListApiKeys", "key_id", item.key_id)
     return ApiKeysList(api_keys=[api_key_from_proto(item) for item in msg.api_keys])
 
 
 def api_key_from_get_proto(msg: api_keys_pb2.GetApiKeyResponse) -> ApiKeySummary | None:
     if msg.HasField("api_key"):
+        require_id("GetApiKey", "key_id", msg.api_key.key_id)
         return api_key_from_proto(msg.api_key)
     return None
 

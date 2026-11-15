@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import has_field, proto_enum_name
 from polyester.errors import PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
@@ -128,6 +129,8 @@ def flow_detail_from_proto(msg: lifecycle_read_pb2.FlowDetailView) -> LifecycleF
 
 
 def flows_list_from_proto(msg: lifecycle_read_pb2.ListFlowsResponse) -> LifecycleFlowsList:
+    for item in msg.flows:
+        require_id("ListFlows", "flow_id", item.flow_id)
     return LifecycleFlowsList(
         flows=[flow_summary_from_proto(item) for item in msg.flows],
         next_page_token=msg.next_page_token,
@@ -137,6 +140,8 @@ def flows_list_from_proto(msg: lifecycle_read_pb2.ListFlowsResponse) -> Lifecycl
 def flows_by_tx_list_from_proto(
     msg: lifecycle_read_pb2.ListFlowsByTxResponse,
 ) -> LifecycleFlowsList:
+    for item in msg.matches:
+        require_id("ListFlowsByTx", "flow_id", item.flow_id)
     return LifecycleFlowsList(
         flows=[flow_tx_match_from_proto(item) for item in msg.matches],
         next_page_token=msg.next_page_token,
@@ -145,6 +150,9 @@ def flows_by_tx_list_from_proto(
 
 def flow_from_get_response(msg: lifecycle_read_pb2.GetFlowResponse) -> LifecycleFlowSummary:
     if msg.HasField("flow"):
+        # The flow detail decoder is shared with the flow stream: check here.
+        if msg.flow.HasField("summary"):
+            require_id("GetFlowById", "flow_id", msg.flow.summary.flow_id)
         return flow_detail_from_proto(msg.flow)
     raise PolyesterTransportError("get flow response is missing flow")
 

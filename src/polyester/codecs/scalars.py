@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numbers
 import operator
 import re
 from collections.abc import Iterable, Mapping
@@ -44,12 +45,14 @@ def market_id(value: object, label: str) -> int:
     """
     if isinstance(value, bool):
         raise PolyesterValidationError(f"{label} must be an integer market ID, not bool")
-    try:
-        parsed = operator.index(value)  # type: ignore[arg-type]
-    except TypeError:
+    # numbers.Integral, not __index__: a float subclass may implement
+    # __index__ and would select market 8 for 8.9.
+    if not isinstance(value, numbers.Integral):
         raise PolyesterValidationError(
             f"{label} must be an integer market ID, not {type(value).__name__}"
-        ) from None
+        )
+    # operator.index, not int(): an int subclass may override __int__.
+    parsed = operator.index(value)
     if parsed < 0 or parsed > UINT32_MAX:
         raise PolyesterValidationError(f"{label} {parsed} is outside 0..{UINT32_MAX}")
     return parsed
@@ -80,6 +83,7 @@ def validate_protocol_scale(scale: int, *, field_name: str = "scale") -> int:
     """Reject scales that would panic or allocate pathological padding."""
     if isinstance(scale, bool) or not isinstance(scale, int):
         raise PolyesterValidationError(f"{field_name} must be an int")
+    scale = operator.index(scale)
     if scale < 0:
         raise PolyesterValidationError(f"{field_name} must be non-negative")
     if scale > MAX_PROTOCOL_SCALE:
@@ -198,6 +202,58 @@ def decimal_to_scaled(raw: str | Decimal, scale: int, field_name: str) -> int:
     return scaled
 
 
+_DECIMAL_INTEGER = re.compile(r"[0-9]+")
+
+
+def exact_integer(
+    value: object,
+    field_name: str,
+    *,
+    min_value: int,
+    max_value: int,
+    allow_str: bool = False,
+) -> int:
+    """Return ``value`` as the exact integer it is, or refuse it.
+
+    Accepts a :class:`numbers.Integral` other than ``bool`` (``int`` and its
+    subclasses, and NumPy integers) and, with ``allow_str``, a string of ASCII
+    decimal digits. Everything else is refused with
+    :class:`PolyesterValidationError`, never converted: a ``bool``, a ``float``
+    (even ``2.0``, and a float subclass with ``__index__``), a ``Decimal``, an
+    object that only implements ``__index__``, and any other string
+    (``"42.0"``, ``"0x10"``, ``" 42"``, ``"-1"``). So a signed or sent value is
+    always the one the caller gave. Values outside ``min_value..max_value``
+    are refused.
+    """
+    expected = "an integer or a decimal-integer string" if allow_str else "an integer"
+    if isinstance(value, bool):
+        raise PolyesterValidationError(f"{field_name} must be {expected}, not bool")
+    if isinstance(value, str):
+        if not allow_str or _DECIMAL_INTEGER.fullmatch(value) is None:
+            raise PolyesterValidationError(
+                f"{field_name} must be {expected}, not {_error_value(repr(value))}"
+            )
+        digits = value.lstrip("0") or "0"
+        if len(digits) > len(str(max_value)):
+            raise PolyesterValidationError(
+                f"{field_name} {_error_value(digits)} is outside {min_value}..{max_value}"
+            )
+        parsed = int(digits)
+    elif isinstance(value, numbers.Integral):
+        # operator.index, not int(): an int subclass may override __int__
+        # (an override returning 1 would sign nonce 42 as nonce 1).
+        parsed = operator.index(value)
+    else:
+        raise PolyesterValidationError(
+            f"{field_name} must be {expected}, not {type(value).__name__}"
+        )
+    if parsed < min_value or parsed > max_value:
+        # str() of a huge int is slow or refused, so a huge value is not repeated.
+        shown = f" {_error_value(str(parsed))}" if parsed.bit_length() <= 512 else ""
+        raise PolyesterValidationError(f"{field_name}{shown} is outside {min_value}..{max_value}")
+    return parsed
+
+
 def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> int:
     """Validate a caller-supplied integer tick count for an int64 wire field.
 
@@ -208,7 +264,7 @@ def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> i
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         raise PolyesterValidationError(f"{field_name} must be an integer")
     try:
-        parsed = int(value)
+        parsed = operator.index(value) if isinstance(value, int) else int(value)
     except ValueError as exc:
         raise PolyesterValidationError(f"{field_name} must be an integer") from exc
     if parsed < 0 or (parsed == 0 and not allow_zero):
@@ -313,7 +369,7 @@ def id_to_int(value: str | int, label: str = "id") -> int:
     if isinstance(value, bool):
         raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
     if isinstance(value, int):
-        parsed = value
+        parsed = operator.index(value)
     elif isinstance(value, str):
         if not value.strip():
             raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")

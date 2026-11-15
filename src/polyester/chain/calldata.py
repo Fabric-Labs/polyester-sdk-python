@@ -11,7 +11,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from polyester.chain._deps import require_eth_abi
+from polyester.codecs.scalars import exact_integer
 from polyester.errors import PolyesterValidationError
+
+_UINT16_MAX = 2**16 - 1
+_UINT192_MAX = 2**192 - 1
+_UINT256_MAX = 2**256 - 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,8 +97,9 @@ def encode_trading_gateway_deposit(
 
     Funding → Trading for the caller's own smart account.
     """
-    if quantity_scaled <= 0:
-        raise PolyesterValidationError("quantity_scaled must be > 0")
+    quantity_scaled = exact_integer(
+        quantity_scaled, "quantity_scaled", min_value=1, max_value=_UINT256_MAX
+    )
     to = _normalize_address(trading_gateway, field="trading_gateway")
     asset = _normalize_bytes32(u_asset_id, field="u_asset_id")
     data = _encode(
@@ -112,8 +118,9 @@ def encode_trading_gateway_deposit_to(
     quantity_scaled: int,
 ) -> ChainCall:
     """Encode ``TradingGateway.depositTo(address,bytes32,uint256)``."""
-    if quantity_scaled <= 0:
-        raise PolyesterValidationError("quantity_scaled must be > 0")
+    quantity_scaled = exact_integer(
+        quantity_scaled, "quantity_scaled", min_value=1, max_value=_UINT256_MAX
+    )
     to = _normalize_address(trading_gateway, field="trading_gateway")
     account = _normalize_address(to_account, field="to_account")
     asset = _normalize_bytes32(u_asset_id, field="u_asset_id")
@@ -139,12 +146,9 @@ def encode_funding_withdraw_to_chain(
     Funding → external chain withdraw. Destination bytes must already be encoded
     for the target chain (same as TS ``encodeWithdrawDestinationForChain``).
     """
-    if chain_id <= 0 or chain_id > 65_535:
-        raise PolyesterValidationError("chain_id must be a uint16 > 0")
-    if z_amount <= 0:
-        raise PolyesterValidationError("z_amount must be > 0")
-    if max_fee < 0:
-        raise PolyesterValidationError("max_fee must be >= 0")
+    chain_id = exact_integer(chain_id, "chain_id", min_value=1, max_value=_UINT16_MAX)
+    z_amount = exact_integer(z_amount, "z_amount", min_value=1, max_value=_UINT256_MAX)
+    max_fee = exact_integer(max_fee, "max_fee", min_value=0, max_value=_UINT256_MAX)
     if z_amount <= max_fee:
         raise PolyesterValidationError("z_amount must be greater than max_fee")
 
@@ -165,11 +169,13 @@ def encode_funding_withdraw_to_chain(
 
 def _guard_tuple(approval: GuardApproval | None) -> tuple[int, int, bytes]:
     guard = approval or GuardApproval()
-    if guard.nonce_space < 0:
-        raise PolyesterValidationError("approval.nonce_space must be >= 0")
-    if guard.deadline < 0:
-        raise PolyesterValidationError("approval.deadline must be >= 0")
-    return (guard.nonce_space, guard.deadline, guard.signature or b"")
+    nonce_space = exact_integer(
+        guard.nonce_space, "approval.nonce_space", min_value=0, max_value=_UINT192_MAX
+    )
+    deadline = exact_integer(
+        guard.deadline, "approval.deadline", min_value=0, max_value=_UINT256_MAX
+    )
+    return (nonce_space, deadline, guard.signature or b"")
 
 
 def encode_set_external_destination_allowlist_required(
@@ -250,8 +256,7 @@ def _encode_external_destinations(
     destinations: list[bytes | str],
     approval: GuardApproval | None,
 ) -> ChainCall:
-    if chain_id <= 0 or chain_id > 65_535:
-        raise PolyesterValidationError("chain_id must be a uint16 > 0")
+    chain_id = exact_integer(chain_id, "chain_id", min_value=1, max_value=_UINT16_MAX)
     if not destinations:
         raise PolyesterValidationError("destinations must be non-empty")
     to = _normalize_address(funding_account, field="funding_account")

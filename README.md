@@ -40,7 +40,9 @@ Requires **Python 3.11+**.
 | User trades | Yes |
 | Triggers | Yes |
 | Internal transfers | Yes |
+| Dust conversion | Yes |
 | Transfer history | Yes |
+| Statement export files | Yes |
 | Deposit addresses | Yes |
 | Trading / funding withdraws | Yes |
 | Zipper deposit-withdraw config | Yes |
@@ -324,7 +326,10 @@ Deposit addresses, sub-accounts and Guard Signer status need one too:
 `sub_accounts.get`), `READ_SUBACCOUNT_INVITES` (`sub_accounts.list_invites`, and
 the invites of `sub_accounts.get`) and `READ_GUARD_SIGNER_STATUS`
 (`guard_signer.get_status`). Account statements need `READ_STATEMENTS`
-(`statements.export`, `statements.export_page`); `READ_BALANCES` and
+(`statements.export`, `statements.export_page` and the statement export files);
+`CONVERT_DUST` converts dust (`dust_conversions.quote`, `dust_conversions.convert`, the
+conversion reads) and `READ_FUNDING_FLOWS` reads the account's own flows
+(`lifecycle.list_account_flows`, `lifecycle.get_account_flow`); `READ_BALANCES` and
 `READ_INTERNAL_TRANSFERS` do not grant it. A key scoped to the main account reaches the main
 account and the sub-accounts it owns; a key scoped to a sub-account reaches only
 that sub-account. `sub_accounts.get` leaves out the members and invites a key
@@ -922,7 +927,11 @@ each 30-day metric is: `status` is `complete`, `price_unavailable` (the metric i
 bound) or `incomplete_history`, with `incomplete_hours` out of 720. Both are `None` when the
 assignment carries no qualification evidence. `policy_class` uses full protobuf enum names
 (`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Rate-limit rules expose
-`vip_tier` (not `tier`).
+`vip_tier` (not `tier`). Trading limits apply per account: the root account and each
+sub-account have their own, and every API key and session that trades for an account shares
+them. Budget against `TradingRateLimits.rules` (placement first, cancellation second);
+`api_key_rules` are informational only, since trading requests are not limited per API key,
+so adding keys does not add capacity.
 
 ```python
 tiers = await client.vip.list_vip_tiers()
@@ -1123,6 +1132,46 @@ one file. `rows()` (and `parse_statement_csv`) read the columns by header name,
 so the columns a later release appends are ignored, and a statement without
 `flow_id` reads it as `""`. Amounts, fees and balances stay exact decimal
 strings; never parse them as floats.
+
+A statement says how far it is complete: `Statement.complete_through` (and each
+`StatementPage.complete_through`) is the end of the movements it covers,
+exclusive: the earliest of `end_time`, the first page's request time and the
+time through which account history was complete then. When it is before
+`end_time`, request the rest, from `complete_through` to `end_time`, later.
+
+### Statement export files
+
+For a long period, ask for the whole statement as one CSV file produced in the
+background. `statements.create_export(...)` takes the same period, asset and
+account as `export` (at most 366 days) and an `idempotency_key` of 1 to 64
+letters, digits, `.`, `_`, `:` or `-`: repeating the create with it returns the
+same export. Poll `statements.get_export(export_id=...)` until its `status` is
+`"ready"` (or `"failed"`, with `failure_reason` `"too_large"` or
+`"unavailable"`); `list_exports` and `iter_exports` list the account's exports,
+newest first. A root account has at most 5 exports queued or processing; another
+create raises `ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, which is not
+retryable: wait for one to finish. An API key needs `READ_STATEMENTS`.
+
+```python
+import asyncio
+from datetime import UTC, datetime
+
+export = await client.statements.create_export(
+    start_time=datetime(2026, 1, 1, tzinfo=UTC),
+    end_time=datetime(2027, 1, 1, tzinfo=UTC),
+    idempotency_key="statement-2026",
+)
+while export.status in ("queued", "processing"):
+    await asyncio.sleep(5)
+    export = await client.statements.get_export(export_id=export.export_id)
+print(export.status, export.movements, export.bytes, export.expires_at)
+```
+
+A ready file is downloaded over REST only, with an authenticated
+`GET /v1/statements/exports/{export_id}/file` for 7 days: `text/csv`, byte for
+byte the `export` pages for the same account, asset and period up to the
+export's `complete_through`, with `Range` and `If-Range` support. This SDK does
+not wrap the download.
 
 ## Price alerts (devnet)
 
@@ -1571,7 +1620,80 @@ SDK notes:
   API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The receipt's `flow_id` reads the transfer's lifecycle flow with
-  `client.lifecycle.get_flow(flow_id=...)`; the flow may become readable after the receipt.
+  `client.lifecycle.get_account_flow(flow_id=...)`; the flow may become readable
+  after the receipt.
+- **Several Trading → Trading transfers at once:**
+  `client.internal_transfers.batch_create(legs=[...], idempotency_key=...)` sends up
+  to 10 legs under one idempotency key and one MFA check (see below).
+- **Dust:** `client.dust_conversions` converts Trading balances too small to trade into one
+  target asset (see below).
+- **Balance history:** `client.balances.get_balance_history(range="7d")` returns one
+  exact balance per point in each series' `balance`: an `AssetAmount` at 18
+  decimals (`amount.as_decimal()`), never a float.
+
+### Batch internal transfers
+
+`internal_transfers.batch_create` takes up to 10 `InternalTransferLeg`s, each
+with the arguments of `create` except the idempotency key: `asset_id`, an exact
+`quantity` (a decimal string, `Decimal` or `AssetAmount`; never a float), one
+destination, and the source account by `account` or `sub_account_id` (legs may
+debit different accounts). Every leg is checked before any runs: if one fails,
+the batch is `"refused"` and nothing moves. Otherwise the batch is
+`"submitted"` and legs run in order, independently and not atomically, so read
+each leg's `status`: `"accepted"`, `"pending"` (outcome not known yet),
+`"refused"` (with `error_code` such as `"insufficient_funds"`) or
+`"not_submitted"`. Retry with the same key and the same legs to read pending
+legs and run the ones not yet accepted; accepted legs answer the same transfers.
+
+```python
+from polyester.models import InternalTransferLeg
+
+batch = await client.internal_transfers.batch_create(
+    idempotency_key="rebalance-2026-11-13-1",
+    legs=[
+        InternalTransferLeg(asset_id=1, quantity="0.5", destination_smart_account_address="0x…"),
+        InternalTransferLeg(
+            asset_id=3, quantity="0.001", destination_account_id="AAo8yKqygTg", account="main"
+        ),
+    ],
+)
+for leg in batch.legs:
+    print(leg.leg_index, leg.status, leg.transfer_id, leg.error_code)
+```
+
+### Dust conversion
+
+`client.dust_conversions` turns dust, Trading balances too small to trade (worth at most 10
+USD with no open market accepting them), into one target asset at index prices
+less a disclosed fee. One conversion takes at most 20 balances worth at most
+200 USD together and moves them atomically, or nothing; an account converts
+once every 6 hours. `list_balances()` previews every balance's `eligibility`
+and reserves nothing; `quote(target_asset_id=...)` prices a conversion for 30
+seconds; `convert(quote_id=..., idempotency_key=...)` converts it; `get` and
+`list` / `iter_conversions` read conversions.
+Amounts are exact `AssetAmount`s, and USD values and prices exact `Decimal`s.
+Listing needs `READ_BALANCES`; the rest needs `CONVERT_DUST`, which an API key's
+policy (and a sub-account's) must grant explicitly.
+
+```python
+import asyncio
+
+preview = await client.dust_conversions.list_balances()
+quote = await client.dust_conversions.quote(target_asset_id=preview.target_asset_id)
+if quote.quote_id:
+    conversion = await client.dust_conversions.convert(
+        quote_id=quote.quote_id, idempotency_key="dust-2026-11-14-1"
+    )
+    while conversion.state == "processing":
+        await asyncio.sleep(1)
+        conversion = await client.dust_conversions.get(conversion_id=conversion.conversion_id)
+    print(conversion.state, conversion.payout, conversion.refusal_code)
+```
+
+`ERROR_CODE_DUST_WINDOW_ACTIVE` and `ERROR_CODE_DUST_DAILY_LIMIT` mean try later
+(hours: not retryable), `ERROR_CODE_DUST_BUSY` is a retryable rate-limit error,
+and `ERROR_CODE_DUST_QUOTE_EXPIRED`, `ERROR_CODE_DUST_PRICE_MOVED` and
+`ERROR_CODE_DUST_BALANCE_CHANGED` mean quote again.
 
 API-key withdrawals always use the authenticated key's bound account or
 subaccount. The SDK's default subaccount does not change that source.
@@ -1649,11 +1771,21 @@ route accepts new deposits and new withdrawals: `deposit_status` and
 `withdrawal_status` read `"normal"`, `"suspended"`, or `""` while availability
 is not known yet, which is not available. `variant.accepts_deposits()` and
 `variant.accepts_withdrawals()` are true only for `"normal"`; the enriched
-chains of `client.catalogs.zipper` carry the same fields. A suspension can stop
-one direction and not the other, and requests made before it continue. Funds
-sent to a deposit address while deposits are suspended are delayed, not lost.
-The config is cacheable for 10 seconds; read it again to see a suspension start
-or end.
+chains of `client.catalogs.zipper` carry the same fields. `""` means the status
+is not known yet: treat it as unknown, not as suspended. A suspension can stop
+one direction and not the other. While a route's `deposit_status` is
+`"suspended"`, do not send funds to a deposit address on it; wait until it
+returns to `"normal"`. While its `withdrawal_status` is `"suspended"`, a new
+withdrawal to that network is refused with `ERROR_CODE_ROUTE_SUSPENDED`
+(`polyester.is_route_suspended`): the suspension is temporary, nothing was
+reserved for the refused request, and a fresh request is safe once the status
+is `"normal"` again. A Trading withdrawal accepted before the suspension and not
+yet sent stays pending, with its funds held, and is sent once the route returns
+to `"normal"`; one already being sent when the suspension takes effect may fail
+instead, and its funds then return to the account. An auto-withdraw run skips
+such a destination with the step reason `route_suspended`, leaving the funds for
+a later run. The config is cacheable for 10 seconds; read it again to see a
+suspension start or end.
 
 ## Public market data
 
@@ -2094,24 +2226,41 @@ Then bump the version, update `CHANGELOG.md`, build, and publish to PyPI. Instal
 
 ## Lifecycle flow lists
 
-A flow list that selects an account (`owner_account_id` or
-`smart_account_address`) returns the flows it owns and the transfers other
-accounts sent to it, such as a transfer from another user or sub-account, or a
-reward payout. Each row's `participation` says which: `"owner"` (its deposit,
-withdrawal, or a transfer it sent, including a move between its own Funding
-and Trading balances) or `"recipient"`. For a transfer, the counterparty is
-`destination_address` when the account sent it and `source_address` (with
-`owner_account_id`) when it received it. `participation=` narrows the list to
-one side; the server refuses it without an account.
+An account reads all of its own flows with the signed
+`client.lifecycle.list_account_flows(...)` and `get_account_flow(flow_id=...)`:
+the flows it owns and the transfers it receives, including those no chain
+transaction started, such as a transfer between Trading accounts or a Trading
+withdrawal not yet sent to a chain. `account=` or `sub_account_id=` selects the
+account as in [Choosing the account](#choosing-the-account). An API key needs
+`READ_FUNDING_FLOWS`. `limit` is at most 500.
+
+Each row's `participation` says how the account takes part: `"owner"` (its
+deposit, withdrawal, or a transfer it sent, including a move between its own
+Funding and Trading balances) or `"recipient"` (a transfer from another user or
+sub-account, or a reward payout). For a transfer, the counterparty is
+`destination_address` when the account sent it and `source_address` when it
+received it. `participation=` narrows the list to one side.
 
 ```python
-page = await client.lifecycle.list_flows(
-    owner_account_id="YOUR_ACCOUNT_ID", participation="recipient", limit=20
-)
+page = await client.lifecycle.list_account_flows(participation="recipient", limit=20)
+flow = await client.lifecycle.get_account_flow(flow_id=page.flows[0].intent_id)
 ```
+
+The public `list_flows`, `get_flow` and `list_flows_by_tx` read only flows a
+chain transaction started, and identify an account by its
+`smart_account_address`, the account's public identity on Polyester Chain;
+`list_flows(smart_account_address=...)` selects one account and accepts
+`participation=`, which the server refuses without an account.
 
 A page token is bound to the request it was returned for: continue with the
 same account, participation, scope and order; only `limit` may change.
+
+A deposit whose destination did not accept the credit, for example because
+deposits into it were paused, ends delivered as zTokens to the account's own
+Polyester Chain wallet (`smart_account_address`) instead: a completed flow with
+`lifecycle_reason == "zipper_deposit_delivered_to_wallet"`, the one completed
+flow that carries a reason. No Funding or Trading balance was credited, so show
+it as delivered to the wallet, not as a failure and not as credited.
 
 ## Lifecycle transaction lookups
 
@@ -2372,7 +2521,22 @@ request field to fix when the server names one; `min_floor_e18` and
 `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN` refuses a broker vault's payout to
 a destination whitelisted less than 24 hours ago: the destination is listed and
 nothing was reserved, so send it again at `payable_from` (`None` when not known
-yet). It is not retryable at once.
+yet). It is not retryable at once. `ERROR_CODE_ROUTE_SUSPENDED`
+(`polyester.ROUTE_SUSPENDED`, `polyester.is_route_suspended(err)`) refuses a new
+withdrawal to an external network whose withdrawals of the asset are
+temporarily suspended. Nothing was reserved for the refused request, so a fresh
+request is safe: submit a new one once the route's `withdrawal_status` in
+`zipper.get_deposit_withdraw_config()` is `"normal"` again. It is final and not
+retryable as is. An auto-withdraw run or a broker payout reports the same
+status with the reason `route_suspended`, next to `destination_cooling_down`.
+
+`PolyesterApiError.cause_code` and `level_index` explain a ladder refused with
+`ERROR_CODE_LADDER_LEVEL_REJECTED`: the code the refused order would return as a
+single order (for example `ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`) and that order's
+zero-based index among the ladder's orders (`0` is the first). Both are `None`
+for every other error. `PolyesterApiError.retry_at` is when a refused X/Twitter or
+Discord link change (`AUTH_SOCIAL_ACCOUNT_COOLDOWN`,
+`AUTH_SOCIAL_CHANGE_LIMIT_REACHED`) may succeed.
 
 `PolyesterApiError.violations` names the request fields to fix, each with
 `field_path`, `rule_id` and `message`: from the `orders.v1.ErrorDetail` of a

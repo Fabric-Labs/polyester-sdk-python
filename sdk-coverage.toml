@@ -160,7 +160,7 @@ reason = "Confirming a Telegram link requires an interactive session with a fres
 
 [[allowlist]]
 procedure = "/auth.v1.SocialVerificationService/UnlinkSocialAccount"
-reason = "Unlinking a social account requires an interactive session; API keys are not accepted."
+reason = "Unlinking a social account requires an interactive session (an X/Twitter or Discord unlink also a fresh MFA step-up); API keys are not accepted."
 
 [[allowlist]]
 service = "swap.quickswap.v1.QuickSwapReferralService"

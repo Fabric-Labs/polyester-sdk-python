@@ -22,6 +22,7 @@ class LifecycleReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ZIPPER_WITHDRAW_EXECUTION_FAILED: _ClassVar[LifecycleReason]
     ZIPPER_DEPOSIT_REFUND_FAILED: _ClassVar[LifecycleReason]
     ZIPPER_COMPLIANCE_TRANSFERRED: _ClassVar[LifecycleReason]
+    ZIPPER_DEPOSIT_DELIVERED_TO_WALLET: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_REJECTED: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS: _ClassVar[LifecycleReason]
     LEDGER_MIRROR_TRANSFER_EXISTS: _ClassVar[LifecycleReason]
@@ -77,6 +78,7 @@ ZIPPER_EXECUTION_REJECTED: LifecycleReason
 ZIPPER_WITHDRAW_EXECUTION_FAILED: LifecycleReason
 ZIPPER_DEPOSIT_REFUND_FAILED: LifecycleReason
 ZIPPER_COMPLIANCE_TRANSFERRED: LifecycleReason
+ZIPPER_DEPOSIT_DELIVERED_TO_WALLET: LifecycleReason
 LEDGER_MIRROR_REJECTED: LifecycleReason
 LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS: LifecycleReason
 LEDGER_MIRROR_TRANSFER_EXISTS: LifecycleReason

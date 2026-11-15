@@ -733,16 +733,20 @@ class FieldViolation(_message.Message):
     def __init__(self, field_path: _Optional[str] = ..., rule_id: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code", "violations", "rate_limit", "existing_order_id")
+    __slots__ = ("code", "violations", "rate_limit", "existing_order_id", "cause_code", "level_index")
     CODE_FIELD_NUMBER: _ClassVar[int]
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
     RATE_LIMIT_FIELD_NUMBER: _ClassVar[int]
     EXISTING_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    CAUSE_CODE_FIELD_NUMBER: _ClassVar[int]
+    LEVEL_INDEX_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     violations: _containers.RepeatedCompositeFieldContainer[FieldViolation]
     rate_limit: _types_pb2.RateLimitDetail
     existing_order_id: int
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ..., existing_order_id: _Optional[int] = ...) -> None: ...
+    cause_code: ErrorCode
+    level_index: int
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ..., existing_order_id: _Optional[int] = ..., cause_code: _Optional[_Union[ErrorCode, str]] = ..., level_index: _Optional[int] = ...) -> None: ...
 
 class RiskMarketIoc(_message.Message):
     __slots__ = ()

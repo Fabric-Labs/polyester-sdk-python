@@ -157,6 +157,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ALLOWLIST_DESTINATION_IN_USE: _ClassVar[ErrorCode]
     ALLOWLIST_CHANGE_PENDING: _ClassVar[ErrorCode]
     VAULT_ALLOWLIST_NOT_READY: _ClassVar[ErrorCode]
+    ROUTE_SUSPENDED: _ClassVar[ErrorCode]
+    INVITE_VOID: _ClassVar[ErrorCode]
 BASIS_UNSPECIFIED: QuoteBasis
 SOURCE_AMOUNT: QuoteBasis
 DESTINATION_AMOUNT: QuoteBasis
@@ -275,6 +277,8 @@ ALLOWLIST_DESTINATION_NOT_LISTED: ErrorCode
 ALLOWLIST_DESTINATION_IN_USE: ErrorCode
 ALLOWLIST_CHANGE_PENDING: ErrorCode
 VAULT_ALLOWLIST_NOT_READY: ErrorCode
+ROUTE_SUSPENDED: ErrorCode
+INVITE_VOID: ErrorCode
 
 class TokenAmount(_message.Message):
     __slots__ = ("base_units", "decimals")

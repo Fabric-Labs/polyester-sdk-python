@@ -48,6 +48,7 @@ from polyester.errors import (
     PolyesterTransportError,
     PolyesterValidationError,
     is_not_found,
+    is_trigger_already_ended,
 )
 from polyester.gen.orders.v1.orders_connect import OrdersServiceClient
 from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
@@ -101,6 +102,15 @@ if TYPE_CHECKING:
 # Trigger statuses a trigger can still fire from; stop_all_trading cancels them.
 LIVE_TRIGGER_STATUSES = ("created", "armed", "running", "paused")
 _STOP_ALL_TRIGGERS_PAGE = 1000
+_TRIGGER_NOT_FOUND = "ERROR_CODE_TRIGGER_NOT_FOUND"
+
+
+def _stop_all_already_ended(exc: Exception) -> bool:
+    """A cancel refused because the trigger or OCO, listed as live, has ended."""
+    return is_trigger_already_ended(exc) or (
+        isinstance(exc, PolyesterApiError) and exc.code == _TRIGGER_NOT_FOUND
+    )
+
 
 # GetBatchReplaceStatus keeps a batch's status this long from acceptance.
 BATCH_REPLACE_STATUS_WINDOW_SECONDS = 60.0
@@ -579,21 +589,30 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         triggers (``created``, ``armed``, ``running``, ``paused``; attached legs
         included) page by page, cancels each, and only then calls
         :meth:`cancel_all`, so an order a trigger places before its cancel is
-        still canceled. ``symbol`` limits both steps to one market.
+        still canceled. ``symbol`` limits both steps to one market. The two
+        legs of an OCO are canceled together, once, with
+        ``triggers.cancel_oco`` by their ``order_list_id``, since canceling
+        one leg ends the other.
 
         An error while listing the triggers is raised before anything is
-        canceled. A trigger whose cancel fails, for any reason, is recorded in
-        ``trigger_failures`` with its error; the other triggers are still
-        canceled and the cancel-all still runs. A trigger that ended between
-        the listing and its cancel fails with an error for which
-        :func:`~polyester.errors.is_trigger_already_ended` is true: it is done
-        already. An error from the cancel-all itself is raised.
+        canceled. A trigger or OCO whose cancel is refused because it has
+        ended since the listing (``ERROR_CODE_TRIGGER_STATUS_INVALID``, see
+        :func:`~polyester.errors.is_trigger_already_ended`, or
+        ``ERROR_CODE_TRIGGER_NOT_FOUND``), after a fill or an expiry for
+        example, is stopped, not failed. A trigger whose cancel fails for any
+        other reason is recorded in ``trigger_failures`` with its error (each
+        listed leg of an OCO whose cancel failed); the other triggers are
+        still canceled and the cancel-all still runs. An error from the
+        cancel-all itself is raised.
         """
         if self._triggers is None:
             raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
         scope = self._resolve_sub_account_id(sub_account_id, account=account)
         explicit_scope = scope if scope is not None else ""
-        trigger_ids: list[str] = []
+        # Each cancel to send, in listing order: a trigger, keyed by its ID,
+        # or an OCO, keyed by its order_list_id, with the legs listed.
+        targets: dict[tuple[str, str], list[str]] = {}
+        seen_triggers: set[str] = set()
         seen_tokens: set[str] = set()
         page_token: str | None = None
         while True:
@@ -604,7 +623,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 limit=_STOP_ALL_TRIGGERS_PAGE,
                 page_token=page_token,
             )
-            trigger_ids.extend(t.trigger_id for t in page.triggers if t.trigger_id)
+            for trigger in page.triggers:
+                if not trigger.trigger_id or trigger.trigger_id in seen_triggers:
+                    continue
+                seen_triggers.add(trigger.trigger_id)
+                if trigger.order_list_id:
+                    key = ("oco", trigger.order_list_id)
+                else:
+                    key = ("trigger", trigger.trigger_id)
+                targets.setdefault(key, []).append(trigger.trigger_id)
             if not page.next_page_token:
                 break
             if page.next_page_token in seen_tokens:
@@ -615,13 +642,21 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             page_token = page.next_page_token
         canceled: list[str] = []
         failures: list[StopAllTradingTriggerFailure] = []
-        for trigger_id in dict.fromkeys(trigger_ids):
+        for (kind, target_id), legs in targets.items():
             try:
-                await self._triggers.cancel(trigger_id=trigger_id, sub_account_id=explicit_scope)
+                if kind == "oco":
+                    await self._triggers.cancel_oco(
+                        order_list_id=target_id, sub_account_id=explicit_scope
+                    )
+                else:
+                    await self._triggers.cancel(trigger_id=target_id, sub_account_id=explicit_scope)
             except Exception as exc:
-                failures.append(StopAllTradingTriggerFailure(trigger_id=trigger_id, error=exc))
+                if not _stop_all_already_ended(exc):
+                    failures.extend(
+                        StopAllTradingTriggerFailure(trigger_id=leg, error=exc) for leg in legs
+                    )
                 continue
-            canceled.append(trigger_id)
+            canceled.extend(legs)
         cancel_all = await self.cancel_all(
             sub_account_id=explicit_scope,
             symbol=symbol,

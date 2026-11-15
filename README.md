@@ -804,11 +804,14 @@ other attached legs keep protecting the parent's filled quantity. To stop all au
 trading, `orders.stop_all_trading()` lists the live triggers (`created`,
 `armed`, `running`, `paused`, attached legs included) page by page, cancels
 each, and only then cancels all orders, so an order a trigger places before
-its cancel is still canceled; `symbol=` limits it to one market. An error
-while listing the triggers is raised before anything is canceled. A trigger
-whose cancel fails, for any reason, is recorded and the run goes on: the other
-triggers are still canceled and the cancel-all always runs; an error from the
-cancel-all itself is raised. The result has `canceled_trigger_ids`,
+its cancel is still canceled; `symbol=` limits it to one market. The two legs
+of an OCO are canceled once, together, by their `order_list_id`. An error
+while listing the triggers is raised before anything is canceled. A trigger or
+OCO that has ended since the listing (its cancel is refused
+`ERROR_CODE_TRIGGER_STATUS_INVALID` or `ERROR_CODE_TRIGGER_NOT_FOUND`) is
+stopped, not failed. A trigger whose cancel fails for any other reason is
+recorded and the run goes on: the other triggers are still canceled and the
+cancel-all always runs; an error from the cancel-all itself is raised. The result has `canceled_trigger_ids`,
 `trigger_failures` (each a `StopAllTradingTriggerFailure` with `trigger_id`
 and `error`: check them, such a trigger may still be live) and `cancel_all`.
 

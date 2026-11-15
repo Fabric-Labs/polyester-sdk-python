@@ -578,10 +578,11 @@ class StopAllTradingResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Outcome of ``orders.stop_all_trading``.
 
     ``canceled_trigger_ids`` are the live triggers whose cancel was accepted,
-    in the order they were canceled. ``trigger_failures`` are the ones whose
-    cancel failed, each with its error: a trigger that ended before its
-    cancel arrived, or any other refusal or transport error. Check it: a
-    failed trigger may still be live. ``cancel_all`` is the cancel-all that
+    in the order they were canceled, both legs of a canceled OCO included.
+    ``trigger_failures`` are the ones whose cancel failed, each with its
+    error: a refusal or transport error. Check it: a failed trigger may still
+    be live. A listed trigger that had already ended when its cancel arrived
+    is in neither list: it is stopped. ``cancel_all`` is the cancel-all that
     followed, for the open orders, those triggers placed included.
     """
 

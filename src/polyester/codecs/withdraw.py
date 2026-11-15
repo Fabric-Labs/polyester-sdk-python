@@ -66,7 +66,11 @@ def trading_withdraw_payload_to_proto(
     destination_address: str = "",
     amount_scale: int | None = None,
 ) -> withdraw_pb2.TradingWithdrawIntentPayload:
-    if not idempotency_key.strip():
+    # Signed exactly as given, never trimmed: the contract only requires a
+    # non-empty key.
+    if not isinstance(idempotency_key, str):
+        raise PolyesterValidationError("idempotency_key must be a string")
+    if not idempotency_key:
         raise PolyesterValidationError("idempotency_key is required")
     action_aliases = {
         "to_funding": withdraw_pb2.TO_FUNDING,

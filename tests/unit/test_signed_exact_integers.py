@@ -438,3 +438,31 @@ def test_user_operation_nonce_key_kept_exact(key: Any, expected: int) -> None:
     account._rpc.request = request  # type: ignore[method-assign]
     account.get_nonce(key=key)
     assert int(calls[0][-48:], 16) == expected
+
+
+# --- idempotency key: signed exactly as given ---------------------------------
+
+
+def test_withdraw_idempotency_key_rule_is_the_contracts() -> None:
+    from polyester.gen.buf.validate import validate_pb2
+
+    field = withdraw_pb2.TradingWithdrawIntentPayload.DESCRIPTOR.fields_by_name["idempotency_key"]
+    rules = field.GetOptions().Extensions[validate_pb2.field]
+    # Only a minimum length: the SDK refuses an empty key and nothing else.
+    assert str(rules.string).strip() == "min_len: 1"
+
+
+@pytest.mark.parametrize("key", [" wd-x ", "wd-x", "  ", "\t", "é"])
+def test_withdraw_idempotency_key_is_signed_unchanged(key: str) -> None:
+    assert _payload(idempotency_key=key).idempotency_key == key
+    prepared = _client().trading_withdraws.prepare_api_key_to_funding(
+        asset_id=2, quantity="1", idempotency_key=key, deadline_ts_sec=DEADLINE, nonce=42
+    )
+    request = withdraw_pb2.CreateTradingWithdrawRequest.FromString(prepared.request_bytes)
+    assert request.payload.idempotency_key == key
+
+
+@pytest.mark.parametrize("key", ["", None, 42, b"wd-x"])
+def test_withdraw_idempotency_key_refuses_empty_and_non_strings(key: Any) -> None:
+    with pytest.raises(PolyesterValidationError, match="idempotency_key"):
+        _payload(idempotency_key=key)

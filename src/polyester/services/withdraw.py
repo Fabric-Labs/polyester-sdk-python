@@ -46,7 +46,7 @@ def _validate_prepared_request(request: withdraw_pb2.CreateTradingWithdrawReques
         raise PolyesterValidationError("prepared withdraw request has invalid deadline_ts_sec")
     if not payload.HasField("nonce") or _u128_value(payload.nonce) <= 0:
         raise PolyesterValidationError("prepared withdraw request has invalid nonce")
-    if not payload.idempotency_key.strip():
+    if not payload.idempotency_key:
         raise PolyesterValidationError("prepared withdraw request is missing idempotency_key")
     if payload.action == withdraw_pb2.TO_FUNDING and payload.destination_chain_id != 0:
         raise PolyesterValidationError(

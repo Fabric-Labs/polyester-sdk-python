@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from google.protobuf.message import Message
 
+from polyester.codecs.ledger_amounts import LEDGER_SCALE
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name, u128_to_str
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.models import (
     AssetBalance,
@@ -12,6 +14,7 @@ from polyester.models import (
     EquityHistory,
     EquityHistorySeries,
 )
+from polyester.types.money import AssetAmount, QuantityDomain
 
 _BALANCE_RANGE_LABELS: dict[int, str] = {
     ledger_read_pb2.DAY_1: "1d",
@@ -50,22 +53,43 @@ def balances_list_from_proto(msg: ledger_read_pb2.GetBalancesResponse) -> Balanc
     return BalancesList(balances=[asset_balance_from_proto(item) for item in msg.balances])
 
 
+def ledger_amount(scaled: int, asset_id: int | None) -> AssetAmount:
+    """An exact 18-decimal ledger amount, as ``AssetAmount`` (domain ``ledger_e18``)."""
+    return AssetAmount(
+        scaled=scaled, scale=LEDGER_SCALE, domain=QuantityDomain.LEDGER_E18, asset_id=asset_id
+    )
+
+
 def balance_history_series_from_proto(msg: ledger_read_pb2.BalanceSeries) -> BalanceHistorySeries:
+    asset_id = int(msg.asset_id)
     return BalanceHistorySeries(
-        asset_id=int(msg.asset_id),
+        asset_id=asset_id,
         account_code=int(msg.account_code),
-        balance_q=[int(v) for v in msg.balance_q],
+        # Exact integers: (hi << 64) | lo, never a float.
+        balance=[ledger_amount((int(v.hi) << 64) | int(v.lo), asset_id) for v in msg.balance],
     )
 
 
 def balance_history_from_proto(msg: ledger_read_pb2.GetBalanceHistoryResponse) -> BalanceHistory:
+    points = int(msg.points)
+    series = [balance_history_series_from_proto(item) for item in msg.series]
+    for item in series:
+        # Each series holds one balance per point. A server on an older
+        # contract sends its balances in a field this SDK no longer reads, so
+        # an empty series must not read as a history without balances.
+        if len(item.balance) != points:
+            raise PolyesterResponseContractError(
+                "GetBalanceHistory",
+                f"series of asset {item.asset_id} has {len(item.balance)} balances "
+                f"for {points} points",
+            )
     return BalanceHistory(
         range=_balance_range_label(msg.range),
         bucket=msg.bucket,
         start_ts_sec=int(msg.start_ts_sec),
         end_ts_sec=int(msg.end_ts_sec),
-        points=int(msg.points),
-        series=[balance_history_series_from_proto(item) for item in msg.series],
+        points=points,
+        series=series,
     )
 
 

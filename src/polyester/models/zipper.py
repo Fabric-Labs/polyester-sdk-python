@@ -33,10 +33,16 @@ class ZipperAssetChainVariant(msgspec.Struct, kw_only=True, omit_defaults=True):
     source_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     z_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     # Whether this route accepts new deposits and new withdrawals: "normal",
-    # "suspended", or "" while availability is not known, which is not
-    # available. A status this SDK does not know reads as its decimal string.
-    # A suspension can stop one direction and not the other; funds sent to a
-    # deposit address while deposits are suspended are delayed, not lost.
+    # "suspended", or "" while the status is not known yet, which is unknown,
+    # not suspended. A status this SDK does not know reads as its decimal
+    # string. A suspension can stop one direction and not the other. While
+    # deposit_status is "suspended", do not send funds to a deposit address on
+    # this route; wait until it returns to "normal". While withdrawal_status is
+    # "suspended", a new withdrawal is refused with ERROR_CODE_ROUTE_SUSPENDED;
+    # a Trading withdrawal accepted before the suspension and not yet sent
+    # stays pending, with its funds held, and is sent once the route returns
+    # to "normal" (one already being sent may fail instead, and its funds then
+    # return to the account).
     deposit_status: str = ""
     withdrawal_status: str = ""
 
@@ -122,10 +128,16 @@ class ZipperEnrichedAssetChain(msgspec.Struct, kw_only=True, omit_defaults=True)
     source_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     z_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     # Whether this route accepts new deposits and new withdrawals: "normal",
-    # "suspended", or "" while availability is not known, which is not
-    # available. A status this SDK does not know reads as its decimal string.
-    # A suspension can stop one direction and not the other; funds sent to a
-    # deposit address while deposits are suspended are delayed, not lost.
+    # "suspended", or "" while the status is not known yet, which is unknown,
+    # not suspended. A status this SDK does not know reads as its decimal
+    # string. A suspension can stop one direction and not the other. While
+    # deposit_status is "suspended", do not send funds to a deposit address on
+    # this route; wait until it returns to "normal". While withdrawal_status is
+    # "suspended", a new withdrawal is refused with ERROR_CODE_ROUTE_SUSPENDED;
+    # a Trading withdrawal accepted before the suspension and not yet sent
+    # stays pending, with its funds held, and is sent once the route returns
+    # to "normal" (one already being sent may fail instead, and its funds then
+    # return to the account).
     deposit_status: str = ""
     withdrawal_status: str = ""
 

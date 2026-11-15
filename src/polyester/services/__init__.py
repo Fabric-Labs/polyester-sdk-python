@@ -6,6 +6,7 @@ from polyester.services.balances import AsyncBalancesService
 from polyester.services.chain_analytics import AsyncChainAnalyticsService
 from polyester.services.changelog import AsyncChangelogService
 from polyester.services.deposit import AsyncDepositService
+from polyester.services.dust_conversions import AsyncDustConversionsService
 from polyester.services.fees import AsyncFeeService
 from polyester.services.guard_signer import AsyncGuardSignerService
 from polyester.services.heatmap import AsyncHeatmapService
@@ -38,6 +39,7 @@ __all__ = [
     "AsyncBalancesService",
     "AsyncChainAnalyticsService",
     "AsyncDepositService",
+    "AsyncDustConversionsService",
     "AsyncFeeService",
     "AsyncGuardSignerService",
     "AsyncHeatmapService",

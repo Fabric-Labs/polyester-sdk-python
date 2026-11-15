@@ -28,6 +28,7 @@ from polyester.services import (
     AsyncChainAnalyticsService,
     AsyncChangelogService,
     AsyncDepositService,
+    AsyncDustConversionsService,
     AsyncFeeService,
     AsyncGuardSignerService,
     AsyncHeatmapService,
@@ -389,8 +390,11 @@ class SyncHeatmapService(_SyncSubscribeService):
 class SyncLifecycleService(_SyncSubscribeService):
     """``Polyester`` view of :class:`~polyester.services.AsyncLifecycleService`."""
 
+    get_account_flow = call(AsyncLifecycleService.get_account_flow)
     get_flow = call(AsyncLifecycleService.get_flow)
     get_flow_by_tx = call(AsyncLifecycleService.get_flow_by_tx)
+    iter_account_flows = iterate(AsyncLifecycleService.iter_account_flows)
+    list_account_flows = call(AsyncLifecycleService.list_account_flows)
     list_flows = call(AsyncLifecycleService.list_flows)
     list_flows_by_tx = call(AsyncLifecycleService.list_flows_by_tx)
     subscribe_flow_detail = call(AsyncLifecycleService.subscribe_flow_detail)
@@ -617,8 +621,12 @@ class SyncTransfersService(_SyncSubscribeService):
 class SyncStatementsService(_SyncService):
     """``Polyester`` view of :class:`~polyester.services.AsyncStatementsService`."""
 
+    create_export = call(AsyncStatementsService.create_export)
     export = call(AsyncStatementsService.export)
     export_page = call(AsyncStatementsService.export_page)
+    get_export = call(AsyncStatementsService.get_export)
+    iter_exports = iterate(AsyncStatementsService.iter_exports)
+    list_exports = call(AsyncStatementsService.list_exports)
 
 
 class SyncSystemService(_SyncService):
@@ -632,7 +640,19 @@ class SyncSystemService(_SyncService):
 class SyncInternalTransfersService(_SyncService):
     """``Polyester`` view of :class:`~polyester.services.AsyncInternalTransfersService`."""
 
+    batch_create = call(AsyncInternalTransfersService.batch_create)
     create = call(AsyncInternalTransfersService.create)
+
+
+class SyncDustConversionsService(_SyncService):
+    """``Polyester`` view of :class:`~polyester.services.AsyncDustConversionsService`."""
+
+    convert = call(AsyncDustConversionsService.convert)
+    get = call(AsyncDustConversionsService.get)
+    iter_conversions = iterate(AsyncDustConversionsService.iter_conversions)
+    list = call(AsyncDustConversionsService.list)
+    list_balances = call(AsyncDustConversionsService.list_balances)
+    quote = call(AsyncDustConversionsService.quote)
 
 
 class SyncDepositService(_SyncService):

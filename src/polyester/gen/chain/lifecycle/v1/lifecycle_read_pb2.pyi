@@ -136,14 +136,13 @@ class ListFlowsByTxRequest(_message.Message):
     def __init__(self, tx_hash: _Optional[str] = ..., lookup_kind: _Optional[_Union[TxLookupKind, str]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListFlowsRequest(_message.Message):
-    __slots__ = ("limit", "sort", "flow_kind", "flow_state", "tx_ref", "scope", "owner_account_id", "smart_account_address", "polyester_chain_ids", "zipped_asset_ids", "unified_asset_ids", "page_token", "order_by", "participation")
+    __slots__ = ("limit", "sort", "flow_kind", "flow_state", "tx_ref", "scope", "smart_account_address", "polyester_chain_ids", "zipped_asset_ids", "unified_asset_ids", "page_token", "order_by", "participation")
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     SORT_FIELD_NUMBER: _ClassVar[int]
     FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
     FLOW_STATE_FIELD_NUMBER: _ClassVar[int]
     TX_REF_FIELD_NUMBER: _ClassVar[int]
     SCOPE_FIELD_NUMBER: _ClassVar[int]
-    OWNER_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     POLYESTER_CHAIN_IDS_FIELD_NUMBER: _ClassVar[int]
     ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
@@ -157,7 +156,6 @@ class ListFlowsRequest(_message.Message):
     flow_state: _types_pb2.FlowState
     tx_ref: str
     scope: ListScope
-    owner_account_id: int
     smart_account_address: str
     polyester_chain_ids: _containers.RepeatedScalarFieldContainer[int]
     zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
@@ -165,7 +163,7 @@ class ListFlowsRequest(_message.Message):
     page_token: str
     order_by: ListOrderBy
     participation: FlowParticipation
-    def __init__(self, limit: _Optional[int] = ..., sort: _Optional[_Union[Sort, str]] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., flow_state: _Optional[_Union[_types_pb2.FlowState, str]] = ..., tx_ref: _Optional[str] = ..., scope: _Optional[_Union[ListScope, str]] = ..., owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., polyester_chain_ids: _Optional[_Iterable[int]] = ..., zipped_asset_ids: _Optional[_Iterable[int]] = ..., unified_asset_ids: _Optional[_Iterable[int]] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[ListOrderBy, str]] = ..., participation: _Optional[_Union[FlowParticipation, str]] = ...) -> None: ...
+    def __init__(self, limit: _Optional[int] = ..., sort: _Optional[_Union[Sort, str]] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., flow_state: _Optional[_Union[_types_pb2.FlowState, str]] = ..., tx_ref: _Optional[str] = ..., scope: _Optional[_Union[ListScope, str]] = ..., smart_account_address: _Optional[str] = ..., polyester_chain_ids: _Optional[_Iterable[int]] = ..., zipped_asset_ids: _Optional[_Iterable[int]] = ..., unified_asset_ids: _Optional[_Iterable[int]] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[ListOrderBy, str]] = ..., participation: _Optional[_Union[FlowParticipation, str]] = ...) -> None: ...
 
 class ListFlowsResponse(_message.Message):
     __slots__ = ("flows", "next_page_token")
@@ -175,8 +173,60 @@ class ListFlowsResponse(_message.Message):
     next_page_token: str
     def __init__(self, flows: _Optional[_Iterable[_Union[FlowSummaryView, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
+class ListAccountFlowsRequest(_message.Message):
+    __slots__ = ("subaccount_id", "limit", "sort", "flow_kind", "flow_state", "tx_ref", "scope", "polyester_chain_ids", "zipped_asset_ids", "unified_asset_ids", "page_token", "order_by", "participation")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    SORT_FIELD_NUMBER: _ClassVar[int]
+    FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
+    FLOW_STATE_FIELD_NUMBER: _ClassVar[int]
+    TX_REF_FIELD_NUMBER: _ClassVar[int]
+    SCOPE_FIELD_NUMBER: _ClassVar[int]
+    POLYESTER_CHAIN_IDS_FIELD_NUMBER: _ClassVar[int]
+    ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    UNIFIED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    ORDER_BY_FIELD_NUMBER: _ClassVar[int]
+    PARTICIPATION_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    limit: int
+    sort: Sort
+    flow_kind: _types_pb2.FlowKind
+    flow_state: _types_pb2.FlowState
+    tx_ref: str
+    scope: ListScope
+    polyester_chain_ids: _containers.RepeatedScalarFieldContainer[int]
+    zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    unified_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    page_token: str
+    order_by: ListOrderBy
+    participation: FlowParticipation
+    def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., sort: _Optional[_Union[Sort, str]] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., flow_state: _Optional[_Union[_types_pb2.FlowState, str]] = ..., tx_ref: _Optional[str] = ..., scope: _Optional[_Union[ListScope, str]] = ..., polyester_chain_ids: _Optional[_Iterable[int]] = ..., zipped_asset_ids: _Optional[_Iterable[int]] = ..., unified_asset_ids: _Optional[_Iterable[int]] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[ListOrderBy, str]] = ..., participation: _Optional[_Union[FlowParticipation, str]] = ...) -> None: ...
+
+class ListAccountFlowsResponse(_message.Message):
+    __slots__ = ("flows", "next_page_token")
+    FLOWS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    flows: _containers.RepeatedCompositeFieldContainer[FlowSummaryView]
+    next_page_token: str
+    def __init__(self, flows: _Optional[_Iterable[_Union[FlowSummaryView, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class GetAccountFlowRequest(_message.Message):
+    __slots__ = ("subaccount_id", "flow_id")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    FLOW_ID_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    flow_id: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., flow_id: _Optional[str] = ...) -> None: ...
+
+class GetAccountFlowResponse(_message.Message):
+    __slots__ = ("flow",)
+    FLOW_FIELD_NUMBER: _ClassVar[int]
+    flow: FlowDetailView
+    def __init__(self, flow: _Optional[_Union[FlowDetailView, _Mapping]] = ...) -> None: ...
+
 class FlowTxMatchView(_message.Message):
-    __slots__ = ("flow_id", "flow_kind", "source_tx_hash", "latest_tx_ref", "tx_occurrence_index", "source_domain", "destination_domain", "current_step", "is_open", "is_terminal", "asset_ids", "polyester_chain_id", "amount_e18", "source_address", "destination_address", "lifecycle_reason", "last_activity_at_unix_ms", "owner_account_id", "smart_account_address", "zipper_reason")
+    __slots__ = ("flow_id", "flow_kind", "source_tx_hash", "latest_tx_ref", "tx_occurrence_index", "source_domain", "destination_domain", "current_step", "is_open", "is_terminal", "asset_ids", "polyester_chain_id", "amount_e18", "source_address", "destination_address", "lifecycle_reason", "last_activity_at_unix_ms", "smart_account_address", "zipper_reason")
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
     SOURCE_TX_HASH_FIELD_NUMBER: _ClassVar[int]
@@ -194,7 +244,6 @@ class FlowTxMatchView(_message.Message):
     DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     LIFECYCLE_REASON_FIELD_NUMBER: _ClassVar[int]
     LAST_ACTIVITY_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
-    OWNER_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     ZIPPER_REASON_FIELD_NUMBER: _ClassVar[int]
     flow_id: str
@@ -214,10 +263,9 @@ class FlowTxMatchView(_message.Message):
     destination_address: str
     lifecycle_reason: _types_pb2.LifecycleReason
     last_activity_at_unix_ms: int
-    owner_account_id: int
     smart_account_address: str
     zipper_reason: _reason_pb2.ZipperReasonDetails
-    def __init__(self, flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., source_tx_hash: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., lifecycle_reason: _Optional[_Union[_types_pb2.LifecycleReason, str]] = ..., last_activity_at_unix_ms: _Optional[int] = ..., owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., zipper_reason: _Optional[_Union[_reason_pb2.ZipperReasonDetails, _Mapping]] = ...) -> None: ...
+    def __init__(self, flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., source_tx_hash: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., lifecycle_reason: _Optional[_Union[_types_pb2.LifecycleReason, str]] = ..., last_activity_at_unix_ms: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., zipper_reason: _Optional[_Union[_reason_pb2.ZipperReasonDetails, _Mapping]] = ...) -> None: ...
 
 class ListFlowsByTxResponse(_message.Message):
     __slots__ = ("tx_hash", "matches", "next_page_token")
@@ -230,8 +278,7 @@ class ListFlowsByTxResponse(_message.Message):
     def __init__(self, tx_hash: _Optional[str] = ..., matches: _Optional[_Iterable[_Union[FlowTxMatchView, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class FlowSummaryView(_message.Message):
-    __slots__ = ("owner_account_id", "smart_account_address", "flow_id", "flow_kind", "current_step", "asset_ids", "polyester_chain_id", "amount_e18", "request_fee", "source_tx_hash", "tx_occurrence_index", "source_address", "destination_address", "latest_tx_ref", "source_domain", "destination_domain", "latest_lifecycle_source", "lifecycle_reason", "zipper_reason", "started_at_unix_ms", "updated_at_unix_ms", "terminal_at_unix_ms", "last_activity_at_unix_ms", "is_open", "is_terminal", "current_step_sequence", "current_progress", "progress_timeline", "estimated_completion_unix_ms", "is_delayed", "participation")
-    OWNER_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("smart_account_address", "flow_id", "flow_kind", "current_step", "asset_ids", "polyester_chain_id", "amount_e18", "request_fee", "source_tx_hash", "tx_occurrence_index", "source_address", "destination_address", "latest_tx_ref", "source_domain", "destination_domain", "latest_lifecycle_source", "lifecycle_reason", "zipper_reason", "started_at_unix_ms", "updated_at_unix_ms", "terminal_at_unix_ms", "last_activity_at_unix_ms", "is_open", "is_terminal", "current_step_sequence", "current_progress", "progress_timeline", "estimated_completion_unix_ms", "is_delayed", "participation")
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     FLOW_KIND_FIELD_NUMBER: _ClassVar[int]
@@ -262,7 +309,6 @@ class FlowSummaryView(_message.Message):
     ESTIMATED_COMPLETION_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     IS_DELAYED_FIELD_NUMBER: _ClassVar[int]
     PARTICIPATION_FIELD_NUMBER: _ClassVar[int]
-    owner_account_id: int
     smart_account_address: str
     flow_id: str
     flow_kind: _types_pb2.FlowKind
@@ -293,7 +339,7 @@ class FlowSummaryView(_message.Message):
     estimated_completion_unix_ms: int
     is_delayed: bool
     participation: FlowParticipation
-    def __init__(self, owner_account_id: _Optional[int] = ..., smart_account_address: _Optional[str] = ..., flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., request_fee: _Optional[_Union[_types_pb2.RequestFee, _Mapping]] = ..., source_tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., latest_lifecycle_source: _Optional[_Union[_types_pb2.LifecycleSource, str]] = ..., lifecycle_reason: _Optional[_Union[_types_pb2.LifecycleReason, str]] = ..., zipper_reason: _Optional[_Union[_reason_pb2.ZipperReasonDetails, _Mapping]] = ..., started_at_unix_ms: _Optional[int] = ..., updated_at_unix_ms: _Optional[int] = ..., terminal_at_unix_ms: _Optional[int] = ..., last_activity_at_unix_ms: _Optional[int] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., current_step_sequence: _Optional[int] = ..., current_progress: _Optional[_Union[FlowSummaryProgressView, _Mapping]] = ..., progress_timeline: _Optional[_Iterable[_Union[FlowTimelineItemView, _Mapping]]] = ..., estimated_completion_unix_ms: _Optional[int] = ..., is_delayed: _Optional[bool] = ..., participation: _Optional[_Union[FlowParticipation, str]] = ...) -> None: ...
+    def __init__(self, smart_account_address: _Optional[str] = ..., flow_id: _Optional[str] = ..., flow_kind: _Optional[_Union[_types_pb2.FlowKind, str]] = ..., current_step: _Optional[_Union[FlowStep, str]] = ..., asset_ids: _Optional[_Union[_types_pb2.AssetIds, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., request_fee: _Optional[_Union[_types_pb2.RequestFee, _Mapping]] = ..., source_tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., source_address: _Optional[str] = ..., destination_address: _Optional[str] = ..., latest_tx_ref: _Optional[str] = ..., source_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., destination_domain: _Optional[_Union[_types_pb2.FlowDomain, str]] = ..., latest_lifecycle_source: _Optional[_Union[_types_pb2.LifecycleSource, str]] = ..., lifecycle_reason: _Optional[_Union[_types_pb2.LifecycleReason, str]] = ..., zipper_reason: _Optional[_Union[_reason_pb2.ZipperReasonDetails, _Mapping]] = ..., started_at_unix_ms: _Optional[int] = ..., updated_at_unix_ms: _Optional[int] = ..., terminal_at_unix_ms: _Optional[int] = ..., last_activity_at_unix_ms: _Optional[int] = ..., is_open: _Optional[bool] = ..., is_terminal: _Optional[bool] = ..., current_step_sequence: _Optional[int] = ..., current_progress: _Optional[_Union[FlowSummaryProgressView, _Mapping]] = ..., progress_timeline: _Optional[_Iterable[_Union[FlowTimelineItemView, _Mapping]]] = ..., estimated_completion_unix_ms: _Optional[int] = ..., is_delayed: _Optional[bool] = ..., participation: _Optional[_Union[FlowParticipation, str]] = ...) -> None: ...
 
 class FlowSummaryProgressView(_message.Message):
     __slots__ = ("current_step_started_at_unix_ms", "current_step_expected_duration_ms", "current_confirmations", "required_confirmations", "approve_count", "reject_count", "validator_count", "required_approvals", "required_rejections")

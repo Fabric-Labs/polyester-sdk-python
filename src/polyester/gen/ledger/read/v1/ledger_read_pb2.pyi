@@ -55,6 +55,11 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_WALLET_NOT_FOUND: _ClassVar[ErrorCode]
     ERROR_CODE_UPSTREAM_ERROR: _ClassVar[ErrorCode]
     ERROR_CODE_INVALID_SUBACCOUNT_ID: _ClassVar[ErrorCode]
+    ERROR_CODE_IDEMPOTENCY_KEY_REUSED: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_EXPORT_NOT_READY: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_EXPORT_EXPIRED: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_EXPORT_FAILED: _ClassVar[ErrorCode]
 RANGE_UNSPECIFIED: BalanceRange
 DAY_1: BalanceRange
 DAY_7: BalanceRange
@@ -84,6 +89,11 @@ ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE: ErrorCode
 ERROR_CODE_WALLET_NOT_FOUND: ErrorCode
 ERROR_CODE_UPSTREAM_ERROR: ErrorCode
 ERROR_CODE_INVALID_SUBACCOUNT_ID: ErrorCode
+ERROR_CODE_IDEMPOTENCY_KEY_REUSED: ErrorCode
+ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED: ErrorCode
+ERROR_CODE_STATEMENT_EXPORT_NOT_READY: ErrorCode
+ERROR_CODE_STATEMENT_EXPORT_EXPIRED: ErrorCode
+ERROR_CODE_STATEMENT_EXPORT_FAILED: ErrorCode
 
 class GetBalancesRequest(_message.Message):
     __slots__ = ("subaccount_id",)
@@ -128,14 +138,14 @@ class GetBalanceHistoryRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., range: _Optional[_Union[BalanceRange, str]] = ..., ledger: _Optional[int] = ..., account_codes: _Optional[_Iterable[_Union[_catalog_pb2.AccountCode, str]]] = ...) -> None: ...
 
 class BalanceSeries(_message.Message):
-    __slots__ = ("asset_id", "account_code", "balance_q")
+    __slots__ = ("asset_id", "account_code", "balance")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_CODE_FIELD_NUMBER: _ClassVar[int]
-    BALANCE_Q_FIELD_NUMBER: _ClassVar[int]
+    BALANCE_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     account_code: _catalog_pb2.AccountCode
-    balance_q: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, asset_id: _Optional[int] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., balance_q: _Optional[_Iterable[int]] = ...) -> None: ...
+    balance: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    def __init__(self, asset_id: _Optional[int] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., balance: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ...) -> None: ...
 
 class GetBalanceHistoryResponse(_message.Message):
     __slots__ = ("range", "bucket", "start_ts_sec", "end_ts_sec", "points", "series")
@@ -258,14 +268,14 @@ class PortfolioAccountEquity(_message.Message):
     def __init__(self, account_id: _Optional[int] = ..., equity_q: _Optional[int] = ..., top_asset_ids: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class PortfolioAssetEquity(_message.Message):
-    __slots__ = ("asset_id", "balance_q", "equity_q")
+    __slots__ = ("asset_id", "balance", "equity_q")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    BALANCE_Q_FIELD_NUMBER: _ClassVar[int]
+    BALANCE_FIELD_NUMBER: _ClassVar[int]
     EQUITY_Q_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
-    balance_q: int
+    balance: _u128_pb2.U128
     equity_q: int
-    def __init__(self, asset_id: _Optional[int] = ..., balance_q: _Optional[int] = ..., equity_q: _Optional[int] = ...) -> None: ...
+    def __init__(self, asset_id: _Optional[int] = ..., balance: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., equity_q: _Optional[int] = ...) -> None: ...
 
 class GetPortfolioEquitySnapshotRequest(_message.Message):
     __slots__ = ()
@@ -374,12 +384,14 @@ class ExportStatementRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ExportStatementResponse(_message.Message):
-    __slots__ = ("csv", "next_page_token")
+    __slots__ = ("csv", "next_page_token", "complete_through")
     CSV_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    COMPLETE_THROUGH_FIELD_NUMBER: _ClassVar[int]
     csv: str
     next_page_token: str
-    def __init__(self, csv: _Optional[str] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    complete_through: _timestamp_pb2.Timestamp
+    def __init__(self, csv: _Optional[str] = ..., next_page_token: _Optional[str] = ..., complete_through: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
     __slots__ = ("code",)

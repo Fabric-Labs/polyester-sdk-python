@@ -218,14 +218,28 @@ async def test_create_oco_without_an_id_sends_a_generated_one(oco_client, kwargs
     assert first.client_list_id == ids[0]
 
 
+# Refused on every path since the contract adopted the client order ID rule:
+# outer spaces, inner spaces, other punctuation, non-ASCII, a decomposed accent.
+REFUSED_CLIENT_LIST_IDS = [
+    "  my oco  ",
+    "my oco",
+    "a b+c=d",
+    "ordre-été",
+    "cafe\u0301",
+    "\ud800",
+]
+
+
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"client_list_id": ""}, "client_list_id must be 1 to 36 bytes in UTF-8; got 0"),
-        ({"client_list_id": "x" * 37}, "client_list_id must be 1 to 36 bytes in UTF-8; got 37"),
-        # 19 characters, 38 bytes: the limit counts bytes.
-        ({"client_list_id": "é" * 19}, "client_list_id must be 1 to 36 bytes in UTF-8; got 38"),
-        ({"client_list_id": "\ud800"}, "client_list_id must be valid UTF-8"),
+        ({"client_list_id": ""}, "client_list_id must be 1 to 36 characters"),
+        ({"client_list_id": "x" * 37}, "client_list_id must be 1 to 36 characters"),
+        *(
+            ({"client_list_id": value}, "client_list_id contains invalid characters")
+            for value in REFUSED_CLIENT_LIST_IDS
+        ),
+        ({"client_list_id": 7}, "client_list_id must be a string"),
         ({"side": "short"}, "side must be buy or sell"),
         ({"self_trade_prevention_mode": "decrease"}, "self_trade_prevention_mode"),
         ({"take_profit": {"trigger_price": "110000", "order_type": "limit"}}, "limit_price"),
@@ -246,20 +260,17 @@ async def test_create_oco_refuses_bad_input_before_sending(oco_client, overrides
     assert server.seen == []
 
 
-# Any characters within 36 bytes in UTF-8, sent exactly as given: not stripped,
-# not normalized, not limited to ASCII.
+# The client order ID rule, sent exactly as given.
 CONTRACT_CLIENT_LIST_IDS = [
-    "ordre-été-✓",
-    "é" * 18,  # 36 bytes
+    "tp-sl:btc/2026-11-15_1",
     "x" * 36,
-    "  my oco  ",
-    "a b+c=d",
-    "cafe\u0301",  # decomposed, kept decomposed
+    "A",
+    "a.b_c:d/e-f",
 ]
 
 
 @pytest.mark.parametrize("client_list_id", CONTRACT_CLIENT_LIST_IDS)
-async def test_create_oco_sends_any_id_within_36_bytes_unchanged(
+async def test_create_oco_sends_a_client_order_id_rule_id_unchanged(
     oco_client, client_list_id
 ) -> None:
     client, server = oco_client
@@ -474,8 +485,12 @@ async def test_list_filters_by_oco(oco_client) -> None:
     [
         ({"order_list_id": 0}, "order_list_id must be a non-zero"),
         ({"order_list_id": "1"}, "order_list_id must be a non-zero"),
-        ({"client_list_id": ""}, "client_list_id must be 1 to 36 bytes in UTF-8; got 0"),
-        ({"client_list_id": "é" * 19}, "client_list_id must be 1 to 36 bytes in UTF-8; got 38"),
+        ({"client_list_id": ""}, "client_list_id must be 1 to 36 characters"),
+        ({"client_list_id": "x" * 37}, "client_list_id must be 1 to 36 characters"),
+        *(
+            ({"client_list_id": value}, "client_list_id contains invalid characters")
+            for value in REFUSED_CLIENT_LIST_IDS
+        ),
     ],
 )
 async def test_list_refuses_a_bad_oco_filter_before_sending(oco_client, kwargs, message) -> None:
@@ -487,7 +502,7 @@ async def test_list_refuses_a_bad_oco_filter_before_sending(oco_client, kwargs, 
 
 
 @pytest.mark.parametrize("client_list_id", CONTRACT_CLIENT_LIST_IDS)
-async def test_list_sends_any_client_list_id_within_36_bytes_unchanged(
+async def test_list_sends_a_client_order_id_rule_client_list_id_unchanged(
     oco_client, client_list_id
 ) -> None:
     client, server = oco_client

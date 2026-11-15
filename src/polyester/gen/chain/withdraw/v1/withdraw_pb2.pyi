@@ -67,6 +67,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_ROUTE_UNSUPPORTED: _ClassVar[ErrorCode]
     ERROR_CODE_VERSION_CONFLICT: _ClassVar[ErrorCode]
     ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN: _ClassVar[ErrorCode]
+    ERROR_CODE_ROUTE_SUSPENDED: _ClassVar[ErrorCode]
 
 class TradingWithdrawAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -133,6 +134,7 @@ ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR: ErrorCode
 ERROR_CODE_ROUTE_UNSUPPORTED: ErrorCode
 ERROR_CODE_VERSION_CONFLICT: ErrorCode
 ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN: ErrorCode
+ERROR_CODE_ROUTE_SUSPENDED: ErrorCode
 ACTION_UNSPECIFIED: TradingWithdrawAction
 TO_FUNDING: TradingWithdrawAction
 TO_EXTERNAL_CHAIN: TradingWithdrawAction

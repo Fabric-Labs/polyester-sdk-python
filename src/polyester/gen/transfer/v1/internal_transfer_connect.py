@@ -24,6 +24,9 @@ class InternalTransferService(Protocol):
     async def create_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def batch_create_internal_transfers(self, request: transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class InternalTransferServiceASGIApplication(ConnectASGIApplication[InternalTransferService]):
     def __init__(self, service: InternalTransferService | AsyncGenerator[InternalTransferService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -49,6 +52,16 @@ class InternalTransferServiceASGIApplication(ConnectASGIApplication[InternalTran
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.create_internal_transfer,
+                ),
+                "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers": Endpoint.unary(
+                    method=MethodInfo(
+                        name="BatchCreateInternalTransfers",
+                        service_name="transfer.v1.InternalTransferService",
+                        input=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest,
+                        output=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.batch_create_internal_transfers,
                 ),
             },
             interceptors=interceptors,
@@ -104,6 +117,26 @@ class InternalTransferServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def batch_create_internal_transfers(
+        self,
+        request: transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="BatchCreateInternalTransfers",
+                service_name="transfer.v1.InternalTransferService",
+                input=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest,
+                output=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -112,6 +145,8 @@ class InternalTransferServiceSync(Protocol):
     def get_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_internal_transfer(self, request: transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def batch_create_internal_transfers(self, request: transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -138,6 +173,16 @@ class InternalTransferServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.create_internal_transfer,
+                ),
+                "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="BatchCreateInternalTransfers",
+                        service_name="transfer.v1.InternalTransferService",
+                        input=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest,
+                        output=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.batch_create_internal_transfers,
                 ),
             },
             interceptors=interceptors,
@@ -187,6 +232,26 @@ class InternalTransferServiceClientSync(ConnectClientSync):
                 service_name="transfer.v1.InternalTransferService",
                 input=transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferRequest,
                 output=transfer_dot_v1_dot_internal__transfer__pb2.CreateInternalTransferResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def batch_create_internal_transfers(
+        self,
+        request: transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="BatchCreateInternalTransfers",
+                service_name="transfer.v1.InternalTransferService",
+                input=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest,
+                output=transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

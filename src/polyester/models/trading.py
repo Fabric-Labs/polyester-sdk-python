@@ -54,7 +54,11 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     on the order book at a time; ``hidden_qty`` is the part of ``leaves_qty``
     the book does not show, so the book shows ``leaves_qty - hidden_qty``.
     Both are zero for a plain order, and ``hidden_qty`` is zero once the order
-    has ended. A replace keeps the display.
+    has ended. Lowering an iceberg's quantity in place to its display or below
+    keeps its queue priority and shows all of it (``hidden_qty`` zero). A
+    replace keeps the display while the new quantity is above it; otherwise
+    the new order is a plain limit order with ``display_qty`` zero, and it
+    stays plain.
     """
 
     order_id: str
@@ -493,22 +497,30 @@ class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     latest_step: str = ""
     is_open: bool = False
     is_terminal: bool = False
-    owner_account_id: str = ""
+    # The account the flow belongs to, by its public identity on Polyester
+    # Chain: its smart account address.
     smart_account_address: str = ""
+    # Why the flow ended or stalled, as a lowercase label such as
+    # "zipper_validation_rejected"; "unspecified" when there is none. One
+    # completed flow carries a reason too: "zipper_deposit_delivered_to_wallet",
+    # a deposit delivered as zTokens to the account's own Polyester Chain
+    # wallet (``smart_account_address``) instead of its Funding or Trading
+    # balance, which was not credited. It is a completed outcome, not a
+    # failure. A reason newer than this SDK reads "unknown_reason_<n>".
     lifecycle_reason: str = "unspecified"
     zipper_reason: ZipperReasonDetails | None = None
     # True when an open flow has made no progress for well beyond its expected
     # step time. Always false for terminal flows and transaction lookups.
     is_delayed: bool = False
-    # How the selected account takes part in the flow, on a list_flows row of a
-    # list that selects an account: "owner" (its deposit, withdrawal or a
-    # transfer it sent, including a move between its own balances) or
-    # "recipient" (a transfer another account sent to it). "unspecified" on an
-    # unscoped list, a flow detail and a realtime update; empty on a
-    # transaction lookup.
+    # How the selected account takes part in the flow, on a row of a list_flows
+    # that selects an account, of list_account_flows and of get_account_flow:
+    # "owner" (its deposit, withdrawal or a transfer it sent, including a move
+    # between its own balances) or "recipient" (a transfer another account sent
+    # to it). "unspecified" on an unscoped list, get_flow and a realtime
+    # update; empty on a transaction lookup.
     participation: str = ""
     # For a transfer, the counterparty is destination_address when the account
-    # sent it and source_address (with owner_account_id) when it received it.
+    # sent it and source_address when it received it.
     source_address: str = ""
     destination_address: str = ""
 
@@ -828,6 +840,90 @@ class InternalTransferResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     flow_id: str = ""
 
 
+class InternalTransferLeg(msgspec.Struct, kw_only=True):
+    """One transfer of :meth:`internal_transfers.batch_create
+    <polyester.services.AsyncInternalTransfersService.batch_create>`.
+
+    It takes the arguments of ``internal_transfers.create`` except the
+    idempotency key, which the batch carries: ``asset_id``, ``quantity`` (a
+    decimal string, ``Decimal`` or ``AssetAmount`` in whole units of the
+    asset, or at ``quantity_scale``; never a float), exactly one destination,
+    and the source account by ``account`` or ``sub_account_id``, resolved as
+    for ``create``: with neither, the client's default sub-account. Legs of
+    one batch may debit different source accounts.
+    """
+
+    asset_id: int
+    quantity: str | Decimal | AssetAmount
+    destination_account_id: str | int | None = None
+    destination_subaccount_id: str | int | None = None
+    destination_smart_account_address: str | None = None
+    sub_account_id: str | int | None = None
+    account: str | dict[str, Any] | None = None
+    quantity_scale: int | None = None
+
+
+class InternalTransferBatchLegResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The outcome of one leg of a batch, in request order.
+
+    ``status`` is ``"accepted"`` (the transfer has a durable ``transfer_id``),
+    ``"pending"`` (the outcome is not known yet; the transfer runs to its
+    outcome without the caller: retry the batch with the same idempotency key
+    to read it), ``"refused"`` (no funds moved; ``error_code`` says why) or
+    ``"not_submitted"`` (the leg did not run: its batch was refused, or the
+    request ended before the leg started; a retry with the same key runs it).
+    ``error_code`` is the transfer error as a lowercase label without the
+    ``ERROR_CODE_`` prefix, such as ``"insufficient_funds"``; "" for an
+    accepted or not-submitted leg, and ``"UNKNOWN_ERROR_CODE(n)"`` for a code
+    this SDK does not know. ``accepted_at_ts_ns`` is the acceptance time in
+    nanoseconds since the Unix epoch, ``None`` before the leg is accepted.
+    ``quantity`` is the echoed amount, exact at 18 decimals. ``destination``
+    is the destination the server resolved for the leg, ``None`` when the
+    reply carries none.
+    """
+
+    leg_index: int = 0
+    status: str = ""
+    request_id: str = ""
+    transfer_id: str = ""
+    flow_id: str = ""
+    accepted_at_ts_ns: int | None = None
+    asset_id: int = 0
+    asset_code: str = ""
+    quantity: AssetAmount | None = None
+    destination: ResolvedDestination | None = None
+    error_code: str = ""
+    error_message: str = ""
+
+
+class ResolvedDestination(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The destination the server resolved for a transfer: the destination's
+    root account public ID, its sub-account public ID when the transfer
+    targets one, and its smart account address. Each is "" when the server
+    does not name it."""
+
+    root_account_public_id: str = ""
+    subaccount_public_id: str = ""
+    smart_account_address: str = ""
+
+
+class InternalTransferBatchResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The receipt of a batch of internal transfers.
+
+    ``status`` is ``"submitted"`` (every leg passed its checks; legs then ran
+    in order and independently, and are not atomic: read each leg) or
+    ``"refused"`` (at least one leg failed its checks, so no leg ran, no funds
+    moved and no step-up was used; the failed legs are ``"refused"``, the
+    others ``"not_submitted"``). ``request_id`` is the batch's identifier,
+    "" when it was refused. ``legs`` holds one result per requested leg, in
+    request order.
+    """
+
+    request_id: str = ""
+    status: str = ""
+    legs: list[InternalTransferBatchLegResult] = []
+
+
 class DepositAddress(msgspec.Struct, kw_only=True, omit_defaults=True):
     chain_id: int = 0
     deposit_address: str = ""
@@ -883,9 +979,19 @@ class TriggerEventsList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class BalanceHistorySeries(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One asset's balance in one account bucket over the history window.
+
+    ``balance`` holds the exact balance at each point, aligned 1:1 with the
+    response's points (``points`` of them, from ``start_ts_sec`` every
+    ``bucket``): an :class:`~polyester.types.money.AssetAmount` in 18-decimal
+    ledger units (``scale`` 18, domain ``ledger_e18``) for ``asset_id``. Read
+    whole units with ``amount.as_decimal()`` or ``amount.format()``; never
+    through a float.
+    """
+
     asset_id: int = 0
     account_code: int = 0
-    balance_q: list[int] = []
+    balance: list[AssetAmount] = []
 
 
 class BalanceHistory(msgspec.Struct, kw_only=True, omit_defaults=True):

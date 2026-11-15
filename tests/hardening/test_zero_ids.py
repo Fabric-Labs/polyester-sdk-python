@@ -383,4 +383,6 @@ async def test_zero_account_id_arguments_are_refused(zero: str | int) -> None:
             http,
             "destination_subaccount_id",
         )
-        await _refused(client.lifecycle.list_flows(owner_account_id=zero), http, "owner_account_id")
+        await _refused(
+            client.lifecycle.list_account_flows(sub_account_id=zero), http, "sub_account_id"
+        )

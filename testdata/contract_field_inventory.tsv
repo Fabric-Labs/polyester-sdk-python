@@ -1,0 +1,155 @@
+# Every field of the request and reply messages public contract 1945423c
+# added or changed, and of the messages nested in their new replies. A guard
+# test walks these messages and fails when a field is missing here or listed
+# but gone, or when a covered name is not an attribute of the named model, so
+# no field of them is dropped by accident.
+#
+# covered: the SDK argument (request) or model attribute (reply) that carries it.
+# omitted: not exposed, with the reason.
+#
+# field	class	SDK name or reason
+auth.v1.AuthErrorDetail.code	covered	PolyesterApiError.code
+auth.v1.AuthErrorDetail.message	covered	PolyesterApiError.message
+auth.v1.AuthErrorDetail.retry_after	covered	PolyesterApiError.retry_at
+chain.lifecycle.v1.GetAccountFlowRequest.flow_id	covered	lifecycle.get_account_flow flow_id
+chain.lifecycle.v1.GetAccountFlowRequest.subaccount_id	covered	lifecycle.get_account_flow account, sub_account_id
+chain.lifecycle.v1.GetAccountFlowResponse.flow	covered	LifecycleFlowSummary (the flow's summary; detail steps are not modelled, as for get_flow)
+chain.lifecycle.v1.ListAccountFlowsRequest.flow_kind	covered	lifecycle.list_account_flows flow_kind
+chain.lifecycle.v1.ListAccountFlowsRequest.flow_state	covered	lifecycle.list_account_flows flow_state
+chain.lifecycle.v1.ListAccountFlowsRequest.limit	covered	lifecycle.list_account_flows limit
+chain.lifecycle.v1.ListAccountFlowsRequest.order_by	covered	lifecycle.list_account_flows order_by
+chain.lifecycle.v1.ListAccountFlowsRequest.page_token	covered	lifecycle.list_account_flows page_token
+chain.lifecycle.v1.ListAccountFlowsRequest.participation	covered	lifecycle.list_account_flows participation
+chain.lifecycle.v1.ListAccountFlowsRequest.polyester_chain_ids	covered	lifecycle.list_account_flows polyester_chain_ids
+chain.lifecycle.v1.ListAccountFlowsRequest.scope	covered	lifecycle.list_account_flows scope
+chain.lifecycle.v1.ListAccountFlowsRequest.sort	covered	lifecycle.list_account_flows reversed
+chain.lifecycle.v1.ListAccountFlowsRequest.subaccount_id	covered	lifecycle.list_account_flows account, sub_account_id
+chain.lifecycle.v1.ListAccountFlowsRequest.tx_ref	covered	lifecycle.list_account_flows tx_ref
+chain.lifecycle.v1.ListAccountFlowsRequest.unified_asset_ids	covered	lifecycle.list_account_flows unified_asset_ids
+chain.lifecycle.v1.ListAccountFlowsRequest.zipped_asset_ids	covered	lifecycle.list_account_flows zipped_asset_ids
+chain.lifecycle.v1.ListAccountFlowsResponse.flows	covered	LifecycleFlowsList.flows
+chain.lifecycle.v1.ListAccountFlowsResponse.next_page_token	covered	LifecycleFlowsList.next_page_token
+ledger.read.v1.BalanceSeries.account_code	covered	BalanceHistorySeries.account_code
+ledger.read.v1.BalanceSeries.asset_id	covered	BalanceHistorySeries.asset_id
+ledger.read.v1.BalanceSeries.balance	covered	BalanceHistorySeries.balance
+ledger.read.v1.CreateStatementExportRequest.asset_id	covered	statements.create_export asset_id
+ledger.read.v1.CreateStatementExportRequest.end_time	covered	statements.create_export end_time
+ledger.read.v1.CreateStatementExportRequest.idempotency_key	covered	statements.create_export idempotency_key
+ledger.read.v1.CreateStatementExportRequest.start_time	covered	statements.create_export start_time
+ledger.read.v1.CreateStatementExportRequest.subaccount_id	covered	statements.create_export account, sub_account_id
+ledger.read.v1.CreateStatementExportResponse.export	covered	StatementExport
+ledger.read.v1.ExportStatementResponse.complete_through	covered	StatementPage.complete_through
+ledger.read.v1.ExportStatementResponse.csv	covered	StatementPage.csv
+ledger.read.v1.ExportStatementResponse.next_page_token	covered	StatementPage.next_page_token
+ledger.read.v1.GetBalanceHistoryResponse.bucket	covered	BalanceHistory.bucket
+ledger.read.v1.GetBalanceHistoryResponse.end_ts_sec	covered	BalanceHistory.end_ts_sec
+ledger.read.v1.GetBalanceHistoryResponse.points	covered	BalanceHistory.points
+ledger.read.v1.GetBalanceHistoryResponse.range	covered	BalanceHistory.range
+ledger.read.v1.GetBalanceHistoryResponse.series	covered	BalanceHistory.series
+ledger.read.v1.GetBalanceHistoryResponse.start_ts_sec	covered	BalanceHistory.start_ts_sec
+ledger.read.v1.GetStatementExportRequest.export_id	covered	statements.get_export export_id
+ledger.read.v1.GetStatementExportResponse.export	covered	StatementExport
+ledger.read.v1.ListStatementExportsRequest.limit	covered	statements.list_exports limit
+ledger.read.v1.ListStatementExportsRequest.page_token	covered	statements.list_exports page_token
+ledger.read.v1.ListStatementExportsRequest.subaccount_id	covered	statements.list_exports account, sub_account_id
+ledger.read.v1.ListStatementExportsResponse.exports	covered	StatementExportsPage.exports
+ledger.read.v1.ListStatementExportsResponse.next_page_token	covered	StatementExportsPage.next_page_token
+ledger.read.v1.StatementExport.asset_id	covered	StatementExport.asset_id
+ledger.read.v1.StatementExport.bytes	covered	StatementExport.bytes
+ledger.read.v1.StatementExport.complete_through	covered	StatementExport.complete_through
+ledger.read.v1.StatementExport.created_at	covered	StatementExport.created_at
+ledger.read.v1.StatementExport.end_time	covered	StatementExport.end_time
+ledger.read.v1.StatementExport.expires_at	covered	StatementExport.expires_at
+ledger.read.v1.StatementExport.export_id	covered	StatementExport.export_id
+ledger.read.v1.StatementExport.failure_reason	covered	StatementExport.failure_reason
+ledger.read.v1.StatementExport.idempotency_key	covered	StatementExport.idempotency_key
+ledger.read.v1.StatementExport.movements	covered	StatementExport.movements
+ledger.read.v1.StatementExport.ready_at	covered	StatementExport.ready_at
+ledger.read.v1.StatementExport.start_time	covered	StatementExport.start_time
+ledger.read.v1.StatementExport.status	covered	StatementExport.status
+ledger.read.v1.StatementExport.subaccount_id	covered	StatementExport.subaccount_id
+orders.v1.ErrorDetail.cause_code	covered	PolyesterApiError.cause_code, PolyesterRateLimitError.cause_code
+orders.v1.ErrorDetail.code	covered	PolyesterApiError.code, PolyesterValidationError.code, PolyesterRateLimitError.code
+orders.v1.ErrorDetail.existing_order_id	covered	PolyesterApiError.existing_order_id
+orders.v1.ErrorDetail.level_index	covered	PolyesterApiError.level_index, PolyesterRateLimitError.level_index
+orders.v1.ErrorDetail.rate_limit	covered	PolyesterRateLimitError.detail
+orders.v1.ErrorDetail.violations	covered	PolyesterApiError.violations, PolyesterValidationError.violations
+transfer.v1.BatchCreateInternalTransfersRequest.idempotency_key	covered	internal_transfers.batch_create idempotency_key
+transfer.v1.BatchCreateInternalTransfersRequest.legs	covered	internal_transfers.batch_create legs
+transfer.v1.BatchCreateInternalTransfersResponse.legs	covered	InternalTransferBatchResult.legs
+transfer.v1.BatchCreateInternalTransfersResponse.request_id	covered	InternalTransferBatchResult.request_id
+transfer.v1.BatchCreateInternalTransfersResponse.status	covered	InternalTransferBatchResult.status
+transfer.v1.CreateDustConversionRequest.idempotency_key	covered	dust_conversions.convert idempotency_key
+transfer.v1.CreateDustConversionRequest.quote_id	covered	dust_conversions.convert quote_id
+transfer.v1.CreateDustConversionRequest.subaccount_id	covered	dust_conversions.convert account, sub_account_id
+transfer.v1.CreateDustConversionResponse.conversion	covered	DustConversion
+transfer.v1.DustAssetPrice.as_of	covered	DustAssetPrice.as_of
+transfer.v1.DustAssetPrice.asset_id	covered	DustAssetPrice.asset_id
+transfer.v1.DustAssetPrice.price_scale	covered	DustAssetPrice.price_scale, price
+transfer.v1.DustAssetPrice.price_ticks	covered	DustAssetPrice.price_ticks, price
+transfer.v1.DustBalance.amount_e18	covered	DustBalance.quantity
+transfer.v1.DustBalance.asset_id	covered	DustBalance.asset_id
+transfer.v1.DustBalance.eligibility	covered	DustBalance.eligibility
+transfer.v1.DustBalance.usd_value_e18	covered	DustBalance.usd_value
+transfer.v1.DustConversion.completed_at	covered	DustConversion.completed_at
+transfer.v1.DustConversion.conversion_id	covered	DustConversion.conversion_id
+transfer.v1.DustConversion.created_at	covered	DustConversion.created_at
+transfer.v1.DustConversion.fee_bps	covered	DustConversion.fee_bps
+transfer.v1.DustConversion.fee_e18	covered	DustConversion.fee
+transfer.v1.DustConversion.payout_e18	covered	DustConversion.payout
+transfer.v1.DustConversion.quote_id	covered	DustConversion.quote_id
+transfer.v1.DustConversion.quoted_payout_e18	covered	DustConversion.quoted_payout
+transfer.v1.DustConversion.refusal_code	covered	DustConversion.refusal_code
+transfer.v1.DustConversion.sources	covered	DustConversion.sources
+transfer.v1.DustConversion.state	covered	DustConversion.state
+transfer.v1.DustConversion.target_asset_id	covered	DustConversion.target_asset_id
+transfer.v1.DustSource.amount_e18	covered	DustSource.quantity
+transfer.v1.DustSource.asset_id	covered	DustSource.asset_id
+transfer.v1.GetDustConversionRequest.conversion_id	covered	dust_conversions.get conversion_id
+transfer.v1.GetDustConversionRequest.subaccount_id	covered	dust_conversions.get account, sub_account_id
+transfer.v1.GetDustConversionResponse.conversion	covered	DustConversion
+transfer.v1.InternalTransferBatchLeg.amount_e18	covered	InternalTransferLeg.quantity, quantity_scale
+transfer.v1.InternalTransferBatchLeg.asset_id	covered	InternalTransferLeg.asset_id
+transfer.v1.InternalTransferBatchLeg.destination_account_id	covered	InternalTransferLeg.destination_account_id
+transfer.v1.InternalTransferBatchLeg.destination_smart_account_address	covered	InternalTransferLeg.destination_smart_account_address
+transfer.v1.InternalTransferBatchLeg.destination_subaccount_id	covered	InternalTransferLeg.destination_subaccount_id
+transfer.v1.InternalTransferBatchLeg.subaccount_id	covered	InternalTransferLeg.account, sub_account_id
+transfer.v1.InternalTransferBatchLegResult.accepted_at_ts_ns	covered	InternalTransferBatchLegResult.accepted_at_ts_ns
+transfer.v1.InternalTransferBatchLegResult.amount_e18	covered	InternalTransferBatchLegResult.quantity
+transfer.v1.InternalTransferBatchLegResult.asset_code	covered	InternalTransferBatchLegResult.asset_code
+transfer.v1.InternalTransferBatchLegResult.asset_id	covered	InternalTransferBatchLegResult.asset_id
+transfer.v1.InternalTransferBatchLegResult.destination	covered	InternalTransferBatchLegResult.destination
+transfer.v1.InternalTransferBatchLegResult.error_code	covered	InternalTransferBatchLegResult.error_code
+transfer.v1.InternalTransferBatchLegResult.error_message	covered	InternalTransferBatchLegResult.error_message
+transfer.v1.InternalTransferBatchLegResult.flow_id	covered	InternalTransferBatchLegResult.flow_id
+transfer.v1.InternalTransferBatchLegResult.leg_index	covered	InternalTransferBatchLegResult.leg_index
+transfer.v1.InternalTransferBatchLegResult.request_id	covered	InternalTransferBatchLegResult.request_id
+transfer.v1.InternalTransferBatchLegResult.status	covered	InternalTransferBatchLegResult.status
+transfer.v1.InternalTransferBatchLegResult.transfer_id	covered	InternalTransferBatchLegResult.transfer_id
+transfer.v1.ListDustBalancesRequest.subaccount_id	covered	dust_conversions.list_balances account, sub_account_id
+transfer.v1.ListDustBalancesRequest.target_asset_id	covered	dust_conversions.list_balances target_asset_id
+transfer.v1.ListDustBalancesResponse.balances	covered	DustBalances.balances
+transfer.v1.ListDustBalancesResponse.fee_bps	covered	DustBalances.fee_bps
+transfer.v1.ListDustBalancesResponse.gross_usd_e18	covered	DustBalances.gross_usd
+transfer.v1.ListDustBalancesResponse.payout_e18	covered	DustBalances.payout
+transfer.v1.ListDustBalancesResponse.target_asset_id	covered	DustBalances.target_asset_id
+transfer.v1.ListDustBalancesResponse.target_available	covered	DustBalances.target_available
+transfer.v1.ListDustBalancesResponse.targets	covered	DustBalances.targets
+transfer.v1.ListDustConversionsRequest.limit	covered	dust_conversions.list limit
+transfer.v1.ListDustConversionsRequest.page_token	covered	dust_conversions.list page_token
+transfer.v1.ListDustConversionsRequest.subaccount_id	covered	dust_conversions.list account, sub_account_id
+transfer.v1.ListDustConversionsResponse.conversions	covered	DustConversionsPage.conversions
+transfer.v1.ListDustConversionsResponse.next_page_token	covered	DustConversionsPage.next_page_token
+transfer.v1.QuoteDustConversionRequest.subaccount_id	covered	dust_conversions.quote account, sub_account_id
+transfer.v1.QuoteDustConversionRequest.target_asset_id	covered	dust_conversions.quote target_asset_id
+transfer.v1.QuoteDustConversionResponse.balances	covered	DustQuote.balances
+transfer.v1.QuoteDustConversionResponse.expires_at	covered	DustQuote.expires_at
+transfer.v1.QuoteDustConversionResponse.fee_bps	covered	DustQuote.fee_bps
+transfer.v1.QuoteDustConversionResponse.gross_usd_e18	covered	DustQuote.gross_usd
+transfer.v1.QuoteDustConversionResponse.payout_e18	covered	DustQuote.payout
+transfer.v1.QuoteDustConversionResponse.prices	covered	DustQuote.prices
+transfer.v1.QuoteDustConversionResponse.quote_id	covered	DustQuote.quote_id
+transfer.v1.QuoteDustConversionResponse.target_asset_id	covered	DustQuote.target_asset_id
+transfer.v1.ResolvedDestination.root_account_public_id	covered	ResolvedDestination.root_account_public_id
+transfer.v1.ResolvedDestination.smart_account_address	covered	ResolvedDestination.smart_account_address
+transfer.v1.ResolvedDestination.subaccount_public_id	covered	ResolvedDestination.subaccount_public_id

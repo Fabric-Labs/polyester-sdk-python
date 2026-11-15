@@ -24,4 +24,4 @@ async def test_balances_get_balance_history(live_client):
     for series in result.series:
         assert series.asset_id >= 0
         assert series.account_code >= 0
-        assert len(series.balance_q) <= result.points
+        assert len(series.balance) == result.points

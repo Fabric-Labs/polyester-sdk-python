@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from google.protobuf.message import Message
 
+from polyester.codecs.decode.balances import ledger_amount
 from polyester.codecs.decode.invariants import (
     ts_ns_string_from_response,
 )
@@ -773,12 +774,33 @@ def _balance_range_label(value: Any) -> str:
 
 
 def decode_balance_history_series(data: dict[str, Any]) -> BalanceHistorySeries:
-    balance_q = _field(data, "balanceQ", "balance_q", default=[]) or []
+    asset_id = int(_field(data, "assetId", "asset_id", default=0) or 0)
+    balances = _field(data, "balance", default=[]) or []
     return BalanceHistorySeries(
-        asset_id=int(_field(data, "assetId", "asset_id", default=0) or 0),
+        asset_id=asset_id,
         account_code=int(_field(data, "accountCode", "account_code", default=0) or 0),
-        balance_q=[int(v) for v in balance_q],
+        balance=[ledger_amount(_u128_json(item), asset_id) for item in balances],
     )
+
+
+def _u128_json(value: Any) -> int:
+    """A ``polyester.type.v1.U128`` in proto JSON (``{"hi": "..", "lo": ".."}``,
+    zero halves omitted), as the exact integer it encodes."""
+    if not isinstance(value, dict):
+        raise PolyesterResponseContractError("U128", "expected an object with hi and lo")
+    halves = []
+    for key in ("hi", "lo"):
+        raw = value.get(key, 0)
+        if isinstance(raw, bool) or not isinstance(raw, int | str):
+            raise PolyesterResponseContractError("U128", f"{key} is not an integer")
+        text = str(raw)
+        if not text.isascii() or not text.isdigit():
+            raise PolyesterResponseContractError("U128", f"{key} is not an unsigned integer")
+        half = int(text)
+        if half >= 1 << 64:
+            raise PolyesterResponseContractError("U128", f"{key} exceeds 64 bits")
+        halves.append(half)
+    return (halves[0] << 64) | halves[1]
 
 
 def decode_balance_history(data: dict[str, Any]) -> BalanceHistory:
@@ -787,12 +809,20 @@ def decode_balance_history(data: dict[str, Any]) -> BalanceHistory:
         for item in _field(data, "series", default=[]) or []
         if isinstance(item, dict)
     ]
+    points = int(_field(data, "points", default=0) or 0)
+    for item in series:
+        if len(item.balance) != points:
+            raise PolyesterResponseContractError(
+                "GetBalanceHistory",
+                f"series of asset {item.asset_id} has {len(item.balance)} balances "
+                f"for {points} points",
+            )
     return BalanceHistory(
         range=_balance_range_label(_field(data, "range")),
         bucket=str(_field(data, "bucket", default="") or ""),
         start_ts_sec=int(_field(data, "startTsSec", "start_ts_sec", default=0) or 0),
         end_ts_sec=int(_field(data, "endTsSec", "end_ts_sec", default=0) or 0),
-        points=int(_field(data, "points", default=0) or 0),
+        points=points,
         series=series,
     )
 

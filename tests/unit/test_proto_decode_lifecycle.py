@@ -21,7 +21,6 @@ def test_flow_summary_from_proto() -> None:
         current_step=lifecycle_read_pb2.FLOW_STEP_SETTLEMENT,
         is_open=False,
         is_terminal=True,
-        owner_account_id=99,
         smart_account_address="0xabc",
     )
     flow = flow_summary_from_proto(msg)
@@ -29,7 +28,7 @@ def test_flow_summary_from_proto() -> None:
     assert flow.flow_kind == "deposit"
     assert flow.latest_step == "settlement"
     assert flow.is_terminal is True
-    assert flow.owner_account_id
+    assert not hasattr(flow, "owner_account_id")
     assert flow.smart_account_address == "0xabc"
     assert flow.lifecycle_reason == "unspecified"
     assert flow.zipper_reason is None

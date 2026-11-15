@@ -22,7 +22,6 @@ def _response() -> bytes:
             lr.FlowSummaryView(
                 flow_id="sent",
                 flow_kind=types_pb2.KIND_TRANSFER,
-                owner_account_id=7,
                 participation=lr.PARTICIPATION_OWNER,
                 source_address=_SELF,
                 destination_address="0x00000000000000000000000000000000000000b2",
@@ -30,7 +29,6 @@ def _response() -> bytes:
             lr.FlowSummaryView(
                 flow_id="received",
                 flow_kind=types_pb2.KIND_TRANSFER,
-                owner_account_id=9,
                 participation=lr.PARTICIPATION_RECIPIENT,
                 source_address="0x00000000000000000000000000000000000000c3",
                 destination_address=_SELF,
@@ -55,7 +53,7 @@ async def _list(httpserver: HTTPServer, **kwargs):
 
 
 async def test_rows_carry_participation_and_counterparty_addresses(httpserver: HTTPServer) -> None:
-    page, sent = await _list(httpserver, owner_account_id="8", limit=10)
+    page, sent = await _list(httpserver, smart_account_address=_SELF, limit=10)
     assert sent.participation == lifecycle_read_pb2.PARTICIPATION_UNSPECIFIED
     sent_row, received, future = page.flows
     assert sent_row.participation == "owner"
@@ -78,9 +76,9 @@ async def test_rows_carry_participation_and_counterparty_addresses(httpserver: H
 async def test_participation_filter_is_sent(
     httpserver: HTTPServer, label: str | None, expected: int
 ) -> None:
-    _, sent = await _list(httpserver, owner_account_id="8", participation=label)
+    _, sent = await _list(httpserver, smart_account_address=_SELF, participation=label)
     assert sent.participation == expected
-    assert sent.owner_account_id != 0
+    assert sent.smart_account_address == _SELF
 
 
 async def test_unknown_participation_is_refused_before_sending(httpserver: HTTPServer) -> None:
@@ -88,7 +86,7 @@ async def test_unknown_participation_is_refused_before_sending(httpserver: HTTPS
     try:
         with pytest.raises(PolyesterValidationError):
             await AsyncLifecycleService(transport).list_flows(
-                owner_account_id="8", participation="sender"
+                smart_account_address=_SELF, participation="sender"
             )
     finally:
         await transport.aclose()

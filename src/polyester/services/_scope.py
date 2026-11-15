@@ -126,10 +126,7 @@ def resolve_account_id(value: str | int | None, default: str | int | None) -> st
 
 def lifecycle_account_fields(msg: Any) -> dict[str, str]:
     fields: dict[str, str] = {}
-    owner_account_id = int(getattr(msg, "owner_account_id", 0) or 0)
     smart_account_address = str(getattr(msg, "smart_account_address", "") or "")
-    if owner_account_id:
-        fields["owner_account_id"] = format_id(owner_account_id)
     if smart_account_address:
         fields["smart_account_address"] = smart_account_address
     return fields

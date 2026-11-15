@@ -23,6 +23,7 @@ from polyester._sync_services import (
     SyncChainAnalyticsService,
     SyncChangelogService,
     SyncDepositService,
+    SyncDustConversionsService,
     SyncFeeService,
     SyncGuardSignerService,
     SyncHeatmapService,
@@ -85,6 +86,7 @@ from polyester.services import (
     AsyncChainAnalyticsService,
     AsyncChangelogService,
     AsyncDepositService,
+    AsyncDustConversionsService,
     AsyncFeeService,
     AsyncGuardSignerService,
     AsyncHeatmapService,
@@ -270,7 +272,11 @@ class AsyncPolyester:
             realtime=self.realtime,
             wait_for_catalogs=catalog_wait,
         )
-        self.lifecycle = AsyncLifecycleService(self._transport, realtime=self.realtime)
+        self.lifecycle = AsyncLifecycleService(
+            self._transport,
+            realtime=self.realtime,
+            default_sub_account_id=default_sub_account_id,
+        )
         self.balances = AsyncBalancesService(
             self._transport,
             self.catalogs,
@@ -320,6 +326,7 @@ class AsyncPolyester:
         )
         self.statements = AsyncStatementsService(self._transport, default_sub_account_id)
         self.deposit = AsyncDepositService(self._transport, default_sub_account_id)
+        self.dust_conversions = AsyncDustConversionsService(self._transport, default_sub_account_id)
         self.fees = AsyncFeeService(
             self._transport,
             default_sub_account_id,
@@ -676,6 +683,7 @@ class Polyester:
         self.statements = SyncStatementsService(loop, client.statements)
         self._system = SyncSystemService(loop, client._system)
         self.deposit = SyncDepositService(loop, client.deposit)
+        self.dust_conversions = SyncDustConversionsService(loop, client.dust_conversions)
         self.fees = SyncFeeService(loop, client.fees)
         self.api_keys = SyncApiKeysService(loop, client.api_keys, subscriptions)
         self.policies = SyncPoliciesService(loop, client.policies, subscriptions)

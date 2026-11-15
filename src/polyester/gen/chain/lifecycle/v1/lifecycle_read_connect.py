@@ -27,6 +27,12 @@ class LifecycleReadService(Protocol):
     async def list_flows_by_tx(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsByTxRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsByTxResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_account_flows(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_account_flow(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class LifecycleReadServiceASGIApplication(ConnectASGIApplication[LifecycleReadService]):
     def __init__(self, service: LifecycleReadService | AsyncGenerator[LifecycleReadService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -62,6 +68,26 @@ class LifecycleReadServiceASGIApplication(ConnectASGIApplication[LifecycleReadSe
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_flows_by_tx,
+                ),
+                "/chain.lifecycle.v1.LifecycleReadService/ListAccountFlows": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListAccountFlows",
+                        service_name="chain.lifecycle.v1.LifecycleReadService",
+                        input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest,
+                        output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_account_flows,
+                ),
+                "/chain.lifecycle.v1.LifecycleReadService/GetAccountFlow": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetAccountFlow",
+                        service_name="chain.lifecycle.v1.LifecycleReadService",
+                        input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest,
+                        output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_account_flow,
                 ),
             },
             interceptors=interceptors,
@@ -137,6 +163,46 @@ class LifecycleReadServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def list_account_flows(
+        self,
+        request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListAccountFlows",
+                service_name="chain.lifecycle.v1.LifecycleReadService",
+                input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest,
+                output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_account_flow(
+        self,
+        request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetAccountFlow",
+                service_name="chain.lifecycle.v1.LifecycleReadService",
+                input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest,
+                output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -147,6 +213,10 @@ class LifecycleReadServiceSync(Protocol):
     def list_flows(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_flows_by_tx(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsByTxRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsByTxResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_account_flows(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_account_flow(self, request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest, ctx: RequestContext) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -183,6 +253,26 @@ class LifecycleReadServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_flows_by_tx,
+                ),
+                "/chain.lifecycle.v1.LifecycleReadService/ListAccountFlows": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListAccountFlows",
+                        service_name="chain.lifecycle.v1.LifecycleReadService",
+                        input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest,
+                        output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_account_flows,
+                ),
+                "/chain.lifecycle.v1.LifecycleReadService/GetAccountFlow": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetAccountFlow",
+                        service_name="chain.lifecycle.v1.LifecycleReadService",
+                        input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest,
+                        output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_account_flow,
                 ),
             },
             interceptors=interceptors,
@@ -252,6 +342,46 @@ class LifecycleReadServiceClientSync(ConnectClientSync):
                 service_name="chain.lifecycle.v1.LifecycleReadService",
                 input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsByTxRequest,
                 output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListFlowsByTxResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_account_flows(
+        self,
+        request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListAccountFlows",
+                service_name="chain.lifecycle.v1.LifecycleReadService",
+                input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsRequest,
+                output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.ListAccountFlowsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_account_flow(
+        self,
+        request: chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetAccountFlow",
+                service_name="chain.lifecycle.v1.LifecycleReadService",
+                input=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowRequest,
+                output=chain_dot_lifecycle_dot_v1_dot_lifecycle__read__pb2.GetAccountFlowResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

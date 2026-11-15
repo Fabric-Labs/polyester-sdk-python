@@ -64,18 +64,29 @@ class StatementPage(msgspec.Struct, kw_only=True, omit_defaults=True):
     the first page starts with the header row, so concatenating the pages in
     order yields the whole statement. ``next_page_token`` is "" on the last
     page.
+
+    ``complete_through`` is how far the statement is complete: it covers the
+    movements from ``start_time`` up to ``complete_through``, exclusive. That
+    is the earliest of ``end_time``, the time of the first page's request and
+    the time through which account history was complete then, never before
+    ``start_time``; every page of one statement carries the same value. When
+    it is before ``end_time``, request the rest (from ``complete_through`` to
+    ``end_time``) later. ``None`` when the server sent none.
     """
 
     csv: str = ""
     next_page_token: str = ""
+    complete_through: datetime | None = None
 
 
 class Statement(msgspec.Struct, kw_only=True, omit_defaults=True):
     """A whole account statement: every page's ``csv`` concatenated in order,
     starting with the header row. A period without movements holds the header
-    row alone."""
+    row alone. ``complete_through`` is the end of what it covers, as on
+    :class:`StatementPage`."""
 
     csv: str = ""
+    complete_through: datetime | None = None
 
     def rows(self) -> list[StatementRow]:
         """The statement's rows, oldest first; see :func:`parse_statement_csv`."""
@@ -152,3 +163,55 @@ def _statement_time(value: str, line: int) -> datetime:
             "ExportStatement", f"statement line {line} has an unreadable time {value!r}"
         )
     return parsed.astimezone(UTC)
+
+
+class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A whole-period account statement produced in the background as one CSV
+    file (``StatementExportService``).
+
+    ``status`` is ``"queued"`` (waiting until account history covers the
+    period and no other export of the account is being produced),
+    ``"processing"`` (``movements`` and ``bytes`` count its progress),
+    ``"ready"`` (downloadable until ``expires_at``), ``"failed"``
+    (``failure_reason`` says why: ``"too_large"``, more than 4,000,000 ledger
+    movements, so split the period; or ``"unavailable"``, create a new
+    export) or ``"expired"`` (the file was deleted; create a new export).
+    "" when the server names none; ``"UNKNOWN(n)"`` for a value this SDK does
+    not know.
+
+    ``export_id`` and ``subaccount_id`` are public IDs; ``subaccount_id`` is
+    "" for a root account. ``asset_id`` is 0 for every asset. The file covers
+    ``start_time`` up to ``complete_through``, exclusive: the earlier of
+    ``end_time`` and the instant the export was created. ``ready_at`` and
+    ``expires_at`` (7 days after ``ready_at``) are ``None`` before the file is
+    ready.
+
+    The file itself is downloaded over REST only, with an authenticated
+    ``GET /v1/statements/exports/{export_id}/file``: ``text/csv``, byte for
+    byte the ``statements.export`` pages for the same account, asset and
+    period up to ``complete_through``, with ``Range`` and ``If-Range``
+    support. This SDK does not wrap the download.
+    """
+
+    export_id: str
+    subaccount_id: str = ""
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    asset_id: int = 0
+    idempotency_key: str = ""
+    status: str = ""
+    complete_through: datetime | None = None
+    movements: int = 0
+    bytes: int = 0
+    created_at: datetime | None = None
+    ready_at: datetime | None = None
+    expires_at: datetime | None = None
+    failure_reason: str = ""
+
+
+class StatementExportsPage(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One page of an account's statement exports, newest first;
+    ``next_page_token`` is "" on the last page."""
+
+    exports: list[StatementExport] = []
+    next_page_token: str = ""

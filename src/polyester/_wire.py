@@ -138,6 +138,10 @@ _RETRYABLE_RESOURCE_CODES = frozenset(
         "ERROR_CODE_TRIGGER_CAPACITY_REACHED",
         "ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED",
         "ERROR_CODE_TWAP_CAPACITY_REACHED",
+        # transfer.v1: too many dust conversions in progress; retry shortly.
+        # DUST_WINDOW_ACTIVE and DUST_DAILY_LIMIT, also resource_exhausted,
+        # last hours and stay final refusals.
+        "ERROR_CODE_DUST_BUSY",
     ]
 )
 
@@ -155,15 +159,28 @@ def _error_detail_priority(detail: Message) -> int:
 
 
 def _rate_limit_error(
-    message: str, *, proto_detail=None, code: str | None = None
+    message: str, *, proto_detail=None, code: str | None = None, order_detail=None
 ) -> PolyesterRateLimitError:
     detail = rate_limit_detail_from_proto(proto_detail)
+    cause_code, level_index = _ladder_cause(order_detail)
     return PolyesterRateLimitError(
         message,
         retry_after=retry_after_seconds_from_detail(detail),
         detail=detail,
         code=code,
+        cause_code=cause_code,
+        level_index=level_index,
     )
+
+
+def _ladder_cause(detail) -> tuple[str | None, int | None]:
+    """An ``orders.v1.ErrorDetail``'s ``cause_code`` and ``level_index``, or
+    ``None`` for each one it leaves unset (any other detail sets neither)."""
+    if detail is None or detail.DESCRIPTOR.full_name != "orders.v1.ErrorDetail":
+        return None, None
+    cause = error_code_name(orders_pb2.ErrorCode, detail.cause_code) if detail.cause_code else None
+    level = int(detail.level_index) if detail.HasField("level_index") else None
+    return cause, level
 
 
 _ORDER_ERROR_CODE_NAMES = frozenset(orders_pb2.ErrorCode.DESCRIPTOR.values_by_name)
@@ -280,6 +297,8 @@ def _map_gateway_problem(exc: GatewayProblemError):
         message,
         code=_error_code_from_rest(exc.problem_code),
         violations=_rest_violations(exc.violations),
+        cause_code=_error_code_from_rest(exc.cause_code) if exc.cause_code else None,
+        level_index=exc.level_index,
     )
 
 
@@ -379,7 +398,12 @@ def _map_connect_error(exc: ConnectError):
                     and code_name not in _FINAL_RESOURCE_CODES
                     and (rate_limit is not None or code_name in _RETRYABLE_RESOURCE_CODES)
                 ):
-                    return _rate_limit_error(error_message, proto_detail=rate_limit, code=code_name)
+                    return _rate_limit_error(
+                        error_message,
+                        proto_detail=rate_limit,
+                        code=code_name,
+                        order_detail=unpacked,
+                    )
                 if (
                     exc.code.value == "unavailable"
                     and not code_name.endswith("_OUTCOME_UNKNOWN")
@@ -419,7 +443,16 @@ def _map_connect_error(exc: ConnectError):
                         status_code=_auth_status(exc),
                         code=code_name,
                     )
-                return PolyesterApiError(message, code=code_name, raw=unpacked)
+                return PolyesterApiError(
+                    message,
+                    code=code_name,
+                    raw=unpacked,
+                    retry_at=(
+                        unpacked.retry_after.ToDatetime(tzinfo=UTC)
+                        if unpacked.HasField("retry_after")
+                        else None
+                    ),
+                )
             if full_name == "polyester.ratelimit.v1.RateLimitDetail":
                 return _rate_limit_error(error_message, proto_detail=unpacked)
             if full_name == "orders.v1.ErrorDetail":
@@ -457,6 +490,8 @@ def _map_connect_error(exc: ConnectError):
                         )
                         for item in unpacked.violations
                     ],
+                    cause_code=_ladder_cause(unpacked)[0],
+                    level_index=_ladder_cause(unpacked)[1],
                 )
             if full_name == "chain.withdraw.v1.ErrorDetail":
                 code_name = error_code_name(withdraw_pb2.ErrorCode, unpacked.code)

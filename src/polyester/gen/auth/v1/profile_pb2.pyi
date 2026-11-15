@@ -70,18 +70,16 @@ class UserProfile(_message.Message):
     def __init__(self, username: _Optional[str] = ..., bio: _Optional[str] = ..., website: _Optional[str] = ..., twitter: _Optional[str] = ..., twitter_verified: _Optional[bool] = ..., discord: _Optional[str] = ..., discord_verified: _Optional[bool] = ..., avatar_url: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., next_username_change_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., vip_tier: _Optional[int] = ..., username_unlocked: _Optional[bool] = ..., current_terms_accepted: _Optional[bool] = ...) -> None: ...
 
 class UserProfilePatch(_message.Message):
-    __slots__ = ("username", "bio", "website", "twitter", "avatar_url")
+    __slots__ = ("username", "bio", "website", "avatar_url")
     USERNAME_FIELD_NUMBER: _ClassVar[int]
     BIO_FIELD_NUMBER: _ClassVar[int]
     WEBSITE_FIELD_NUMBER: _ClassVar[int]
-    TWITTER_FIELD_NUMBER: _ClassVar[int]
     AVATAR_URL_FIELD_NUMBER: _ClassVar[int]
     username: str
     bio: str
     website: str
-    twitter: str
     avatar_url: str
-    def __init__(self, username: _Optional[str] = ..., bio: _Optional[str] = ..., website: _Optional[str] = ..., twitter: _Optional[str] = ..., avatar_url: _Optional[str] = ...) -> None: ...
+    def __init__(self, username: _Optional[str] = ..., bio: _Optional[str] = ..., website: _Optional[str] = ..., avatar_url: _Optional[str] = ...) -> None: ...
 
 class GetProfileRequest(_message.Message):
     __slots__ = ()

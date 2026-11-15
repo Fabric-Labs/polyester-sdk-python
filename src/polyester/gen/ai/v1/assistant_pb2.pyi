@@ -79,6 +79,16 @@ class AssistantKeyState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTIVE: _ClassVar[AssistantKeyState]
     DISABLED: _ClassVar[AssistantKeyState]
 
+class AccountSelection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACCOUNT_SELECTION_UNSPECIFIED: _ClassVar[AccountSelection]
+    ACCOUNT_SELECTION_NONE: _ClassVar[AccountSelection]
+
+class AssistantKeyView(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ASSISTANT_KEY_VIEW_UNSPECIFIED: _ClassVar[AssistantKeyView]
+    ASSISTANT_KEY_VIEW_FULL: _ClassVar[AssistantKeyView]
+
 class DisplaySetting(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SETTING_UNSPECIFIED: _ClassVar[DisplaySetting]
@@ -180,6 +190,10 @@ PROFILE: MemoryKind
 KEY_STATE_UNSPECIFIED: AssistantKeyState
 ACTIVE: AssistantKeyState
 DISABLED: AssistantKeyState
+ACCOUNT_SELECTION_UNSPECIFIED: AccountSelection
+ACCOUNT_SELECTION_NONE: AccountSelection
+ASSISTANT_KEY_VIEW_UNSPECIFIED: AssistantKeyView
+ASSISTANT_KEY_VIEW_FULL: AssistantKeyView
 SETTING_UNSPECIFIED: DisplaySetting
 APPEARANCE: DisplaySetting
 LANGUAGE: DisplaySetting
@@ -1001,16 +1015,18 @@ class RunEvent(_message.Message):
     def __init__(self, seq: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., text_delta: _Optional[_Union[TextDelta, _Mapping]] = ..., discard_partial: _Optional[_Union[DiscardPartial, _Mapping]] = ..., tool_started: _Optional[_Union[ToolStarted, _Mapping]] = ..., tool_finished: _Optional[_Union[ToolFinished, _Mapping]] = ..., skill_loaded: _Optional[_Union[SkillLoaded, _Mapping]] = ..., subagent_started: _Optional[_Union[SubagentStarted, _Mapping]] = ..., subagent_finished: _Optional[_Union[SubagentFinished, _Mapping]] = ..., approval_requested: _Optional[_Union[ApprovalRequested, _Mapping]] = ..., approval_resolved: _Optional[_Union[ApprovalResolved, _Mapping]] = ..., view: _Optional[_Union[View, _Mapping]] = ..., run_completed: _Optional[_Union[RunCompleted, _Mapping]] = ..., run_failed: _Optional[_Union[RunFailed, _Mapping]] = ..., memories_recalled: _Optional[_Union[MemoriesRecalled, _Mapping]] = ..., destinations_suggested: _Optional[_Union[DestinationsSuggested, _Mapping]] = ..., display_setting_action: _Optional[_Union[DisplaySettingAction, _Mapping]] = ...) -> None: ...
 
 class AssistantKey(_message.Message):
-    __slots__ = ("subaccount_id", "key_id", "public_key_ed25519", "state")
+    __slots__ = ("subaccount_id", "key_id", "public_key_ed25519", "state", "label")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     KEY_ID_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_ED25519_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     key_id: str
     public_key_ed25519: bytes
     state: AssistantKeyState
-    def __init__(self, subaccount_id: _Optional[int] = ..., key_id: _Optional[str] = ..., public_key_ed25519: _Optional[bytes] = ..., state: _Optional[_Union[AssistantKeyState, str]] = ...) -> None: ...
+    label: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., key_id: _Optional[str] = ..., public_key_ed25519: _Optional[bytes] = ..., state: _Optional[_Union[AssistantKeyState, str]] = ..., label: _Optional[str] = ...) -> None: ...
 
 class AssistantKeyAccount(_message.Message):
     __slots__ = ("subaccount_id",)
@@ -1051,7 +1067,7 @@ class CurrentPage(_message.Message):
     def __init__(self, destination_id: _Optional[str] = ..., route: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
 
 class SendMessageRequest(_message.Message):
-    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings")
+    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings", "account_selection")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
@@ -1059,6 +1075,7 @@ class SendMessageRequest(_message.Message):
     DESTINATIONS_FIELD_NUMBER: _ClassVar[int]
     PAGE_FIELD_NUMBER: _ClassVar[int]
     DISPLAY_SETTINGS_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_SELECTION_FIELD_NUMBER: _ClassVar[int]
     conversation_id: int
     text: str
     idempotency_key: str
@@ -1066,7 +1083,8 @@ class SendMessageRequest(_message.Message):
     destinations: _containers.RepeatedCompositeFieldContainer[Destination]
     page: CurrentPage
     display_settings: _containers.RepeatedScalarFieldContainer[DisplaySetting]
-    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ...) -> None: ...
+    account_selection: AccountSelection
+    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ..., account_selection: _Optional[_Union[AccountSelection, str]] = ...) -> None: ...
 
 class SendMessageResponse(_message.Message):
     __slots__ = ("run_id", "conversation_id")
@@ -1203,8 +1221,10 @@ class CompleteAssistantKeysResponse(_message.Message):
     def __init__(self, keys: _Optional[_Iterable[_Union[AssistantKey, _Mapping]]] = ...) -> None: ...
 
 class ListAssistantKeysRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("view",)
+    VIEW_FIELD_NUMBER: _ClassVar[int]
+    view: AssistantKeyView
+    def __init__(self, view: _Optional[_Union[AssistantKeyView, str]] = ...) -> None: ...
 
 class ListAssistantKeysResponse(_message.Message):
     __slots__ = ("keys",)

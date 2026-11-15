@@ -85,8 +85,13 @@ class GatewayProblemError(ConnectError):
         problem=None,
         retry_after: float | None = None,
         rate_limit: object | None = None,
+        cause_code: str = "",
+        level_index: int | None = None,
     ) -> None:
         super().__init__(code, problem_code)
+        # A refused ladder's ``causeCode`` and ``levelIndex``, when sent.
+        self.cause_code = cause_code
+        self.level_index = level_index
         self.problem = problem
         self.retry_after = retry_after
         # The problem's ``rate_limit`` object, as sent.
@@ -357,6 +362,8 @@ def _raise_problem(
         body = {}
     detail = body.get("detail")
     violations = body.get("violations")
+    cause_code = body.get("causeCode")
+    level_index = body.get("levelIndex")
     raise GatewayProblemError(
         connect_code,
         code,
@@ -364,6 +371,14 @@ def _raise_problem(
         problem=decode_http_problem(body, response.status),
         retry_after=retry_after,
         rate_limit=body.get("rate_limit"),
+        cause_code=cause_code if isinstance(cause_code, str) else "",
+        level_index=(
+            level_index
+            if isinstance(level_index, int)
+            and not isinstance(level_index, bool)
+            and 0 <= level_index < 2**32
+            else None
+        ),
         detail=detail if isinstance(detail, str) else "",
         violations=(
             [item for item in violations if isinstance(item, dict)]

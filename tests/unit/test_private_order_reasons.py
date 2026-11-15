@@ -31,7 +31,7 @@ def test_rejected_order_read_carries_the_orders_api_error_code() -> None:
         )
     )
     assert order.status == "rejected"
-    assert order.reject_reason == "INSUFFICIENT_FUNDS"
+    assert order.reject_reason == "insufficient_funds"
     assert order.cancel_reason is None
 
 
@@ -42,7 +42,7 @@ def test_canceled_order_read_carries_its_cancel_reason() -> None:
             cancel_reason=orders_read_pb2.CANCEL_REASON_STP_EXPIRE_MAKER,
         )
     )
-    assert order.cancel_reason == "STP_EXPIRE_MAKER"
+    assert order.cancel_reason == "stp_expire_maker"
     assert order.reject_reason is None
 
 
@@ -63,7 +63,7 @@ def test_reasons_are_none_for_other_statuses(status: int) -> None:
 )
 def test_every_cancel_reason_decodes_without_its_prefix(name: str, value: int) -> None:
     order = order_from_proto(_order(status=orders_read_pb2.CANCELED, cancel_reason=value))
-    assert order.cancel_reason == name.removeprefix("CANCEL_REASON_")
+    assert order.cancel_reason == name.removeprefix("CANCEL_REASON_").lower()
 
 
 def test_unknown_reason_numbers_decode_without_raising() -> None:
@@ -92,7 +92,7 @@ def test_stream_snapshot_and_unit_orders_carry_reasons() -> None:
         ]
     )
     assert [(o.reject_reason, o.cancel_reason) for o in snapshot] == [
-        ("POST_ONLY_CROSS", None),
+        ("post_only_cross", None),
         (None, None),
     ]
 
@@ -106,7 +106,7 @@ def test_stream_snapshot_and_unit_orders_carry_reasons() -> None:
             ]
         )
     )
-    assert unit.orders[0].cancel_reason == "REPLACED"
+    assert unit.orders[0].cancel_reason == "replaced"
     assert unit.orders[0].reject_reason is None
 
 
@@ -141,9 +141,9 @@ def test_order_event_reasons() -> None:
     )
     events = [event for event in unit.events if isinstance(event, PrivateOrderEvent)]
     assert [(e.kind, e.reject_reason, e.cancel_reason) for e in events] == [
-        ("rejected", "POST_ONLY_CROSS", None),
-        ("canceled", None, "USER_REQUEST"),
-        ("replaced", None, "REPLACED"),
+        ("rejected", "post_only_cross", None),
+        ("canceled", None, "user_request"),
+        ("replaced", None, "replaced"),
         ("replaced", None, None),
         ("accepted", None, None),
         ("canceled", None, "UNKNOWN_CANCEL_REASON(999)"),

@@ -895,7 +895,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersServiceClient,
             lambda client, req: client.batch_create_orders(req),
             proto_request,
-            batch_create_from_proto,
+            lambda response: batch_create_from_proto(
+                response, quantity_scales=[base for base, _ in item_scales]
+            ),
         )
 
     async def batch_cancel(

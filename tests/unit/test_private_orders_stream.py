@@ -342,7 +342,7 @@ async def test_units_deliver_orders_removed_ids_and_events(
     assert isinstance(outcome, PrivateOrderCommandOutcome)
     assert outcome.kind == "cancel_rejected"
     assert outcome.order_id == format_id(3)
-    assert outcome.reason == "ORDER_ALREADY_TERMINAL"
+    assert outcome.reason == "order_already_terminal"
 
 
 async def test_seq_gap_resubscribes_with_the_last_applied_cursor(

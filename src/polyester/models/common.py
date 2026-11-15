@@ -60,7 +60,7 @@ class PriceBand(msgspec.Struct, kw_only=True, omit_defaults=True):
     A limit buy priced above the upper limit, or a limit sell priced below the
     lower limit, is refused ``PRICE_BAND_VIOLATION``. A market order, or
     another order whose price the exchange sets, trades only up to the limit,
-    and its unfilled remainder is canceled with cancel reason ``PRICE_BAND``.
+    and its unfilled remainder is canceled with cancel reason ``price_band``.
     A resting order is never canceled by the band, and a limit order priced
     away from the market on the passive side is accepted.
     """

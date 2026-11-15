@@ -88,7 +88,7 @@ def self_trade_prevention_mode_to_proto(value: str) -> orders_pb2.SelfTradePreve
 
     ``decrement`` reduces both orders by the quantity that would have traded,
     with no trade; the order left with no quantity is canceled with cancel
-    reason ``STP_DECREMENT``. Orders with attached exits and triggers take it
+    reason ``stp_decrement``. Orders with attached exits and triggers take it
     too.
     """
     key = value.lower() if isinstance(value, str) else ""

@@ -109,11 +109,13 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     # ``orders.get_batch_replace_status``); "" for every other origin.
     batch_request_id: str = ""
     # Why a ``rejected`` order was refused: the Orders API error code for the
-    # same refusal, without its ``ERROR_CODE_`` prefix (for example
-    # ``POST_ONLY_CROSS``). ``None`` for every other status.
+    # same refusal, in lower case without its ``ERROR_CODE_`` prefix (for
+    # example ``post_only_cross``). ``None`` for every other status. A code
+    # this SDK does not know reads ``UNKNOWN_ERROR_CODE(n)``.
     reject_reason: str | None = None
-    # Why a ``canceled`` order ended, without the ``CANCEL_REASON_`` prefix
-    # (for example ``USER_REQUEST`` or ``REPLACED``). ``None`` for every other
+    # Why a ``canceled`` order ended, in lower case without the
+    # ``CANCEL_REASON_`` prefix (for example ``user_request``, ``replaced`` or
+    # ``stp_decrement``). ``None`` for every other
     # status. A number this SDK does not know reads ``UNKNOWN_CANCEL_REASON(n)``.
     cancel_reason: str | None = None
     avg_price: Decimal | None = None
@@ -391,6 +393,9 @@ class OrderMutationResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     take_profit_trigger_id: str = ""
     stop_loss_trigger_id: str = ""
     trailing_stop_trigger_id: str = ""
+    # When a create's admission completed, in nanoseconds since the Unix
+    # epoch; None when the server sent no time, and on a cancel.
+    accepted_ts_ns: int | None = None
 
 
 class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -523,6 +528,9 @@ class ModifyOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     take_profit_trigger_id: str = ""
     stop_loss_trigger_id: str = ""
     trailing_stop_trigger_id: str = ""
+    # When the server answered the modify, in nanoseconds since the Unix
+    # epoch; None when it sent no time.
+    ts_ns: int | None = None
 
 
 class CancelledOrder(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -842,7 +850,7 @@ class TriggerEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``failed`` event with ``failure_reason``. With ``self_trade_prevented``
     the attempt placed an order that self-trade prevention expired against
     another of the account's resting orders: ``child_seq`` names that order,
-    which ends ``canceled`` with ``STP_EXPIRE_TAKER`` or ``STP_EXPIRE_BOTH``.
+    which ends ``canceled`` with ``stp_expire_taker`` or ``stp_expire_both``.
     Every other refusal placed no order. A ladder keeps working when the
     order book rejects one of its levels on arrival (a post-only level that
     would cross, for example): that level's ``fired`` event, which names the
@@ -1021,6 +1029,9 @@ class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True
     # Field violations a rejection names, in the order the server sent them;
     # empty for an accepted item or a rejection that names no field.
     violations: list[OrderFieldViolation] = []
+    # On a duplicate-client-order-ID rejection: the order that already holds
+    # the client order ID, when known; empty otherwise.
+    existing_order_id: str = ""
 
 
 class BatchReplaceOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -1090,12 +1101,21 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     # Empty when the item was not sized that way, and for a rejection.
     submitted_max_quote_debit_scaled: str = ""
     submitted_quote_proceeds_scaled: str = ""
+    # An accepted item's gross base quantity resolved for execution, as on a
+    # single create: scaled by the pair's base quantity scale, which
+    # ``resolved_base_qty`` carries when the catalogs know the pair. Empty and
+    # None for a rejection.
+    resolved_base_qty_scaled: str = ""
+    resolved_base_qty: Quantity | None = None
 
 
 class BatchCreateOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     results: list[BatchCreateResultItem]
     accepted_count: int = 0
     rejected_count: int = 0
+    # When the server answered the batch, in nanoseconds since the Unix epoch;
+    # None when it sent no time.
+    ts_ns: int | None = None
 
 
 class BatchCancelResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):

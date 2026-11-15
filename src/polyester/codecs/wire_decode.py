@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, TypeVar
+
+from google.protobuf.message import Message
 
 from polyester.codecs.decode.invariants import (
-    ts_ns_from_response,
     ts_ns_string_from_response,
 )
 from polyester.codecs.decode.lifecycle import lifecycle_reason_from_code
@@ -27,11 +29,12 @@ from polyester.models.trading import (
     BalanceHistory,
     BalanceHistorySeries,
     BalancesList,
-    BatchReplaceAdmissionItem,
+    BatchCancelOrdersResult,
+    BatchCreateOrdersResult,
     BatchReplaceOrdersResult,
-    BatchReplaceStatusItem,
     BatchReplaceStatusResult,
     BucketTransferResult,
+    CancelAllAfterResult,
     CancelAllOrdersResult,
     DepositAddress,
     DepositAddressesList,
@@ -63,12 +66,33 @@ from polyester.models.trading import (
     ZipperReasonDetails,
 )
 
+if TYPE_CHECKING:
+    from polyester.codecs.decode.orders import OrderScales
+
+_M = TypeVar("_M", bound=Message)
+
 
 def _field(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
     for key in keys:
         if key in data:
             return data[key]
     return default
+
+
+def _contract_message(data: Any, message: _M, context: str) -> _M:
+    """Parse protobuf JSON (camelCase or snake_case names; unknown fields are
+    ignored) into ``message``, so the protobuf decoder reads it exactly as it
+    reads the binary response. A dict that is not a valid ``context`` raises
+    ``PolyesterResponseContractError``."""
+    from google.protobuf.json_format import ParseDict, ParseError
+
+    if not isinstance(data, dict):
+        raise PolyesterResponseContractError(context, "response is not a JSON object")
+    try:
+        ParseDict(data, message, ignore_unknown_fields=True)
+    except ParseError as exc:
+        raise PolyesterResponseContractError(context, f"response is not valid: {exc}") from exc
+    return message
 
 
 def _optional_scaled_field(data: dict[str, Any], *keys: str) -> str | None:
@@ -118,113 +142,81 @@ def _id_str(value: Any) -> str:
         return str(value)
 
 
-def decode_order(data: dict[str, Any]) -> Order:
-    from polyester.types.money import Price, Quantity
+def decode_order(
+    data: dict[str, Any],
+    *,
+    quantity_scale: int | None = None,
+    quote_quantity_scale: int | None = None,
+) -> Order:
+    """Decode an ``orders.v1.Order`` in its protobuf JSON form, exactly as
+    ``order_from_proto`` decodes the binary message."""
+    from polyester.codecs.decode.orders import order_from_proto
+    from polyester.gen.orders.v1 import orders_read_pb2
 
-    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
-
-    def _qty(raw: Any) -> Quantity | None:
-        if raw is None or raw == "":
-            return None
-        return Quantity.from_scaled(int(raw), symbol_id=symbol_id)
-
-    def _price(raw: Any) -> Price | None:
-        if raw is None or raw == "" or int(raw) == 0:
-            return None
-        return Price.from_ticks(int(raw))
-
-    return Order(
-        order_id=_id_str(_field(data, "orderId", "order_id")),
-        symbol_id=symbol_id,
-        client_order_id=str(_field(data, "clientOrderId", "client_order_id", default="") or ""),
-        side=_enum_name(_field(data, "side")).lower(),
-        status=_enum_name(_field(data, "status")),
-        order_type=_enum_name(_field(data, "orderType", "order_type")).lower(),
-        tif=_enum_name(_field(data, "tif")).lower(),
-        orig_qty=_qty(_field(data, "origQty", "orig_qty", default="") or 0),
-        cum_qty=_qty(_field(data, "cumQty", "cum_qty", default="") or 0),
-        leaves_qty=_qty(_field(data, "leavesQty", "leaves_qty", default="") or 0),
-        price=_price(_field(data, "priceTicks", "price_ticks", default=0) or 0),
-        avg_px=_price(_field(data, "avgPxTicks", "avg_px_ticks", default=0) or 0),
-        created_ts_ns=ts_ns_string_from_response(
-            _field(data, "createdTsNs", "created_ts_ns", default=0) or 0,
-            context="Order",
-            field_name="created_ts_ns",
-            empty_when_zero=True,
-        ),
-        version=int(_field(data, "version", default=0) or 0),
+    return order_from_proto(
+        _contract_message(data, orders_read_pb2.Order(), "Order"),
+        quantity_scale=quantity_scale,
+        quote_quantity_scale=quote_quantity_scale,
     )
 
 
-def decode_orders_list(data: dict[str, Any]) -> OrdersList:
-    orders = [
-        decode_order(item)
-        for item in _field(data, "orders", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return OrdersList(
-        orders=orders,
-        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
-    )
+def decode_orders_list(data: dict[str, Any], *, scales: OrderScales | None = None) -> OrdersList:
+    """Decode an open-orders or order-history page in its protobuf JSON form,
+    exactly as ``orders_list_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import orders_list_from_proto
+    from polyester.gen.orders.v1 import orders_read_pb2
+
+    message = _contract_message(data, orders_read_pb2.GetOpenOrdersResponse(), "ListOrders")
+    return orders_list_from_proto(message, scales=scales)
 
 
-def decode_order_mutation(data: dict[str, Any]) -> OrderMutationResult:
-    return OrderMutationResult(
-        status=str(_field(data, "status", default="") or ""),
-        order_id=_id_str(_field(data, "orderId", "order_id")),
-        client_order_id=str(_field(data, "clientOrderId", "client_order_id", default="") or ""),
-    )
+def decode_order_mutation(
+    data: dict[str, Any], *, quantity_scale: int | None = None
+) -> OrderMutationResult:
+    """Decode a create or cancel answer in its protobuf JSON form, exactly as
+    ``order_mutation_from_proto`` decodes the binary response. A cancel answer
+    carries ``status``; a create answer does not."""
+    from polyester.codecs.decode.orders import order_mutation_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message: orders_pb2.CreateOrderResponse | orders_pb2.CancelOrderResponse
+    if isinstance(data, dict) and "status" in data:
+        message = _contract_message(data, orders_pb2.CancelOrderResponse(), "CancelOrder")
+    else:
+        message = _contract_message(data, orders_pb2.CreateOrderResponse(), "CreateOrder")
+    return order_mutation_from_proto(message, quantity_scale=quantity_scale)
 
 
-def decode_get_order(data: dict[str, Any]) -> GetOrderResult:
-    order_raw = _field(data, "order")
-    order = decode_order(order_raw) if isinstance(order_raw, dict) else None
-    trades = [
-        decode_user_trade(item)
-        for item in _field(data, "trades", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return GetOrderResult(order=order, trades=trades)
+def decode_get_order(data: dict[str, Any], *, scales: OrderScales | None = None) -> GetOrderResult:
+    """Decode an order read in its protobuf JSON form, exactly as
+    ``get_order_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import get_order_from_proto
+    from polyester.gen.orders.v1 import orders_read_pb2
+
+    message = _contract_message(data, orders_read_pb2.GetOrderResponse(), "GetOrder")
+    return get_order_from_proto(message, scales=scales)
 
 
-def decode_user_trade(data: dict[str, Any]) -> UserTrade:
-    from polyester.types.money import Price, Quantity
+def decode_user_trade(data: dict[str, Any], *, quantity_scale: int | None = None) -> UserTrade:
+    """Decode an ``orders.v1.UserTrade`` in its protobuf JSON form, exactly as
+    ``user_trade_from_proto`` decodes the binary message."""
+    from polyester.codecs.decode.orders import user_trade_from_proto
+    from polyester.gen.orders.v1 import orders_read_pb2
 
-    symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
-    qty_raw = _field(data, "qtyScaled", "qty_scaled", default=0) or 0
-    price_raw = _field(data, "priceTicks", "price_ticks", default=0) or 0
-    return UserTrade(
-        symbol_id=symbol_id,
-        match_id=str(_field(data, "matchId", "match_id", default="") or ""),
-        order_id=_id_str(_field(data, "orderId", "order_id")),
-        side=_enum_name(_field(data, "side")).lower(),
-        is_maker=bool(_field(data, "isMaker", "is_maker", default=False)),
-        price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
-        qty=Quantity.from_scaled(int(qty_raw), symbol_id=symbol_id),
-        fee_amount_e18=_u128_str(_field(data, "feeAmountE18", "fee_amount_e18")),
-        fee_asset=_enum_name(_field(data, "feeAsset", "fee_asset", default="")).lower(),
-        referral_share_amount_e18=_u128_str(
-            _field(data, "referralShareAmountE18", "referral_share_amount_e18")
-        ),
-        ts_ns=ts_ns_string_from_response(
-            _field(data, "tsNs", "ts_ns", default=0) or 0,
-            context="UserTrade",
-            empty_when_zero=True,
-        ),
-        fee_is_rebate=bool(_field(data, "feeIsRebate", "fee_is_rebate", default=False)),
-    )
+    message = _contract_message(data, orders_read_pb2.UserTrade(), "UserTrade")
+    return user_trade_from_proto(message, quantity_scale=quantity_scale)
 
 
-def decode_user_trades_list(data: dict[str, Any]) -> UserTradesList:
-    trades = [
-        decode_user_trade(item)
-        for item in _field(data, "trades", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return UserTradesList(
-        trades=trades,
-        next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
-    )
+def decode_user_trades_list(
+    data: dict[str, Any], *, scales: OrderScales | None = None
+) -> UserTradesList:
+    """Decode a user trades page in its protobuf JSON form, exactly as
+    ``user_trades_list_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import user_trades_list_from_proto
+    from polyester.gen.orders.v1 import orders_read_pb2
+
+    message = _contract_message(data, orders_read_pb2.GetUserTradesResponse(), "GetUserTrades")
+    return user_trades_list_from_proto(message, scales=scales)
 
 
 def decode_market_trade(data: dict[str, Any], *, quantity_scale: int) -> MarketTrade:
@@ -513,23 +505,56 @@ def decode_lifecycle_flows_list(data: dict[str, Any]) -> LifecycleFlowsList:
 
 
 def decode_modify_order_result(data: dict[str, Any]) -> ModifyOrderResult:
-    return ModifyOrderResult(
-        action_taken=str(_field(data, "actionTaken", "action_taken", default="") or ""),
-        old_order_id=_id_str(_field(data, "oldOrderId", "old_order_id")),
-        final_order_id=_id_str(_field(data, "finalOrderId", "final_order_id")),
-        code=str(_field(data, "code", default="") or ""),
-    )
+    """Decode a modify answer in its protobuf JSON form, exactly as
+    ``modify_order_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import modify_order_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message = _contract_message(data, orders_pb2.ModifyOrderResponse(), "ModifyOrder")
+    return modify_order_from_proto(message)
 
 
 def decode_cancel_all_orders_result(data: dict[str, Any]) -> CancelAllOrdersResult:
-    return CancelAllOrdersResult(
-        status=str(_field(data, "status", default="") or ""),
-        matched_orders=int(_field(data, "matchedOrders", "matched_orders", default=0) or 0),
-        submitted_cancels=int(
-            _field(data, "submittedCancels", "submitted_cancels", default=0) or 0
-        ),
-        failed_cancels=int(_field(data, "failedCancels", "failed_cancels", default=0) or 0),
-    )
+    """Decode a cancel-all answer in its protobuf JSON form, exactly as
+    ``cancel_all_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import cancel_all_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message = _contract_message(data, orders_pb2.CancelAllOrdersResponse(), "CancelAllOrders")
+    return cancel_all_from_proto(message)
+
+
+def decode_cancel_all_after_result(data: dict[str, Any]) -> CancelAllAfterResult:
+    """Decode a cancel-all-after answer in its protobuf JSON form, exactly as
+    ``cancel_all_after_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import cancel_all_after_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message = _contract_message(data, orders_pb2.CancelAllAfterResponse(), "CancelAllAfter")
+    return cancel_all_after_from_proto(message)
+
+
+def decode_batch_create_result(
+    data: dict[str, Any], *, quantity_scales: Sequence[int | None] | None = None
+) -> BatchCreateOrdersResult:
+    """Decode a batch create answer in its protobuf JSON form, exactly as
+    ``batch_create_from_proto`` decodes the binary response. ``quantity_scales``
+    are the requested items' base quantity scales, in request order."""
+    from polyester.codecs.decode.orders import batch_create_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message = _contract_message(data, orders_pb2.BatchCreateOrdersResponse(), "BatchCreateOrders")
+    return batch_create_from_proto(message, quantity_scales=quantity_scales)
+
+
+def decode_batch_cancel_result(data: dict[str, Any]) -> BatchCancelOrdersResult:
+    """Decode a batch cancel answer in its protobuf JSON form, exactly as
+    ``batch_cancel_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import batch_cancel_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message = _contract_message(data, orders_pb2.BatchCancelOrdersResponse(), "BatchCancelOrders")
+    return batch_cancel_from_proto(message)
 
 
 def decode_trigger(data: dict[str, Any]) -> Trigger:
@@ -909,114 +934,26 @@ def decode_transfer_destinations(data: dict[str, Any]) -> TransferDestinationsLi
     return TransferDestinationsList(destinations=destinations)
 
 
-def _batch_replace_item_error(item: dict[str, Any]) -> Any:
-    """The item's ``ErrorDetail``, parsed as protobuf so its field violations
-    and rate-limit detail decode as on the protobuf path."""
-    from google.protobuf.json_format import ParseDict, ParseError
-
-    from polyester.gen.orders.v1 import orders_pb2
-
-    detail = orders_pb2.ErrorDetail()
-    raw = _field(item, "error")
-    if isinstance(raw, dict):
-        try:
-            ParseDict(raw, detail, ignore_unknown_fields=True)
-        except ParseError as exc:
-            raise PolyesterResponseContractError(
-                "BatchReplaceOrders", f"item error detail is not valid: {exc}"
-            ) from exc
-    return detail
-
-
-def _batch_replace_action_taken(item: dict[str, Any]) -> str:
-    from polyester.codecs.proto_helpers import proto_enum_name
-    from polyester.gen.orders.v1 import orders_pb2
-
-    raw = _field(item, "actionTaken", "action_taken")
-    if isinstance(raw, str) and raw in orders_pb2.ModifyActionTaken.DESCRIPTOR.values_by_name:
-        raw = orders_pb2.ModifyActionTaken.Value(raw)
-    if isinstance(raw, int) and not isinstance(raw, bool):
-        return proto_enum_name(orders_pb2.ModifyActionTaken, raw)
-    return _enum_name(raw)
-
-
-def _decode_batch_replace_item(item: dict[str, Any]) -> BatchReplaceAdmissionItem:
-    from polyester.codecs.decode.orders import _field_violations_from_proto
-    from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
-
-    error = _batch_replace_item_error(item)
-    return BatchReplaceAdmissionItem(
-        item_index=int(_field(item, "itemIndex", "item_index", default=0) or 0),
-        status=_enum_name(_field(item, "status")).lower(),
-        client_order_id=str(_field(item, "clientOrderId", "client_order_id", default="") or ""),
-        old_order_id=_id_str(_field(item, "oldOrderId", "old_order_id")),
-        replacement_order_id=_id_str(_field(item, "replacementOrderId", "replacement_order_id")),
-        code=str(_field(item, "code", default="") or ""),
-        rate_limit=(
-            rate_limit_detail_from_proto(error.rate_limit) if error.HasField("rate_limit") else None
-        ),
-        action_taken=_batch_replace_action_taken(item),
-        violations=_field_violations_from_proto(error),
-    )
-
-
 def decode_batch_replace_result(data: dict[str, Any]) -> BatchReplaceOrdersResult:
-    results = [
-        _decode_batch_replace_item(item)
-        for item in _field(data, "results", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return BatchReplaceOrdersResult(
-        batch_request_id=_id_str(_field(data, "batchRequestId", "batch_request_id")),
-        status=_enum_name(_field(data, "status")).lower(),
-        results=results,
-        accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
-        rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
-        accepted_ts_ns=ts_ns_from_response(
-            _field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0,
-            context="BatchReplaceOrders",
-            field_name="accepted_ts_ns",
-        ),
-    )
+    """Decode a batch replace answer in its protobuf JSON form, exactly as
+    ``batch_replace_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import batch_replace_from_proto
+    from polyester.gen.orders.v1 import orders_pb2
+
+    message = _contract_message(data, orders_pb2.BatchReplaceOrdersResponse(), "BatchReplaceOrders")
+    return batch_replace_from_proto(message)
 
 
 def decode_batch_replace_status(data: dict[str, Any]) -> BatchReplaceStatusResult:
-    items = [
-        BatchReplaceStatusItem(
-            item_index=int(_field(item, "itemIndex", "item_index", default=0) or 0),
-            phase=_enum_name(_field(item, "phase")).lower(),
-            old_order_id=_id_str(_field(item, "oldOrderId", "old_order_id")),
-            replacement_order_id=_id_str(
-                _field(item, "replacementOrderId", "replacement_order_id")
-            ),
-            order_status=_enum_name(_field(item, "orderStatus", "order_status")).lower(),
-            code=str(_field(item, "code", default="") or ""),
-            updated_ts_ns=ts_ns_from_response(
-                _field(item, "updatedTsNs", "updated_ts_ns", default=0) or 0,
-                context="GetBatchReplaceStatus",
-                field_name="updated_ts_ns",
-            ),
-        )
-        for item in _field(data, "items", default=[]) or []
-        if isinstance(item, dict)
-    ]
-    return BatchReplaceStatusResult(
-        batch_request_id=_id_str(_field(data, "batchRequestId", "batch_request_id")),
-        admission_status=_enum_name(_field(data, "admissionStatus", "admission_status")).lower(),
-        items=items,
-        accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
-        rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
-        accepted_ts_ns=ts_ns_from_response(
-            _field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0,
-            context="GetBatchReplaceStatus",
-            field_name="accepted_ts_ns",
-        ),
-        updated_ts_ns=ts_ns_from_response(
-            _field(data, "updatedTsNs", "updated_ts_ns", default=0) or 0,
-            context="GetBatchReplaceStatus",
-            field_name="updated_ts_ns",
-        ),
+    """Decode a batch replace status read in its protobuf JSON form, exactly as
+    ``batch_replace_status_from_proto`` decodes the binary response."""
+    from polyester.codecs.decode.orders import batch_replace_status_from_proto
+    from polyester.gen.orders.v1 import orders_read_pb2
+
+    message = _contract_message(
+        data, orders_read_pb2.GetBatchReplaceStatusResponse(), "GetBatchReplaceStatus"
     )
+    return batch_replace_status_from_proto(message)
 
 
 def decode_withdraw_intent(data: dict[str, Any]) -> WithdrawIntentResult:

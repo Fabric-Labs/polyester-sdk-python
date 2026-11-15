@@ -1,3 +1,4 @@
+from polyester.codecs.scalars import format_id
 from polyester.codecs.wire_decode import (
     decode_balances_list,
     decode_order,
@@ -13,17 +14,19 @@ def test_decode_order_from_connect_json_shape() -> None:
             "symbolId": 7,
             "clientOrderId": "cid-1",
             "side": "BUY",
-            "status": "ORDER_STATUS_OPEN",
+            "status": "WORKING",
             "orderType": "LIMIT",
-            "tif": "GTC",
-            "origQty": "1000",
-            "leavesQty": "1000",
+            "timeInForce": "GTC",
+            "origQtyScaled": "1000",
+            "leavesQtyScaled": "1000",
             "priceTicks": "12345",
         }
     )
     assert order.symbol_id == 7
-    assert order.side in ("buy", "BUY".lower())
+    assert order.side == "buy"
+    assert order.status == "working"
     assert order.order_type == "limit"
+    assert order.orig_qty is not None and order.orig_qty.scaled == 1000
     assert order.client_order_id == "cid-1"
 
 
@@ -39,9 +42,13 @@ def test_decode_orders_list() -> None:
 
 
 def test_decode_order_mutation() -> None:
-    result = decode_order_mutation({"status": "accepted", "orderId": "99", "clientOrderId": "cid"})
+    result = decode_order_mutation({"orderId": "99", "clientOrderId": "cid"})
     assert result.status == "accepted"
+    assert result.order_id == format_id(99)
     assert result.client_order_id == "cid"
+    canceled = decode_order_mutation({"status": "ACCEPTED", "orderId": "99"})
+    assert canceled.status == "accepted"
+    assert canceled.order_id == format_id(99)
 
 
 def test_decode_balances_list() -> None:

@@ -82,6 +82,9 @@ sub-account's balances. When balances cannot be read right now the call raises
 `AUTH_TEMPORARILY_UNAVAILABLE`, which `is_retryable_error(err)` reports
 retryable: retry, or omit `include_balances` for the rest of the view.
 
+<!-- readme-setup
+sub_id = "Bht3tfQZv8E"
+-->
 ```python
 view = await client.sub_accounts.get(sub_account_id=sub_id, include_balances=True)
 for row in view.balances.balances if view.balances else []:
@@ -96,6 +99,11 @@ caller's role or access does not move `revision` or `updated_at`, so apply each
 update as it arrives. `sub_accounts.list` and `sub_accounts.get` never set
 `removed`.
 
+<!-- readme-setup
+from polyester.models import SubAccount
+
+known: dict[str, SubAccount] = {}
+-->
 ```python
 subscription = await client.sub_accounts.subscribe()
 async with subscription:
@@ -408,7 +416,8 @@ matches. Only create again with that id if reconciliation shows the first
 attempt did not admit. When the server knows the order that already holds the
 id, the rejection carries it: `PolyesterApiError.existing_order_id` on a
 single create, `BatchCreateResultItem.existing_order_id` on a batch create
-item (empty otherwise).
+item and `BatchReplaceAdmissionItem.existing_order_id` on a batch replace item
+whose new client order ID is held (empty otherwise).
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create accepts at most 20 items; batch cancel and replace accept at
 most 50, and refuse an item field they don't support. `batch_create`
@@ -424,6 +433,8 @@ model (`trigger_price`, `trigger_price_source`, `order_type`, `limit_price`). Ch
 nested `child.execution` wrapper.
 
 ```python
+from polyester.models import ClientOrderId
+
 result = await client.orders.create(
     symbol="BTC-USDT",
     side="buy",
@@ -455,6 +466,8 @@ Decimal/str quote amounts use the pair's catalog `quote_quantity_scale`. Typed b
 and validate against `client.catalogs.quote_quantity_scale_for_symbol`.
 
 ```python
+from polyester import Quantity
+
 quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BTC-USDT")
 assert quote_scale is not None  # await client.wait_for_catalogs() first
 result = await client.orders.create(
@@ -511,6 +524,8 @@ A peg on a market order, with quote sizing or with `attached_risk` raises
 afterwards; read the order for the price it got.
 
 ```python
+from polyester.models import OrderPeg
+
 await client.orders.create(
     symbol="BTC-USDT", side="buy", order_type="limit", qty="1", price="61000",
     display_qty="0.1", peg=OrderPeg(reference="best_bid", offset_ticks=-1),
@@ -707,8 +722,15 @@ reads back from `orders.get`, `orders.list_open`, `orders.list_history` and
 `orders.subscribe` with `Order.batch_request_id` set to the receipt's
 `batch_request_id`; it is `""` for an order of any other origin.
 
+<!-- readme-setup
+order_id = "Bht3tfQZv8E"
+-->
 ```python
-receipt = await client.orders.batch_replace(symbol="BTC-USDT", items=items)
+from polyester.models import BatchReplaceItem, OrderId
+
+receipt = await client.orders.batch_replace(
+    symbol="BTC-USDT", items=[BatchReplaceItem(key=OrderId(order_id), new_price="64000")]
+)
 status = await client.orders.wait_batch_replace(batch_request_id=receipt.batch_request_id)
 for item in status.items:
     if item.phase == "rejected":
@@ -738,7 +760,12 @@ connections that opted in to cancel-on-disconnect all closed). Both are `None` f
 status. A number this SDK does not know yet reads `UNKNOWN_ERROR_CODE(n)` or
 `UNKNOWN_CANCEL_REASON(n)`; treat it as a generic refusal or end.
 
+<!-- readme-setup
+client_order_id = "my-bot-001"
+-->
 ```python
+from polyester.models import ClientOrderId
+
 order = (await client.orders.get(key=ClientOrderId(client_order_id))).order
 if order is not None and order.reject_reason == "post_only_cross":
     ...  # reprice and resend
@@ -746,8 +773,9 @@ if order is not None and order.reject_reason == "post_only_cross":
 
 A buy sized by a quote amount (`max_quote_debit`) that spends its amount, or a
 sell sized by `quote_proceeds` that receives its target, ends
-`filled`, with nothing remaining; `MARKET_REMAINDER` and `IOC_REMAINDER` mean
-the book, its price limit or the market's maximum quantity stopped it first.
+`filled`, with nothing remaining; a `cancel_reason` of `market_remainder` or
+`ioc_remainder` means the book, its price limit or the market's maximum
+quantity stopped it first.
 
 Orders carry their exact execution totals across the lineage. `avg_price` is
 the exact average execution price as a `Decimal` with up to 18 decimals
@@ -768,8 +796,14 @@ is left of its `submitted_max_quote_debit_scaled`. Both are `None` until
 again. Take the scales from the catalog
 (`catalogs.base_quantity_scale_for_symbol_id`, `quote_quantity_scale_for_symbol`).
 
+<!-- readme-setup
+order_id = "Bht3tfQZv8E"
+-->
 ```python
+from polyester.models import OrderId
+
 order = (await client.orders.get(key=OrderId(order_id))).order
+assert order is not None  # None only when the order is not found
 base_scale = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)
 quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BTC-USDT")
 used = order.quote_used(base_scale)
@@ -790,9 +824,15 @@ fill. A working order keeps the wait polling until it ends or `timeout`
 recorded so far on an order that is still working, read it with `orders.get`
 and compare its trades to `cum_qty`.
 
+<!-- readme-setup
+order_id = "Bht3tfQZv8E"
+-->
 ```python
+from polyester.models import OrderId
+
 detail = await client.orders.wait_for_order_trades_complete(key=OrderId(order_id), timeout=20.0)
-print(detail.order.status, len(detail.trades), "trades")
+if detail.order is not None:
+    print(detail.order.status, len(detail.trades), "trades")
 ```
 
 A cancel of an order that has already ended, a repeat of the cancel that ended
@@ -1005,7 +1045,8 @@ from datetime import UTC, datetime
 
 async for post in client.changelog.iter_posts():
     print(post.slug, post.title, post.breaking_change_count)
-post = await client.changelog.get_post("2026-09-24")
+full_post = await client.changelog.get_post("2026-09-24")
+print(full_post.summary.title, [section.heading for section in full_post.sections])
 for entry in await client.changelog.breaking_changes_since(datetime(2026, 9, 1, tzinfo=UTC)):
     print(entry.post_slug, entry.change.id, entry.change.title, entry.change.migration_guidance)
 async for group in client.changelog.iter_deployment_groups():
@@ -1163,6 +1204,9 @@ attached take-profit, stop-loss and trailing-stop triggers of one order. An
 unknown trigger type, or a parent order ID that is zero or not an order ID,
 raises `PolyesterValidationError` before sending.
 
+<!-- readme-setup
+order_id = "Bht3tfQZv8E"
+-->
 ```python
 ladders = await client.triggers.list(trigger_type="ladder", status="running")
 legs = await client.triggers.list(parent_order_id=order_id)
@@ -1217,7 +1261,12 @@ a `BatchReplaceItem`, alone or with a new price or quantity. It sends an empty
 risk policy, which the server reads as "no attached risk". With a
 `new_attached_risk` it raises before sending.
 
+<!-- readme-setup
+order_id = "Bht3tfQZv8E"
+-->
 ```python
+from polyester.models import OrderId
+
 await client.orders.modify(
     key=OrderId(order_id), symbol="BTC-USDT", new_price="64672.97", clear_attached_risk=True
 )
@@ -1361,14 +1410,14 @@ await client.triggers.create(
 reads.
 
 A trailing stop created with an activation price the market has already
-reached now ends `FAILED` with reason
-`TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (244).
+reached now ends `failed` with `failure_reason`
+`trigger_would_trigger_immediately` (244).
 `ModifyTrigger` and order modifies that would make it act at once are refused
 with `ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (302), leaving the
 existing state unchanged. To start trailing from the market, clear the
 activation price with a present zero. A stop-loss or take-profit created with a
 trigger price the watched price has already reached, the last or the index
-price alike, ends the same way: `FAILED` with reason 244, never armed and no
+price alike, ends the same way: `failed` with reason 244, never armed and no
 order placed. `triggers.create` returns before that, so read the trigger with
 `triggers.get` for its outcome, and place the order directly if you meant it to
 run at once.
@@ -1404,6 +1453,9 @@ again for their current IDs.
 `symbol` / `symbol_id` they target the trigger's own market. When given, it
 must be that market, and an API key limited to specific markets must give it.
 
+<!-- readme-setup
+trigger_id = "Bht3tfQZv8E"
+-->
 ```python
 await client.triggers.modify(trigger_id=trigger_id, trigger_price="82500")
 await client.triggers.resume(trigger_id=trigger_id)
@@ -1514,8 +1566,9 @@ SDK notes:
   (`smart_account_address`, and per balance `zipped_asset_id`,
   `unified_asset_id`, `chain_id`, `ztoken_address`, exact `amount_e18` and
   `amount`). A withdrawal Zipper rejects is refunded there, net of its kept
-  fee: its lifecycle flow ends `refunded`. `sub_account_id=` selects a
-  sub-account. An API key needs `READ_BALANCES`.
+  fee: its lifecycle flow ends `refunded`. `account=` or `sub_account_id=`
+  selects the account, as in [Choosing the account](#choosing-the-account). An
+  API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The receipt's `flow_id` reads the transfer's lifecycle flow with
   `client.lifecycle.get_flow(flow_id=...)`; the flow may become readable after the receipt.
@@ -1572,10 +1625,21 @@ transfers and other account-scoped ledger operations.
 
 Format u128 wire amounts with the public helper (18-decimal scale):
 
+<!-- readme-setup
+balance = (await client.balances.list()).balances[0]
+-->
 ```python
 from polyester import format_ledger_u128
 
 print(format_ledger_u128(balance.funding), format_ledger_u128(balance.trading))
+```
+
+```pycon
+>>> from polyester import format_ledger_u128
+>>> format_ledger_u128("1500000000000000000")
+'1.5'
+>>> format_ledger_u128(25_000_000, scale=6)
+'25'
 ```
 
 ### Deposit and withdrawal routes
@@ -1631,6 +1695,9 @@ ends (`epoch_ends`). When `next_after_trade_id` equals the ID you sent,
 nothing newer is available yet; retry later with backoff. `after_trade_id`
 cannot be combined with the time range, side or page token.
 
+<!-- readme-setup
+def handle(trade: object) -> None: ...
+-->
 ```python
 after = 0
 while True:
@@ -1710,6 +1777,9 @@ acts on none. Poll it, and treat an age far above 30 s, such as 90 s, as a stall
 `refresh_snapshot()`, or close and subscribe again. A sync subscription offers the same
 method.
 
+<!-- readme-setup
+book_sub = await client.orderbook.create_subscription(symbol="BTC-USDT", depth=10)
+-->
 ```python
 if book_sub.since_last_publication() > 90:
     await book_sub.refresh_snapshot()
@@ -1924,8 +1994,15 @@ that runs on the client loop,
 `subscribe_sync` (`PolyesterRealtimeError`) and `Polyester.close()`. Make those
 calls from another thread.
 
+<!-- readme-setup
+from polyester import Polyester
+
+client: Polyester
+-->
 ```python
-holder = {}
+from polyester.sync_subscribe import SyncSubscription
+
+holder: dict[str, SyncSubscription] = {}
 
 def on_event(trade):
     print(trade)
@@ -2041,6 +2118,9 @@ same account, participation, scope and order; only `limit` may change.
 One chain transaction can reference multiple lifecycle flows when operations
 are bundled. Transaction lookups therefore return a page, not one flow:
 
+<!-- readme-setup
+tx_hash = "0x" + "00" * 32
+-->
 ```python
 page = await client.lifecycle.list_flows_by_tx(tx_hash=tx_hash, limit=50)
 flow_ids = [flow.intent_id for flow in page.flows]
@@ -2111,6 +2191,8 @@ and a catalog that does not validate, fails at once. No other call is retried
 this way, and mutations never are.
 
 ```python
+from polyester import PolyesterCatalogHydrationError
+
 try:
     await client.wait_for_catalogs()
 except PolyesterCatalogHydrationError as err:
@@ -2250,7 +2332,7 @@ already linked to another account; it is terminal, and
 wallet already uses.
 
 ```python
-from polyester import AUTH_IP_NOT_ALLOWED, auth_error_code
+from polyester import AUTH_IP_NOT_ALLOWED, PolyesterAuthError, auth_error_code
 
 try:
     await client.orders.list_open()

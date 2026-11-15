@@ -1644,6 +1644,7 @@ each leg's `status`: `"accepted"`, `"pending"` (outcome not known yet),
 `"refused"` (with `error_code` such as `"insufficient_funds"`) or
 `"not_submitted"`. Retry with the same key and the same legs to read pending
 legs and run the ones not yet accepted; accepted legs answer the same transfers.
+Each leg's `destination` is the destination the server resolved for it.
 
 ```python
 from polyester.models import InternalTransferLeg
@@ -2232,7 +2233,10 @@ the flows it owns and the transfers it receives, including those no chain
 transaction started, such as a transfer between Trading accounts or a Trading
 withdrawal not yet sent to a chain. `account=` or `sub_account_id=` selects the
 account as in [Choosing the account](#choosing-the-account). An API key needs
-`READ_FUNDING_FLOWS`. `limit` is at most 500.
+`READ_FUNDING_FLOWS`. `limit` is at most 500. They filter by `flow_kind`,
+`flow_state`, `tx_ref`, `polyester_chain_ids`, `zipped_asset_ids` and
+`unified_asset_ids` (each at most 100 unique positive IDs), ordered by
+`order_by` (`"last_activity"` or `"started_at"`).
 
 Each row's `participation` says how the account takes part: `"owner"` (its
 deposit, withdrawal, or a transfer it sent, including a move between its own

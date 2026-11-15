@@ -877,7 +877,9 @@ class InternalTransferBatchLegResult(msgspec.Struct, kw_only=True, omit_defaults
     accepted or not-submitted leg, and ``"UNKNOWN_ERROR_CODE(n)"`` for a code
     this SDK does not know. ``accepted_at_ts_ns`` is the acceptance time in
     nanoseconds since the Unix epoch, ``None`` before the leg is accepted.
-    ``quantity`` is the echoed amount, exact at 18 decimals.
+    ``quantity`` is the echoed amount, exact at 18 decimals. ``destination``
+    is the destination the server resolved for the leg, ``None`` when the
+    reply carries none.
     """
 
     leg_index: int = 0
@@ -889,8 +891,20 @@ class InternalTransferBatchLegResult(msgspec.Struct, kw_only=True, omit_defaults
     asset_id: int = 0
     asset_code: str = ""
     quantity: AssetAmount | None = None
+    destination: ResolvedDestination | None = None
     error_code: str = ""
     error_message: str = ""
+
+
+class ResolvedDestination(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The destination the server resolved for a transfer: the destination's
+    root account public ID, its sub-account public ID when the transfer
+    targets one, and its smart account address. Each is "" when the server
+    does not name it."""
+
+    root_account_public_id: str = ""
+    subaccount_public_id: str = ""
+    smart_account_address: str = ""
 
 
 class InternalTransferBatchResult(msgspec.Struct, kw_only=True, omit_defaults=True):

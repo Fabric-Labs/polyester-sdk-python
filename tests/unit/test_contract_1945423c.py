@@ -1029,11 +1029,12 @@ async def test_iter_account_flows_follows_pages_with_the_same_request() -> None:
     assert all(s.participation == lr.PARTICIPATION_OWNER and s.limit == 10 for s in sent)
 
 
-async def test_ladder_refused_for_request_quota_keeps_its_cause_on_the_rate_limit() -> None:
+@pytest.mark.parametrize("level", [0, 2])
+async def test_ladder_refused_for_request_quota_keeps_its_cause_on_the_rate_limit(level) -> None:
     detail = orders_pb2.ErrorDetail(
         code=orders_pb2.ERROR_CODE_LADDER_LEVEL_REJECTED,
         cause_code=orders_pb2.ERROR_CODE_RATE_LIMIT_EXCEEDED,
-        level_index=2,
+        level_index=level,
     )
     detail.rate_limit.retry_after_ms = 1500
     err = await _raised(
@@ -1042,5 +1043,69 @@ async def test_ladder_refused_for_request_quota_keeps_its_cause_on_the_rate_limi
     )
     assert isinstance(err, PolyesterRateLimitError)
     assert err.code == "ERROR_CODE_LADDER_LEVEL_REJECTED"
-    assert (err.cause_code, err.level_index) == ("ERROR_CODE_RATE_LIMIT_EXCEEDED", 2)
+    assert (err.cause_code, err.level_index) == ("ERROR_CODE_RATE_LIMIT_EXCEEDED", level)
     assert err.retry_after == 1.5
+
+
+async def test_batch_create_reads_each_legs_resolved_destination() -> None:
+    destination = it_pb2.ResolvedDestination(
+        root_account_public_id="AAo8yKqygTg",
+        subaccount_public_id="AAo8yKqygTh",
+        smart_account_address=_ADDRESS,
+    )
+    reply = it_pb2.BatchCreateInternalTransfersResponse(
+        request_id="batch-1",
+        status=it_pb2.BATCH_SUBMITTED,
+        legs=[_accepted(0, destination=destination), _accepted(1)],
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        result = await client.internal_transfers.batch_create(legs=_legs(2), idempotency_key="k")
+    got = result.legs[0].destination
+    assert got is not None
+    assert got.root_account_public_id == "AAo8yKqygTg"
+    assert got.subaccount_public_id == "AAo8yKqygTh"
+    assert got.smart_account_address == _ADDRESS
+    assert result.legs[1].destination is None
+
+
+async def test_list_account_flows_sends_every_filter() -> None:
+    async with _client(_ok(lr.ListAccountFlowsResponse())) as (client, requests):
+        await client.lifecycle.list_account_flows(
+            flow_kind="withdraw",
+            flow_state="PENDING_LEDGER",
+            order_by="started_at",
+            tx_ref="0xabc",
+            polyester_chain_ids=[7],
+            zipped_asset_ids=[3, 4],
+            unified_asset_ids=list(range(1, 101)),
+        )
+    sent = lr.ListAccountFlowsRequest.FromString(requests[0].body)
+    assert sent.flow_kind == types_pb2.KIND_WITHDRAW
+    assert sent.flow_state == types_pb2.STATE_PENDING_LEDGER
+    assert sent.order_by == lr.ORDER_BY_STARTED_AT
+    assert sent.tx_ref == "0xabc"
+    assert list(sent.polyester_chain_ids) == [7]
+    assert list(sent.zipped_asset_ids) == [3, 4]
+    assert list(sent.unified_asset_ids) == list(range(1, 101))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"flow_kind": "sideways"},
+        {"flow_kind": "unspecified"},
+        {"flow_state": "sideways"},
+        {"order_by": "sideways"},
+        {"polyester_chain_ids": [0]},
+        {"zipped_asset_ids": [3, 3]},
+        {"unified_asset_ids": list(range(1, 102))},
+        {"unified_asset_ids": [1.0]},
+        {"polyester_chain_ids": [True]},
+        {"tx_ref": 5},
+    ],
+)
+async def test_list_account_flows_refuses_out_of_contract_filters_before_sending(kwargs) -> None:
+    async with _client(_ok(lr.ListAccountFlowsResponse())) as (client, requests):
+        with pytest.raises(PolyesterValidationError):
+            await client.lifecycle.list_account_flows(**kwargs)
+    assert requests == []

@@ -7,6 +7,7 @@ from polyester.models import (
     InternalTransferBatchLegResult,
     InternalTransferBatchResult,
     InternalTransferResult,
+    ResolvedDestination,
 )
 from polyester.types.money import AssetAmount, QuantityDomain
 
@@ -111,6 +112,15 @@ def _batch_leg_from_proto(
             scale=LEDGER_SCALE,
             domain=QuantityDomain.LEDGER_E18,
             asset_id=asset_id,
+        ),
+        destination=(
+            ResolvedDestination(
+                root_account_public_id=msg.destination.root_account_public_id,
+                subaccount_public_id=msg.destination.subaccount_public_id,
+                smart_account_address=msg.destination.smart_account_address,
+            )
+            if msg.HasField("destination")
+            else None
         ),
         error_code=transfer_error_label(int(msg.error_code)),
         error_message=msg.error_message,

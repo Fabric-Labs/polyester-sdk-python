@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from google.protobuf.timestamp_pb2 import Timestamp
+
 from polyester.codecs.decode.invariants import (
     ts_ns_from_response,
     ts_ns_string_from_response,
@@ -69,6 +71,44 @@ def _field(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
         if key in data:
             return data[key]
     return default
+
+
+def _paired_ts_ns_field(
+    data: dict[str, Any],
+    ts_ns_keys: tuple[str, ...],
+    ts_keys: tuple[str, ...],
+    *,
+    context: str,
+) -> int | None:
+    """A response time in nanoseconds since the Unix epoch, as the protobuf
+    decoders read it: the exact ``*_ts_ns`` field, or its paired timestamp
+    (RFC 3339 text or a ``seconds``/``nanos`` object) when the nanosecond
+    field is unset; ``None`` when neither is sent (or a time before the epoch).
+    """
+    field_name = ts_ns_keys[-1]
+    exact = ts_ns_from_response(
+        _field(data, *ts_ns_keys, default=0) or 0, context=context, field_name=field_name
+    )
+    if exact:
+        return exact
+    raw = _field(data, *ts_keys)
+    if raw is None or raw == "":
+        return None
+    timestamp = Timestamp()
+    try:
+        if isinstance(raw, str):
+            timestamp.FromJsonString(raw)
+        elif isinstance(raw, dict):
+            timestamp.seconds = int(raw.get("seconds", 0) or 0)
+            timestamp.nanos = int(raw.get("nanos", 0) or 0)
+        else:
+            raise TypeError(type(raw).__name__)
+    except (TypeError, ValueError) as exc:
+        raise PolyesterResponseContractError(
+            context, f"{ts_keys[-1]} is not a valid timestamp: {raw!r}"
+        ) from exc
+    nanos = int(timestamp.seconds) * 1_000_000_000 + int(timestamp.nanos)
+    return nanos if nanos > 0 else None
 
 
 def _optional_scaled_field(data: dict[str, Any], *keys: str) -> str | None:
@@ -173,6 +213,12 @@ def decode_order_mutation(data: dict[str, Any]) -> OrderMutationResult:
         status=str(_field(data, "status", default="") or ""),
         order_id=_id_str(_field(data, "orderId", "order_id")),
         client_order_id=str(_field(data, "clientOrderId", "client_order_id", default="") or ""),
+        accepted_ts_ns=_paired_ts_ns_field(
+            data,
+            ("acceptedAtTsNs", "accepted_at_ts_ns"),
+            ("acceptedAt", "accepted_at"),
+            context="CreateOrder",
+        ),
     )
 
 
@@ -518,6 +564,7 @@ def decode_modify_order_result(data: dict[str, Any]) -> ModifyOrderResult:
         old_order_id=_id_str(_field(data, "oldOrderId", "old_order_id")),
         final_order_id=_id_str(_field(data, "finalOrderId", "final_order_id")),
         code=str(_field(data, "code", default="") or ""),
+        ts_ns=_paired_ts_ns_field(data, ("tsNs", "ts_ns"), ("ts",), context="ModifyOrder"),
     )
 
 
@@ -975,11 +1022,14 @@ def decode_batch_replace_result(data: dict[str, Any]) -> BatchReplaceOrdersResul
         results=results,
         accepted_count=int(_field(data, "acceptedCount", "accepted_count", default=0) or 0),
         rejected_count=int(_field(data, "rejectedCount", "rejected_count", default=0) or 0),
-        accepted_ts_ns=ts_ns_from_response(
-            _field(data, "acceptedTsNs", "accepted_ts_ns", default=0) or 0,
+        # The exact nanoseconds, or the paired timestamp when only that is sent.
+        accepted_ts_ns=_paired_ts_ns_field(
+            data,
+            ("acceptedTsNs", "accepted_ts_ns"),
+            ("acceptedTs", "accepted_ts"),
             context="BatchReplaceOrders",
-            field_name="accepted_ts_ns",
-        ),
+        )
+        or 0,
     )
 
 

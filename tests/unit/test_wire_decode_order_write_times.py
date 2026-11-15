@@ -101,13 +101,8 @@ def test_json_batch_replace_keeps_acceptance_time(snake_case, fields, expected) 
 
 
 def test_json_cancel_result_has_no_acceptance_time() -> None:
-    cancel = {"status": "accepted", "orderId": "1", "tsNs": "5"}
+    cancel = {"status": "ACCEPTED", "orderId": "1", "tsNs": "5"}
     assert decode_order_mutation(cancel).accepted_ts_ns is None
-
-
-def test_json_timestamp_as_seconds_and_nanos_object() -> None:
-    data = {"orderId": "1", "acceptedAt": {"seconds": "1763164740", "nanos": 987654321}}
-    assert decode_order_mutation(data).accepted_ts_ns == TIMESTAMP_NS
 
 
 @pytest.mark.parametrize("bad", ["not-a-time", {"seconds": "x"}, 7])

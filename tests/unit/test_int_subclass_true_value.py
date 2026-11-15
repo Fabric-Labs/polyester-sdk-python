@@ -92,3 +92,48 @@ def test_ids_scales_and_scaled_amounts_return_plain_ints() -> None:
         assert value in (42, 8) and type(value) is int
     amount = AssetAmount.from_scaled(LyingInt(5), scale=18, domain=QuantityDomain.ASSET, asset_id=2)
     assert int(amount.scaled) == 5 and type(amount.scaled) is int
+
+
+def _prepare(nonce: Any):
+    from polyester import AsyncPolyester
+    from tests.hardening_support import make_test_credentials
+
+    creds = make_test_credentials()
+    client = AsyncPolyester(
+        api_url="http://127.0.0.1:9",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    prepared = client.trading_withdraws.prepare_api_key_to_funding(
+        asset_id=LyingInt(2),
+        quantity="1",
+        idempotency_key="k",
+        deadline_ts_sec=LyingInt(1_800_000_000),
+        nonce=nonce,
+    )
+    return creds, prepared
+
+
+def test_prepared_signed_withdraw_signs_the_true_value_of_an_int_subclass() -> None:
+    from polyester.gen.chain.withdraw.v1 import withdraw_pb2
+
+    creds, prepared = _prepare(LyingInt(42))
+    request = withdraw_pb2.CreateTradingWithdrawRequest.FromString(prepared.request_bytes)
+    assert _u128(request.payload.nonce) == 42
+    assert request.payload.deadline_ts_sec == 1_800_000_000
+    assert request.payload.asset_id == 2
+    # The signature covers the payload that carries nonce 42.
+    payload_bytes = request.payload.SerializeToString(deterministic=True)
+    assert request.payload_signature == creds.sign_payload(payload_bytes)
+
+
+@pytest.mark.parametrize("nonce", [LyingInt(-1), LyingInt(0)])
+def test_prepared_signed_withdraw_refuses_a_non_positive_int_subclass_nonce(nonce: Any) -> None:
+    with pytest.raises(PolyesterValidationError, match="nonce"):
+        _prepare(nonce)
+
+
+def test_market_id_refuses_a_negative_int_subclass() -> None:
+    with pytest.raises(PolyesterValidationError, match="outside"):
+        market_id(LyingInt(-1), "market")

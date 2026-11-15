@@ -135,9 +135,11 @@ async def test_export_page_applies_the_default_sub_account_unless_named() -> Non
         service = AsyncStatementsService(transport, sub)
         await service.export_page(start_time=START, end_time=END)
         await service.export_page(start_time=START, end_time=END, sub_account_id=other)
+        await service.export_page(start_time=START, end_time=END, account="active")
         await service.export_page(start_time=START, end_time=END, account="main")
     sent = [ledger_read_pb2.ExportStatementRequest.FromString(r.body) for r in requests]
-    assert [s.subaccount_id for s in sent] == [9_000_000_001, 9_000_000_002, 9_000_000_001]
+    assert [s.subaccount_id for s in sent] == [9_000_000_001, 9_000_000_002, 9_000_000_001, 0]
+    assert not sent[3].HasField("subaccount_id")
     assert all(s.asset_id == 0 for s in sent)
 
 

@@ -5,8 +5,17 @@ from typing import Any, Literal
 from polyester.codecs.scalars import format_id, parse_account_id
 from polyester.errors import PolyesterValidationError
 
-# A dict selector names the sub-account under "subaccountId" or "sub_account_id",
-# as a public ID string or the numeric ID.
+# The account a call acts on:
+#
+# - ``None`` (unset) or ``"active"``: the client's ``default_sub_account_id``,
+#   or the main account when none is configured;
+# - ``"main"`` or ``""``: always the main account, whatever the default is;
+# - any other string: that sub-account's public ID;
+# - a dict naming the sub-account under ``"subaccountId"`` or
+#   ``"sub_account_id"``, as a public ID string or the numeric ID.
+#
+# Any other value raises ``PolyesterValidationError``. Pass ``account`` or
+# ``sub_account_id``, not both.
 AccountScope = (
     Literal["main", "active"] | str | dict[str, str] | dict[str, int] | dict[str, str | int]
 )
@@ -61,7 +70,9 @@ def scoped_sub_account_id(
     sub_account_id: str | int | None = None,
     default: str | None = None,
 ) -> str | None:
-    """Resolve sub-account scope from TS-style ``account`` or legacy ``sub_account_id``."""
+    """Resolve the sub-account of a call from ``account`` (see ``AccountScope``)
+    or the legacy ``sub_account_id``. ``None`` means the main account; the
+    default applies only when both are unset or ``account`` is ``"active"``."""
     return resolve_sub_account_from_scope(
         account=account,
         sub_account_id=sub_account_id,
@@ -79,8 +90,10 @@ def resolve_sub_account_from_scope(
         raise PolyesterValidationError("Pass account or sub_account_id, not both")
     if sub_account_id is not None:
         return resolve_sub_account_id(_public_id(sub_account_id, "sub_account_id"), default)
-    if account is None or account == "active" or account == "main":
+    if account is None or account == "active":
         return resolve_sub_account_id(None, default)
+    if account == "main" or account == "":
+        return None
     if isinstance(account, dict):
         scoped = account.get("subaccountId")
         if scoped is None or scoped == "":

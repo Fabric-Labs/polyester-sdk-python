@@ -24,8 +24,8 @@ class _StubService(ScopedSubAccountMixin):
     _default_sub_account_id = "default-sub"
 
 
-def test_resolve_sub_account_from_scope_main_uses_default() -> None:
-    assert resolve_sub_account_from_scope(account="main", default="sub-123") == "sub-123"
+def test_resolve_sub_account_from_scope_active_uses_default() -> None:
+    assert resolve_sub_account_from_scope(account="active", default="sub-123") == "sub-123"
     assert resolve_sub_account_from_scope(account="active", default=None) is None
 
 
@@ -51,7 +51,8 @@ def test_scoped_sub_account_id_prefers_account_scope() -> None:
 
 def test_scoped_sub_account_mixin_on_service() -> None:
     service = _StubService()
-    assert service._resolve_sub_account_id(account="main") == "default-sub"
+    assert service._resolve_sub_account_id(account="active") == "default-sub"
+    assert service._resolve_sub_account_id(account="main") is None
     assert service._resolve_sub_account_id(account={"subaccountId": "x"}) == "x"
 
 

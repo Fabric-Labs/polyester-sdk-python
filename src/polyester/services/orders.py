@@ -496,7 +496,19 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         new_attached_risk: dict | AttachedRisk | None = None,
         behavior: str | None = None,
         new_client_order_id: str | None = None,
+        clear_attached_risk: bool = False,
     ) -> ModifyOrderResult:
+        """Modify an open order: set at least one of ``new_price``, ``new_qty``,
+        ``new_attached_risk`` or ``clear_attached_risk``.
+
+        ``new_attached_risk`` replaces the order's attached take-profit,
+        stop-loss or trailing stop; ``None`` leaves them unchanged, and an
+        empty one (``{}`` or ``AttachedRisk()``) raises
+        :class:`PolyesterValidationError` before sending.
+        ``clear_attached_risk=True`` removes every attached leg, alone or with
+        a new price or quantity; with ``new_attached_risk`` it raises before
+        sending.
+        """
         await self._ensure_catalogs()
         symbol_id: int | None = None
         if self._wait_for_catalogs is not None:
@@ -522,6 +534,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             behavior=behavior,
             new_client_order_id=new_client_order_id,
             quantity_scale=scale,
+            clear_attached_risk=clear_attached_risk,
         )
         return await unary_auth_decoded(
             self._transport,

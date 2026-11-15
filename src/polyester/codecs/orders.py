@@ -1026,12 +1026,15 @@ def risk_policy_from_dict(
         return None
     if isinstance(data, AttachedRisk):
         data = _attached_risk_to_dict(data)
-        if not data:
-            raise PolyesterValidationError("attached_risk requires take_profit and/or a stop leg")
     elif not isinstance(data, dict):
         raise PolyesterValidationError("attached_risk must be an object or AttachedRisk")
     if not data:
-        return None
+        # An empty risk is never dropped: it would leave the order's legs as
+        # they were while the call succeeds.
+        message = "attached_risk requires take_profit and/or a stop leg"
+        if risk_field == "new_attached_risk":
+            message += "; to remove the order's attached risk, pass clear_attached_risk=True"
+        raise PolyesterValidationError(message)
     _reject_unknown_keys(data, _RISK_POLICY_KEYS, field_name="attached_risk")
 
     take_profit = _mapping_get(data, "take_profit", "takeProfit")
@@ -1104,8 +1107,43 @@ def risk_policy_from_dict(
 # Fields a batch item dictionary may carry. Account scope and order_id /
 # client_order_id keys are refused earlier with their own messages.
 _BATCH_REPLACE_ITEM_KEYS = frozenset(
-    {"key", "new_price", "new_qty", "new_client_order_id", "new_attached_risk"}
+    {
+        "key",
+        "new_price",
+        "new_qty",
+        "new_client_order_id",
+        "new_attached_risk",
+        "clear_attached_risk",
+    }
 )
+
+
+def replacement_risk_policy(
+    new_attached_risk: dict[str, Any] | AttachedRisk | None,
+    clear_attached_risk: object,
+    *,
+    symbol: str | None,
+) -> orders_pb2.RiskPolicy | None:
+    """The ``new_attached_risk`` of a modify or a batch replace item.
+
+    ``clear_attached_risk=True`` sends an empty ``RiskPolicy``, which removes
+    the order's take-profit, stop-loss and trailing stop; with a
+    ``new_attached_risk`` it raises. Otherwise ``None`` leaves the legs
+    unchanged, and an empty risk raises.
+    """
+    if not isinstance(clear_attached_risk, bool):
+        raise PolyesterValidationError("clear_attached_risk must be a bool")
+    if clear_attached_risk:
+        if new_attached_risk is not None:
+            raise PolyesterValidationError(
+                "pass new_attached_risk or clear_attached_risk=True, not both"
+            )
+        return orders_pb2.RiskPolicy()
+    # The request carries no side: the server applies the side rule to a
+    # trailing stop's maximum and answers ERROR_CODE_BAD_PRICE.
+    return risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
+
+
 _BATCH_CANCEL_ITEM_KEYS = frozenset({"key", "symbol_id"})
 
 
@@ -1123,6 +1161,7 @@ def batch_replace_item_to_proto(
             "new_qty": item.new_qty,
             "new_client_order_id": item.new_client_order_id,
             "new_attached_risk": item.new_attached_risk,
+            "clear_attached_risk": item.clear_attached_risk,
         }
     refuse_item_scope(item, "batch_replace")
     key = _item_order_key(item, label="each batch replace item")
@@ -1130,9 +1169,16 @@ def batch_replace_item_to_proto(
     new_price = item.get("new_price")
     new_qty = item.get("new_qty")
     new_attached_risk = item.get("new_attached_risk")
-    if new_price is None and new_qty is None and new_attached_risk is None:
+    clear_attached_risk = item.get("clear_attached_risk", False)
+    if (
+        new_price is None
+        and new_qty is None
+        and new_attached_risk is None
+        and clear_attached_risk is False
+    ):
         raise PolyesterValidationError(
-            "each batch item requires new_price, new_qty, and/or new_attached_risk"
+            "each batch item requires new_price, new_qty, new_attached_risk, "
+            "and/or clear_attached_risk"
         )
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
@@ -1148,9 +1194,7 @@ def batch_replace_item_to_proto(
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
         )
-    # The item carries no side: the server applies the side rule to a trailing
-    # stop's maximum and answers ERROR_CODE_BAD_PRICE.
-    risk = risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
+    risk = replacement_risk_policy(new_attached_risk, clear_attached_risk, symbol=symbol)
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
     return proto
@@ -1298,11 +1342,13 @@ def modify_order_to_proto(
     behavior: str | None = None,
     new_client_order_id: str | None = None,
     quantity_scale: int | None = None,
+    clear_attached_risk: bool = False,
 ) -> orders_pb2.ModifyOrderRequest:
-    if not new_price and not new_qty and not new_attached_risk:
+    if not new_price and not new_qty and new_attached_risk is None and clear_attached_risk is False:
         raise PolyesterValidationError(
-            "modify requires new_price, new_qty, and/or new_attached_risk"
+            "modify requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk"
         )
+    risk = replacement_risk_policy(new_attached_risk, clear_attached_risk, symbol=symbol)
 
     if symbol_id <= 0:
         raise PolyesterValidationError("modify requires a resolved symbol_id")
@@ -1338,9 +1384,6 @@ def modify_order_to_proto(
         proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
     if new_client_order_id:
         proto.new_client_order_id = required_client_id(new_client_order_id, "new_client_order_id")
-    # The modify request carries no side: the server applies the side rule to
-    # the trailing stop's maximum and answers ERROR_CODE_BAD_PRICE.
-    risk = risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
     return proto

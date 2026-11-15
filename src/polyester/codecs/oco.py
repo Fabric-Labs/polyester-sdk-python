@@ -77,7 +77,9 @@ def create_oco_to_proto(
     """Encode an OCO over ``qty`` of ``symbol`` that both legs trade on ``side``.
 
     ``client_list_id`` is the create's idempotency key; left out (``None``),
-    one is generated. Given, it must be 1 to 36 bytes in UTF-8, any
+    one is generated. ``self_trade_prevention_mode`` ``decrement`` and a leg's
+    ``trigger_price_source`` ``mark``, which the contract does not support on an
+    OCO, raise ``PolyesterValidationError``. Given, it must be 1 to 36 bytes in UTF-8, any
     characters, and is sent unchanged; otherwise ``PolyesterValidationError``.
     """
     if symbol_id <= 0:
@@ -105,9 +107,14 @@ def create_oco_to_proto(
         ),
     )
     if self_trade_prevention_mode is not None:
-        intent.self_trade_prevention_mode = self_trade_prevention_mode_to_proto(
-            self_trade_prevention_mode
-        )
+        mode = self_trade_prevention_mode_to_proto(self_trade_prevention_mode)
+        if mode == orders_pb2.DECREMENT:
+            # The contract does not support DECREMENT on an OCO.
+            raise PolyesterValidationError(
+                "self_trade_prevention_mode of an OCO must be expire_taker, expire_maker or "
+                "expire_both; decrement is not supported on an OCO"
+            )
+        intent.self_trade_prevention_mode = mode
     intent.take_profit.CopyFrom(_oco_leg(take_profit, field_name="take_profit", symbol=symbol))
     intent.stop_loss.CopyFrom(_oco_leg(stop_loss, field_name="stop_loss", symbol=symbol))
     proto = triggers_pb2.CreateOcoRequest(oco=intent)

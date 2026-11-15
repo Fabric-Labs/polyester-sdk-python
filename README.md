@@ -354,6 +354,23 @@ read the same way.
 from the process environment. This is a convenience helper, not the primary
 integration pattern.
 
+### Choosing the account
+
+Calls that act on an account take `account=` and, on most calls, the legacy
+`sub_account_id=`. The account is:
+
+| `account` | Account the call acts on |
+| --- | --- |
+| `None` (unset) | the client's `default_sub_account_id`, or the main account when none is set |
+| `"active"` | the same as `None` |
+| `"main"` or `""` | always the main account, whatever `default_sub_account_id` is |
+| a sub-account ID, such as `"Bht3tfQZv8E"` | that sub-account |
+| `{"subaccountId": id}` or `{"sub_account_id": id}` | that sub-account (a public ID string or the numeric ID) |
+
+A `sub_account_id` of `""` also means the main account, and a non-empty one
+names a sub-account. Pass `account` or `sub_account_id`, not both. Any other
+`account` value raises `PolyesterValidationError` before sending.
+
 ## Create and cancel orders
 
 ```python
@@ -550,8 +567,10 @@ raise it with no `code`.
 
 `self_trade_prevention_mode` (`expire_taker`, `expire_maker`, `expire_both`
 or `decrement`) sets the order's self-trade prevention on create, preview and
-batch create items, `triggers.create` and `triggers.create_oco`; omit it for
-the server default. `decrement` trades neither order: both are reduced by the
+batch create items and `triggers.create`; omit it for the server default.
+`triggers.create_oco` takes `expire_taker`, `expire_maker` or `expire_both`:
+the contract does not support `decrement` on an OCO, so it raises
+`PolyesterValidationError` before sending. `decrement` trades neither order: both are reduced by the
 quantity that would have traded, and the order left with none is canceled
 with `cancel_reason` `stp_decrement`. A resting order of yours can be reduced
 this way even if you never send `decrement`, when another order of the same
@@ -1189,6 +1208,20 @@ that runtime `AttachedRiskLegState` at `.state` with `status`, nanosecond
 armed/terminal timestamps, `trigger_id`, and `child_order_id`; absent policy
 fields remain unset. `Order` also exposes `post_only`. Create/modify accept the
 same policy shape as a dict or `AttachedRisk`.
+
+An empty attached risk (`{}` or `AttachedRisk()`) raises
+`PolyesterValidationError` before sending, on create, `orders.modify` and
+`orders.batch_replace`. To remove an order's take-profit, stop-loss and
+trailing stop, pass `clear_attached_risk=True` to `orders.modify`, or set it on
+a `BatchReplaceItem`, alone or with a new price or quantity. It sends an empty
+risk policy, which the server reads as "no attached risk". With a
+`new_attached_risk` it raises before sending.
+
+```python
+await client.orders.modify(
+    key=OrderId(order_id), symbol="BTC-USDT", new_price="64672.97", clear_attached_risk=True
+)
+```
 
 A stop-loss or take-profit with `order_type="market"` takes an optional
 slippage cap, `max_slippage_ticks` (Q9 ticks) or `max_slippage_bps` (1–10000

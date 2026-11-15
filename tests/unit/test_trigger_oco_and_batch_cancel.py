@@ -495,3 +495,30 @@ async def test_list_sends_any_client_list_id_within_36_bytes_unchanged(
     await client.triggers.list(client_list_id=client_list_id)
     [request] = server.requests("ListTriggers")
     assert request.client_list_id == client_list_id
+
+
+# The contract does not support DECREMENT self-trade prevention on an OCO, so
+# it is refused before sending, in any case; the other modes are sent.
+@pytest.mark.parametrize("mode", ["decrement", "DECREMENT"])
+async def test_create_oco_refuses_decrement_before_sending(oco_client, mode) -> None:
+    client, server = oco_client
+    server.answers["CreateOco"] = _created
+    with pytest.raises(PolyesterValidationError, match="decrement is not supported on an OCO"):
+        await _create_oco(client, self_trade_prevention_mode=mode)
+    assert server.seen == []
+
+
+@pytest.mark.parametrize(
+    ("mode", "wire"),
+    [
+        ("expire_taker", orders_pb2.EXPIRE_TAKER),
+        ("expire_maker", orders_pb2.EXPIRE_MAKER),
+        ("expire_both", orders_pb2.EXPIRE_BOTH),
+    ],
+)
+async def test_create_oco_sends_the_supported_self_trade_modes(oco_client, mode, wire) -> None:
+    client, server = oco_client
+    server.answers["CreateOco"] = _created
+    await _create_oco(client, self_trade_prevention_mode=mode)
+    [request] = server.requests("CreateOco")
+    assert request.oco.self_trade_prevention_mode == wire

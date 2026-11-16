@@ -14,7 +14,9 @@ from polyester.orderbook.local_book import parse_bucket_ticks
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.sync_subscribe import SyncSubscription
 
-INVALID_BUCKETS = ["abc", "-1", "0", "0.000", " ", "0.0000000001", "nan", "inf"]
+# A whitespace-only bucket is not empty: like a whitespace-only price, it is
+# refused. Whitespace around a valid price is ignored, as for every price.
+INVALID_BUCKETS = ["abc", "-1", "0", "0.000", " ", "\t \n", "0.0000000001", "nan", "inf"]
 
 
 def _catalogs() -> CatalogManager:
@@ -27,7 +29,14 @@ def _catalogs() -> CatalogManager:
 
 @pytest.mark.parametrize(
     ("bucket", "ticks"),
-    [(None, None), ("", None), ("0.01", 10_000_000), ("1", 1_000_000_000), ("0.000000001", 1)],
+    [
+        (None, None),
+        ("", None),
+        ("0.01", 10_000_000),
+        (" 0.01\t", 10_000_000),
+        ("1", 1_000_000_000),
+        ("0.000000001", 1),
+    ],
 )
 def test_parse_bucket_ticks_accepts_empty_and_positive_prices(bucket, ticks) -> None:
     assert parse_bucket_ticks(bucket) == ticks

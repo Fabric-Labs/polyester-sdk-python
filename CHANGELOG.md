@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.33.0
+
+Git tag: `v0.33.0`. Released 2026-11-16. Built on public contract `1945423`.
 
 - **Breaking:** An order book's client-side `bucket` must be `None` or `""` (no bucketing) or a positive price with at most 9 decimal places, such as `"0.01"`. An invalid bucket such as `"abc"`, `"-1"` or `"0"` raises `PolyesterValidationError`, saying what is valid: from `orderbook.create_subscription` before connecting, and from `set_bucket`, which keeps the current bucket (the sync subscription's `set_bucket` raises in the calling thread). It was silently ignored and the book was rendered without bucketing. Affected: `orderbook.create_subscription(bucket=...)`, `OrderbookSubscription.set_bucket`, `SyncSubscription.set_bucket`, `polyester.orderbook.local_book.parse_bucket_ticks`. Migration: pass `None` for no bucketing and handle `PolyesterValidationError` from `set_bucket` where the bucket comes from user input.
 - **Breaking:** A zero or negative `new_price` or `new_qty` in `orders.modify` and in a batch replace item raises `PolyesterValidationError` (`new_price must be positive`, `new_qty must be positive`) before sending, in every form: `int`, `float`, `Decimal`, `str` and a typed `Price`. A string `"0"` price was sent as 0 ticks, which the API reads as no change, so the price was silently kept; a numeric `0` reported that the modify had nothing to change. `new_price` and `new_qty` are now checked for presence (`is not None`), not truthiness. Affected: `orders.modify`, `orders.batch_replace`, `codecs.orders.modify_order_to_proto`, `codecs.orders.batch_replace_item_to_proto`, `codecs.orders.batch_replace_orders_to_proto`. Migration: leave `new_price` or `new_qty` `None` to keep the order's price or quantity.

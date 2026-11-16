@@ -32,6 +32,11 @@ class OrderbookSubscription:
         self._publication_age = publication_age or (lambda: time.monotonic() - started)
 
     def set_bucket(self, bucket: str | None) -> None:
+        """Change the price bucket: ``None`` or ``""`` turns bucketing off.
+
+        An invalid bucket raises :class:`PolyesterValidationError` and keeps the current
+        bucket; see ``parse_bucket_ticks``.
+        """
         self._set_bucket(bucket)
 
     def since_last_publication(self) -> float:

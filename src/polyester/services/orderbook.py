@@ -9,8 +9,8 @@ from collections.abc import Callable
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.orderbook import (
-    depth_to_connect_enum,
     orderbook_snapshot_depth,
+    orderbook_snapshot_wire_depth,
     orderbook_stream_tier,
     require_published_stream_depth,
 )
@@ -64,18 +64,24 @@ class AsyncOrderbookService(BaseService):
         return scale
 
     async def get(self, *, symbol: str, depth: int = 50) -> OrderbookData:
-        from polyester.gen.orderbook.v1 import orderbook_pb2
+        """Snapshot of ``symbol`` with up to ``depth`` levels per side.
 
-        # Report the depth requested on the wire, not the one passed.
-        depth = orderbook_snapshot_depth(depth)
-        depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(depth))
+        ``depth`` is any level count from 1 to the ``max_depth`` every snapshot reports
+        (5,000 by default), sent as given; 0 selects the default of 50, and the result's
+        ``depth`` reads 50. A depth above ``max_depth`` is refused by the server with
+        ``INVALID_ARGUMENT`` (:class:`PolyesterValidationError`), never truncated. A
+        negative depth, one above the uint32 range, or a value that is not an integer, is
+        refused before any request.
+        """
+        wire_depth = orderbook_snapshot_wire_depth(depth)
+        depth = orderbook_snapshot_depth(wire_depth)
         # Levels are decoded with the pair's catalog quantity scale.
         await self._ensure_catalogs()
         request = GetOrderBookRequest(
             symbol_id=resolve_symbol_id(
                 self._catalogs, symbol=symbol, symbol_id=None, label="orderbook.get"
             ),
-            depth=depth_enum,
+            depth=wire_depth,
         )
         return await unary_public_decoded(
             self._transport,
@@ -227,12 +233,9 @@ class AsyncOrderbookService(BaseService):
                 emit()
 
         async def fetch_snapshot():
-            from polyester.gen.orderbook.v1 import orderbook_pb2
-
             # At the tier, not the requested depth: deltas diff the tier's whole view, and a
             # level promoted into a trimmed view must already be known.
-            depth_enum = getattr(orderbook_pb2, depth_to_connect_enum(stream_depth))
-            request = GetOrderBookRequest(symbol_id=resolved_symbol_id, depth=depth_enum)
+            request = GetOrderBookRequest(symbol_id=resolved_symbol_id, depth=stream_depth)
             return await unary_public_decoded(
                 self._transport,
                 OrderbookServiceClient,

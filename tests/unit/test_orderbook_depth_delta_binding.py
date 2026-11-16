@@ -110,6 +110,8 @@ def _snapshot_service(monkeypatch, *, levels: int = 1):
             orderbook_pb2.GetOrderBookResponse(
                 symbol_id=request.symbol_id,
                 book_seq=7,
+                book_epoch=3,
+                max_depth=5000,
                 available=True,
                 bids=[
                     orderbook_pb2.PriceLevel(price_ticks=52_320_000_000 - i, qty_scaled=5)
@@ -126,41 +128,56 @@ def _snapshot_service(monkeypatch, *, levels: int = 1):
     return AsyncOrderbookService(MagicMock(), catalogs=_catalogs()), requests
 
 
-# POLY-8586: the reported depth is the depth requested on the wire. A depth between
-# snapshot depths rides the smallest one covering it, 0 is the default 50, and a
-# depth below 0 or above 1000 is refused before any request.
+# The depth is a level count sent as given: no rounding to the old fixed depths and no
+# local maximum, since the server reports its own (max_depth). 0 is sent as 0, the
+# server's default of 50, which the result reports. Only what the uint32 field cannot
+# carry, or a value that is not an integer, is refused before any request.
 @pytest.mark.parametrize(
     ("depth", "wire", "reported"),
     [
-        (1, "DEPTH_1", 1),
-        (2, "DEPTH_5", 5),
-        (5, "DEPTH_5", 5),
-        (10, "DEPTH_10", 10),
-        (11, "DEPTH_20", 20),
-        (15, "DEPTH_20", 20),
-        (20, "DEPTH_20", 20),
-        (0, "DEPTH_50", 50),
-        (21, "DEPTH_50", 50),
-        (101, "DEPTH_200", 200),
-        (501, "DEPTH_1000", 1000),
-        (1000, "DEPTH_1000", 1000),
+        (0, 0, 50),
+        (1, 1, 1),
+        (2, 2, 2),
+        (11, 11, 11),
+        (50, 50, 50),
+        (1001, 1001, 1001),
+        (2500, 2500, 2500),
+        (5000, 5000, 5000),
+        (6000, 6000, 6000),
+        (2**32 - 1, 2**32 - 1, 2**32 - 1),
     ],
 )
-async def test_snapshot_reports_wire_depth(
-    monkeypatch, depth: int, wire: str, reported: int
+async def test_snapshot_sends_depth_as_given(
+    monkeypatch, depth: int, wire: int, reported: int
 ) -> None:
     service, requests = _snapshot_service(monkeypatch)
     book = await service.get(symbol="BTC-USDT", depth=depth)
-    assert [orderbook_pb2.Depth.Name(r.depth) for r in requests] == [wire]
+    assert [r.depth for r in requests] == [wire]
     assert book.depth == reported
 
 
-@pytest.mark.parametrize("depth", [-1, -2, 1001, 5000, True, 2.5])
+@pytest.mark.parametrize("depth", [-1, -2, 2**32, True, 2.5, "20", None])
 async def test_snapshot_refuses_unsupported_depth_before_request(monkeypatch, depth) -> None:
     service, requests = _snapshot_service(monkeypatch)
     with pytest.raises(PolyesterValidationError, match="depth"):
         await service.get(symbol="BTC-USDT", depth=depth)
     assert requests == []
+
+
+async def test_snapshot_carries_epoch_and_max_depth(monkeypatch) -> None:
+    service, _ = _snapshot_service(monkeypatch)
+    book = await service.get(symbol="BTC-USDT", depth=20)
+    assert (book.book_seq, book.book_epoch, book.max_depth) == ("7", "3", 5000)
+
+
+def test_snapshot_without_max_depth_decodes_zero() -> None:
+    book = orderbook_from_proto(
+        orderbook_pb2.GetOrderBookResponse(symbol_id=1, available=False),
+        symbol="BTC-USDT",
+        depth=50,
+        quantity_scale=8,
+    )
+    assert (book.book_epoch, book.max_depth, book.available) == ("0", 0, False)
 
 
 def _assert_bound(levels, symbol: str) -> None:

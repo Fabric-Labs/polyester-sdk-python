@@ -256,8 +256,8 @@ Recognized retry-later Connect `resource_exhausted` and REST admission-limit res
 server attaches `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), inspect `error.detail` for `policy_class`, `scope`,
 `operation_id`, and presence-aware quota fields. A REST `RATE_LIMIT_EXCEEDED` problem raises the
-same `PolyesterRateLimitError`, whichever side refused, with its `rate_limit` object in
-`error.detail`; every field is optional. The gateway's own refusal names only `reason` and `scope`
+same `PolyesterRateLimitError`, whichever side refused, with its `rateLimit` object (camelCase
+fields such as `operationId` and `retryAfterMs`) in `error.detail`; every field is optional. The gateway's own refusal names only `reason` and `scope`
 (`CLIENT_IP`, no `operation_id`); a service's also names the operation, the policy class and the
 remaining quota. The gateway's Connect refusal (`resource_exhausted`, "rate limit exceeded, retry
 later") has no detail at all. `retry_after` prefers `detail.retry_after_ms`, then `Retry-After` /
@@ -1873,12 +1873,30 @@ if not book.available:
     ...  # unknown book: retry later instead of quoting into an empty side
 ```
 
-`orderbook.get` takes the snapshot depths 1, 5, 10, 20, 50, 100, 200, 500 and 1000.
-Any other depth from 1 to 1000 requests the smallest of them that covers it, 20 for
-`11`, and 0 means 50; the result's `depth` is the depth requested
-(`polyester.codecs.orderbook.orderbook_snapshot_depth`). A depth below 0 or above
-1000, or one that isn't an exact integer, raises `PolyesterValidationError` before any
-request. An exact integer is an `int` or any type with `__index__`, such as a NumPy
+`orderbook.get` takes any level count per side from 1 to the `max_depth` every
+snapshot reports (5,000 by default), sent as given; 0 means the default 50, and the
+result's `depth` reads 50 then. A depth above `max_depth` is refused by the server
+with `PolyesterApiError` code `invalid_argument`, never truncated: read `max_depth`
+from any snapshot instead of assuming a limit. A negative depth, one above the uint32
+range, or one that isn't an exact integer, raises `PolyesterValidationError` before
+any request. Each snapshot also carries `book_epoch`, the epoch of its `book_seq`:
+order snapshots by `(book_epoch, book_seq)` with
+`polyester.orderbook.compare_snapshots(a, b)` (-1, 0 or 1), since a higher epoch is
+newer whatever its `book_seq` and a new epoch may restart `book_seq`; keep the newest
+and drop one of an older epoch. A snapshot is a frozen view at its own position: never
+apply stream deltas to it. A managed subscription's views carry `book_epoch` `""` and
+`max_depth` `0`, as the delta stream names no epoch.
+
+```python
+from polyester.orderbook import compare_snapshots
+
+deep = await client.orderbook.get(symbol="BTC-USDT", depth=2500)
+newer = await client.orderbook.get(symbol="BTC-USDT", depth=2500)
+if compare_snapshots(newer, deep) > 0:
+    deep = newer
+```
+
+An exact integer is an `int` or any type with `__index__`, such as a NumPy
 integer; `bool` and `float` are refused. The same rule applies to every depth and
 `limit` argument, and the SDK sends and reports a plain `int`.
 Each level's price and quantity carry the book's symbol, so passing one to an order

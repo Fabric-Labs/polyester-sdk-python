@@ -104,12 +104,12 @@ RATE_LIMIT_PROBLEM = {
                 "reason": "QUOTA_EXCEEDED",
                 "limit": "30",
                 "remaining": "0",
-                "retry_after_ms": "1409",
-                "policy_version": "5",
-                "operation_id": "auth.wallet_challenge",
-                "policy_class": "AUTH_PUBLIC",
+                "retryAfterMs": "1409",
+                "policyVersion": "5",
+                "operationId": "auth.wallet_challenge",
+                "policyClass": "AUTH_PUBLIC",
                 "scope": "AUTH_SUBJECT",
-                "refill_model": "CONTINUOUS",
+                "refillModel": "CONTINUOUS",
             },
             {
                 "Retry-After": "2",
@@ -151,7 +151,7 @@ RATE_LIMIT_PROBLEM = {
             id="gateway concurrency",
         ),
         pytest.param(
-            {"reason": "SOME_NEW_REASON", "limit": 30, "retry_after_ms": 250},
+            {"reason": "SOME_NEW_REASON", "limit": 30, "retryAfterMs": 250},
             None,
             RateLimitDetail(reason="SOME_NEW_REASON", limit=30, retry_after_ms=250),
             0.25,
@@ -163,7 +163,7 @@ async def test_rate_limit_problem_carries_its_detail(
     httpserver: HTTPServer, rate_limit, headers, detail, retry_after
 ) -> None:
     error = await _rest_error(
-        httpserver, 429, {**RATE_LIMIT_PROBLEM, "rate_limit": rate_limit}, headers=headers
+        httpserver, 429, {**RATE_LIMIT_PROBLEM, "rateLimit": rate_limit}, headers=headers
     )
     assert isinstance(error, PolyesterRateLimitError), repr(error)
     assert error.code == "ERROR_CODE_RATE_LIMIT_EXCEEDED"
@@ -292,6 +292,26 @@ async def test_wallet_already_linked_is_a_terminal_auth_refusal(
     assert not mutation_outcome_unknown(error)
 
 
+async def test_rate_limit_problem_reads_only_the_camel_case_member(
+    httpserver: HTTPServer,
+) -> None:
+    # The problem body spells the detail rateLimit with camelCase fields; the
+    # snake_case spelling it replaced is no longer read.
+    error = await _rest_error(
+        httpserver,
+        429,
+        {
+            **RATE_LIMIT_PROBLEM,
+            "rate_limit": {"reason": "QUOTA_EXCEEDED", "retry_after_ms": "1500"},
+            "rateLimit": {"reason": "QUOTA_EXCEEDED", "retry_after_ms": "1500", "scope": "ACCOUNT"},
+        },
+        headers={"Retry-After": "3"},
+    )
+    assert isinstance(error, PolyesterRateLimitError), repr(error)
+    assert error.detail == RateLimitDetail(reason="QUOTA_EXCEEDED", scope="ACCOUNT")
+    assert error.retry_after == 3.0
+
+
 def test_request_size_and_wallet_predicates_read_only_their_codes() -> None:
     assert not is_request_too_large(PolyesterApiError("x", code="PAYLOAD_TOO_LARGE"))
     assert not is_request_too_large(PolyesterRateLimitError("x", code="REQUEST_TOO_LARGE"))
@@ -321,11 +341,11 @@ async def test_rate_limit_problem_ignores_an_unreadable_integer(
         429,
         {
             **RATE_LIMIT_PROBLEM,
-            "rate_limit": {
+            "rateLimit": {
                 "reason": "QUOTA_EXCEEDED",
                 "scope": "CLIENT_IP",
                 "limit": retry_after_ms,
-                "retry_after_ms": retry_after_ms,
+                "retryAfterMs": retry_after_ms,
             },
         },
         headers={"Retry-After": "2"},

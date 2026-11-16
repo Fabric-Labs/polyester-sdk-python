@@ -6,11 +6,28 @@ from typing import Any
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.bps import (
+    MAX_BPS,
     MAX_SELL_SLIPPAGE_BPS,
     max_slippage_bps_for_side,
     validate_bps,
 )
 from polyester.codecs.correlation_id import optional_request_id, required_client_id
+from polyester.codecs.refusal_codes import (
+    BAD_PRICE,
+    CLIENT_TRIGGER_ID_INVALID,
+    FEE_ASSET_NOT_ALLOWED,
+    LADDER_LEVELS_INVALID,
+    MAX_SLIPPAGE_INVALID,
+    SLIPPAGE_BPS_INVALID,
+    SLIPPAGE_TICKS_INVALID,
+    TRAILING_DISTANCE_INVALID,
+    TRIGGER_ACTIVATION_PRICE_INVALID,
+    TRIGGER_PRICE_INVALID,
+    TRIGGER_QTY_INVALID,
+    TWAP_DURATION_INVALID,
+    TWAP_INTERVAL_INVALID,
+    refusal_code,
+)
 from polyester.codecs.scalars import (
     INT64_MAX,
     exact_integer,
@@ -147,6 +164,23 @@ LADDER_DISTRIBUTION_TO_PROTO = {
 }
 
 
+def _slippage_bps(value: object, *, max_value: int, allow_clear: bool = False) -> int:
+    """A ``max_slippage_bps``: 1 to 10000 (0 too with ``allow_clear``), and at most
+    ``max_value`` where 10000 would leave no price.
+
+    Outside 1 to 10000 is ``SLIPPAGE_BPS_INVALID``; 10000 where only 9999 applies (a
+    child that sells, any trailing stop) is ``MAX_SLIPPAGE_INVALID``, as the server
+    answers them.
+    """
+    with refusal_code(SLIPPAGE_BPS_INVALID):
+        parsed = validate_bps(value, "max_slippage_bps", allow_clear=allow_clear)
+    if parsed > max_value:
+        raise PolyesterValidationError(
+            f"max_slippage_bps must be between 1 and {max_value}", code=MAX_SLIPPAGE_INVALID
+        )
+    return parsed
+
+
 def _conditional_child(
     *,
     side: str,
@@ -177,10 +211,11 @@ def _conditional_child(
                 "a market child allows at most one of max_slippage_ticks or max_slippage_bps"
             )
         if max_slippage_ticks is not None:
-            market.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
+            with refusal_code(SLIPPAGE_TICKS_INVALID):
+                market.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         elif max_slippage_bps is not None:
-            market.max_slippage_bps = validate_bps(
-                max_slippage_bps, "max_slippage_bps", max_value=max_slippage_bps_for_side(side)
+            market.max_slippage_bps = _slippage_bps(
+                max_slippage_bps, max_value=max_slippage_bps_for_side(side)
             )
         return child
     if max_slippage_ticks is not None or max_slippage_bps is not None:
@@ -188,11 +223,12 @@ def _conditional_child(
             "max_slippage_ticks and max_slippage_bps apply to a market child only; "
             "a limit child is capped by its limit price"
         )
-    price_ticks = (
-        resolve_price_ticks(limit_price, "limit_price", symbol=symbol)  # type: ignore[arg-type]
-        if limit_price is not None
-        else None
-    )
+    with refusal_code(BAD_PRICE):
+        price_ticks = (
+            resolve_price_ticks(limit_price, "limit_price", symbol=symbol)  # type: ignore[arg-type]
+            if limit_price is not None
+            else None
+        )
     tif_key = tif.lower()
     if tif_key == "gtc":
         child.limit_gtc.SetInParent()
@@ -321,27 +357,32 @@ def create_trigger_to_proto(
         )
     side_proto = orders_pb2.BUY if side_key == "buy" else orders_pb2.SELL
 
-    intent = triggers_pb2.TriggerIntent(
-        symbol_id=symbol_id,
-        qty_scaled=resolve_qty_scaled(
+    with refusal_code(TRIGGER_QTY_INVALID):
+        qty_scaled = resolve_qty_scaled(
             qty,  # type: ignore[arg-type]
             quantity_scale,
             "qty",
             symbol=symbol,
             symbol_id=symbol_id,
-        ),
-    )
+        )
+    intent = triggers_pb2.TriggerIntent(symbol_id=symbol_id, qty_scaled=qty_scaled)
     # The contract requires an ID. A blank one is a caller's mistake: replacing
     # it would hide that a retry can no longer find its first attempt.
-    intent.client_trigger_id = (
-        required_client_id(client_trigger_id, "client_trigger_id")
-        if client_trigger_id
-        else f"trg-{uuid.uuid4().hex[:12]}"
-    )
+    with refusal_code(CLIENT_TRIGGER_ID_INVALID):
+        intent.client_trigger_id = (
+            required_client_id(client_trigger_id, "client_trigger_id")
+            if client_trigger_id
+            else f"trg-{uuid.uuid4().hex[:12]}"
+        )
     if fee_asset is not None:
         fee_key = fee_asset.lower()
         if fee_key not in FEE_ASSET_TO_PROTO:
             raise PolyesterValidationError("fee_asset must be quote or base")
+        # A sell pays its fee in quote, whatever the strategy.
+        if side_key == "sell" and fee_key != "quote":
+            raise PolyesterValidationError(
+                "a sell trigger must use fee_asset=quote", code=FEE_ASSET_NOT_ALLOWED
+            )
         intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_key])
     if self_trade_prevention_mode is not None:
         intent.self_trade_prevention_mode = self_trade_prevention_mode_to_proto(
@@ -359,9 +400,10 @@ def create_trigger_to_proto(
             side=side_proto, trigger_price_source=price_source
         )
         if trigger_price is not None:
-            conditional.trigger_price_ticks = resolve_price_ticks(
-                trigger_price, "trigger_price", symbol=symbol
-            )  # type: ignore[arg-type]
+            with refusal_code(TRIGGER_PRICE_INVALID):
+                conditional.trigger_price_ticks = resolve_price_ticks(
+                    trigger_price, "trigger_price", symbol=symbol
+                )  # type: ignore[arg-type]
         conditional.child.CopyFrom(
             _conditional_child(
                 side=side_key,
@@ -387,12 +429,14 @@ def create_trigger_to_proto(
                 raise PolyesterValidationError(
                     "trailing_stop with side=buy requires limit_price (the maximum price)"
                 )
-            trailing.limit_price_ticks = resolve_price_ticks(
-                limit_price, "limit_price", symbol=symbol
-            )  # type: ignore[arg-type]
+            with refusal_code(BAD_PRICE):
+                trailing.limit_price_ticks = resolve_price_ticks(
+                    limit_price, "limit_price", symbol=symbol
+                )  # type: ignore[arg-type]
             if trailing.limit_price_ticks <= 0:
                 raise PolyesterValidationError(
-                    "trailing_stop with side=buy: limit_price must be positive (the maximum price)"
+                    "trailing_stop with side=buy: limit_price must be positive (the maximum price)",
+                    code=BAD_PRICE,
                 )
         elif limit_price is not None:
             raise PolyesterValidationError(
@@ -407,61 +451,68 @@ def create_trigger_to_proto(
             raise PolyesterValidationError(
                 "set at most one of max_slippage_ticks or max_slippage_bps"
             )
-        if trailing_distance_ticks is not None:
-            trailing.trailing_distance_ticks = tick_count(
-                trailing_distance_ticks, "trailing_distance_ticks"
-            )
-        if trailing_distance_bps is not None:
-            trailing.trailing_distance_bps = validate_bps(
-                trailing_distance_bps, "trailing_distance_bps"
-            )
+        with refusal_code(TRAILING_DISTANCE_INVALID):
+            if trailing_distance_ticks is not None:
+                trailing.trailing_distance_ticks = tick_count(
+                    trailing_distance_ticks, "trailing_distance_ticks"
+                )
+            if trailing_distance_bps is not None:
+                trailing.trailing_distance_bps = validate_bps(
+                    trailing_distance_bps, "trailing_distance_bps"
+                )
         if activation_price is not None:
-            trailing.activation_price_ticks = resolve_price_ticks(
-                activation_price, "activation_price", symbol=symbol
-            )  # type: ignore[arg-type]
+            with refusal_code(TRIGGER_ACTIVATION_PRICE_INVALID):
+                trailing.activation_price_ticks = resolve_price_ticks(
+                    activation_price, "activation_price", symbol=symbol
+                )  # type: ignore[arg-type]
             if side_key == "buy" and trailing.limit_price_ticks < trailing.activation_price_ticks:
                 raise PolyesterValidationError(
                     "trailing_stop with side=buy requires limit_price at least activation_price"
                 )
         if max_slippage_ticks is not None:
-            trailing.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
+            with refusal_code(SLIPPAGE_TICKS_INVALID):
+                trailing.max_slippage_ticks = tick_count(max_slippage_ticks, "max_slippage_ticks")
         if max_slippage_bps is not None:
             # Every trailing stop takes at most 9999 bps.
-            trailing.max_slippage_bps = validate_bps(
-                max_slippage_bps, "max_slippage_bps", max_value=MAX_SELL_SLIPPAGE_BPS
+            trailing.max_slippage_bps = _slippage_bps(
+                max_slippage_bps, max_value=MAX_SELL_SLIPPAGE_BPS
             )
     elif type_key == "twap":
         twap = intent.twap
         twap.side = side_proto
         # Left out, either is 0 on the wire, which the contract refuses.
-        for option, value in (
-            ("twap_duration_ms", twap_duration_ms),
-            ("twap_slice_interval_ms", twap_slice_interval_ms),
+        for option, value, code in (
+            ("twap_duration_ms", twap_duration_ms, TWAP_DURATION_INVALID),
+            ("twap_slice_interval_ms", twap_slice_interval_ms, TWAP_INTERVAL_INVALID),
         ):
             if value is None:
-                raise PolyesterValidationError(f"{option} is required for a twap")
-        twap.duration_ms = exact_integer(
-            twap_duration_ms,
-            "twap_duration_ms",
-            min_value=TWAP_DURATION_MS_MIN,
-            max_value=TWAP_DURATION_MS_MAX,
-        )
-        twap.slice_interval_ms = exact_integer(
-            twap_slice_interval_ms,
-            "twap_slice_interval_ms",
-            min_value=TWAP_SLICE_INTERVAL_MS_MIN,
-            max_value=TWAP_SLICE_INTERVAL_MS_MAX,
-        )
+                raise PolyesterValidationError(f"{option} is required for a twap", code=code)
+        with refusal_code(TWAP_DURATION_INVALID):
+            twap.duration_ms = exact_integer(
+                twap_duration_ms,
+                "twap_duration_ms",
+                min_value=TWAP_DURATION_MS_MIN,
+                max_value=TWAP_DURATION_MS_MAX,
+            )
+        with refusal_code(TWAP_INTERVAL_INVALID):
+            twap.slice_interval_ms = exact_integer(
+                twap_slice_interval_ms,
+                "twap_slice_interval_ms",
+                min_value=TWAP_SLICE_INTERVAL_MS_MIN,
+                max_value=TWAP_SLICE_INTERVAL_MS_MAX,
+            )
         if twap.slice_interval_ms > twap.duration_ms:
             raise PolyesterValidationError(
-                "twap_slice_interval_ms must not exceed twap_duration_ms"
+                "twap_slice_interval_ms must not exceed twap_duration_ms",
+                code=TWAP_INTERVAL_INVALID,
             )
         # TWAP children are market-IOC or limit-GTC only.
         if order_key == "limit":
             if limit_price is not None:
-                twap.limit_gtc.price_ticks = resolve_price_ticks(
-                    limit_price, "limit_price", symbol=symbol
-                )  # type: ignore[arg-type]
+                with refusal_code(BAD_PRICE):
+                    twap.limit_gtc.price_ticks = resolve_price_ticks(
+                        limit_price, "limit_price", symbol=symbol
+                    )  # type: ignore[arg-type]
             else:
                 twap.limit_gtc.SetInParent()
         else:
@@ -470,15 +521,14 @@ def create_trigger_to_proto(
                     "twap market_ioc allows at most one of max_slippage_ticks or max_slippage_bps"
                 )
             if max_slippage_ticks is not None:
-                twap.market_ioc.max_slippage_ticks = tick_count(
-                    max_slippage_ticks, "max_slippage_ticks"
-                )
+                with refusal_code(SLIPPAGE_TICKS_INVALID):
+                    twap.market_ioc.max_slippage_ticks = tick_count(
+                        max_slippage_ticks, "max_slippage_ticks"
+                    )
             elif max_slippage_bps is not None:
                 # A slice that sells takes at most 9999 bps.
-                twap.market_ioc.max_slippage_bps = validate_bps(
-                    max_slippage_bps,
-                    "max_slippage_bps",
-                    max_value=max_slippage_bps_for_side(side_key),
+                twap.market_ioc.max_slippage_bps = _slippage_bps(
+                    max_slippage_bps, max_value=max_slippage_bps_for_side(side_key)
                 )
             else:
                 twap.market_ioc.SetInParent()
@@ -490,21 +540,23 @@ def create_trigger_to_proto(
         ladder.SetInParent()
         price_min_ticks = None
         price_max_ticks = None
-        if ladder_price_min is not None:
-            price_min_ticks = resolve_price_ticks(
-                ladder_price_min, "ladder_price_min", symbol=symbol
-            )  # type: ignore[arg-type]
-        if ladder_price_max is not None:
-            price_max_ticks = resolve_price_ticks(
-                ladder_price_max, "ladder_price_max", symbol=symbol
-            )  # type: ignore[arg-type]
+        with refusal_code(TRIGGER_PRICE_INVALID):
+            if ladder_price_min is not None:
+                price_min_ticks = resolve_price_ticks(
+                    ladder_price_min, "ladder_price_min", symbol=symbol
+                )  # type: ignore[arg-type]
+            if ladder_price_max is not None:
+                price_max_ticks = resolve_price_ticks(
+                    ladder_price_max, "ladder_price_max", symbol=symbol
+                )  # type: ignore[arg-type]
         if (
             price_min_ticks is not None
             and price_max_ticks is not None
             and price_min_ticks >= price_max_ticks
         ):
             raise PolyesterValidationError(
-                "ladder_price_min must be strictly less than ladder_price_max"
+                "ladder_price_min must be strictly less than ladder_price_max",
+                code=TRIGGER_PRICE_INVALID,
             )
         if price_min_ticks is not None:
             ladder.price_min_ticks = price_min_ticks
@@ -512,13 +564,16 @@ def create_trigger_to_proto(
             ladder.price_max_ticks = price_max_ticks
         # Left out, levels is 0 on the wire, which the contract refuses.
         if ladder_levels is None:
-            raise PolyesterValidationError("ladder_levels is required for a ladder")
-        ladder.levels = exact_integer(
-            ladder_levels,
-            "ladder_levels",
-            min_value=LADDER_LEVELS_MIN,
-            max_value=LADDER_LEVELS_MAX,
-        )
+            raise PolyesterValidationError(
+                "ladder_levels is required for a ladder", code=LADDER_LEVELS_INVALID
+            )
+        with refusal_code(LADDER_LEVELS_INVALID):
+            ladder.levels = exact_integer(
+                ladder_levels,
+                "ladder_levels",
+                min_value=LADDER_LEVELS_MIN,
+                max_value=LADDER_LEVELS_MAX,
+            )
         if post_only:
             ladder.post_only = True
 
@@ -599,33 +654,35 @@ def modify_trigger_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if trigger_price is not None:
-        proto.trigger_price_ticks = resolve_price_ticks(
-            trigger_price, "trigger_price", symbol=symbol
-        )
-    if trailing_distance_ticks is not None:
-        proto.trailing_distance_ticks = tick_count(
-            trailing_distance_ticks, "trailing_distance_ticks"
-        )
-    if trailing_distance_bps is not None:
-        proto.trailing_distance_bps = validate_bps(
-            trailing_distance_bps,
-            "trailing_distance_bps",
-            allow_clear=True,
-        )
+        with refusal_code(TRIGGER_PRICE_INVALID):
+            proto.trigger_price_ticks = resolve_price_ticks(
+                trigger_price, "trigger_price", symbol=symbol
+            )
+    with refusal_code(TRAILING_DISTANCE_INVALID):
+        if trailing_distance_ticks is not None:
+            proto.trailing_distance_ticks = tick_count(
+                trailing_distance_ticks, "trailing_distance_ticks"
+            )
+        if trailing_distance_bps is not None:
+            proto.trailing_distance_bps = validate_bps(
+                trailing_distance_bps,
+                "trailing_distance_bps",
+                allow_clear=True,
+            )
     if activation_price is not None:
-        proto.activation_price_ticks = resolve_price_ticks(
-            activation_price, "activation_price", symbol=symbol
-        )
+        with refusal_code(TRIGGER_ACTIVATION_PRICE_INVALID):
+            proto.activation_price_ticks = resolve_price_ticks(
+                activation_price, "activation_price", symbol=symbol
+            )
     if max_slippage_ticks is not None:
         # Zero clears the cap.
-        proto.max_slippage_ticks = tick_count(
-            max_slippage_ticks, "max_slippage_ticks", allow_zero=True
-        )
+        with refusal_code(SLIPPAGE_TICKS_INVALID):
+            proto.max_slippage_ticks = tick_count(
+                max_slippage_ticks, "max_slippage_ticks", allow_zero=True
+            )
     if max_slippage_bps is not None:
-        proto.max_slippage_bps = validate_bps(
-            max_slippage_bps,
-            "max_slippage_bps",
-            allow_clear=True,
+        proto.max_slippage_bps = _slippage_bps(
+            max_slippage_bps, max_value=MAX_BPS, allow_clear=True
         )
     return proto
 

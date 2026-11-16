@@ -318,7 +318,7 @@ class PolyesterRateLimitError(PolyesterTransportError):
 
     ``detail`` is the structured ``polyester.ratelimit.v1.RateLimitDetail``
     payload when the server attached it: ConnectRPC details, an in-band order
-    rejection, or the ``rate_limit`` object of a REST ``RATE_LIMIT_EXCEEDED``
+    rejection, or the ``rateLimit`` object of a REST ``RATE_LIMIT_EXCEEDED``
     problem, whose fields are all optional. The gateway's own refusal names
     only ``reason`` and ``scope`` (``CLIENT_IP``, no ``operation_id``); a
     service's also names the operation, the policy class and the remaining

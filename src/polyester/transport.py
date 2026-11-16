@@ -370,7 +370,7 @@ def _raise_problem(
         http_status=response.status,
         problem=decode_http_problem(body, response.status),
         retry_after=retry_after,
-        rate_limit=body.get("rate_limit"),
+        rate_limit=body.get("rateLimit"),
         cause_code=cause_code if isinstance(cause_code, str) else "",
         level_index=(
             level_index

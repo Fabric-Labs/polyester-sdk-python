@@ -39,4 +39,6 @@ def orderbook_from_proto(
             for item in msg.asks
         ],
         available=bool(msg.available),
+        book_epoch=str(msg.book_epoch),
+        max_depth=int(msg.max_depth),
     )

@@ -2,6 +2,7 @@ from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.local_book import (
     apply_delta,
     build_orderbook_data,
+    compare_snapshots,
     levels_to_map,
     parse_bucket_ticks,
     side_to_levels,
@@ -11,6 +12,7 @@ __all__ = [
     "OrderBookDeltaUpdate",
     "apply_delta",
     "build_orderbook_data",
+    "compare_snapshots",
     "levels_to_map",
     "parse_bucket_ticks",
     "side_to_levels",

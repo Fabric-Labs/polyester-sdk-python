@@ -165,12 +165,23 @@ def build_orderbook_data(
 
 
 def parse_bucket_ticks(bucket: str | None) -> int | None:
-    if not bucket:
+    """Price ticks of an order book bucket; ``None`` or ``""`` is no bucketing.
+
+    Any other bucket must be a positive price with at most 9 decimal places, such as
+    ``"0.01"``; anything else raises :class:`PolyesterValidationError`.
+    """
+    if bucket is None or bucket == "":
         return None
     try:
-        return parse_price_ticks(bucket, "bucket")
-    except Exception:
-        return None
+        ticks = parse_price_ticks(bucket, "bucket")
+    except (PolyesterValidationError, TypeError, ValueError, ArithmeticError):
+        ticks = 0
+    if ticks <= 0:
+        raise PolyesterValidationError(
+            f"invalid orderbook bucket {bucket!r}: a bucket is a positive price with at "
+            'most 9 decimal places, such as "0.01", or empty for no bucketing'
+        )
+    return ticks
 
 
 def apply_delta(

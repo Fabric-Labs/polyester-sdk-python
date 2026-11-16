@@ -234,7 +234,8 @@ def test_bucket_aggregation_formats_decimal_levels() -> None:
 def test_parse_bucket_ticks() -> None:
     assert parse_bucket_ticks("0.01") == 10_000_000
     assert parse_bucket_ticks(None) is None
-    assert parse_bucket_ticks("not-a-price") is None
+    with pytest.raises(PolyesterValidationError, match="invalid orderbook bucket"):
+        parse_bucket_ticks("not-a-price")
 
 
 def test_bucket_side_rounds_asks_up() -> None:

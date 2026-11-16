@@ -131,8 +131,13 @@ class AsyncOrderbookService(BaseService):
         its levels and its next view reads ``available=False``, and it waits for the
         stream's next reset (or a new snapshot from ``refresh_snapshot`` or a reconnect)
         instead of fetching snapshots.
+
+        ``bucket`` is ``None`` or ``""`` for no bucketing, or a positive price with at most
+        9 decimal places, such as ``"0.01"``; any other bucket raises
+        :class:`PolyesterValidationError` before connecting, as ``set_bucket`` does.
         """
         stream_depth = orderbook_stream_tier(depth)
+        bucket_ticks: int | None = parse_bucket_ticks(bucket)
         # Views report a plain int, also for a NumPy depth.
         depth = operator.index(depth)
         realtime = require_realtime(self._realtime)
@@ -177,7 +182,6 @@ class AsyncOrderbookService(BaseService):
         last_view_unavailable = False
         recheck_delay = _UNAVAILABLE_SNAPSHOT_INITIAL_DELAY
         recheck_handle: asyncio.TimerHandle | None = None
-        bucket_ticks: int | None = parse_bucket_ticks(bucket)
         queue: asyncio.Queue[OrderbookData | None] = asyncio.Queue(maxsize=200)
         close = asyncio.Event()
         stream_holder: dict[str, AsyncSnapshotThenStreamSubscription | None] = {"stream": None}

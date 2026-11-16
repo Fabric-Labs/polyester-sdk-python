@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
 import msgspec
@@ -1149,6 +1150,46 @@ def replacement_risk_policy(
 _BATCH_CANCEL_ITEM_KEYS = frozenset({"key", "symbol_id"})
 
 
+_KEEP_UNCHANGED = {"new_price": "price", "new_qty": "quantity"}
+
+
+def _non_positive_error(field_name: str) -> PolyesterValidationError:
+    return PolyesterValidationError(
+        f"{field_name} must be positive; leave it None to keep the order's "
+        f"{_KEEP_UNCHANGED[field_name]}"
+    )
+
+
+def _refuse_non_positive(value: object, field_name: str) -> None:
+    """Refuse a zero or negative modify value in any numeric form, before it is resolved.
+
+    The wire reads a new price or quantity of 0 as no change, so a 0 would be dropped
+    silently. Values of other types and malformed strings are left to the resolver.
+    """
+    if isinstance(value, bool):
+        return
+    number: object = value
+    if isinstance(value, str):
+        try:
+            number = Decimal(value.strip())
+        except InvalidOperation:
+            return
+    if not isinstance(number, (int, float, Decimal)):
+        return
+    try:
+        non_positive = number <= 0
+    except InvalidOperation:  # Decimal NaN
+        return
+    if non_positive:
+        raise _non_positive_error(field_name)
+
+
+def _positive(resolved: int, field_name: str) -> int:
+    if resolved <= 0:
+        raise _non_positive_error(field_name)
+    return resolved
+
+
 def batch_replace_item_to_proto(
     item: BatchReplaceItem | dict[str, Any],
     *,
@@ -1185,12 +1226,19 @@ def batch_replace_item_to_proto(
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
     if new_price is not None:
+        _refuse_non_positive(new_price, "new_price")
         with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
-            proto.new_price_ticks = resolve_price_ticks(new_price, "new_price", symbol=symbol)
+            proto.new_price_ticks = _positive(
+                resolve_price_ticks(new_price, "new_price", symbol=symbol), "new_price"
+            )
     if new_qty is not None:
+        _refuse_non_positive(new_qty, "new_qty")
         with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
-            proto.new_qty_scaled = resolve_qty_scaled(
-                new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
+            proto.new_qty_scaled = _positive(
+                resolve_qty_scaled(
+                    new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
+                ),
+                "new_qty",
             )
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
@@ -1367,7 +1415,12 @@ def modify_order_to_proto(
     quantity_scale: int | None = None,
     clear_attached_risk: bool = False,
 ) -> orders_pb2.ModifyOrderRequest:
-    if not new_price and not new_qty and new_attached_risk is None and clear_attached_risk is False:
+    if (
+        new_price is None
+        and new_qty is None
+        and new_attached_risk is None
+        and clear_attached_risk is False
+    ):
         raise PolyesterValidationError(
             "modify requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk"
         )
@@ -1383,20 +1436,28 @@ def modify_order_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if new_price is not None:
+        _refuse_non_positive(new_price, "new_price")
         with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
-            proto.new_price_ticks = resolve_price_ticks(
-                new_price,  # type: ignore[arg-type]
+            proto.new_price_ticks = _positive(
+                resolve_price_ticks(
+                    new_price,  # type: ignore[arg-type]
+                    "new_price",
+                    symbol=symbol,
+                ),
                 "new_price",
-                symbol=symbol,
             )
     if new_qty is not None:
+        _refuse_non_positive(new_qty, "new_qty")
         with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
-            proto.new_qty_scaled = resolve_qty_scaled(
-                new_qty,  # type: ignore[arg-type]
-                _codec_quantity_scale(new_qty, quantity_scale),
+            proto.new_qty_scaled = _positive(
+                resolve_qty_scaled(
+                    new_qty,  # type: ignore[arg-type]
+                    _codec_quantity_scale(new_qty, quantity_scale),
+                    "new_qty",
+                    symbol=symbol,
+                    symbol_id=symbol_id,
+                ),
                 "new_qty",
-                symbol=symbol,
-                symbol_id=symbol_id,
             )
     if behavior:
         behavior_key = behavior.lower()

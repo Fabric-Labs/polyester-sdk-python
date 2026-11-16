@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 
 from polyester._sync_bridge import on_client_loop
 from polyester.errors import PolyesterRealtimeError
+from polyester.orderbook.local_book import parse_bucket_ticks
 from polyester.realtime.client import AsyncSubscription
 
 T = TypeVar("T")
@@ -40,11 +41,16 @@ class SyncSubscription:
         self._finished = False
 
     def set_bucket(self, bucket: str | None) -> None:
-        """Forward bucket changes to orderbook subscriptions (no-op otherwise)."""
+        """Forward bucket changes to orderbook subscriptions (no-op otherwise).
+
+        An invalid bucket raises :class:`PolyesterValidationError` here, in the caller,
+        and keeps the current bucket.
+        """
         if self._holder is None:
             return
         sub = self._holder.get("sub")
         if sub is not None and hasattr(sub, "set_bucket"):
+            parse_bucket_ticks(bucket)
             self._loop.call_soon_threadsafe(sub.set_bucket, bucket)
 
     def since_last_publication(self) -> float | None:

@@ -723,17 +723,13 @@ async def test_round4_read_retry_honours_every_answers_delay(
 
 
 async def test_round4_no_answer_carries_no_metadata() -> None:
-    import socket
-
     from polyester import AsyncPolyester
     from tests.hardening_support import make_test_credentials
 
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        port = sock.getsockname()[1]
+    # Port 1 on the loopback refuses the connection: no answer at all.
     creds = make_test_credentials()
     client = AsyncPolyester(
-        api_url=f"http://127.0.0.1:{port}",
+        api_url="http://127.0.0.1:1",
         api_key_id=creds.key_id,
         api_private_key=creds.private_key,
         hydrate_catalogs=False,

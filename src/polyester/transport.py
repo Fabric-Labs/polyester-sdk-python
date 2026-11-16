@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager, contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
 from http import HTTPStatus
-from math import isfinite
 from typing import Any, Literal, NoReturn
 
 import httpx
@@ -22,6 +21,7 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
 
+from polyester._answer import retry_after_from_headers
 from polyester._contract_codes import (
     carries_contract_code,
     decode_coded_detail,
@@ -115,16 +115,7 @@ class _AnswerError(ConnectError):
 def _retry_after_header(response: pyqwest.FullResponse) -> float | None:
     """The delay in seconds an answer asks for: ``Retry-After``, then
     ``Retry-After-Ms``, then ``Grpc-Retry-Pushback-Ms``; ``None`` without one."""
-    for header, divisor in (
-        ("retry-after", 1),
-        ("retry-after-ms", 1000),
-        ("grpc-retry-pushback-ms", 1000),
-    ):
-        with suppress(ValueError, TypeError):
-            value = float(response.headers.get(header, "")) / divisor
-            if isfinite(value) and value >= 0:
-                return value
-    return None
+    return retry_after_from_headers(response.headers)
 
 
 _CONNECT_CODES = frozenset(code.value for code in Code)

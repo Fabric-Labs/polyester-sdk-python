@@ -744,3 +744,22 @@ async def test_round4_no_answer_carries_no_metadata() -> None:
     assert isinstance(raised.value, PolyesterError), repr(raised.value)
     assert getattr(raised.value, "status_code", None) is None, repr(raised.value)
     assert getattr(raised.value, "retry_after", None) is None, repr(raised.value)
+
+
+# --- round 5: the status reported is the answer's own --------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        (503, '{"code":"unavailable","message":"busy"}'),
+        (429, '{"code":"unavailable","message":"busy"}'),
+        (503, '{"code":"unauthenticated","message":"temporarily unavailable"}'),
+        (503, '{"code":"permission_denied","message":"denied"}'),
+    ],
+)
+async def test_round5_status_is_the_answers_own(status: int, body: str) -> None:
+    error, _ = await _call("write", status, JSON, body, headers={"Retry-After": "30"})
+    assert error is not None
+    assert error.status_code == status, repr(error)
+    assert error.retry_after == 30, repr(error)

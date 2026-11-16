@@ -172,6 +172,9 @@ class PolyesterError(Exception):
     problem: HTTPProblem | None = None
     retry_after: float | None = None
     status_code: int | None = None
+    # The status the error mapping read a code as, kept for classification
+    # only; ``status_code`` reports the answer's own.
+    _admission_status: int | None = None
 
 
 class PolyesterAuthError(PolyesterError):
@@ -876,7 +879,10 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
             and not isinstance(err, (PolyesterRateLimitError, PolyesterTimestampSkewError))
             and not (
                 isinstance(err, PolyesterServerError)
-                and err.status_code == 503
+                and (
+                    err._admission_status if err._admission_status is not None else err.status_code
+                )
+                == 503
                 and (
                     _is_known_admission_refusal(err.code)
                     or (

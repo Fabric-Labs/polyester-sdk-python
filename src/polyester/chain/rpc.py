@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from polyester._answer import retry_after_from_headers
 from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
 
 # Reject oversized JSON-RPC bodies before decode (DoS / memory).
@@ -25,6 +26,30 @@ class JsonRpcError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.data = data
+
+
+class JsonRpcHttpError(JsonRpcError, httpx.HTTPStatusError):
+    """A JSON-RPC endpoint's failed HTTP answer. It is the ``httpx.HTTPStatusError``
+    httpx raises for it, and keeps the answer's ``status_code`` and the delay it
+    asked for with ``Retry-After`` (``retry_after``, seconds, ``None`` without
+    one)."""
+
+    def __init__(self, error: httpx.HTTPStatusError) -> None:
+        httpx.HTTPStatusError.__init__(
+            self, str(error), request=error.request, response=error.response
+        )
+        self.code = None
+        self.data = None
+        self.status_code = error.response.status_code
+        self.retry_after = retry_after_from_headers(error.response.headers)
+
+
+def _raise_for_status(response: httpx.Response) -> None:
+    """``response.raise_for_status()``, with the answer's metadata on its error."""
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise JsonRpcHttpError(exc) from exc
 
 
 class JsonRpcClient:
@@ -56,7 +81,7 @@ class JsonRpcClient:
         ):
             try:
                 with client.stream("POST", self._url, json=payload) as response:
-                    response.raise_for_status()
+                    _raise_for_status(response)
                     raw = _read_limited_sync(
                         response,
                         MAX_JSONRPC_RESPONSE_BYTES,
@@ -80,11 +105,14 @@ class JsonRpcClient:
         }
         try:
             async with asyncio.timeout(self._timeout):
-                async with httpx.AsyncClient(
-                    timeout=self._timeout,
-                    headers=_HTTP_HEADERS,
-                ) as client, client.stream("POST", self._url, json=payload) as response:
-                    response.raise_for_status()
+                async with (
+                    httpx.AsyncClient(
+                        timeout=self._timeout,
+                        headers=_HTTP_HEADERS,
+                    ) as client,
+                    client.stream("POST", self._url, json=payload) as response,
+                ):
+                    _raise_for_status(response)
                     raw = await _read_limited(response, MAX_JSONRPC_RESPONSE_BYTES)
         except TimeoutError as exc:
             raise JsonRpcError("json-rpc timed out") from exc

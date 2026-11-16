@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 import httpx
 
+from polyester._answer import attach_answer
 from polyester._problem import decode_http_problem
 from polyester._redact import url_for_error, url_without_userinfo
 from polyester._redirects import redirect_refusal
@@ -13,6 +14,7 @@ from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import (
     TIMESTAMP_SKEW,
     PolyesterAuthError,
+    PolyesterError,
     PolyesterRealtimeError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
@@ -170,36 +172,49 @@ async def signed_get(
                 else http.stream("GET", target, headers=headers, auth=auth, follow_redirects=False)
             )
             async with stream as response:
-                refusal = redirect_refusal(
-                    response.status_code, response.headers.get("location"), target
-                )
-                if refusal is not None:
-                    raise refusal
                 try:
-                    raw = await _read_limited(response, max_bytes, label=label)
-                except asyncio.CancelledError:
-                    # Ensure the streamed peer is aborted promptly on cancel (E6).
-                    await response.aclose()
-                    raise
-                if response.status_code == 403 and is_cloudflare_browser_ban(
-                    raw.decode("utf-8", errors="replace")
-                ):
-                    raise PolyesterTransportError(cloudflare_1010_message())
-                if response.status_code in (401, 403):
-                    raise _auth_http_error(
-                        status_code=response.status_code,
-                        label=label,
-                        endpoint=url_for_error(url),
-                        body=raw,
+                    return await _read_signed_answer(
+                        response, url=url, target=target, label=label, max_bytes=max_bytes
                     )
-                if response.status_code >= 400:
-                    truncated = _truncate_body(raw)
-                    detail = f": {truncated}" if truncated else ""
-                    raise PolyesterRealtimeError(f"{label}: HTTP {response.status_code}{detail}")
+                except PolyesterError as error:
+                    # Every error from a failed answer carries its status and delay.
+                    if response.status_code >= 300:
+                        attach_answer(error, response.status_code, response.headers)
+                    raise
     except TimeoutError as exc:
         raise PolyesterRealtimeError(f"{label}: timed out") from exc
     except httpx.TimeoutException as exc:
         raise PolyesterRealtimeError(f"{label}: timed out") from exc
+
+
+async def _read_signed_answer(
+    response: httpx.Response, *, url: str, target: str, label: str, max_bytes: int
+) -> bytes:
+    """A signed GET's answer: its body when it succeeded, else the error it maps to."""
+    refusal = redirect_refusal(response.status_code, response.headers.get("location"), target)
+    if refusal is not None:
+        raise refusal
+    try:
+        raw = await _read_limited(response, max_bytes, label=label)
+    except asyncio.CancelledError:
+        # Ensure the streamed peer is aborted promptly on cancel (E6).
+        await response.aclose()
+        raise
+    if response.status_code == 403 and is_cloudflare_browser_ban(
+        raw.decode("utf-8", errors="replace")
+    ):
+        raise PolyesterTransportError(cloudflare_1010_message())
+    if response.status_code in (401, 403):
+        raise _auth_http_error(
+            status_code=response.status_code,
+            label=label,
+            endpoint=url_for_error(url),
+            body=raw,
+        )
+    if response.status_code >= 400:
+        truncated = _truncate_body(raw)
+        detail = f": {truncated}" if truncated else ""
+        raise PolyesterRealtimeError(f"{label}: HTTP {response.status_code}{detail}")
     return raw
 
 

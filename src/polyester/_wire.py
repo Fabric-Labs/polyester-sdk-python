@@ -336,8 +336,13 @@ def map_connect_error(exc: ConnectError):
     if isinstance(mapped, PolyesterError):
         if mapped.retry_after is None:
             mapped.retry_after = getattr(exc, "retry_after", None)
-        if mapped.status_code is None:
-            mapped.status_code = getattr(exc, "http_status", None)
+        # The status reported is the answer's own, which the transport
+        # captured for every answer: it wins over one the mapping read a
+        # Connect code as. Classification keeps the mapping's.
+        http_status = getattr(exc, "http_status", None)
+        if http_status is not None:
+            mapped._admission_status = mapped.status_code
+            mapped.status_code = http_status
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
     # The mapped error holds what it decoded from the answer too, such as a

@@ -367,9 +367,10 @@ def create_trigger_to_proto(
             symbol_id=symbol_id,
         )
     intent = triggers_pb2.TriggerIntent(symbol_id=symbol_id, qty_scaled=qty_scaled)
+    # None asks the SDK for an ID; an explicit one, even empty, is checked.
     intent.client_trigger_id = (
         _client_trigger_id(client_trigger_id)
-        if client_trigger_id
+        if client_trigger_id is not None
         else f"trg-{uuid.uuid4().hex[:12]}"
     )
     if fee_asset is not None:
@@ -749,7 +750,7 @@ def _client_trigger_id(value: object) -> str:
         f"client_trigger_id must be 1 to {CLIENT_TRIGGER_ID_MAX_BYTES} bytes of UTF-8",
         code=CLIENT_TRIGGER_ID_INVALID,
     )
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not value:
         raise refusal
     try:
         size = len(value.encode("utf-8"))

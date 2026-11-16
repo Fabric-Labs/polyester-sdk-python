@@ -235,6 +235,15 @@ def _map_gateway_problem(exc: GatewayProblemError):
             code=_error_code_from_rest(exc.problem_code),
             violations=_rest_violations(exc.violations),
         )
+    if exc.http_status == 504:
+        # Whatever code its body names, a 504 is an unknown outcome (see the
+        # transport): never a retryable refusal.
+        return PolyesterServerError(
+            message or "Gateway Timeout",
+            code=exc.problem_code or None,
+            status_code=504,
+            retry_after=exc.retry_after,
+        )
     order_code = _error_code_from_rest(exc.problem_code)
     if order_code in _RETRYABLE_RESOURCE_CODES:
         # A rate-limit problem's ``rate_limit`` object, whichever side refused;
@@ -255,10 +264,6 @@ def _map_gateway_problem(exc: GatewayProblemError):
         )
     if exc.http_status == 429:
         return PolyesterApiError(message, code=order_code)
-    if exc.http_status == 504:
-        return PolyesterServerError(
-            message or "Gateway Timeout", code=exc.problem_code or None, status_code=504
-        )
     if code == "unimplemented" and exc.http_status == 501:
         return PolyesterNotImplementedError(message, code=order_code)
     if exc.problem_code == AUTH_SESSION_KIND_NOT_ALLOWED:
@@ -290,6 +295,7 @@ def _map_gateway_problem(exc: GatewayProblemError):
             message,
             code=_error_code_from_rest(exc.problem_code) or None,
             status_code=exc.http_status,
+            retry_after=exc.retry_after,
         )
     if code in ("resource_exhausted", "unknown"):
         return None
@@ -309,6 +315,13 @@ def map_connect_error(exc: ConnectError):
     mapped = _map_connect_error(exc)
     if isinstance(mapped, PolyesterRateLimitError) and mapped.retry_after is None:
         mapped.retry_after = getattr(exc, "retry_after", None)
+    if (
+        isinstance(mapped, PolyesterServerError)
+        and mapped.retry_after is None
+        and exc.code.value == "unavailable"
+    ):
+        # A temporary failure keeps the delay its answer asked for.
+        mapped.retry_after = getattr(exc, "retry_after", None)
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
     # The mapped error holds what it decoded from the answer too, such as a
@@ -324,6 +337,12 @@ def _auth_status(exc: ConnectError) -> int | None:
 def _map_connect_error(exc: ConnectError):
     if isinstance(exc, SignedRedirectRefused):
         return exc.refusal
+    if isinstance(exc, GatewayProblemError) and exc.http_status == 504:
+        # Before any code-named refusal below: a 504 is an unknown outcome
+        # whatever its body names (see _map_gateway_problem).
+        mapped = _map_gateway_problem(exc)
+        if mapped is not None:
+            return mapped
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
             status_code=401 if exc.code.value == "unauthenticated" else None

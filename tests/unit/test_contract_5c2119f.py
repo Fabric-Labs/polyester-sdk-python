@@ -5,6 +5,7 @@ and REST answers a temporary failure with 503."""
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import pytest
@@ -17,6 +18,7 @@ from polyester.codecs.orders import create_order_to_proto
 from polyester.codecs.triggers import create_trigger_to_proto, modify_trigger_to_proto
 from polyester.errors import (
     PolyesterApiError,
+    PolyesterRateLimitError,
     PolyesterServerError,
     PolyesterTimeoutError,
     PolyesterValidationError,
@@ -410,3 +412,101 @@ async def test_edge_plain_text_failure_retries_a_read(status: int) -> None:
     error, calls = await _call("read", status, "text/plain", "error code: 502", fail_for=2)
     assert error is None, repr(error)
     assert calls == 3
+
+
+# --- a 504 stays an unknown outcome whatever its body names -------------------------------------
+
+_RETRYABLE_AT_504 = [
+    (PROBLEM, {"code": "RATE_LIMIT_EXCEEDED", "rateLimit": {"reason": "QUOTA_EXCEEDED"}}),
+    (PROBLEM, {"code": "RATE_LIMIT_AUTHORITY_UNAVAILABLE"}),
+    (PROBLEM, {"code": "OVERLOADED"}),
+    (PROBLEM, {"code": "SYSTEM_RATE_LIMITED"}),
+    (PROBLEM, {"code": "REPLAY_CAPACITY_EXHAUSTED"}),
+    (PROBLEM, {"code": "AUTH_REPLAY_CAPACITY_EXHAUSTED"}),
+    (PROBLEM, {"code": "AUTH_TEMPORARILY_UNAVAILABLE"}),
+    (PROBLEM, {"code": "TIMESTAMP_SKEW"}),
+    (PROBLEM, {"code": "ORDER_SEQUENCE_EXHAUSTED"}),
+    (JSON, {"code": "resource_exhausted", "message": "rate limit exceeded, retry later"}),
+]
+
+
+@pytest.mark.parametrize(("content_type", "body"), _RETRYABLE_AT_504)
+async def test_504_with_a_retryable_code_stays_unknown(content_type: str, body: dict) -> None:
+    error, calls = await _call(
+        "write", 504, content_type, json.dumps(body), headers={"Retry-After": "2"}
+    )
+    assert type(error) is PolyesterServerError, repr(error)
+    assert error.status_code == 504
+    assert not is_retryable_error(error)
+    assert mutation_outcome_unknown(error)
+    assert calls == 1
+    # A safe read retries it.
+    error, calls = await _call("read", 504, content_type, json.dumps(body), fail_for=1)
+    assert error is None, repr(error)
+    assert calls == 2
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"code": "RATE_LIMIT_EXCEEDED", "rateLimit": {"reason": "QUOTA_EXCEEDED"}},
+        {"code": "AUTH_REPLAY_CAPACITY_EXHAUSTED"},
+    ],
+)
+async def test_429_control_stays_a_retryable_refusal(body: dict) -> None:
+    error, calls = await _call("write", 429, PROBLEM, json.dumps(body))
+    assert type(error) is PolyesterRateLimitError, repr(error)
+    assert is_retryable_error(error)
+    assert not mutation_outcome_unknown(error)
+    assert calls == 1
+
+
+async def test_504_outcome_unknown_code_keeps_its_code() -> None:
+    error, _ = await _call(
+        "write", 504, PROBLEM, json.dumps({"code": "ORDER_CREATE_OUTCOME_UNKNOWN", "detail": "d"})
+    )
+    assert type(error) is PolyesterApiError, repr(error)
+    assert error.code == "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"
+    assert mutation_outcome_unknown(error)
+
+
+# --- a 503 keeps its code and Retry-After, and reads wait for it ---------------------------------
+
+
+async def test_503_keeps_its_code_and_retry_after() -> None:
+    body = json.dumps({"code": "UPSTREAM_ERROR", "detail": "upstream_unavailable", "status": 503})
+    error, _ = await _call("write", 503, PROBLEM, body, headers={"Retry-After": "30"})
+    assert type(error) is PolyesterServerError, repr(error)
+    assert (error.code or "").endswith("UPSTREAM_ERROR")
+    assert error.retry_after == 30
+    error, _ = await _call(
+        "write",
+        503,
+        JSON,
+        json.dumps({"code": "unavailable", "message": "temporarily unavailable"}),
+        headers={"Retry-After": "7"},
+    )
+    assert type(error) is PolyesterServerError, repr(error)
+    assert error.retry_after == 7
+    error, _ = await _call("write", 503, PROBLEM, json.dumps({"code": "SERVICE_UNAVAILABLE"}))
+    assert type(error) is PolyesterServerError and error.retry_after is None, repr(error)
+
+
+async def test_read_retry_waits_for_retry_after_or_gives_up() -> None:
+    body = json.dumps({"code": "UPSTREAM_ERROR", "status": 503})
+    # Past the 2-second budget: no retry, the delay is on the error.
+    started = time.monotonic()
+    error, calls = await _call(
+        "read", 503, PROBLEM, body, fail_for=1, headers={"Retry-After": "30"}
+    )
+    assert time.monotonic() - started < 1.5
+    assert type(error) is PolyesterServerError and error.retry_after == 30, repr(error)
+    assert calls == 1
+    # Within the budget: the retry waits at least that long.
+    started = time.monotonic()
+    error, calls = await _call(
+        "read", 503, PROBLEM, body, fail_for=1, headers={"Retry-After": "0.4"}
+    )
+    assert error is None, repr(error)
+    assert calls == 2
+    assert time.monotonic() - started >= 0.4

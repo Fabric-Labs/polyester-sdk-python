@@ -353,8 +353,13 @@ class PolyesterServerError(PolyesterTransportError):
     """Raised for server-side failures and any HTTP error that can't prove a refusal.
 
     That is a 5xx, or a 4xx other than 401 and 403 with no code the contract
-    defines: a gateway or an edge can send those too. ``code`` keeps an
-    unrecognised code for diagnosis, and ``status_code`` the HTTP status.
+    defines: a gateway or an edge can send those too. ``code`` keeps the
+    answer's code (a 503 problem's ``UPSTREAM_ERROR``, or an unrecognised code
+    kept for diagnosis), and ``status_code`` the HTTP status. ``retry_after``
+    is the delay in seconds a temporary failure's ``Retry-After`` (or
+    ``Retry-After-Ms``) asked for, on an HTTP 503, 502 or 504 answer or a
+    ConnectRPC ``unavailable`` one; ``None`` when it named none. The SDK's own
+    retries of safe reads wait at least that long.
     """
 
     def __init__(
@@ -364,11 +369,13 @@ class PolyesterServerError(PolyesterTransportError):
         code: str | None = None,
         status_code: int | None = None,
         raw: object | None = None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.status_code = status_code
         self.raw = raw
+        self.retry_after = retry_after
 
 
 class PolyesterTimeoutError(PolyesterTransportError):

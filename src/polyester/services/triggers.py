@@ -325,11 +325,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         (the server's default when unset), ``expire_both`` or ``decrement``,
         and applies to the orders the trigger places.
 
-        ``client_trigger_id`` identifies this create. Left out or empty, the SDK
+        ``client_trigger_id`` identifies this create. Left out (``None``), the SDK
         generates one, which reads back on the trigger. An ID you choose and
         keep is what lets you find the trigger after an unknown outcome, so set
         one when you may need to. It is sent unchanged: 1 to 36 bytes of UTF-8 in
-        any characters, as the contract takes it; a longer one raises
+        any characters, as the contract takes it; an empty or longer one raises
         ``PolyesterValidationError`` with code
         ``ERROR_CODE_CLIENT_TRIGGER_ID_INVALID`` before sending.
         """

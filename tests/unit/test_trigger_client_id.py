@@ -71,7 +71,7 @@ async def _create(client: AsyncPolyester, **kwargs):
     )
 
 
-@pytest.mark.parametrize("kwargs", [{}, {"client_trigger_id": None}, {"client_trigger_id": ""}])
+@pytest.mark.parametrize("kwargs", [{}, {"client_trigger_id": None}])
 async def test_create_without_an_id_sends_a_generated_one(trigger_client, kwargs) -> None:
     client, seen = trigger_client
     await _create(client, **kwargs)
@@ -99,7 +99,7 @@ async def test_create_sends_any_id_the_contract_takes_unchanged(trigger_client, 
     assert [request.trigger.client_trigger_id for request in seen] == [value]
 
 
-@pytest.mark.parametrize("value", ["a" * 37, "é" * 19, "bad\ud800"])
+@pytest.mark.parametrize("value", ["", "a" * 37, "é" * 19, "bad\ud800"])
 async def test_create_refuses_an_id_the_contract_refuses_before_sending(
     trigger_client, value
 ) -> None:

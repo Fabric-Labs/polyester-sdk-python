@@ -42,6 +42,8 @@ class UnavailableRetry:
     initial_delay: float = 0.025
     max_delay: float = 0.5
     budget: float = 2.0
+    # A retry never waits less than the ``Retry-After`` its answer asked for,
+    # and none is made when that delay would end past ``budget``.
 
 
 # Trigger reads answer UNAVAILABLE until they can show the latest answered
@@ -90,9 +92,14 @@ async def unary_auth_decoded_retry_unavailable(
         try:
             response: TResponse = await call(client, request)
         except ConnectError as exc:
-            if not _is_real_unavailability(exc) or _monotonic() - started + delay > policy.budget:
+            if not _is_real_unavailability(exc):
                 raise map_connect_error(exc) from exc
-            await _sleep(delay)
+            mapped = map_connect_error(exc)
+            asked = getattr(mapped, "retry_after", None)
+            wait = max(delay, asked) if asked is not None else delay
+            if _monotonic() - started + wait > policy.budget:
+                raise mapped from exc
+            await _sleep(wait)
             delay = min(delay * 2, policy.max_delay)
             continue
         return decoder(response)

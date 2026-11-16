@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `orders.list_history` and `trades.list` take the contract's time-window filters as new keyword arguments `start_ts_ns` and `end_ts_ns` (`int | None`, inclusive, Unix nanoseconds). Each is sent only when not `None`, and an explicit 0 is sent: `end_ts_ns=0` returns an empty page. A `start_ts_ns` after a non-zero `end_ts_ns` is refused with `PolyesterValidationError` before sending, as the contract requires, as is a bound that is not an integer in the field's uint64 range (`bool`, `float`, a string, a negative value or one above 2^64 - 1). Existing calls are unchanged; the sync client takes the same arguments.
 - **Breaking:** Safe address prediction refuses an owner that is not an address someone controls with `PolyesterValidationError` naming it (`owner_address`, or `owners[i]` for `predict_safe_address_with_data`). The zero address was accepted and a Safe was predicted for it, though the Safe contract refuses it as an owner, so that Safe could never be deployed. An owner that is not 20 bytes of hex was already refused, with a bare `ValueError` that did not name it; it now raises `PolyesterValidationError` too, which is not a `ValueError`. Affected: `chain.predict_safe_address`, `chain.predict_polyester_smart_account_address`, `chain.predict_safe_address_with_data`. Migration: pass each owner's 20-byte address, and catch `PolyesterValidationError` where `ValueError` was caught.
 
 ## 0.33.0

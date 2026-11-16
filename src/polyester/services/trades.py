@@ -17,7 +17,7 @@ from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto_batch
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import resolve_symbol_id
-from polyester.services._validation import validate_limit
+from polyester.services._validation import validate_limit, validate_time_range
 
 
 class AsyncTradesService(ScopedSubAccountMixin, BaseService):
@@ -56,6 +56,8 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         include_transfers: bool = False,
         limit: int = 100,
         page_token: str | None = None,
+        start_ts_ns: int | None = None,
+        end_ts_ns: int | None = None,
     ) -> UserTradesList:
         """List user fills, optionally scoped to one physical order or lineage.
 
@@ -65,7 +67,13 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         ceiling and requires ``lineage_id``. Set ``include_transfers`` to
         receive settlement legs; identify a match by ``(symbol_id, match_id)``
         and deduplicate repeated legs across pages by ``tx_id``.
+
+        ``start_ts_ns`` and ``end_ts_ns`` bound the inclusive time range in
+        Unix nanoseconds; each is sent only when not ``None``. An explicit
+        ``end_ts_ns=0`` returns an empty page, and a start after any other end
+        raises :class:`PolyesterValidationError` before sending.
         """
+        start, end = validate_time_range("trades.list", start_ts_ns, end_ts_ns)
         if order_id is not None and lineage_id is not None:
             raise PolyesterValidationError(
                 "trades.list order_id and lineage_id are mutually exclusive"
@@ -83,6 +91,10 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
                 )
         validated_limit = validate_limit(limit)
         request = GetUserTradesRequest(limit=validated_limit)
+        if start is not None:
+            request.start_ts_ns = start
+        if end is not None:
+            request.end_ts_ns = end
         if order_id is not None:
             request.order_id = id_to_int(order_id, "order_id")
         if lineage_id is not None:

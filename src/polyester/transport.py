@@ -103,12 +103,13 @@ class GatewayProblemError(ConnectError):
         self.violations = list(violations or [])
 
 
-class _ConnectErrorWithRetryAfter(ConnectError):
-    def __init__(
-        self, code: Code, message: str, details: list[AnyMessage], retry_after: float
-    ) -> None:
-        super().__init__(code, message, details)
-        self.retry_after = retry_after
+class _AnswerError(ConnectError):
+    """A ConnectRPC error this SDK decoded from an answer itself, so the
+    answer's metadata rides along: the upstream ``ConnectError`` carries no
+    response status or headers. ``_raise_for_gateway_rejection`` records them."""
+
+    http_status: int | None = None
+    retry_after: float | None = None
 
 
 def _retry_after_header(response: pyqwest.FullResponse) -> float | None:
@@ -256,12 +257,37 @@ def _no_recognised_code_error(
             problem=decode_http_problem(body, status),
             retry_after=retry_after,
         )
-    if retry_after is not None:
-        return _ConnectErrorWithRetryAfter(known, message, [], retry_after)
-    return ConnectError(known, message)
+    return _AnswerError(known, message)
+
+
+def _connect_code_for_status(status: int) -> Code:
+    """The code Connect reads an answer with no readable code as, by status."""
+    return {
+        400: Code.INTERNAL,
+        401: Code.UNAUTHENTICATED,
+        403: Code.PERMISSION_DENIED,
+        404: Code.UNIMPLEMENTED,
+        429: Code.UNAVAILABLE,
+        502: Code.UNAVAILABLE,
+        503: Code.UNAVAILABLE,
+        504: Code.UNAVAILABLE,
+    }.get(status, Code.UNKNOWN)
 
 
 def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.FullResponse:
+    """Classify a failed answer; whatever error it raises carries the answer's
+    metadata, its HTTP status and the delay it asked for, captured here once."""
+    try:
+        return _classify_failed_answer(response)
+    except ConnectError as exc:
+        if getattr(exc, "http_status", None) is None:
+            exc.http_status = response.status  # type: ignore[attr-defined]
+        if getattr(exc, "retry_after", None) is None:
+            exc.retry_after = _retry_after_header(response)  # type: ignore[attr-defined]
+        raise
+
+
+def _classify_failed_answer(response: pyqwest.FullResponse) -> pyqwest.FullResponse:
     """Map an API-gateway rejection that is not a Connect error.
 
     The gateway answers API-key failures with a JSON body such as
@@ -322,18 +348,14 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             and not _has_service_detail(details)
         ):
             raise _no_recognised_code_error(response, body)
-        if retry_after is not None:
-            # Decode the Connect error here so the answer's delay rides along:
-            # the upstream ConnectError carries no response metadata.
-            raise _ConnectErrorWithRetryAfter(
-                Code(code),
-                str((body.get("message") if isinstance(body, dict) else None) or ""),
-                details,
-                retry_after,
-            )
-        return response
+        # Decoded here, as Connect would, so the answer's metadata rides along.
+        raise _AnswerError(
+            Code(code),
+            str((body.get("message") if isinstance(body, dict) else None) or ""),
+            details,
+        )
     if has_no_code:
-        return _answer_without_a_code(response, body, is_json, code, details, retry_after)
+        return _answer_without_a_code(response, body, is_json, code, details)
     assert isinstance(code, str)
     if is_recognised_rest_code(code) or (status == 429 and _REST_CODE_FORM.fullmatch(code)):
         fallback = Code.INTERNAL if status >= 500 else Code.FAILED_PRECONDITION
@@ -374,34 +396,26 @@ def _answer_without_a_code(
     is_json: bool,
     code: object,
     details: list[AnyMessage],
-    retry_after: float | None = None,
 ) -> pyqwest.FullResponse:
-    """Let Connect read what its table gets right; report the rest by status."""
+    """Report an answer with no code by its status, as Connect reads it."""
     status = response.status
     if status < 400:
         return response
-    known = _NO_RECOGNISED_CODE_STATUS_TO_CODE.get(status)
-    if (
-        known is not None
-        and retry_after is not None
-        and (_has_service_detail(details) or code in (None, ""))
+    message = body.get("message") if isinstance(body, dict) else None
+    message = message if isinstance(message, str) else ""
+    if _has_service_detail(details) or (
+        status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and code in (None, "")
     ):
-        # What Connect would read by status, decoded here so the answer's
-        # delay rides along.
-        message = body.get("message") if isinstance(body, dict) else None
-        raise _ConnectErrorWithRetryAfter(
-            known, message if isinstance(message, str) else "", details, retry_after
+        # What Connect reads by status, decoded here so the answer's metadata
+        # rides along. A body that is not JSON, or JSON that does not parse,
+        # reads by its status alone.
+        raise _AnswerError(
+            _connect_code_for_status(status), message or _status_line(status), details
         )
-    if _has_service_detail(details):
-        return response
-    # Connect's status table agrees with these, unless a code it can't read would
-    # stop its decoder.
-    if status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and code in (None, ""):
-        return response
     # Connect reads this as unimplemented, which the error mapping names a
     # missing route.
     if status == 404 and _is_bare_404(response, body, is_json):
-        return response
+        raise _AnswerError(Code.UNIMPLEMENTED, "not found", [])
     raise _no_recognised_code_error(response, body, code=_future_code(details))
 
 

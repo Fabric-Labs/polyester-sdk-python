@@ -648,3 +648,103 @@ async def test_round3_connect_deadline_at_504_is_the_deadline(message: str) -> N
     error, calls = await _call("read", 504, JSON, body, fail_for=1)
     assert error is None, repr(error)
     assert calls == 2
+
+
+# --- round 4: every error from an answer carries the answer's metadata ----------------------------
+
+_ROUND4_ANSWERS = [
+    (
+        "deadline 504",
+        504,
+        JSON,
+        '{"code":"deadline_exceeded","message":"context deadline exceeded"}',
+        True,
+    ),
+    ("auth 503", 503, PROBLEM, '{"code":"AUTH_TEMPORARILY_UNAVAILABLE","status":503}', True),
+    (
+        "permission denied 403",
+        403,
+        PROBLEM,
+        '{"code":"PERMISSION_DENIED","status":403,"detail":"denied"}',
+        False,
+    ),
+    ("malformed message 503", 503, JSON, '{"code":"unavailable","message":5}', True),
+    ("malformed message 504", 504, JSON, '{"code":"unavailable","message":5}', True),
+    (
+        "malformed detail 503",
+        503,
+        JSON,
+        '{"code":"unavailable","message":"m","details":"nope"}',
+        True,
+    ),
+    (
+        "malformed detail 504",
+        504,
+        JSON,
+        '{"code":"unavailable","message":"m","details":[{"type":"orders.v1.ErrorDetail","value":"!!"}]}',
+        True,
+    ),
+    ("broken json 503", 503, JSON, "{broken", True),
+]
+
+
+@pytest.mark.parametrize(("name", "status", "content_type", "body", "retried"), _ROUND4_ANSWERS)
+async def test_round4_every_answer_carries_its_metadata(
+    name: str, status: int, content_type: str, body: str, retried: bool
+) -> None:
+    error, _ = await _call("write", status, content_type, body, headers={"Retry-After": "30"})
+    assert error is not None
+    assert getattr(error, "retry_after", None) == 30, (name, repr(error))
+    assert getattr(error, "status_code", None) == status, (name, repr(error))
+
+
+@pytest.mark.parametrize(("name", "status", "content_type", "body", "retried"), _ROUND4_ANSWERS)
+@pytest.mark.parametrize("delay", ["30", "0.4"])
+async def test_round4_read_retry_honours_every_answers_delay(
+    name: str, status: int, content_type: str, body: str, retried: bool, delay: str
+) -> None:
+    started = time.monotonic()
+    error, calls = await _call(
+        "read", status, content_type, body, fail_for=1, headers={"Retry-After": delay}
+    )
+    elapsed = time.monotonic() - started
+    if not retried or delay == "30":
+        # A refusal is never retried; a delay past the budget returns at once.
+        assert calls == 1, (name, calls)
+        assert elapsed < 1.5, (name, elapsed)
+        assert error is not None and getattr(error, "retry_after", None) == float(delay), (
+            name,
+            repr(error),
+        )
+    else:
+        assert error is None, (name, repr(error))
+        assert calls == 2, (name, calls)
+        assert elapsed >= 0.4, (name, elapsed)
+
+
+async def test_round4_no_answer_carries_no_metadata() -> None:
+    import socket
+
+    from polyester import AsyncPolyester
+    from tests.hardening_support import make_test_credentials
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    creds = make_test_credentials()
+    client = AsyncPolyester(
+        api_url=f"http://127.0.0.1:{port}",
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    try:
+        with pytest.raises(Exception) as raised:
+            await client.triggers.get(trigger_id="9")
+    finally:
+        await client.aclose()
+    from polyester.errors import PolyesterError
+
+    assert isinstance(raised.value, PolyesterError), repr(raised.value)
+    assert getattr(raised.value, "status_code", None) is None, repr(raised.value)
+    assert getattr(raised.value, "retry_after", None) is None, repr(raised.value)

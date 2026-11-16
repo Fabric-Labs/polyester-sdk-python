@@ -158,16 +158,20 @@ _OUTCOME_UNKNOWN_SUFFIX = "_OUTCOME_UNKNOWN"
 class PolyesterError(Exception):
     """Base class for all SDK-raised errors.
 
-    ``retry_after`` is the delay in seconds the answer behind the error asked
-    for with ``Retry-After`` (or ``Retry-After-Ms``, or a rate-limit detail's
-    ``retry_after_ms``), on every error that comes from an answer, an
-    ``AUTH_TEMPORARILY_UNAVAILABLE`` refusal included; ``None`` when it named
-    none or there was no answer. The SDK captures it once, where it reads the
-    answer, and its own retries of safe reads wait at least this long.
+    Every error that comes from an HTTP answer carries that answer's
+    metadata: ``status_code``, its HTTP status, and ``retry_after``, the delay
+    in seconds it asked for with ``Retry-After`` (or ``Retry-After-Ms``, or a
+    rate-limit detail's ``retry_after_ms``), ``None`` when it named none. That
+    includes a server deadline, an authentication or permission refusal and an
+    answer whose body cannot be read. The SDK captures it once, where the
+    transport reads the answer; an error with no answer behind it, such as a
+    refused connection or a check made before sending, carries neither. The
+    SDK's own retries of safe reads wait at least ``retry_after``.
     """
 
     problem: HTTPProblem | None = None
     retry_after: float | None = None
+    status_code: int | None = None
 
 
 class PolyesterAuthError(PolyesterError):

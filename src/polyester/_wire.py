@@ -333,8 +333,11 @@ def map_connect_error(exc: ConnectError):
     mapped = _map_connect_error(exc)
     # The answer's delay, captured once by the transport, rides on whatever
     # error it maps to.
-    if isinstance(mapped, PolyesterError) and mapped.retry_after is None:
-        mapped.retry_after = getattr(exc, "retry_after", None)
+    if isinstance(mapped, PolyesterError):
+        if mapped.retry_after is None:
+            mapped.retry_after = getattr(exc, "retry_after", None)
+        if mapped.status_code is None:
+            mapped.status_code = getattr(exc, "http_status", None)
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
     # The mapped error holds what it decoded from the answer too, such as a

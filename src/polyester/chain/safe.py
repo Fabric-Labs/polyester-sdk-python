@@ -15,6 +15,7 @@ from polyester.chain.environment import (
     SafeDeploymentConfig,
 )
 from polyester.codecs.scalars import exact_integer
+from polyester.errors import PolyesterValidationError
 
 # SafeProxy creation bytecode from @safe-global/safe-contracts v1.4.1
 # (must match SafeProxyFactory.proxyCreationCode on Polyester).
@@ -111,6 +112,28 @@ def _create2_address(*, factory: str, salt: bytes, init_code_hash: bytes) -> str
     return to_checksum_address(raw[-20:])
 
 
+_ZERO_ADDRESS = "0x" + "0" * 40
+
+
+def _safe_owner(value: str, field: str) -> str:
+    """Checksummed Safe owner, or ``PolyesterValidationError`` naming ``field``.
+
+    An owner is a 20-byte hex address, with or without ``0x``, and not the zero
+    address: the Safe contract refuses it as an owner, so a Safe predicted for it
+    could never be deployed or controlled.
+    """
+    try:
+        owner = to_checksum_address(value)
+    except (TypeError, ValueError) as exc:
+        raise PolyesterValidationError(f"{field} must be a 20-byte hex address") from exc
+    if owner == _ZERO_ADDRESS:
+        raise PolyesterValidationError(
+            f"{field} must not be the zero address: a Safe owner must be an address "
+            "someone controls"
+        )
+    return owner
+
+
 def predict_safe_address_with_data(
     *,
     owners: list[str],
@@ -119,7 +142,12 @@ def predict_safe_address_with_data(
     safe: SafeDeploymentConfig | None = None,
     environment: PolyesterChainEnvironment | None = None,
 ) -> PredictedSafe:
-    """Deterministic CREATE2 Safe address + factory deploy data (zero RPC)."""
+    """Deterministic CREATE2 Safe address + factory deploy data (zero RPC).
+
+    Each owner must be a 20-byte hex address, with or without ``0x``, and not the
+    zero address; any other owner raises ``PolyesterValidationError`` naming it,
+    such as ``owners[1]``.
+    """
     require_eth_abi()
     if not owners:
         raise ValueError("owners must be non-empty")
@@ -127,7 +155,7 @@ def predict_safe_address_with_data(
     salt_nonce = exact_integer(salt_nonce, "salt_nonce", min_value=0, max_value=2**256 - 1)
     env = environment or POLYESTER_DEVNET_ENVIRONMENT
     cfg = safe or env.account_abstraction.safe
-    owners_cs = [to_checksum_address(o) for o in owners]
+    owners_cs = [_safe_owner(o, f"owners[{i}]") for i, o in enumerate(owners)]
     thresh = threshold if threshold is not None else len(owners_cs)
     initializer = _get_initializer(owners=owners_cs, threshold=thresh, safe=cfg)
     factory_calldata = _CREATE_PROXY_SELECTOR + encode(
@@ -156,7 +184,13 @@ def predict_safe_address(
     salt_nonce: int = 0,
     environment: PolyesterChainEnvironment | None = None,
 ) -> str:
-    """Predict the Polyester Safe for a single owner (main account = salt 0)."""
+    """Predict the Polyester Safe for a single owner (main account = salt 0).
+
+    ``owner_address`` must be a 20-byte hex address, with or without ``0x``, and
+    not the zero address; any other value raises ``PolyesterValidationError``
+    naming ``owner_address``.
+    """
+    _safe_owner(owner_address, "owner_address")
     return predict_safe_address_with_data(
         owners=[owner_address],
         salt_nonce=salt_nonce,

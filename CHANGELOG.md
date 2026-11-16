@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** Safe address prediction refuses an owner that is not an address someone controls with `PolyesterValidationError` naming it (`owner_address`, or `owners[i]` for `predict_safe_address_with_data`). The zero address was accepted and a Safe was predicted for it, though the Safe contract refuses it as an owner, so that Safe could never be deployed. An owner that is not 20 bytes of hex was already refused, with a bare `ValueError` that did not name it; it now raises `PolyesterValidationError` too, which is not a `ValueError`. Affected: `chain.predict_safe_address`, `chain.predict_polyester_smart_account_address`, `chain.predict_safe_address_with_data`. Migration: pass each owner's 20-byte address, and catch `PolyesterValidationError` where `ValueError` was caught.
+
 ## 0.33.0
 
 Git tag: `v0.33.0`. Released 2026-11-16. Built on public contract `1945423`.

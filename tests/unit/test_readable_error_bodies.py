@@ -78,6 +78,7 @@ async def _call(
     *,
     fail_for: int | None = None,
     encoding: str | None = None,
+    headers: dict[str, str] | None = None,
 ) -> tuple[BaseException | None, int]:
     """Answer one public call with this response and return its error and requests made."""
     path = READ_PATH if op == "read" else WRITE_PATH
@@ -95,10 +96,11 @@ async def _call(
                 ).SerializeToString()
             )
         raw = gzip.compress(body.encode()) if encoding == "gzip" else body.encode()
-        headers = [("Content-Type", content_type), ("Content-Length", str(len(raw)))]
+        answer = [("Content-Type", content_type), ("Content-Length", str(len(raw)))]
         if encoding:
-            headers.append(("Content-Encoding", encoding))
-        return HttpScript.raw(status, headers=headers, body=raw)
+            answer.append(("Content-Encoding", encoding))
+        answer.extend((headers or {}).items())
+        return HttpScript.raw(status, headers=answer, body=raw)
 
     http = await MockHttpServer.spawn(handler)
     creds = make_test_credentials()

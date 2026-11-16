@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager, contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
 from http import HTTPStatus
-from math import isfinite
 from typing import Any, Literal, NoReturn
 
 import httpx
@@ -22,6 +21,7 @@ from google.protobuf.any_pb2 import Any as AnyMessage
 from google.protobuf.json_format import MessageToJson, Parse
 from google.protobuf.message import Message
 
+from polyester._answer import retry_after_from_headers
 from polyester._contract_codes import (
     carries_contract_code,
     decode_coded_detail,
@@ -29,6 +29,7 @@ from polyester._contract_codes import (
     has_future_code,
     is_placeholder_code,
     is_recognised_rest_code,
+    outcome_unknown_code,
 )
 from polyester._problem import decode_http_problem
 from polyester._redact import (
@@ -102,10 +103,19 @@ class GatewayProblemError(ConnectError):
         self.violations = list(violations or [])
 
 
-class _ConnectErrorWithRetryAfter(ConnectError):
-    def __init__(self, message: str, details: list[AnyMessage], retry_after: float) -> None:
-        super().__init__(Code.RESOURCE_EXHAUSTED, message, details)
-        self.retry_after = retry_after
+class _AnswerError(ConnectError):
+    """A ConnectRPC error this SDK decoded from an answer itself, so the
+    answer's metadata rides along: the upstream ``ConnectError`` carries no
+    response status or headers. ``_raise_for_gateway_rejection`` records them."""
+
+    http_status: int | None = None
+    retry_after: float | None = None
+
+
+def _retry_after_header(response: pyqwest.FullResponse) -> float | None:
+    """The delay in seconds an answer asks for: ``Retry-After``, then
+    ``Retry-After-Ms``, then ``Grpc-Retry-Pushback-Ms``; ``None`` without one."""
+    return retry_after_from_headers(response.headers)
 
 
 _CONNECT_CODES = frozenset(code.value for code in Code)
@@ -228,6 +238,7 @@ def _no_recognised_code_error(
     status = response.status
     known = _NO_RECOGNISED_CODE_STATUS_TO_CODE.get(status)
     message = _body_text(body, status)
+    retry_after = _retry_after_header(response)
     if known is None or (code and status != 429):
         return GatewayProblemError(
             known or Code.INTERNAL,
@@ -235,11 +246,39 @@ def _no_recognised_code_error(
             http_status=status,
             detail=message,
             problem=decode_http_problem(body, status),
+            retry_after=retry_after,
         )
-    return ConnectError(known, message)
+    return _AnswerError(known, message)
+
+
+def _connect_code_for_status(status: int) -> Code:
+    """The code Connect reads an answer with no readable code as, by status."""
+    return {
+        400: Code.INTERNAL,
+        401: Code.UNAUTHENTICATED,
+        403: Code.PERMISSION_DENIED,
+        404: Code.UNIMPLEMENTED,
+        429: Code.UNAVAILABLE,
+        502: Code.UNAVAILABLE,
+        503: Code.UNAVAILABLE,
+        504: Code.UNAVAILABLE,
+    }.get(status, Code.UNKNOWN)
 
 
 def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.FullResponse:
+    """Classify a failed answer; whatever error it raises carries the answer's
+    metadata, its HTTP status and the delay it asked for, captured here once."""
+    try:
+        return _classify_failed_answer(response)
+    except ConnectError as exc:
+        if getattr(exc, "http_status", None) is None:
+            exc.http_status = response.status  # type: ignore[attr-defined]
+        if getattr(exc, "retry_after", None) is None:
+            exc.retry_after = _retry_after_header(response)  # type: ignore[attr-defined]
+        raise
+
+
+def _classify_failed_answer(response: pyqwest.FullResponse) -> pyqwest.FullResponse:
     """Map an API-gateway rejection that is not a Connect error.
 
     The gateway answers API-key failures with a JSON body such as
@@ -257,17 +296,7 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         with suppress(Exception):
             body = response.json()
     code = body.get("code") if isinstance(body, dict) else None
-    retry_after = None
-    for header, divisor in (
-        ("retry-after", 1),
-        ("retry-after-ms", 1000),
-        ("grpc-retry-pushback-ms", 1000),
-    ):
-        with suppress(ValueError, TypeError):
-            value = float(response.headers.get(header, "")) / divisor
-            if isfinite(value) and value >= 0:
-                retry_after = value
-                break
+    retry_after = _retry_after_header(response)
     status = response.status
     has_connect_code = isinstance(code, str) and code in _CONNECT_CODES
     has_no_code = not isinstance(code, str) or not code or is_placeholder_code(code)
@@ -280,10 +309,28 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         if decoded is None or not isinstance(message, str | None):
             raise _unreadable_connect_error(status)
         details = decoded
-        if code == "resource_exhausted" and retry_after is not None:
-            # Preserve valid Connect details while carrying response backoff
-            # through a ConnectError, whose upstream type has no metadata.
-            raise _ConnectErrorWithRetryAfter(message or "", details, retry_after)
+    if status == 504:
+        # The HTTP status decides outcome certainty first. A 504 never proves
+        # a refusal: the API answers it only where a write's outcome is
+        # unknown, and an edge answers it for a request that may have reached
+        # the API. So before any code, message or typed detail is read for a
+        # refusal, it is an unknown outcome that safe reads retry: the
+        # outcome-unknown code the answer names, else a server error. No
+        # body, a ConnectRPC code, a retryable rate-limit, admission or
+        # authentication code, or a typed detail included, changes that.
+        rest_code = code if isinstance(code, str) and code not in _CONNECT_CODES else ""
+        outcome = _outcome_unknown_name(code, body, details)
+        # ConnectRPC answers its own deadline_exceeded with 504: the request's
+        # deadline passed, read as the deadline it is, whatever its message
+        # or detail says. Still an unknown outcome that reads retry.
+        deadline = not outcome and code == "deadline_exceeded"
+        _raise_problem(
+            response,
+            body,
+            outcome or rest_code or _future_code(details),
+            Code.DEADLINE_EXCEEDED if deadline else Code.UNAVAILABLE,
+            retry_after,
+        )
     if has_connect_code:
         # These say nothing a 401 or 403 doesn't already say better.
         if (
@@ -292,7 +339,12 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             and not _has_service_detail(details)
         ):
             raise _no_recognised_code_error(response, body)
-        return response
+        # Decoded here, as Connect would, so the answer's metadata rides along.
+        raise _AnswerError(
+            Code(code),
+            str((body.get("message") if isinstance(body, dict) else None) or ""),
+            details,
+        )
     if has_no_code:
         return _answer_without_a_code(response, body, is_json, code, details)
     assert isinstance(code, str)
@@ -308,6 +360,21 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
     raise _no_recognised_code_error(response, body, code=code)
 
 
+def _outcome_unknown_name(code: object, body: object, details: list[AnyMessage]) -> str:
+    """The outcome-unknown code an answer names, or ``""``: a REST problem's
+    code, a ConnectRPC error's code-only message, or an order detail's code."""
+    if isinstance(code, str) and code.endswith("_OUTCOME_UNKNOWN"):
+        return code
+    message = body.get("message") if isinstance(body, dict) else None
+    if isinstance(message, str) and message.strip().endswith("_OUTCOME_UNKNOWN"):
+        return message.strip()
+    for d in details:
+        name = outcome_unknown_code(d.type_url.removeprefix(_TYPE_URL_PREFIX), d.value)
+        if name:
+            return name
+    return ""
+
+
 def _has_service_detail(details: list[AnyMessage]) -> bool:
     return any(
         carries_contract_code(d.type_url.removeprefix(_TYPE_URL_PREFIX), d.value) for d in details
@@ -321,24 +388,25 @@ def _answer_without_a_code(
     code: object,
     details: list[AnyMessage],
 ) -> pyqwest.FullResponse:
-    """Let Connect read what its table gets right; report the rest by status."""
+    """Report an answer with no code by its status, as Connect reads it."""
     status = response.status
     if status < 400:
         return response
-    if status == 504:
-        # A non-Connect 504 cannot prove that a mutation was refused, even if
-        # the gateway sent HTML, malformed JSON, or no structured code at all.
-        _raise_problem(response, body, "", Code.UNAVAILABLE, None)
-    if _has_service_detail(details):
-        return response
-    # Connect's status table agrees with these, unless a code it can't read would
-    # stop its decoder.
-    if status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and code in (None, ""):
-        return response
+    message = body.get("message") if isinstance(body, dict) else None
+    message = message if isinstance(message, str) else ""
+    if _has_service_detail(details) or (
+        status in _NO_RECOGNISED_CODE_STATUS_TO_CODE and code in (None, "")
+    ):
+        # What Connect reads by status, decoded here so the answer's metadata
+        # rides along. A body that is not JSON, or JSON that does not parse,
+        # reads by its status alone.
+        raise _AnswerError(
+            _connect_code_for_status(status), message or _status_line(status), details
+        )
     # Connect reads this as unimplemented, which the error mapping names a
     # missing route.
     if status == 404 and _is_bare_404(response, body, is_json):
-        return response
+        raise _AnswerError(Code.UNIMPLEMENTED, "not found", [])
     raise _no_recognised_code_error(response, body, code=_future_code(details))
 
 
@@ -370,7 +438,7 @@ def _raise_problem(
         http_status=response.status,
         problem=decode_http_problem(body, response.status),
         retry_after=retry_after,
-        rate_limit=body.get("rate_limit"),
+        rate_limit=body.get("rateLimit"),
         cause_code=cause_code if isinstance(cause_code, str) else "",
         level_index=(
             level_index
@@ -394,6 +462,9 @@ class SignedRedirectRefused(ConnectError):
     connectrpc passes a ``ConnectError`` from the HTTP client through, so the
     error mapping turns ``refusal`` into the :class:`PolyesterRedirectError`.
     """
+
+    http_status: int | None = None
+    retry_after: float | None = None
 
     def __init__(self, refusal: PolyesterRedirectError) -> None:
         super().__init__(Code.FAILED_PRECONDITION, str(refusal))
@@ -441,7 +512,7 @@ def capture_response_refs() -> Iterator[list[str]]:
         _response_refs.reset(token)
 
 
-def _record_response_ref(response: pyqwest.FullResponse) -> None:
+def _record_response_ref(response: pyqwest.FullResponse | pyqwest.Response) -> None:
     refs = _response_refs.get()
     if refs is None:
         return
@@ -462,6 +533,11 @@ class _ConnectHTTPClient:
     never follows a redirect, and a redirect answering it raises
     :class:`SignedRedirectRefused`. Unsigned requests go through ``inner``,
     pyqwest's default client, which follows redirects as before.
+
+    An answer's metadata, its status and the delay it asked for, is read when
+    its headers arrive, before its body and before any redirect is refused, so
+    every error made from that answer carries it: one whose body is cut short,
+    is too large to inspect or does not arrive before the deadline included.
     """
 
     def __init__(
@@ -471,30 +547,101 @@ class _ConnectHTTPClient:
         self._signed = signed or pyqwest.Client(_signed_transport())
 
     async def post(self, url: str, headers=None, content=None, **kwargs) -> pyqwest.FullResponse:
-        target = url_without_userinfo(url)
-        signed = carries_api_key(headers)
-        client = self._signed if signed else self._inner
-        response = await client.post(url=target, headers=headers, content=content, **kwargs)
-        _record_response_ref(response)
-        if signed:
-            _refuse_redirect(response, target)
-        return _raise_for_gateway_rejection(response)
+        return await self._send("POST", url, headers, content, **kwargs)
 
     async def get(self, url: str, headers=None, **kwargs) -> pyqwest.FullResponse:
+        return await self._send("GET", url, headers, None, **kwargs)
+
+    async def _send(
+        self, method: str, url: str, headers: Any, content: Any, **kwargs: Any
+    ) -> pyqwest.FullResponse:
         target = url_without_userinfo(url)
         signed = carries_api_key(headers)
         client = self._signed if signed else self._inner
-        response = await client.get(url=target, headers=headers, **kwargs)
-        _record_response_ref(response)
-        if signed:
-            _refuse_redirect(response, target)
-        return _raise_for_gateway_rejection(response)
+        async with client.stream(method, target, headers, content, **kwargs) as response:
+            return await _full_answer(response, target, signed=signed)
 
 
-def _refuse_redirect(response: pyqwest.FullResponse, url: str) -> None:
-    refusal = redirect_refusal(response.status, response.headers.get("location"), url)
+# The most of a failed answer's body read to classify it. A longer one is read
+# by its status alone, as one that cannot be read is.
+MAX_FAILED_ANSWER_BYTES = 64 * 1024
+# The attribute that hands a failed answer whose body the deadline cut off to
+# the error mapping, on the cancellation the deadline raised.
+UNREAD_ANSWER_ATTR = "_polyester_unread_answer"
+
+
+async def _full_answer(
+    response: pyqwest.Response, target: str, *, signed: bool
+) -> pyqwest.FullResponse:
+    """Read ``response`` whole, or raise the error its answer maps to.
+
+    The answer's metadata is taken from its headers before anything else is
+    read or decided.
+    """
+    status = response.status
+    headers = response.headers
+    _record_response_ref(response)
+    if signed:
+        _refuse_redirect(status, headers, target)
+    if status == 200:
+        content = b"".join([bytes(chunk) async for chunk in response.content])
+        return pyqwest.FullResponse(status, headers, content, response.trailers)
+    try:
+        failed_body = await _failed_answer_body(response)
+    except asyncio.CancelledError as exc:
+        # The deadline (or the caller) ended the call while the body was
+        # read: the answer still decides the error, should the deadline be
+        # why (see map_connect_error).
+        setattr(exc, UNREAD_ANSWER_ATTR, unread_answer_error(status, headers))
+        raise
+    if failed_body is None:
+        raise unread_answer_error(status, headers)
+    return _raise_for_gateway_rejection(
+        pyqwest.FullResponse(status, headers, failed_body, response.trailers)
+    )
+
+
+async def _failed_answer_body(response: pyqwest.Response) -> bytes | None:
+    """A failed answer's body, or ``None`` when it cannot be read whole: cut
+    short, broken, or longer than ``MAX_FAILED_ANSWER_BYTES``."""
+    with suppress(ValueError, TypeError):
+        if int(response.headers.get("content-length", "")) > MAX_FAILED_ANSWER_BYTES:
+            return None
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        async for chunk in response.content:
+            total += len(chunk)
+            if total > MAX_FAILED_ANSWER_BYTES:
+                return None
+            chunks.append(bytes(chunk))
+    except Exception:
+        return None
+    return b"".join(chunks)
+
+
+def unread_answer_error(status: int, headers: pyqwest.Headers) -> ConnectError:
+    """The error of a failed answer whose body cannot be read: read by its
+    status alone, with the answer's metadata."""
+    try:
+        _raise_for_gateway_rejection(pyqwest.FullResponse(status, headers, b"", pyqwest.Headers()))
+    except ConnectError as exc:
+        return exc
+    # An answer below 400 that is no redirect: Connect reads it by status.
+    error = _AnswerError(_connect_code_for_status(status), _status_line(status))
+    error.http_status = status
+    error.retry_after = retry_after_from_headers(headers)
+    return error
+
+
+def _refuse_redirect(status: int, headers: pyqwest.Headers, url: str) -> None:
+    refusal = redirect_refusal(status, headers.get("location"), url)
     if refusal is not None:
-        raise SignedRedirectRefused(refusal)
+        refusal.retry_after = retry_after_from_headers(headers)
+        error = SignedRedirectRefused(refusal)
+        error.http_status = status
+        error.retry_after = refusal.retry_after
+        raise error
 
 
 class _CancellationUnaryInterceptor(UnaryInterceptor):

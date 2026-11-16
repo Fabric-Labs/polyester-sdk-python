@@ -156,9 +156,25 @@ _OUTCOME_UNKNOWN_SUFFIX = "_OUTCOME_UNKNOWN"
 
 
 class PolyesterError(Exception):
-    """Base class for all SDK-raised errors."""
+    """Base class for all SDK-raised errors.
+
+    Every error that comes from an HTTP answer carries that answer's
+    metadata: ``status_code``, its HTTP status, and ``retry_after``, the delay
+    in seconds it asked for with ``Retry-After`` (or ``Retry-After-Ms``, or a
+    rate-limit detail's ``retry_after_ms``), ``None`` when it named none. That
+    includes a server deadline, an authentication or permission refusal and an
+    answer whose body cannot be read. The SDK captures it once, where the
+    transport reads the answer; an error with no answer behind it, such as a
+    refused connection or a check made before sending, carries neither. The
+    SDK's own retries of safe reads wait at least ``retry_after``.
+    """
 
     problem: HTTPProblem | None = None
+    retry_after: float | None = None
+    status_code: int | None = None
+    # The status the error mapping read a code as, kept for classification
+    # only; ``status_code`` reports the answer's own.
+    _admission_status: int | None = None
 
 
 class PolyesterAuthError(PolyesterError):
@@ -318,7 +334,7 @@ class PolyesterRateLimitError(PolyesterTransportError):
 
     ``detail`` is the structured ``polyester.ratelimit.v1.RateLimitDetail``
     payload when the server attached it: ConnectRPC details, an in-band order
-    rejection, or the ``rate_limit`` object of a REST ``RATE_LIMIT_EXCEEDED``
+    rejection, or the ``rateLimit`` object of a REST ``RATE_LIMIT_EXCEEDED``
     problem, whose fields are all optional. The gateway's own refusal names
     only ``reason`` and ``scope`` (``CLIENT_IP``, no ``operation_id``); a
     service's also names the operation, the policy class and the remaining
@@ -353,8 +369,13 @@ class PolyesterServerError(PolyesterTransportError):
     """Raised for server-side failures and any HTTP error that can't prove a refusal.
 
     That is a 5xx, or a 4xx other than 401 and 403 with no code the contract
-    defines: a gateway or an edge can send those too. ``code`` keeps an
-    unrecognised code for diagnosis, and ``status_code`` the HTTP status.
+    defines: a gateway or an edge can send those too. ``code`` keeps the
+    answer's code (a 503 problem's ``UPSTREAM_ERROR``, or an unrecognised code
+    kept for diagnosis), and ``status_code`` the HTTP status. ``retry_after``
+    is the delay in seconds a temporary failure's ``Retry-After`` (or
+    ``Retry-After-Ms``) asked for, on an HTTP 503, 502 or 504 answer or a
+    ConnectRPC ``unavailable`` one; ``None`` when it named none. The SDK's own
+    retries of safe reads wait at least that long.
     """
 
     def __init__(
@@ -364,11 +385,13 @@ class PolyesterServerError(PolyesterTransportError):
         code: str | None = None,
         status_code: int | None = None,
         raw: object | None = None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.status_code = status_code
         self.raw = raw
+        self.retry_after = retry_after
 
 
 class PolyesterTimeoutError(PolyesterTransportError):
@@ -856,7 +879,10 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
             and not isinstance(err, (PolyesterRateLimitError, PolyesterTimestampSkewError))
             and not (
                 isinstance(err, PolyesterServerError)
-                and err.status_code == 503
+                and (
+                    err._admission_status if err._admission_status is not None else err.status_code
+                )
+                == 503
                 and (
                     _is_known_admission_refusal(err.code)
                     or (

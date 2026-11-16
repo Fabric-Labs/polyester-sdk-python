@@ -138,9 +138,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             try:
                 self._apply_snapshot(snapshot, buffered)
             except Exception as exc:
-                self._fail_closed(
-                    PolyesterRealtimeError(f"apply_snapshot callback failed: {exc}")
-                )
+                self._fail_closed(PolyesterRealtimeError(f"apply_snapshot callback failed: {exc}"))
                 return False
             while True:
                 next_buffered = self._take_pending_or_mark_ready(generation)
@@ -152,9 +150,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     self._apply_live_publications(next_buffered)
                 except Exception as exc:
                     self._fail_closed(
-                        PolyesterRealtimeError(
-                            f"apply_live_publications callback failed: {exc}"
-                        )
+                        PolyesterRealtimeError(f"apply_live_publications callback failed: {exc}")
                     )
                     return False
             self._last_error = None
@@ -182,9 +178,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
             self._pending = []
             return buffered
 
-    def _take_pending_or_mark_ready(
-        self, generation: int
-    ) -> list[TPublication] | None:
+    def _take_pending_or_mark_ready(self, generation: int) -> list[TPublication] | None:
         with self._state_lock:
             if self._disposed or generation != self._generation:
                 return None
@@ -199,9 +193,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         try:
             publications = self._read_publication(message)
         except Exception as exc:
-            self._fail_closed(
-                PolyesterRealtimeError(f"read_publication callback failed: {exc}")
-            )
+            self._fail_closed(PolyesterRealtimeError(f"read_publication callback failed: {exc}"))
             return
         if not publications:
             return
@@ -255,8 +247,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                     if succeeded:
                         self._fail_closed(
                             PolyesterRealtimeError(
-                                "snapshot refresh did not converge after repeated "
-                                "publication gaps"
+                                "snapshot refresh did not converge after repeated publication gaps"
                             )
                         )
                     else:
@@ -335,9 +326,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                 elif sub.error is not None:
                     self._last_error = sub.error
                     self._report_snapshot_error(
-                        sub.error
-                        if isinstance(sub.error, Exception)
-                        else Exception(str(sub.error))
+                        sub.error if isinstance(sub.error, Exception) else Exception(str(sub.error))
                     )
             except asyncio.CancelledError:
                 break

@@ -20,6 +20,7 @@ from urllib.parse import urlsplit, urlunsplit
 from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
+from polyester._answer import refused_upgrade
 from polyester.codecs.decode.orders import OrderScales
 from polyester.codecs.decode.private_orders import (
     private_orders_from_proto,
@@ -383,7 +384,9 @@ class PrivateOrderStream:
                     self._fail_all("connection", exc, terminal=True)
                     return
                 except Exception as exc:
-                    error = PolyesterRealtimeError(f"private WebSocket connection failed: {exc}")
+                    message = f"private WebSocket connection failed: {exc}"
+                    # A refused upgrade is an answer: its status and delay ride along.
+                    error = refused_upgrade(exc, message) or PolyesterRealtimeError(message)
                     self._fail_all("connection", error, terminal=False)
                     if not self._owns_connection():
                         return

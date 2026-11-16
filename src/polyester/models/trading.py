@@ -77,6 +77,15 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     # ``leaves_qty``).
     display_qty: Quantity | None = None
     hidden_qty: Quantity | None = None
+    # A LIMIT order's limit price. A MARKET order's protection price: the worst
+    # price it may fill at (a BUY at or below it, a SELL at or above it), its
+    # reference price moved by its maximum slippage, or by the pair's default
+    # market slippage, on the tick grid. Every market order has one, whatever
+    # placed it: a direct market order, a stop-loss's, take-profit's, trailing
+    # stop's or attached leg's market order, or a TWAP slice. A stop's or
+    # trailing stop's market order takes the price that fired it as its
+    # reference. Tell a market order from a limit order by ``order_type``, never
+    # by a missing or zero price.
     price: Price | None = None
     avg_px: Price | None = None
     created_ts_ns: str = ""

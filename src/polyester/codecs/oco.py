@@ -7,6 +7,12 @@ from typing import Any
 
 from polyester.codecs.correlation_id import check_correlation_id
 from polyester.codecs.orders import _risk_leg_from_dict, _risk_leg_model_to_dict
+from polyester.codecs.refusal_codes import (
+    BAD_PRICE,
+    BAD_QTY,
+    TRIGGER_PRICE_INVALID,
+    refusal_code,
+)
 from polyester.codecs.scalars import parse_account_id
 from polyester.codecs.triggers import self_trade_prevention_mode_to_proto
 from polyester.errors import PolyesterValidationError
@@ -47,7 +53,16 @@ def _oco_leg(leg: RiskLeg | dict[str, Any], *, field_name: str, symbol: str) -> 
     """
     if isinstance(leg, RiskLeg):
         leg = _risk_leg_model_to_dict(leg)
-    policy = _risk_leg_from_dict(leg, field_name=field_name, symbol=symbol, risk_field="oco")
+    # A leg's refused trigger price answers TRIGGER_PRICE_INVALID and its refused
+    # limit price BAD_PRICE, as the API answers them for an OCO.
+    policy = _risk_leg_from_dict(
+        leg,
+        field_name=field_name,
+        symbol=symbol,
+        risk_field="oco",
+        trigger_price_code=TRIGGER_PRICE_INVALID,
+        limit_price_code=BAD_PRICE,
+    )
     return triggers_pb2.OcoLeg(
         trigger_price_ticks=policy.trigger_price_ticks,
         child=policy.child,
@@ -82,16 +97,18 @@ def create_oco_to_proto(
     side_key = side.lower() if isinstance(side, str) else ""
     if side_key not in ("buy", "sell"):
         raise PolyesterValidationError("side must be buy or sell")
-    intent = triggers_pb2.OcoIntent(
-        symbol_id=symbol_id,
-        side=orders_pb2.BUY if side_key == "buy" else orders_pb2.SELL,
-        qty_scaled=resolve_qty_scaled(
+    with refusal_code(BAD_QTY):
+        qty_scaled = resolve_qty_scaled(
             qty,  # type: ignore[arg-type]
             quantity_scale,
             "qty",
             symbol=symbol,
             symbol_id=symbol_id,
-        ),
+        )
+    intent = triggers_pb2.OcoIntent(
+        symbol_id=symbol_id,
+        side=orders_pb2.BUY if side_key == "buy" else orders_pb2.SELL,
+        qty_scaled=qty_scaled,
         # The contract requires an ID. An empty one is a caller's mistake:
         # replacing it would hide that a retry can no longer find its first
         # attempt.

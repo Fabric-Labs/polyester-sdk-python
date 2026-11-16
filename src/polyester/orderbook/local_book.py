@@ -164,6 +164,40 @@ def build_orderbook_data(
     )
 
 
+_UINT64_MAX = 2**64 - 1
+
+
+def _snapshot_position(snapshot: OrderbookData, field: str) -> int:
+    text = getattr(snapshot, field)
+    if not isinstance(text, str) or not text.isascii() or not text.isdigit():
+        raise PolyesterValidationError(
+            f"orderbook snapshot {field} must be a decimal uint64 from orderbook.get, got {text!r}"
+        )
+    value = int(text)
+    if value > _UINT64_MAX:
+        raise PolyesterValidationError(
+            f"orderbook snapshot {field} must be a decimal uint64 from orderbook.get, got {text!r}"
+        )
+    return value
+
+
+def compare_snapshots(a: OrderbookData, b: OrderbookData) -> int:
+    """Order two ``orderbook.get`` snapshots of one pair by ``(book_epoch, book_seq)``.
+
+    Returns -1 when ``a`` is older than ``b``, 0 when both are at the same position and 1
+    when ``a`` is newer. A higher epoch is newer whatever its ``book_seq``, since a new
+    epoch may restart ``book_seq``; sequences are compared only within one epoch. Keep the
+    newest snapshot and drop one whose epoch is older.
+
+    Both must be snapshots from ``orderbook.get``: a managed subscription's view carries no
+    epoch (``book_epoch`` ``""``), and an epoch or sequence that is not a decimal uint64 is
+    refused with :class:`PolyesterValidationError`.
+    """
+    left = (_snapshot_position(a, "book_epoch"), _snapshot_position(a, "book_seq"))
+    right = (_snapshot_position(b, "book_epoch"), _snapshot_position(b, "book_seq"))
+    return (left > right) - (left < right)
+
+
 def parse_bucket_ticks(bucket: str | None) -> int | None:
     """Price ticks of an order book bucket; ``None`` or ``""`` is no bucketing.
 

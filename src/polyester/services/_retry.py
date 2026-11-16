@@ -12,7 +12,7 @@ from connectrpc.code import Code
 from connectrpc.errors import ConnectError
 from google.protobuf.message import Message
 
-from polyester._wire import map_connect_error
+from polyester._wire import map_connect_error, retry_delay
 from polyester.errors import (
     AUTH_TEMPORARILY_UNAVAILABLE,
     PolyesterApiError,
@@ -42,6 +42,8 @@ class UnavailableRetry:
     initial_delay: float = 0.025
     max_delay: float = 0.5
     budget: float = 2.0
+    # A retry never waits less than the ``Retry-After`` its answer asked for,
+    # and none is made when that delay would end past ``budget``.
 
 
 # Trigger reads answer UNAVAILABLE until they can show the latest answered
@@ -90,9 +92,12 @@ async def unary_auth_decoded_retry_unavailable(
         try:
             response: TResponse = await call(client, request)
         except ConnectError as exc:
-            if not _is_real_unavailability(exc) or _monotonic() - started + delay > policy.budget:
+            if not _is_real_unavailability(exc):
                 raise map_connect_error(exc) from exc
-            await _sleep(delay)
+            wait = retry_delay(exc, delay)
+            if _monotonic() - started + wait > policy.budget:
+                raise map_connect_error(exc) from exc
+            await _sleep(wait)
             delay = min(delay * 2, policy.max_delay)
             continue
         return decoder(response)

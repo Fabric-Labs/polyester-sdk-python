@@ -71,6 +71,11 @@ jobs:
             -f 'client_payload[sdk]=python' \
             -f 'client_payload[sha]=${{ github.sha }}'
 
+      # Release channel routing, devnet versions and the publish workflow's
+      # stable/devnet split (scripts/devnet_release.py).
+      - name: Release channel tests
+        run: python -m unittest discover -s scripts -p 'test_devnet_release.py'
+
       - name: Ruff
         run: ruff check src tests scripts
 

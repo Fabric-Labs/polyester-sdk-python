@@ -463,6 +463,9 @@ class SignedRedirectRefused(ConnectError):
     error mapping turns ``refusal`` into the :class:`PolyesterRedirectError`.
     """
 
+    http_status: int | None = None
+    retry_after: float | None = None
+
     def __init__(self, refusal: PolyesterRedirectError) -> None:
         super().__init__(Code.FAILED_PRECONDITION, str(refusal))
         self.refusal = refusal
@@ -509,7 +512,7 @@ def capture_response_refs() -> Iterator[list[str]]:
         _response_refs.reset(token)
 
 
-def _record_response_ref(response: pyqwest.FullResponse) -> None:
+def _record_response_ref(response: pyqwest.FullResponse | pyqwest.Response) -> None:
     refs = _response_refs.get()
     if refs is None:
         return
@@ -530,6 +533,11 @@ class _ConnectHTTPClient:
     never follows a redirect, and a redirect answering it raises
     :class:`SignedRedirectRefused`. Unsigned requests go through ``inner``,
     pyqwest's default client, which follows redirects as before.
+
+    An answer's metadata, its status and the delay it asked for, is read when
+    its headers arrive, before its body and before any redirect is refused, so
+    every error made from that answer carries it: one whose body is cut short,
+    is too large to inspect or does not arrive before the deadline included.
     """
 
     def __init__(
@@ -539,30 +547,101 @@ class _ConnectHTTPClient:
         self._signed = signed or pyqwest.Client(_signed_transport())
 
     async def post(self, url: str, headers=None, content=None, **kwargs) -> pyqwest.FullResponse:
-        target = url_without_userinfo(url)
-        signed = carries_api_key(headers)
-        client = self._signed if signed else self._inner
-        response = await client.post(url=target, headers=headers, content=content, **kwargs)
-        _record_response_ref(response)
-        if signed:
-            _refuse_redirect(response, target)
-        return _raise_for_gateway_rejection(response)
+        return await self._send("POST", url, headers, content, **kwargs)
 
     async def get(self, url: str, headers=None, **kwargs) -> pyqwest.FullResponse:
+        return await self._send("GET", url, headers, None, **kwargs)
+
+    async def _send(
+        self, method: str, url: str, headers: Any, content: Any, **kwargs: Any
+    ) -> pyqwest.FullResponse:
         target = url_without_userinfo(url)
         signed = carries_api_key(headers)
         client = self._signed if signed else self._inner
-        response = await client.get(url=target, headers=headers, **kwargs)
-        _record_response_ref(response)
-        if signed:
-            _refuse_redirect(response, target)
-        return _raise_for_gateway_rejection(response)
+        async with client.stream(method, target, headers, content, **kwargs) as response:
+            return await _full_answer(response, target, signed=signed)
 
 
-def _refuse_redirect(response: pyqwest.FullResponse, url: str) -> None:
-    refusal = redirect_refusal(response.status, response.headers.get("location"), url)
+# The most of a failed answer's body read to classify it. A longer one is read
+# by its status alone, as one that cannot be read is.
+MAX_FAILED_ANSWER_BYTES = 64 * 1024
+# The attribute that hands a failed answer whose body the deadline cut off to
+# the error mapping, on the cancellation the deadline raised.
+UNREAD_ANSWER_ATTR = "_polyester_unread_answer"
+
+
+async def _full_answer(
+    response: pyqwest.Response, target: str, *, signed: bool
+) -> pyqwest.FullResponse:
+    """Read ``response`` whole, or raise the error its answer maps to.
+
+    The answer's metadata is taken from its headers before anything else is
+    read or decided.
+    """
+    status = response.status
+    headers = response.headers
+    _record_response_ref(response)
+    if signed:
+        _refuse_redirect(status, headers, target)
+    if status == 200:
+        content = b"".join([bytes(chunk) async for chunk in response.content])
+        return pyqwest.FullResponse(status, headers, content, response.trailers)
+    try:
+        failed_body = await _failed_answer_body(response)
+    except asyncio.CancelledError as exc:
+        # The deadline (or the caller) ended the call while the body was
+        # read: the answer still decides the error, should the deadline be
+        # why (see map_connect_error).
+        setattr(exc, UNREAD_ANSWER_ATTR, unread_answer_error(status, headers))
+        raise
+    if failed_body is None:
+        raise unread_answer_error(status, headers)
+    return _raise_for_gateway_rejection(
+        pyqwest.FullResponse(status, headers, failed_body, response.trailers)
+    )
+
+
+async def _failed_answer_body(response: pyqwest.Response) -> bytes | None:
+    """A failed answer's body, or ``None`` when it cannot be read whole: cut
+    short, broken, or longer than ``MAX_FAILED_ANSWER_BYTES``."""
+    with suppress(ValueError, TypeError):
+        if int(response.headers.get("content-length", "")) > MAX_FAILED_ANSWER_BYTES:
+            return None
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        async for chunk in response.content:
+            total += len(chunk)
+            if total > MAX_FAILED_ANSWER_BYTES:
+                return None
+            chunks.append(bytes(chunk))
+    except Exception:
+        return None
+    return b"".join(chunks)
+
+
+def unread_answer_error(status: int, headers: pyqwest.Headers) -> ConnectError:
+    """The error of a failed answer whose body cannot be read: read by its
+    status alone, with the answer's metadata."""
+    try:
+        _raise_for_gateway_rejection(pyqwest.FullResponse(status, headers, b"", pyqwest.Headers()))
+    except ConnectError as exc:
+        return exc
+    # An answer below 400 that is no redirect: Connect reads it by status.
+    error = _AnswerError(_connect_code_for_status(status), _status_line(status))
+    error.http_status = status
+    error.retry_after = retry_after_from_headers(headers)
+    return error
+
+
+def _refuse_redirect(status: int, headers: pyqwest.Headers, url: str) -> None:
+    refusal = redirect_refusal(status, headers.get("location"), url)
     if refusal is not None:
-        raise SignedRedirectRefused(refusal)
+        refusal.retry_after = retry_after_from_headers(headers)
+        error = SignedRedirectRefused(refusal)
+        error.http_status = status
+        error.retry_after = refusal.retry_after
+        raise error
 
 
 class _CancellationUnaryInterceptor(UnaryInterceptor):

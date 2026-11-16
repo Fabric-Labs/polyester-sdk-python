@@ -45,11 +45,21 @@ class JsonRpcHttpError(JsonRpcError, httpx.HTTPStatusError):
 
 
 def _raise_for_status(response: httpx.Response) -> None:
-    """``response.raise_for_status()``, with the answer's metadata on its error."""
+    """``response.raise_for_status()``, with the answer's metadata on its error.
+
+    It runs as a response hook, when the answer's headers arrive: before its
+    body is read and before httpx reads a redirect's ``Location``, so a body
+    cut short or a malformed ``Location`` cannot hide the answer. A redirect is
+    never followed.
+    """
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         raise JsonRpcHttpError(exc) from exc
+
+
+async def _araise_for_status(response: httpx.Response) -> None:
+    _raise_for_status(response)
 
 
 class JsonRpcClient:
@@ -76,12 +86,12 @@ class JsonRpcClient:
             httpx.Client(
                 timeout=httpx.Timeout(self._timeout),
                 headers=_HTTP_HEADERS,
+                event_hooks={"response": [_raise_for_status]},
             ) as client,
             _deadline_client_close(client, deadline),
         ):
             try:
                 with client.stream("POST", self._url, json=payload) as response:
-                    _raise_for_status(response)
                     raw = _read_limited_sync(
                         response,
                         MAX_JSONRPC_RESPONSE_BYTES,
@@ -109,10 +119,10 @@ class JsonRpcClient:
                     httpx.AsyncClient(
                         timeout=self._timeout,
                         headers=_HTTP_HEADERS,
+                        event_hooks={"response": [_araise_for_status]},
                     ) as client,
                     client.stream("POST", self._url, json=payload) as response,
                 ):
-                    _raise_for_status(response)
                     raw = await _read_limited(response, MAX_JSONRPC_RESPONSE_BYTES)
         except TimeoutError as exc:
             raise JsonRpcError("json-rpc timed out") from exc

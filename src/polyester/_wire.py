@@ -58,6 +58,7 @@ from polyester.models.trading import OrderFieldViolation
 from polyester.transport import (
     AMBIGUOUS_CONNECT_CODES,
     ROUTE_NOT_FOUND_MESSAGES,
+    UNREAD_ANSWER_ATTR,
     GatewayProblemError,
     SignedRedirectRefused,
 )
@@ -330,6 +331,12 @@ def map_connect_error(exc: ConnectError):
     # Every SDK error raised for a call is mapped here: redact the Connect
     # error and its causes once, so nothing in the chain prints a credential.
     redact_exception_chain(exc)
+    unread = _unread_answer(exc)
+    if unread is not None:
+        # The deadline passed while a failed answer's body was read: that
+        # answer, read by its status alone, is the error.
+        unread.__cause__ = exc
+        exc = unread
     mapped = _map_connect_error(exc)
     # The answer's delay, captured once by the transport, rides on whatever
     # error it maps to.
@@ -349,6 +356,21 @@ def map_connect_error(exc: ConnectError):
     # rate-limit detail from a binary detail.
     redact_exception_chain(mapped)
     return mapped
+
+
+def _unread_answer(exc: ConnectError) -> ConnectError | None:
+    """The failed answer a deadline cut off while its body was read, if any."""
+    if exc.code.value != "deadline_exceeded":
+        return None
+    seen: set[int] = set()
+    link: BaseException | None = exc
+    while link is not None and id(link) not in seen:
+        seen.add(id(link))
+        unread = getattr(link, UNREAD_ANSWER_ATTR, None)
+        if isinstance(unread, ConnectError):
+            return unread
+        link = link.__cause__ or link.__context__
+    return None
 
 
 def _auth_status(exc: ConnectError) -> int | None:

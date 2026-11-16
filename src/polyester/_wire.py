@@ -236,6 +236,9 @@ def _map_gateway_problem(exc: GatewayProblemError):
             code=_error_code_from_rest(exc.problem_code),
             violations=_rest_violations(exc.violations),
         )
+    if exc.http_status == 504 and exc.code.value == "deadline_exceeded":
+        # A ConnectRPC deadline_exceeded at 504: the request's deadline.
+        return PolyesterTimeoutError(message or "deadline exceeded")
     if exc.http_status == 504:
         # Whatever code its body names, a 504 is an unknown outcome (see the
         # transport): never a retryable refusal.

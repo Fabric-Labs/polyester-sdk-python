@@ -302,11 +302,16 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         # body, a ConnectRPC code, a retryable rate-limit, admission or
         # authentication code, or a typed detail included, changes that.
         rest_code = code if isinstance(code, str) and code not in _CONNECT_CODES else ""
+        outcome = _outcome_unknown_name(code, body, details)
+        # ConnectRPC answers its own deadline_exceeded with 504: the request's
+        # deadline passed, read as the deadline it is, whatever its message
+        # or detail says. Still an unknown outcome that reads retry.
+        deadline = not outcome and code == "deadline_exceeded"
         _raise_problem(
             response,
             body,
-            _outcome_unknown_name(code, body, details) or rest_code or _future_code(details),
-            Code.UNAVAILABLE,
+            outcome or rest_code or _future_code(details),
+            Code.DEADLINE_EXCEEDED if deadline else Code.UNAVAILABLE,
             retry_after,
         )
     if has_connect_code:

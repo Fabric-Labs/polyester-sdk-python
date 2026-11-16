@@ -633,3 +633,18 @@ def test_round3_retry_delay_reads_every_errors_retry_after() -> None:
     assert retry_delay(auth, 0.025) == 30
     assert retry_delay(PolyesterServerError("x", retry_after=0.001), 0.025) == 0.025
     assert retry_delay(PolyesterRateLimitError("x", retry_after=1.5), 0.025) == 1.5
+
+
+@pytest.mark.parametrize("message", ["context deadline exceeded", "TIMESTAMP_SKEW"])
+async def test_round3_connect_deadline_at_504_is_the_deadline(message: str) -> None:
+    # ConnectRPC answers a server-side deadline_exceeded with HTTP 504: the
+    # request's deadline, whatever its message says, never a refusal.
+    body = json.dumps({"code": "deadline_exceeded", "message": message})
+    error, calls = await _call("write", 504, JSON, body)
+    assert type(error) is PolyesterTimeoutError, repr(error)
+    assert not is_retryable_error(error)
+    assert mutation_outcome_unknown(error)
+    assert calls == 1
+    error, calls = await _call("read", 504, JSON, body, fail_for=1)
+    assert error is None, repr(error)
+    assert calls == 2

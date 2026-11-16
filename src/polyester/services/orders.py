@@ -93,7 +93,7 @@ from polyester.services._symbols import (
     resolve_order_identity,
     resolve_symbol_id,
 )
-from polyester.services._validation import validate_limit
+from polyester.services._validation import validate_limit, validate_time_range
 from polyester.types import Quantity
 
 if TYPE_CHECKING:
@@ -204,18 +204,30 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         include_attached_risk: bool = False,
         include_attached_risk_state: bool = False,
         trigger_id: str | int | None = None,
+        start_ts_ns: int | None = None,
+        end_ts_ns: int | None = None,
     ) -> OrdersList:
         """List order history.
 
         When ``trigger_id`` is set, only child orders created by that trigger
         are returned (for example TWAP/ladder slice children).
+
+        ``start_ts_ns`` and ``end_ts_ns`` bound the inclusive time range in
+        Unix nanoseconds; each is sent only when not ``None``. An explicit
+        ``end_ts_ns=0`` returns an empty page, and a start after any other end
+        raises :class:`PolyesterValidationError` before sending.
         """
+        start, end = validate_time_range("orders.list_history", start_ts_ns, end_ts_ns)
         validated_limit = validate_limit(limit)
         request = GetOrderHistoryRequest(
             limit=validated_limit,
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
         )
+        if start is not None:
+            request.start_ts_ns = start
+        if end is not None:
+            request.end_ts_ns = end
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

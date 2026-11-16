@@ -915,6 +915,12 @@ fee model and exact integer budgeting guidance.
 `trades.list(after_match_id=...)` is a durable fill-replay cursor and requires
 `symbol` or `symbol_id`.
 
+`orders.list_history` and `trades.list` take an inclusive time window,
+`start_ts_ns=` and `end_ts_ns=` (Unix nanoseconds), sent only when not `None`,
+so a restart can read the last hour rather than the whole history; an explicit
+`end_ts_ns=0` returns an empty page, and a start after any other end raises
+`PolyesterValidationError` before sending.
+
 ## VIP, spot fees, and trading rate limits
 
 Public catalog reads need no credentials. Authenticated VIP status, effective spot fees, and

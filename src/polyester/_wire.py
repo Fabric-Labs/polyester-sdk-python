@@ -33,6 +33,7 @@ from polyester.errors import (
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
+    PolyesterError,
     PolyesterNotImplementedError,
     PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
@@ -57,6 +58,7 @@ from polyester.models.trading import OrderFieldViolation
 from polyester.transport import (
     AMBIGUOUS_CONNECT_CODES,
     ROUTE_NOT_FOUND_MESSAGES,
+    UNREAD_ANSWER_ATTR,
     GatewayProblemError,
     SignedRedirectRefused,
 )
@@ -235,6 +237,18 @@ def _map_gateway_problem(exc: GatewayProblemError):
             code=_error_code_from_rest(exc.problem_code),
             violations=_rest_violations(exc.violations),
         )
+    if exc.http_status == 504 and exc.code.value == "deadline_exceeded":
+        # A ConnectRPC deadline_exceeded at 504: the request's deadline.
+        return PolyesterTimeoutError(message or "deadline exceeded")
+    if exc.http_status == 504:
+        # Whatever code its body names, a 504 is an unknown outcome (see the
+        # transport): never a retryable refusal.
+        return PolyesterServerError(
+            message or "Gateway Timeout",
+            code=exc.problem_code or None,
+            status_code=504,
+            retry_after=exc.retry_after,
+        )
     order_code = _error_code_from_rest(exc.problem_code)
     if order_code in _RETRYABLE_RESOURCE_CODES:
         # A rate-limit problem's ``rate_limit`` object, whichever side refused;
@@ -255,10 +269,6 @@ def _map_gateway_problem(exc: GatewayProblemError):
         )
     if exc.http_status == 429:
         return PolyesterApiError(message, code=order_code)
-    if exc.http_status == 504:
-        return PolyesterServerError(
-            message or "Gateway Timeout", code=exc.problem_code or None, status_code=504
-        )
     if code == "unimplemented" and exc.http_status == 501:
         return PolyesterNotImplementedError(message, code=order_code)
     if exc.problem_code == AUTH_SESSION_KIND_NOT_ALLOWED:
@@ -290,6 +300,7 @@ def _map_gateway_problem(exc: GatewayProblemError):
             message,
             code=_error_code_from_rest(exc.problem_code) or None,
             status_code=exc.http_status,
+            retry_after=exc.retry_after,
         )
     if code in ("resource_exhausted", "unknown"):
         return None
@@ -302,19 +313,64 @@ def _map_gateway_problem(exc: GatewayProblemError):
     )
 
 
+def retry_delay(error: BaseException, fallback: float) -> float:
+    """How long a retry of a safe read waits after ``error``: ``fallback``, or
+    the delay the answer asked for (``retry_after``) when that is longer.
+
+    Every SDK retry loop reads the delay here, from the one place the SDK
+    keeps it.
+    """
+    mapped = map_connect_error(error) if isinstance(error, ConnectError) else error
+    asked = getattr(mapped, "retry_after", None)
+    if isinstance(asked, int | float) and not isinstance(asked, bool) and asked > fallback:
+        return float(asked)
+    return fallback
+
+
 def map_connect_error(exc: ConnectError):
     # Every SDK error raised for a call is mapped here: redact the Connect
     # error and its causes once, so nothing in the chain prints a credential.
     redact_exception_chain(exc)
+    unread = _unread_answer(exc)
+    if unread is not None:
+        # The deadline passed while a failed answer's body was read: that
+        # answer, read by its status alone, is the error.
+        unread.__cause__ = exc
+        exc = unread
     mapped = _map_connect_error(exc)
-    if isinstance(mapped, PolyesterRateLimitError) and mapped.retry_after is None:
-        mapped.retry_after = getattr(exc, "retry_after", None)
+    # The answer's delay, captured once by the transport, rides on whatever
+    # error it maps to.
+    if isinstance(mapped, PolyesterError):
+        if mapped.retry_after is None:
+            mapped.retry_after = getattr(exc, "retry_after", None)
+        # The status reported is the answer's own, which the transport
+        # captured for every answer: it wins over one the mapping read a
+        # Connect code as. Classification keeps the mapping's.
+        http_status = getattr(exc, "http_status", None)
+        if http_status is not None:
+            mapped._admission_status = mapped.status_code
+            mapped.status_code = http_status
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
     # The mapped error holds what it decoded from the answer too, such as a
     # rate-limit detail from a binary detail.
     redact_exception_chain(mapped)
     return mapped
+
+
+def _unread_answer(exc: ConnectError) -> ConnectError | None:
+    """The failed answer a deadline cut off while its body was read, if any."""
+    if exc.code.value != "deadline_exceeded":
+        return None
+    seen: set[int] = set()
+    link: BaseException | None = exc
+    while link is not None and id(link) not in seen:
+        seen.add(id(link))
+        unread = getattr(link, UNREAD_ANSWER_ATTR, None)
+        if isinstance(unread, ConnectError):
+            return unread
+        link = link.__cause__ or link.__context__
+    return None
 
 
 def _auth_status(exc: ConnectError) -> int | None:
@@ -324,6 +380,12 @@ def _auth_status(exc: ConnectError) -> int | None:
 def _map_connect_error(exc: ConnectError):
     if isinstance(exc, SignedRedirectRefused):
         return exc.refusal
+    if isinstance(exc, GatewayProblemError) and exc.http_status == 504:
+        # Before any code-named refusal below: a 504 is an unknown outcome
+        # whatever its body names (see _map_gateway_problem).
+        mapped = _map_gateway_problem(exc)
+        if mapped is not None:
+            return mapped
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
             status_code=401 if exc.code.value == "unauthenticated" else None

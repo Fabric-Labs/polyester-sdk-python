@@ -12,6 +12,7 @@ import httpx
 import websockets
 from websockets.asyncio.client import ClientConnection
 
+from polyester._answer import refused_upgrade
 from polyester.auth import ApiKeyCredentials
 from polyester.errors import (
     PolyesterAuthError,
@@ -460,17 +461,23 @@ class AsyncRealtimeClient:
                             sub._set_error(exc)
                         signal_ready(exc)
                         break
-                    except Exception as exc:
+                    except Exception as raw:
+                        # A refused WebSocket upgrade is an answer: its error
+                        # carries the answer's status and delay.
+                        failure = (
+                            refused_upgrade(raw, f"realtime WebSocket connection failed: {raw}")
+                            or raw
+                        )
                         if close.is_set():
                             break
                         if not ready.done():
                             # Match Rust/Go: first handshake failure is terminal.
-                            signal_ready(exc)
+                            signal_ready(failure)
                             break
                         if resume is not None and not resume.ready:
                             # An attempt to resume failed: retry within its limit.
-                            resume.last_error = exc
-                            sub._notify_error(exc)
+                            resume.last_error = failure
+                            sub._notify_error(failure)
                             try:
                                 await self._access.await_resume(channel, resume)
                             except PolyesterSubscriptionEndedError as ended:
@@ -479,9 +486,9 @@ class AsyncRealtimeClient:
                             continue
                         # Transient transport failures reconnect after a successful handshake.
                         if not auto_reconnect:
-                            sub._set_error(exc)
+                            sub._set_error(failure)
                             break
-                        sub._notify_error(exc)
+                        sub._notify_error(failure)
                     else:
                         if close.is_set():
                             break

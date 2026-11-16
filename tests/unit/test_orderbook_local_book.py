@@ -1,13 +1,14 @@
 import pytest
 
-from polyester.codecs.orderbook import depth_to_connect_enum
 from polyester.errors import PolyesterValidationError
+from polyester.models import OrderbookData
 from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.local_book import (
     apply_delta,
     apply_side_delta,
     bucket_side,
     build_orderbook_data,
+    compare_snapshots,
     levels_to_map,
     parse_bucket_ticks,
     side_to_levels,
@@ -19,13 +20,6 @@ def test_levels_to_map_rejects_missing_price_or_quantity() -> None:
         levels_to_map([("100", "5"), ("101", "0")])
     with pytest.raises(PolyesterValidationError, match="missing price"):
         levels_to_map([("0", "5")])
-
-
-def test_depth_mapping_preserves_protocol_boundaries() -> None:
-    assert depth_to_connect_enum(1) == "DEPTH_1"
-    assert depth_to_connect_enum(5) == "DEPTH_5"
-    assert depth_to_connect_enum(500) == "DEPTH_500"
-    assert depth_to_connect_enum(1000) == "DEPTH_1000"
 
 
 def test_apply_delta_updates_and_deletes_levels() -> None:
@@ -265,3 +259,48 @@ def test_build_orderbook_data_rejects_negative_levels() -> None:
             asks={110: 1},
             quantity_scale=8,
         )
+
+
+def _snapshot(epoch: str, seq: str) -> OrderbookData:
+    return OrderbookData(
+        symbol="BTC-USDT", depth=50, book_seq=seq, bids=[], asks=[], book_epoch=epoch
+    )
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "want"),
+    [
+        (("3", "10"), ("3", "10"), 0),
+        (("3", "11"), ("3", "10"), 1),
+        (("3", "9"), ("3", "10"), -1),
+        # A higher epoch is newer whatever its sequence: a new epoch may restart it.
+        (("4", "1"), ("3", "984321"), 1),
+        (("3", "984321"), ("4", "1"), -1),
+        # An unavailable snapshot (epoch 0) is older than any snapshot of a later epoch.
+        (("0", "0"), ("1", "0"), -1),
+        (("18446744073709551615", "0"), ("18446744073709551614", "18446744073709551615"), 1),
+    ],
+)
+def test_compare_snapshots_orders_by_epoch_then_sequence(a, b, want) -> None:
+    assert compare_snapshots(_snapshot(*a), _snapshot(*b)) == want
+    assert compare_snapshots(_snapshot(*b), _snapshot(*a)) == -want
+
+
+@pytest.mark.parametrize(
+    ("epoch", "seq"),
+    [
+        ("", "10"),  # a managed subscription's view: no epoch
+        ("3", ""),
+        ("-1", "10"),
+        ("3", "+10"),
+        ("3", " 10"),
+        ("3", "1e3"),
+        ("٣", "10"),
+        ("18446744073709551616", "10"),
+    ],
+)
+def test_compare_snapshots_refuses_a_view_without_a_snapshot_position(epoch, seq) -> None:
+    with pytest.raises(PolyesterValidationError, match="orderbook.get"):
+        compare_snapshots(_snapshot(epoch, seq), _snapshot("1", "1"))
+    with pytest.raises(PolyesterValidationError, match="orderbook.get"):
+        compare_snapshots(_snapshot("1", "1"), _snapshot(epoch, seq))

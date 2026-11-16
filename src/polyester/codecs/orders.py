@@ -21,6 +21,7 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
+from polyester.codecs.refusal_codes import FEE_ASSET_NOT_ALLOWED, refusal_code
 from polyester.codecs.scalars import (
     UINT32_MAX,
     FractionalDigitsError,
@@ -358,7 +359,9 @@ def order_intent_from_request(
         if fee_asset not in FEE_ASSET_TO_PROTO:
             raise PolyesterValidationError("fee_asset must be quote or base")
         if request.side == "sell" and fee_asset != "quote":
-            raise PolyesterValidationError("sell orders must use fee_asset=quote")
+            raise PolyesterValidationError(
+                "sell orders must use fee_asset=quote", code=FEE_ASSET_NOT_ALLOWED
+            )
         intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_asset])
     if request.self_trade_prevention_mode is not None:
         # Attached take-profit, stop-loss and trailing-stop exits use this mode.
@@ -729,6 +732,7 @@ def _risk_execution_from_friendly(
     field_name: str,
     symbol: str | None,
     field_path: str,
+    price_code: str | None = None,
 ) -> orders_pb2.RiskExecution:
     child = orders_pb2.RiskExecution()
     label = str(order_type).strip().lower() if order_type is not None else "market"
@@ -739,13 +743,16 @@ def _risk_execution_from_friendly(
         return child
     if label in {"limit", "limit_gtc"}:
         if limit_price is None:
-            raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
-        child.limit_gtc.price_ticks = _resolve_optional_price_ticks(
-            limit_price,
-            f"{field_name}.limit_price",
-            symbol=symbol,
-            field_path=f"{field_path}.child.limit_gtc.price_ticks",
-        )
+            raise PolyesterValidationError(
+                f"{field_name} LIMIT child requires limit_price", code=price_code
+            )
+        with refusal_code(price_code):
+            child.limit_gtc.price_ticks = _resolve_optional_price_ticks(
+                limit_price,
+                f"{field_name}.limit_price",
+                symbol=symbol,
+                field_path=f"{field_path}.child.limit_gtc.price_ticks",
+            )
         return child
     raise PolyesterValidationError(
         f"{field_name} order_type must be 'market' or 'limit' (got {order_type!r})"
@@ -758,6 +765,7 @@ def _risk_execution_from_child(
     field_name: str,
     symbol: str | None,
     field_path: str,
+    price_code: str | None = None,
 ) -> orders_pb2.RiskExecution:
     if not isinstance(child, dict):
         raise PolyesterValidationError(f"{field_name}.child must be an object")
@@ -787,19 +795,20 @@ def _risk_execution_from_child(
             raise PolyesterValidationError(
                 f"{field_name}.child.limit_gtc accepts price or price_ticks, not both"
             )
-        if price is not None:
-            execution.limit_gtc.price_ticks = _resolve_optional_price_ticks(
-                price,
-                f"{field_name}.child.limit_gtc.price",
-                symbol=symbol,
-                field_path=f"{field_path}.child.limit_gtc.price_ticks",
-            )
-        elif ticks is not None:
-            execution.limit_gtc.price_ticks = tick_count(
-                ticks, f"{field_name}.child.limit_gtc.price_ticks"
-            )
-        else:
-            raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
+        with refusal_code(price_code):
+            if price is not None:
+                execution.limit_gtc.price_ticks = _resolve_optional_price_ticks(
+                    price,
+                    f"{field_name}.child.limit_gtc.price",
+                    symbol=symbol,
+                    field_path=f"{field_path}.child.limit_gtc.price_ticks",
+                )
+            elif ticks is not None:
+                execution.limit_gtc.price_ticks = tick_count(
+                    ticks, f"{field_name}.child.limit_gtc.price_ticks"
+                )
+            else:
+                raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
         return execution
     if has_market:
         market = _mapping_get(child, "market_ioc", "marketIoc")
@@ -822,7 +831,14 @@ def _risk_leg_from_dict(
     field_name: str,
     symbol: str | None,
     risk_field: str = "order.attached_risk",
+    trigger_price_code: str | None = None,
+    limit_price_code: str | None = None,
 ) -> orders_pb2.TakeProfitPolicy:
+    """Encode a take-profit or stop-loss leg.
+
+    A refused trigger price carries ``trigger_price_code`` and a refused limit price
+    ``limit_price_code``, when given: the codes an OCO's legs answer.
+    """
     if not isinstance(data, dict):
         raise PolyesterValidationError(f"{field_name} must be an object")
     _reject_unknown_keys(data, _RISK_LEG_KEYS, field_name=field_name)
@@ -836,14 +852,16 @@ def _risk_leg_from_dict(
             f"{field_name} accepts trigger_price or trigger_price_ticks, not both"
         )
     if trigger_price is not None:
-        ticks = _resolve_optional_price_ticks(
-            trigger_price,
-            f"{field_name}.trigger_price",
-            symbol=symbol,
-            field_path=f"{leg_path}.trigger_price_ticks",
-        )
+        with refusal_code(trigger_price_code):
+            ticks = _resolve_optional_price_ticks(
+                trigger_price,
+                f"{field_name}.trigger_price",
+                symbol=symbol,
+                field_path=f"{leg_path}.trigger_price_ticks",
+            )
     elif trigger_ticks is not None:
-        ticks = tick_count(trigger_ticks, f"{field_name}.trigger_price_ticks")
+        with refusal_code(trigger_price_code):
+            ticks = tick_count(trigger_ticks, f"{field_name}.trigger_price_ticks")
     else:
         raise PolyesterValidationError(f"{field_name} requires trigger_price")
 
@@ -856,7 +874,11 @@ def _risk_leg_from_dict(
         )
     if child_data is not None:
         child = _risk_execution_from_child(
-            child_data, field_name=field_name, symbol=symbol, field_path=leg_path
+            child_data,
+            field_name=field_name,
+            symbol=symbol,
+            field_path=leg_path,
+            price_code=limit_price_code,
         )
     else:
         child = _risk_execution_from_friendly(
@@ -865,6 +887,7 @@ def _risk_leg_from_dict(
             field_name=field_name,
             symbol=symbol,
             field_path=leg_path,
+            price_code=limit_price_code,
         )
 
     policy = orders_pb2.TakeProfitPolicy(

@@ -24,7 +24,7 @@ from google.protobuf.message import Message
 
 from polyester._redact import redact_text
 from polyester.errors import PolyesterCatalogHydrationError
-from polyester.services._retry import _is_real_unavailability
+from polyester.services._retry import _is_real_unavailability, retry_delay
 from polyester.transport import TransportFactory, capture_response_refs
 
 STARTUP_ATTEMPTS = 3
@@ -82,10 +82,12 @@ async def load_catalog(
                 failure = exc
             else:
                 break
+        # Never sooner than the Retry-After the answer asked for.
+        wait = retry_delay(failure, delay)
         if (
             not _is_real_unavailability(failure)
             or attempt >= STARTUP_ATTEMPTS
-            or _monotonic() + delay >= deadline
+            or _monotonic() + wait >= deadline
         ):
             raise _read_failure(
                 source,
@@ -94,7 +96,7 @@ async def load_catalog(
                 elapsed=_monotonic() - started,
                 response_ref=refs[-1] if refs else None,
             )
-        await _sleep(delay)
+        await _sleep(wait)
         delay = min(delay * 2, MAX_BACKOFF)
     try:
         install(response)

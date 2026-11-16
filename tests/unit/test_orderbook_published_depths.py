@@ -2,8 +2,8 @@
 
 The server here behaves like the public stream contract: it accepts a subscribe on
 any depth, but publishes only on the tiers 1, 20, 50, 200 and 500, each as a SET
-diff of that tier's own top-N view. Snapshots answer at any depth the snapshot enum
-names, up to 1000.
+diff of that tier's own top-N view. Snapshots answer at any level count up to the
+max_depth they report, and refuse a deeper one with INVALID_ARGUMENT.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import pytest
 import websockets
 
 from polyester import AsyncPolyester
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterApiError, PolyesterValidationError
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.realtime.client import AsyncRealtimeClient
 from tests.hardening_support import (
@@ -28,7 +28,7 @@ from tests.hardening_support import (
 from tests.unit.test_server_unsubscribe import CentrifugoServer, publication
 
 TIERS = (1, 20, 50, 200, 500)
-SNAPSHOT_DEPTHS = (1, 5, 10, 20, 50, 100, 200, 500, 1000)
+MAX_DEPTH = 5000
 UNIT = 1_000_000_000  # One quote unit, in price ticks.
 BEST_BID = 2000 * UNIT
 BEST_ASK = 2001 * UNIT
@@ -64,7 +64,7 @@ class TierMarket:
         self.asks = {BEST_ASK + i * UNIT: 5 for i in range(levels)}
         self.seq = 100
         self.available = True
-        self.snapshot_requests: list[str] = []
+        self.snapshot_requests: list[int] = []
         self.delivered: dict[str, int] = {}
         self.published = {tier: self._view(tier) for tier in TIERS}
         self.published_seq = dict.fromkeys(TIERS, self.seq)
@@ -77,13 +77,21 @@ class TierMarket:
     async def snapshot(self, request: ParsedRequest) -> HttpScript:
         assert request.path.endswith("/GetOrderBook")
         message = orderbook_pb2.GetOrderBookRequest.FromString(request.body)
-        name = orderbook_pb2.Depth.Name(message.depth)
-        self.snapshot_requests.append(name)
+        self.snapshot_requests.append(message.depth)
+        if message.depth > MAX_DEPTH:
+            return HttpScript.json(
+                400,
+                {"code": "invalid_argument", "message": f"depth must be at most {MAX_DEPTH}"},
+            )
         response = orderbook_pb2.GetOrderBookResponse(
-            symbol_id=1, book_seq=self.seq, available=self.available
+            symbol_id=1,
+            book_seq=self.seq,
+            book_epoch=2 if self.available else 0,
+            max_depth=MAX_DEPTH,
+            available=self.available,
         )
         if self.available:
-            bids, asks = self._view(int(name.removeprefix("DEPTH_")))
+            bids, asks = self._view(message.depth or 50)
             for price, qty in sorted(bids.items(), reverse=True):
                 response.bids.add(price_ticks=price, qty_scaled=qty)
             for price, qty in sorted(asks.items()):
@@ -242,7 +250,7 @@ async def test_every_requested_depth_rides_its_tier_and_trims() -> None:
             sub = await h.client.orderbook.create_subscription(symbol="BTC-USDT", depth=depth)
             assert await subscribed_channel(h.server) == channel_for(tier), depth
             first = await next_view(sub, what=f"first view at depth {depth}")
-            assert h.market.snapshot_requests[-1] == f"DEPTH_{tier}", depth
+            assert h.market.snapshot_requests[-1] == tier, depth
             assert first.depth == depth
             assert bid_ticks(first) == [BEST_BID - i * UNIT for i in range(depth)]
             assert ask_ticks(first) == [BEST_ASK + i * UNIT for i in range(depth)]
@@ -269,7 +277,7 @@ async def test_each_tier_uses_itself_for_channel_snapshot_and_view(tier: int) ->
         sub = await h.client.orderbook.create_subscription(symbol="BTC-USDT", depth=tier)
         assert await subscribed_channel(h.server) == channel_for(tier)
         view = await next_view(sub, what="first view")
-        assert h.market.snapshot_requests == [f"DEPTH_{tier}"]
+        assert h.market.snapshot_requests == [tier]
         assert (view.depth, len(view.bids), len(view.asks)) == (tier, tier, tier)
         h.market.asks[BEST_ASK] = 9
         await h.market.publish()
@@ -298,7 +306,7 @@ async def test_unservable_depth_is_refused_before_connecting(depth) -> None:
         sub = await h.client.orderbook.create_subscription(symbol="BTC-USDT", depth=500)
         await next_view(sub, what="first view")
         assert h.server.connections == 1
-        assert h.market.snapshot_requests == ["DEPTH_500"]
+        assert h.market.snapshot_requests == [500]
         await sub.aclose()
 
 
@@ -376,7 +384,7 @@ async def test_gap_in_a_delta_outside_the_view_waits_for_the_next_reset() -> Non
         assert stale.available is False
         assert stale.book_seq == first.book_seq == "100"
         assert bid_ticks(stale) == bid_ticks(first)
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
 
         # Later diffs cannot apply to the book either and add no view.
         await h.market.send(20, start=200, end=201, bids={BEST_BID: 9})
@@ -388,7 +396,7 @@ async def test_gap_in_a_delta_outside_the_view_waits_for_the_next_reset() -> Non
         assert len(recovered.bids) == 10
         assert recovered.bids[0].qty.scaled == 5
         assert gaps == ["gap"]
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
         await sub.aclose()
 
 
@@ -409,7 +417,7 @@ async def test_sequence_zero_snapshot_still_detects_a_gap_at_a_trimmed_depth() -
         assert gaps == ["gap"]
         assert (stale.available, stale.book_seq) == (False, "0")
         assert stale.bids[0].qty.scaled == 5, "the gapped delta must not be applied"
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
         await sub.aclose()
 
 
@@ -428,7 +436,7 @@ async def test_sequence_zero_snapshot_applies_the_next_contiguous_delta() -> Non
         assert gaps == []
         assert (updated.book_seq, updated.bids[0].qty.scaled) == ("1", 8)
         assert updated.available is True
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
         await sub.aclose()
 
 
@@ -447,7 +455,7 @@ async def test_delta_one_past_the_book_is_a_gap_not_the_next_view() -> None:
 
         assert gaps == ["gap"]
         assert (stale.available, stale.book_seq, stale.bids[0].qty.scaled) == (False, "100", 5)
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
         await sub.aclose()
 
 
@@ -464,7 +472,7 @@ async def test_delta_overlapping_the_book_is_a_gap() -> None:
 
         assert gaps == ["gap"]
         assert (stale.available, stale.book_seq, stale.bids[0].qty.scaled) == (False, "100", 5)
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
         await sub.aclose()
 
 
@@ -484,7 +492,7 @@ async def test_unavailable_book_stays_unknown_then_recovers_trimmed() -> None:
         recovered = await next_view(sub, what="view after the book came back")
         assert recovered.available is True
         assert (len(recovered.bids), len(recovered.asks)) == (10, 10)
-        assert set(h.market.snapshot_requests) == {"DEPTH_20"}
+        assert set(h.market.snapshot_requests) == {20}
         assert len(h.market.snapshot_requests) == 2
         await sub.aclose()
 
@@ -549,7 +557,7 @@ async def test_zero_price_outside_the_trimmed_view_waits_for_the_next_reset() ->
         assert stale.available is False
         assert stale.book_seq == first.book_seq
         assert bid_ticks(stale) == bid_ticks(first)
-        assert h.market.snapshot_requests == ["DEPTH_20"]
+        assert h.market.snapshot_requests == [20]
         assert gaps == ["gap"]
 
         await _reset_to_the_market(h, end=102)
@@ -575,7 +583,7 @@ async def test_reconnect_stays_on_the_tier_and_refetches_at_it() -> None:
             assert await h.server.subscribed.get() == channel_for(20)
         refreshed = await next_view(sub, what="view after the reconnect")
         assert reconnects == ["r"]
-        assert h.market.snapshot_requests == ["DEPTH_20", "DEPTH_20"]
+        assert h.market.snapshot_requests == [20, 20]
         assert len(refreshed.bids) == 10
         await sub.aclose()
 
@@ -607,10 +615,37 @@ async def test_raw_deltas_at_an_unpublished_depth_are_refused(depth) -> None:
         assert h.server.connections == 0
 
 
-@pytest.mark.parametrize("depth", SNAPSHOT_DEPTHS)
-async def test_raw_snapshot_serves_every_enum_depth(depth: int) -> None:
-    async with harness(levels=1100) as h:
+@pytest.mark.parametrize("depth", [1, 2, 7, 50, 1000, 1001, 2500, MAX_DEPTH])
+async def test_raw_snapshot_serves_any_depth_up_to_max_depth(depth: int) -> None:
+    # The book holds 1500 levels a side: a deeper snapshot holds all of them.
+    async with harness(levels=1500) as h:
         book = await h.client.orderbook.get(symbol="BTC-USDT", depth=depth)
-        assert h.market.snapshot_requests == [f"DEPTH_{depth}"]
-        assert (book.depth, len(book.bids), len(book.asks)) == (depth, depth, depth)
+        assert h.market.snapshot_requests == [depth]
+        held = min(depth, 1500)
+        assert (book.depth, len(book.bids), len(book.asks)) == (depth, held, held)
+        assert (book.book_epoch, book.max_depth) == ("2", MAX_DEPTH)
         assert h.server.connections == 0
+
+
+async def test_raw_snapshot_depth_zero_is_the_default_50() -> None:
+    async with harness() as h:
+        book = await h.client.orderbook.get(symbol="BTC-USDT", depth=0)
+        assert h.market.snapshot_requests == [0]
+        assert (book.depth, len(book.bids), len(book.asks)) == (50, 50, 50)
+
+
+async def test_raw_snapshot_above_max_depth_is_the_servers_refusal() -> None:
+    async with harness() as h:
+        with pytest.raises(PolyesterApiError, match="at most 5000") as refused:
+            await h.client.orderbook.get(symbol="BTC-USDT", depth=MAX_DEPTH + 1)
+        assert refused.value.code == "invalid_argument"
+        # Sent as given: the maximum is the server's, not the SDK's.
+        assert h.market.snapshot_requests == [MAX_DEPTH + 1]
+
+
+async def test_managed_views_carry_no_epoch_or_max_depth() -> None:
+    async with harness() as h:
+        sub = await h.client.orderbook.create_subscription(symbol="BTC-USDT", depth=20)
+        view = await next_view(sub, what="first view")
+        assert (view.book_epoch, view.max_depth) == ("", 0)
+        await sub.aclose()

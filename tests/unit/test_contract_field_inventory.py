@@ -1,5 +1,5 @@
-"""Every field of the requests and replies public contract 1945423c added or
-changed is classified.
+"""Every field of the requests and replies public contracts 1945423c and 5c2119f
+added or changed is classified.
 
 ``testdata/contract_field_inventory.tsv`` lists each field of those messages,
 and of the messages nested in their new replies, as ``covered`` (naming the
@@ -21,6 +21,7 @@ import polyester.gen.auth.v1.auth_pb2  # noqa: F401
 import polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2  # noqa: F401
 import polyester.gen.ledger.read.v1.ledger_read_pb2  # noqa: F401
 import polyester.gen.ledger.read.v1.statement_export_pb2  # noqa: F401
+import polyester.gen.orderbook.v1.orderbook_pb2  # noqa: F401
 import polyester.gen.orders.v1.orders_pb2  # noqa: F401
 import polyester.gen.transfer.v1.dust_conversion_pb2  # noqa: F401
 import polyester.gen.transfer.v1.internal_transfer_pb2  # noqa: F401
@@ -28,6 +29,7 @@ import polyester.models
 from polyester.services.dust_conversions import AsyncDustConversionsService
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.lifecycle import AsyncLifecycleService
+from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.statements import AsyncStatementsService
 
 INVENTORY = Path(__file__).parents[2] / "testdata" / "contract_field_inventory.tsv"
@@ -48,6 +50,8 @@ MESSAGES = [
     "ledger.read.v1.ListStatementExportsRequest",
     "ledger.read.v1.ListStatementExportsResponse",
     "ledger.read.v1.StatementExport",
+    "orderbook.v1.GetOrderBookRequest",
+    "orderbook.v1.GetOrderBookResponse",
     "orders.v1.ErrorDetail",
     "transfer.v1.BatchCreateInternalTransfersRequest",
     "transfer.v1.InternalTransferBatchLeg",
@@ -82,6 +86,7 @@ METHODS = {
     "dust_conversions.get": AsyncDustConversionsService.get,
     "dust_conversions.list": AsyncDustConversionsService.list,
     "internal_transfers.batch_create": AsyncInternalTransfersService.batch_create,
+    "orderbook.get": AsyncOrderbookService.get,
 }
 
 

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextvars import ContextVar
 from urllib.parse import quote
 
 import httpx
 
+from polyester._answer import attach_answer
 from polyester._problem import decode_http_problem
 from polyester._redact import url_for_error, url_without_userinfo
 from polyester._redirects import redirect_refusal
@@ -13,6 +15,7 @@ from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import (
     TIMESTAMP_SKEW,
     PolyesterAuthError,
+    PolyesterError,
     PolyesterRealtimeError,
     PolyesterTimestampSkewError,
     PolyesterTransportError,
@@ -126,6 +129,31 @@ def _auth_http_error(
     return error
 
 
+# The answers a signed GET in this task received, recorded by a response hook:
+# httpx runs it when an answer's headers arrive, before it reads the body or a
+# redirect's Location, either of which can fail.
+_answers: ContextVar[list[httpx.Response] | None] = ContextVar(
+    "polyester_signed_answers", default=None
+)
+
+
+async def _record_answer(response: httpx.Response) -> None:
+    answers = _answers.get()
+    if answers is not None:
+        answers.append(response)
+
+
+def _capture_answers(http: httpx.AsyncClient) -> None:
+    """Have ``http`` record each answer a signed GET receives (see ``_answers``).
+
+    The hook records nothing outside a signed GET, so ``http`` is otherwise
+    unchanged.
+    """
+    hooks = http.event_hooks
+    if _record_answer not in hooks.get("response", []):
+        http.event_hooks = {**hooks, "response": [*hooks.get("response", []), _record_answer]}
+
+
 def _userinfo_auth(http: httpx.AsyncClient, url: str) -> httpx.Auth | None:
     """The Basic auth httpx would derive from ``url``'s userinfo, or ``None``.
 
@@ -160,6 +188,12 @@ async def signed_get(
     # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
     # arrive within the read timeout while the total exceeds the SDK budget.
     timeout = _client_timeout_seconds(http)
+    # Each answer is recorded when its headers arrive: whatever then cuts its
+    # body off, or makes its Location unreadable, the deadline included, the
+    # error made from a failed answer carries its status and delay.
+    _capture_answers(http)
+    answers: list[httpx.Response] = []
+    recording = _answers.set(answers)
     try:
         async with asyncio.timeout(timeout):
             # Never follow a redirect, whatever the client's own setting: it
@@ -170,37 +204,88 @@ async def signed_get(
                 else http.stream("GET", target, headers=headers, auth=auth, follow_redirects=False)
             )
             async with stream as response:
-                refusal = redirect_refusal(
-                    response.status_code, response.headers.get("location"), target
-                )
-                if refusal is not None:
-                    raise refusal
                 try:
-                    raw = await _read_limited(response, max_bytes, label=label)
-                except asyncio.CancelledError:
-                    # Ensure the streamed peer is aborted promptly on cancel (E6).
-                    await response.aclose()
-                    raise
-                if response.status_code == 403 and is_cloudflare_browser_ban(
-                    raw.decode("utf-8", errors="replace")
-                ):
-                    raise PolyesterTransportError(cloudflare_1010_message())
-                if response.status_code in (401, 403):
-                    raise _auth_http_error(
-                        status_code=response.status_code,
-                        label=label,
-                        endpoint=url_for_error(url),
-                        body=raw,
+                    return await _read_signed_answer(
+                        response, url=url, target=target, label=label, max_bytes=max_bytes
                     )
-                if response.status_code >= 400:
-                    truncated = _truncate_body(raw)
-                    detail = f": {truncated}" if truncated else ""
-                    raise PolyesterRealtimeError(f"{label}: HTTP {response.status_code}{detail}")
+                except PolyesterError as error:
+                    # Every error from a failed answer carries its status and delay.
+                    if response.status_code >= 300:
+                        attach_answer(error, response.status_code, response.headers)
+                    raise
+    except httpx.TransportError as exc:
+        # The body was cut short or broken, or a redirect's Location could
+        # not be read: a failed answer reads by its status alone.
+        failed = _failed_answer(answers)
+        if failed is not None:
+            raise _unread_answer_error(failed, url=url, target=target, label=label) from exc
+        if isinstance(exc, httpx.TimeoutException):
+            raise PolyesterRealtimeError(f"{label}: timed out") from exc
+        raise
     except TimeoutError as exc:
+        failed = _failed_answer(answers)
+        if failed is not None:
+            raise _unread_answer_error(failed, url=url, target=target, label=label) from exc
         raise PolyesterRealtimeError(f"{label}: timed out") from exc
-    except httpx.TimeoutException as exc:
-        raise PolyesterRealtimeError(f"{label}: timed out") from exc
+    finally:
+        _answers.reset(recording)
+
+
+def _failed_answer(answers: list[httpx.Response]) -> httpx.Response | None:
+    """The failed answer the signed GET received, if it received one."""
+    if answers and answers[-1].status_code >= 300:
+        return answers[-1]
+    return None
+
+
+def _unread_answer_error(
+    response: httpx.Response, *, url: str, target: str, label: str
+) -> PolyesterError:
+    """The error of a failed answer whose body or Location could not be read:
+    a refused redirect, or else its status alone, carrying the answer's
+    metadata."""
+    status = response.status_code
+    error: PolyesterError | None = redirect_refusal(
+        status, response.headers.get("location"), target
+    )
+    if error is None:
+        error = _answer_error(status, b"", url=url, label=label)
+    attach_answer(error, status, response.headers)
+    return error
+
+
+async def _read_signed_answer(
+    response: httpx.Response, *, url: str, target: str, label: str, max_bytes: int
+) -> bytes:
+    """A signed GET's answer: its body when it succeeded, else the error it maps to."""
+    refusal = redirect_refusal(response.status_code, response.headers.get("location"), target)
+    if refusal is not None:
+        raise refusal
+    try:
+        raw = await _read_limited(response, max_bytes, label=label)
+    except asyncio.CancelledError:
+        # Ensure the streamed peer is aborted promptly on cancel (E6).
+        await response.aclose()
+        raise
+    if response.status_code >= 300:
+        raise _answer_error(response.status_code, raw, url=url, label=label)
     return raw
+
+
+def _answer_error(status: int, raw: bytes, *, url: str, label: str) -> PolyesterError:
+    """The error a failed answer with this body maps to."""
+    if status == 403 and is_cloudflare_browser_ban(raw.decode("utf-8", errors="replace")):
+        return PolyesterTransportError(cloudflare_1010_message())
+    if status in (401, 403):
+        return _auth_http_error(
+            status_code=status,
+            label=label,
+            endpoint=url_for_error(url),
+            body=raw,
+        )
+    truncated = _truncate_body(raw)
+    detail = f": {truncated}" if truncated else ""
+    return PolyesterRealtimeError(f"{label}: HTTP {status}{detail}")
 
 
 async def fetch_rt_token(

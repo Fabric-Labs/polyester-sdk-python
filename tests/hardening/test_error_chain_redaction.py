@@ -257,7 +257,7 @@ STRUCTURED = [
         {
             "code": "RATE_LIMIT_EXCEEDED",
             "detail": f"upstream {PROXY_URL}",
-            "rate_limit": {"reason": "ip", "operation_id": PROXY_URL},
+            "rateLimit": {"reason": "ip", "operationId": PROXY_URL},
         },
         "detail",
         id="rate-limit-detail",

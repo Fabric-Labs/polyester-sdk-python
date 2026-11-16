@@ -113,6 +113,17 @@ def decode_coded_detail(detail_type: str, value: bytes) -> Message | None:
     return detail
 
 
+def outcome_unknown_code(detail_type: str, value: bytes) -> str:
+    """The code of an encoded order detail whose code ends in ``_OUTCOME_UNKNOWN``, or ``""``."""
+    detail = decode_coded_detail(detail_type, value)
+    if not isinstance(detail, orders_pb2.ErrorDetail):
+        return ""
+    if detail.code not in orders_pb2.ErrorCode.values():
+        return ""
+    name = orders_pb2.ErrorCode.Name(detail.code)
+    return name if name.endswith("_OUTCOME_UNKNOWN") else ""
+
+
 def carries_contract_code(detail_type: str, value: bytes) -> bool:
     """Whether an encoded detail is a service detail with a code this SDK can name."""
     detail = decode_coded_detail(detail_type, value)

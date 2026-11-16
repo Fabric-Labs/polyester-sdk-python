@@ -35,6 +35,14 @@ def contract_string_length(message: Any, name: str) -> tuple[int, int]:
     return int(rules.min_len), int(rules.max_len)
 
 
+def contract_string_max_bytes(message: Any, name: str) -> int:
+    """The ``max_bytes`` the contract sets on a string field."""
+    rules = _rules(message, name).string
+    if not rules.HasField("max_bytes"):
+        raise LookupError(f"{message.DESCRIPTOR.full_name}.{name} has no max_bytes")
+    return int(rules.max_bytes)
+
+
 def contract_string_pattern(message: Any, name: str) -> str:
     """The regular expression the contract sets on a string field."""
     rules = _rules(message, name).string

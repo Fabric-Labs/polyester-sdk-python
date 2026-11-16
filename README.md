@@ -148,6 +148,25 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Devnet pre-releases
+
+Stable releases track testnet. While `CHANGELOG.md` has entries under
+`## Unreleased`, every push to `main` also publishes a devnet pre-release of the
+next version, `<version>.dev<YYYYMMDDHHmmss>` (the commit time, UTC), for
+trying changes before they reach a stable release. pip installs a pre-release
+only when asked, so `pip install polyester-sdk` keeps installing the stable
+release.
+
+```bash
+pip install --pre polyester-sdk                          # newest, pre-releases included
+pip install "polyester-sdk==0.34.0.dev20261117093000"    # one devnet build
+```
+
+The [releases page](https://github.com/Fabric-Labs/polyester-sdk-python/releases)
+holds one pre-release per upcoming version, pointing at its newest devnet build,
+with the changes it carries. A devnet build can change between snapshots, so
+pin an exact version. [RELEASING.md](RELEASING.md) describes both channels.
+
 ## Examples
 
 Runnable cookbook examples live in the sibling repo

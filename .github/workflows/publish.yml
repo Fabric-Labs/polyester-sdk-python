@@ -1,23 +1,67 @@
 name: Publish
 
-# Publishes polyester-sdk to PyPI through trusted publishing (OIDC, no token)
-# when a vX.Y.Z tag is pushed. The tag must match the package version, and
-# the full CI workflow must pass before anything is built or uploaded.
+# Publishes polyester-sdk to PyPI through trusted publishing (OIDC, no token).
+# PyPI trusts this file (publish.yml) and the pypi environment, so both release
+# channels live here. RELEASING.md describes them.
+#
+# Stable: pushing a vX.Y.Z tag publishes that version. The tag must match the
+# package version, and the full CI workflow must pass before anything is built
+# or uploaded.
+#
+# Devnet: every push to main whose CHANGELOG has entries under ## Unreleased
+# publishes the pre-release <next version>.dev<YYYYMMDDHHmmss> (PEP 440), which
+# pip installs only with --pre or an exact pin, and moves the one GitHub
+# pre-release of that version to it. scripts/devnet_release.py computes the
+# version. A manual run builds and checks the pre-release; it publishes only
+# from main with dry_run off.
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    tags:
+      - "v*"
+      # Devnet tags never take the stable path.
+      - "!v*-devnet*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and check the devnet pre-release without publishing it
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
+# One publish per ref at a time: each tag, and main, publishes in order. A
+# manual dry run publishes nothing and takes no lock.
 concurrency:
-  group: publish-${{ github.ref }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('publish-dry-run-{0}', github.run_id) || format('publish-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
+  route:
+    name: Route stable or devnet
+    runs-on: ubuntu-24.04
+    outputs:
+      channel: ${{ steps.route.outputs.channel }}
+      dry_run: ${{ steps.route.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      # A vX.Y.Z tag goes stable, a push to main goes devnet, a devnet tag
+      # goes nowhere. scripts/test_devnet_release.py covers each case.
+      - name: Pick the channel
+        id: route
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python3 scripts/devnet_release.py route --event "$GITHUB_EVENT_NAME" --ref "$GITHUB_REF" --dry-run "$DRY_RUN"
+
   check-tag:
     name: Tag matches package version
+    needs: route
+    if: needs.route.outputs.channel == 'stable'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -100,3 +144,134 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  devnet-build:
+    name: Build devnet pre-release
+    needs: route
+    if: needs.route.outputs.channel == 'devnet'
+    runs-on: ubuntu-24.04
+    outputs:
+      skip: ${{ steps.plan.outputs.skip }}
+      version: ${{ steps.plan.outputs.version }}
+      exists: ${{ steps.exists.outputs.exists }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      # Next version from the last vX.Y.Z tag and ## Unreleased, timestamped
+      # with the commit time; skip=true when Unreleased has no entries.
+      - name: Plan the devnet version
+        id: plan
+        run: python scripts/devnet_release.py plan --notes devnet-notes.md
+
+      - name: Is the version already on PyPI?
+        id: exists
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python scripts/devnet_release.py exists --version "$VERSION"
+
+      # Build time only: the stamped version is never committed.
+      - name: Stamp the version into pyproject.toml and _version.py
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python scripts/devnet_release.py stamp --version "$VERSION"
+
+      - name: Build sdist and wheel
+        if: steps.plan.outputs.skip == 'false'
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+          python -m build
+          twine check --strict dist/*
+
+      # Wheel and sdist metadata carry the version, and next to the latest
+      # stable wheel pip installs stable by default and this one with --pre.
+      - name: Artefacts carry the version; pip default stays stable
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python scripts/devnet_release.py verify --version "$VERSION"
+
+      - name: GitHub pre-release preview
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/devnet_release.py release --notes devnet-notes.md --dry-run true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: steps.plan.outputs.skip == 'false'
+        with:
+          name: devnet-dist
+          path: |
+            dist/
+            devnet-notes.md
+          if-no-files-found: error
+
+  devnet-ci:
+    name: CI
+    needs: devnet-build
+    if: needs.devnet-build.outputs.skip == 'false'
+    uses: ./.github/workflows/ci.yml
+
+  devnet-publish:
+    name: Publish devnet pre-release to PyPI
+    needs: [route, devnet-build, devnet-ci]
+    if: needs.route.outputs.channel == 'devnet' && needs.route.outputs.dry_run == 'false' && needs.devnet-build.outputs.skip == 'false' && needs.devnet-build.outputs.exists == 'false'
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/polyester-sdk/${{ needs.devnet-build.outputs.version }}/
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: devnet-dist
+
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  # Runs after a publish, and after a re-run whose version PyPI already has.
+  devnet-release:
+    name: Devnet GitHub pre-release
+    needs: [route, devnet-build, devnet-ci, devnet-publish]
+    if: ${{ !cancelled() && needs.route.outputs.channel == 'devnet' && needs.route.outputs.dry_run == 'false' && needs.devnet-build.outputs.skip == 'false' && needs.devnet-ci.result == 'success' && (needs.devnet-publish.result == 'success' || (needs.devnet-publish.result == 'skipped' && needs.devnet-build.outputs.exists == 'true')) }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: devnet-dist
+          path: devnet-dist
+
+      # Waits until PyPI serves the version, then checks that a plain
+      # `pip install polyester-sdk` still resolves to a stable release.
+      - name: PyPI serves it; the default install stays stable
+        env:
+          VERSION: ${{ needs.devnet-build.outputs.version }}
+        run: |
+          python -m pip install --upgrade pip
+          python scripts/devnet_release.py check-registry --version "$VERSION"
+
+      - name: Move the GitHub pre-release to this snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/devnet_release.py release --notes devnet-dist/devnet-notes.md

@@ -510,3 +510,126 @@ async def test_read_retry_waits_for_retry_after_or_gives_up() -> None:
     assert error is None, repr(error)
     assert calls == 2
     assert time.monotonic() - started >= 0.4
+
+
+# --- round 3: status first, and Retry-After on every answer -------------------------------------
+
+
+def _connect_detail(type_name: str, message) -> dict:
+    import base64
+
+    return {
+        "type": type_name,
+        "value": base64.b64encode(message.SerializeToString()).decode().rstrip("="),
+    }
+
+
+def _round3_504_bodies() -> list[dict]:
+    from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
+
+    rate = _connect_detail(
+        "orders.v1.ErrorDetail",
+        orders_pb2.ErrorDetail(code=orders_pb2.ERROR_CODE_RATE_LIMIT_EXCEEDED),
+    )
+    limit = _connect_detail(
+        "polyester.ratelimit.v1.RateLimitDetail", ratelimit_pb2.RateLimitDetail(retry_after_ms=1500)
+    )
+    return [
+        {"code": "unavailable", "message": "TIMESTAMP_SKEW"},
+        {"code": "unavailable", "message": "rate limited", "details": [rate]},
+        {"code": "unavailable", "message": "rate limited", "details": [limit]},
+        {"code": "resource_exhausted", "message": "rate limited", "details": [rate]},
+        {"code": "unavailable", "message": "AUTH_TEMPORARILY_UNAVAILABLE"},
+        {"code": "unavailable", "message": "temporarily unavailable"},
+        {"code": "internal", "message": "boom"},
+        {"code": "unknown", "message": "?"},
+    ]
+
+
+@pytest.mark.parametrize("index", range(8))
+async def test_round3_504_connect_bodies_are_unknown(index: int) -> None:
+    body = json.dumps(_round3_504_bodies()[index])
+    error, calls = await _call("write", 504, JSON, body)
+    assert error is not None
+    assert not is_retryable_error(error), repr(error)
+    assert mutation_outcome_unknown(error), repr(error)
+    assert calls == 1
+    error, calls = await _call("read", 504, JSON, body, fail_for=1)
+    assert error is None, repr(error)
+    assert calls == 2
+
+
+async def test_round3_504_outcome_unknown_beside_a_rate_limit_detail() -> None:
+    from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
+
+    limit = _connect_detail(
+        "polyester.ratelimit.v1.RateLimitDetail", ratelimit_pb2.RateLimitDetail(retry_after_ms=1500)
+    )
+    body = json.dumps(
+        {
+            "code": "resource_exhausted",
+            "message": "ORDER_CREATE_OUTCOME_UNKNOWN",
+            "details": [limit],
+        }
+    )
+    error, _ = await _call("write", 504, JSON, body)
+    assert type(error) is PolyesterApiError, repr(error)
+    assert error.code == "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"
+    assert mutation_outcome_unknown(error) and not is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    ("status", "content_type", "body"),
+    [
+        (503, PROBLEM, {"code": "AUTH_TEMPORARILY_UNAVAILABLE", "status": 503}),
+        (503, PROBLEM, {"code": "ACCOUNT_ROUTING_INVALID", "status": 503}),
+        (503, PROBLEM, {"code": "PAIR_BACKLOGGED", "status": 503}),
+        (503, JSON, {"code": "unavailable", "message": "AUTH_TEMPORARILY_UNAVAILABLE"}),
+        (429, PROBLEM, {"code": "RATE_LIMIT_EXCEEDED", "status": 429}),
+        (504, PROBLEM, {"code": "ORDER_CREATE_OUTCOME_UNKNOWN", "status": 504}),
+    ],
+)
+async def test_round3_retry_after_on_every_answer(
+    status: int, content_type: str, body: dict
+) -> None:
+    error, _ = await _call(
+        "write", status, content_type, json.dumps(body), headers={"Retry-After": "30"}
+    )
+    assert error is not None
+    assert getattr(error, "retry_after", None) == 30, repr(error)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"code": "UPSTREAM_ERROR", "status": 503},
+        {"code": "AUTH_TEMPORARILY_UNAVAILABLE", "status": 503},
+    ],
+)
+async def test_round3_read_retry_waits_for_retry_after(body: dict) -> None:
+    started = time.monotonic()
+    error, calls = await _call(
+        "read", 503, PROBLEM, json.dumps(body), fail_for=1, headers={"Retry-After": "30"}
+    )
+    assert time.monotonic() - started < 1.5
+    assert calls == 1
+    assert error is not None and getattr(error, "retry_after", None) == 30, repr(error)
+    started = time.monotonic()
+    error, calls = await _call(
+        "read", 503, PROBLEM, json.dumps(body), fail_for=1, headers={"Retry-After": "0.4"}
+    )
+    assert error is None, repr(error)
+    assert calls == 2
+    assert time.monotonic() - started >= 0.4
+
+
+def test_round3_retry_delay_reads_every_errors_retry_after() -> None:
+    from polyester._wire import retry_delay
+    from polyester.errors import AUTH_TEMPORARILY_UNAVAILABLE
+
+    auth = PolyesterApiError("busy", code=AUTH_TEMPORARILY_UNAVAILABLE)
+    assert retry_delay(auth, 0.025) == 0.025
+    auth.retry_after = 30
+    assert retry_delay(auth, 0.025) == 30
+    assert retry_delay(PolyesterServerError("x", retry_after=0.001), 0.025) == 0.025
+    assert retry_delay(PolyesterRateLimitError("x", retry_after=1.5), 0.025) == 1.5

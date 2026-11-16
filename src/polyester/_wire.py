@@ -33,6 +33,7 @@ from polyester.errors import (
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
+    PolyesterError,
     PolyesterNotImplementedError,
     PolyesterRateLimitError,
     PolyesterRouteNotFoundError,
@@ -308,19 +309,28 @@ def _map_gateway_problem(exc: GatewayProblemError):
     )
 
 
+def retry_delay(error: BaseException, fallback: float) -> float:
+    """How long a retry of a safe read waits after ``error``: ``fallback``, or
+    the delay the answer asked for (``retry_after``) when that is longer.
+
+    Every SDK retry loop reads the delay here, from the one place the SDK
+    keeps it.
+    """
+    mapped = map_connect_error(error) if isinstance(error, ConnectError) else error
+    asked = getattr(mapped, "retry_after", None)
+    if isinstance(asked, int | float) and not isinstance(asked, bool) and asked > fallback:
+        return float(asked)
+    return fallback
+
+
 def map_connect_error(exc: ConnectError):
     # Every SDK error raised for a call is mapped here: redact the Connect
     # error and its causes once, so nothing in the chain prints a credential.
     redact_exception_chain(exc)
     mapped = _map_connect_error(exc)
-    if isinstance(mapped, PolyesterRateLimitError) and mapped.retry_after is None:
-        mapped.retry_after = getattr(exc, "retry_after", None)
-    if (
-        isinstance(mapped, PolyesterServerError)
-        and mapped.retry_after is None
-        and exc.code.value == "unavailable"
-    ):
-        # A temporary failure keeps the delay its answer asked for.
+    # The answer's delay, captured once by the transport, rides on whatever
+    # error it maps to.
+    if isinstance(mapped, PolyesterError) and mapped.retry_after is None:
         mapped.retry_after = getattr(exc, "retry_after", None)
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Unpack, overload
 
 import msgspec
 
+from polyester._wire import retry_delay
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import (
     batch_cancel_from_proto,
@@ -851,7 +852,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     raise asyncio.CancelledError() from exc
                 if not _is_transient_status_read_error(exc):
                     raise
+                # Never sooner than the Retry-After the answer asked for.
+                wait = retry_delay(exc, delay)
             else:
+                wait = delay
                 last = current
                 if is_batch_replace_settled(last):
                     return last
@@ -865,7 +869,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                         - time.time()
                     )
                     deadline = min(deadline, time.monotonic() + max(left, 0.0))
-            await asyncio.sleep(max(min(delay, deadline - time.monotonic()), 0.0))
+            await asyncio.sleep(max(min(wait, deadline - time.monotonic()), 0.0))
             delay = min(delay * 2, _BATCH_REPLACE_POLL_MAX)
 
     async def batch_create(

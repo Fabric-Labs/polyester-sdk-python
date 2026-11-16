@@ -29,7 +29,7 @@ from polyester._contract_codes import (
     has_future_code,
     is_placeholder_code,
     is_recognised_rest_code,
-    names_outcome_unknown,
+    outcome_unknown_code,
 )
 from polyester._problem import decode_http_problem
 from polyester._redact import (
@@ -246,6 +246,7 @@ def _no_recognised_code_error(
     status = response.status
     known = _NO_RECOGNISED_CODE_STATUS_TO_CODE.get(status)
     message = _body_text(body, status)
+    retry_after = _retry_after_header(response)
     if known is None or (code and status != 429):
         return GatewayProblemError(
             known or Code.INTERNAL,
@@ -253,8 +254,10 @@ def _no_recognised_code_error(
             http_status=status,
             detail=message,
             problem=decode_http_problem(body, status),
-            retry_after=_retry_after_header(response) if status in (502, 503, 504) else None,
+            retry_after=retry_after,
         )
+    if retry_after is not None:
+        return _ConnectErrorWithRetryAfter(known, message, [], retry_after)
     return ConnectError(known, message)
 
 
@@ -289,28 +292,21 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
         if decoded is None or not isinstance(message, str | None):
             raise _unreadable_connect_error(status)
         details = decoded
-    if status == 504 and not _names_outcome_unknown(code, body, details):
-        # A 504 never proves a refusal. The API answers it only where a
-        # write's outcome is unknown, and an edge answers it for a request
-        # that may have reached the API. So whatever code its body names, a
-        # retryable rate-limit, admission or authentication code included, it
-        # stays an unknown outcome that safe reads retry. An explicit
-        # outcome-unknown code keeps that code.
+    if status == 504:
+        # The HTTP status decides outcome certainty first. A 504 never proves
+        # a refusal: the API answers it only where a write's outcome is
+        # unknown, and an edge answers it for a request that may have reached
+        # the API. So before any code, message or typed detail is read for a
+        # refusal, it is an unknown outcome that safe reads retry: the
+        # outcome-unknown code the answer names, else a server error. No
+        # body, a ConnectRPC code, a retryable rate-limit, admission or
+        # authentication code, or a typed detail included, changes that.
         rest_code = code if isinstance(code, str) and code not in _CONNECT_CODES else ""
         _raise_problem(
-            response, body, rest_code or _future_code(details), Code.UNAVAILABLE, retry_after
-        )
-    if (
-        has_connect_code
-        and code in ("resource_exhausted", "unavailable")
-        and retry_after is not None
-    ):
-        # Preserve valid Connect details while carrying response backoff
-        # through a ConnectError, whose upstream type has no metadata.
-        raise _ConnectErrorWithRetryAfter(
-            Code(code),
-            str((body.get("message") if isinstance(body, dict) else None) or ""),
-            details,
+            response,
+            body,
+            _outcome_unknown_name(code, body, details) or rest_code or _future_code(details),
+            Code.UNAVAILABLE,
             retry_after,
         )
     if has_connect_code:
@@ -321,9 +317,18 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
             and not _has_service_detail(details)
         ):
             raise _no_recognised_code_error(response, body)
+        if retry_after is not None:
+            # Decode the Connect error here so the answer's delay rides along:
+            # the upstream ConnectError carries no response metadata.
+            raise _ConnectErrorWithRetryAfter(
+                Code(code),
+                str((body.get("message") if isinstance(body, dict) else None) or ""),
+                details,
+                retry_after,
+            )
         return response
     if has_no_code:
-        return _answer_without_a_code(response, body, is_json, code, details)
+        return _answer_without_a_code(response, body, is_json, code, details, retry_after)
     assert isinstance(code, str)
     if is_recognised_rest_code(code) or (status == 429 and _REST_CODE_FORM.fullmatch(code)):
         fallback = Code.INTERNAL if status >= 500 else Code.FAILED_PRECONDITION
@@ -337,18 +342,19 @@ def _raise_for_gateway_rejection(response: pyqwest.FullResponse) -> pyqwest.Full
     raise _no_recognised_code_error(response, body, code=code)
 
 
-def _names_outcome_unknown(code: object, body: object, details: list[AnyMessage]) -> bool:
-    """Whether an answer names an outcome-unknown code: a REST problem's code,
-    a ConnectRPC error's message, or an order detail."""
+def _outcome_unknown_name(code: object, body: object, details: list[AnyMessage]) -> str:
+    """The outcome-unknown code an answer names, or ``""``: a REST problem's
+    code, a ConnectRPC error's code-only message, or an order detail's code."""
+    if isinstance(code, str) and code.endswith("_OUTCOME_UNKNOWN"):
+        return code
     message = body.get("message") if isinstance(body, dict) else None
-    return (
-        (isinstance(code, str) and code.endswith("_OUTCOME_UNKNOWN"))
-        or (isinstance(message, str) and message.strip().endswith("_OUTCOME_UNKNOWN"))
-        or any(
-            names_outcome_unknown(d.type_url.removeprefix(_TYPE_URL_PREFIX), d.value)
-            for d in details
-        )
-    )
+    if isinstance(message, str) and message.strip().endswith("_OUTCOME_UNKNOWN"):
+        return message.strip()
+    for d in details:
+        name = outcome_unknown_code(d.type_url.removeprefix(_TYPE_URL_PREFIX), d.value)
+        if name:
+            return name
+    return ""
 
 
 def _has_service_detail(details: list[AnyMessage]) -> bool:
@@ -363,15 +369,24 @@ def _answer_without_a_code(
     is_json: bool,
     code: object,
     details: list[AnyMessage],
+    retry_after: float | None = None,
 ) -> pyqwest.FullResponse:
     """Let Connect read what its table gets right; report the rest by status."""
     status = response.status
     if status < 400:
         return response
-    if status == 504:
-        # A non-Connect 504 cannot prove that a mutation was refused, even if
-        # the gateway sent HTML, malformed JSON, or no structured code at all.
-        _raise_problem(response, body, "", Code.UNAVAILABLE, None)
+    known = _NO_RECOGNISED_CODE_STATUS_TO_CODE.get(status)
+    if (
+        known is not None
+        and retry_after is not None
+        and (_has_service_detail(details) or code in (None, ""))
+    ):
+        # What Connect would read by status, decoded here so the answer's
+        # delay rides along.
+        message = body.get("message") if isinstance(body, dict) else None
+        raise _ConnectErrorWithRetryAfter(
+            known, message if isinstance(message, str) else "", details, retry_after
+        )
     if _has_service_detail(details):
         return response
     # Connect's status table agrees with these, unless a code it can't read would

@@ -69,7 +69,7 @@ class AsyncOrderbookService(BaseService):
         ``depth`` is any level count from 1 to the ``max_depth`` every snapshot reports
         (5,000 by default), sent as given; 0 selects the default of 50, and the result's
         ``depth`` reads 50. A depth above ``max_depth`` is refused by the server with
-        ``INVALID_ARGUMENT`` (:class:`PolyesterValidationError`), never truncated. A
+        ``invalid_argument`` (:class:`PolyesterApiError`), never truncated. A
         negative depth, one above the uint32 range, or a value that is not an integer, is
         refused before any request.
         """

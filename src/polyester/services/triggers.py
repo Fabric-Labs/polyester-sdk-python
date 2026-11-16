@@ -328,8 +328,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``client_trigger_id`` identifies this create. Left out or empty, the SDK
         generates one, which reads back on the trigger. An ID you choose and
         keep is what lets you find the trigger after an unknown outcome, so set
-        one when you may need to. A blank one raises
-        ``PolyesterValidationError`` before sending.
+        one when you may need to. It is sent unchanged: 1 to 36 bytes of UTF-8 in
+        any characters, as the contract takes it; a longer one raises
+        ``PolyesterValidationError`` with code
+        ``ERROR_CODE_CLIENT_TRIGGER_ID_INVALID`` before sending.
         """
         await self._ensure_catalogs()
         symbol_id: int | None = None

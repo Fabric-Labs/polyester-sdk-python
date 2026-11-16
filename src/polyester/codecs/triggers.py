@@ -11,7 +11,8 @@ from polyester.codecs.bps import (
     max_slippage_bps_for_side,
     validate_bps,
 )
-from polyester.codecs.correlation_id import optional_request_id, required_client_id
+from polyester.codecs.contract_limits import contract_string_max_bytes
+from polyester.codecs.correlation_id import optional_request_id
 from polyester.codecs.refusal_codes import (
     BAD_PRICE,
     CLIENT_TRIGGER_ID_INVALID,
@@ -366,14 +367,11 @@ def create_trigger_to_proto(
             symbol_id=symbol_id,
         )
     intent = triggers_pb2.TriggerIntent(symbol_id=symbol_id, qty_scaled=qty_scaled)
-    # The contract requires an ID. A blank one is a caller's mistake: replacing
-    # it would hide that a retry can no longer find its first attempt.
-    with refusal_code(CLIENT_TRIGGER_ID_INVALID):
-        intent.client_trigger_id = (
-            required_client_id(client_trigger_id, "client_trigger_id")
-            if client_trigger_id
-            else f"trg-{uuid.uuid4().hex[:12]}"
-        )
+    intent.client_trigger_id = (
+        _client_trigger_id(client_trigger_id)
+        if client_trigger_id
+        else f"trg-{uuid.uuid4().hex[:12]}"
+    )
     if fee_asset is not None:
         fee_key = fee_asset.lower()
         if fee_key not in FEE_ASSET_TO_PROTO:
@@ -736,3 +734,27 @@ def batch_cancel_triggers_to_proto(
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     return proto
+
+
+# The contract's rule on TriggerIntent.client_trigger_id: 1 to 36 bytes of
+# UTF-8, in any characters.
+CLIENT_TRIGGER_ID_MAX_BYTES = contract_string_max_bytes(
+    triggers_pb2.TriggerIntent, "client_trigger_id"
+)
+
+
+def _client_trigger_id(value: object) -> str:
+    """``value`` unchanged when the contract takes it as a client trigger ID."""
+    refusal = PolyesterValidationError(
+        f"client_trigger_id must be 1 to {CLIENT_TRIGGER_ID_MAX_BYTES} bytes of UTF-8",
+        code=CLIENT_TRIGGER_ID_INVALID,
+    )
+    if not isinstance(value, str):
+        raise refusal
+    try:
+        size = len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        raise refusal from None
+    if size > CLIENT_TRIGGER_ID_MAX_BYTES:
+        raise refusal
+    return value

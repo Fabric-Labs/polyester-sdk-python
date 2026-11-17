@@ -333,16 +333,11 @@ def test_poly_4689_standalone_create_distance_bps_is_capped(value: int) -> None:
         _create_trailing(trailing_distance_bps=value)
 
 
-@pytest.mark.parametrize("value", [10_001, 10**12])
+@pytest.mark.parametrize("value", [0, 10_001, 10**12])
 def test_poly_4689_standalone_modify_distance_bps_is_capped(value: int) -> None:
+    # The contract takes 1 to 10000 on modify too: 0 does not clear a distance.
     with pytest.raises(PolyesterValidationError, match="trailing_distance_bps.*1.*10000"):
         modify_trigger_to_proto(trigger_id="2", symbol_id=1, trailing_distance_bps=value)
-    assert (
-        modify_trigger_to_proto(
-            trigger_id="2", symbol_id=1, trailing_distance_bps=0
-        ).trailing_distance_bps
-        == 0
-    )
 
 
 @pytest.mark.parametrize(

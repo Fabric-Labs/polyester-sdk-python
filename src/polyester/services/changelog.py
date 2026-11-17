@@ -61,7 +61,7 @@ class AsyncChangelogService(BaseService):
         """One page of post summaries, newest first. ``limit`` defaults to 20
         on the server (maximum 100)."""
         request = changelog_pb2.ListPostsRequest(
-            limit=validate_limit(limit, allow_none=True) or 0,
+            limit=validate_limit(limit, changelog_pb2.ListPostsRequest, allow_none=True) or 0,
             page_token=page_token or "",
         )
         return await unary_public_decoded(
@@ -96,7 +96,8 @@ class AsyncChangelogService(BaseService):
         slug. The list is empty until the environment publishes release
         posts."""
         request = changelog_pb2.ListDeploymentGroupsRequest(
-            limit=validate_limit(limit, allow_none=True) or 0,
+            limit=validate_limit(limit, changelog_pb2.ListDeploymentGroupsRequest, allow_none=True)
+            or 0,
             page_token=page_token or "",
         )
         return await unary_public_decoded(
@@ -166,7 +167,7 @@ class AsyncChangelogService(BaseService):
             audiences=_enum_values(changelog_pb2.Audience, audiences, "audiences"),
             post_slug=post_slug or "",
             sort=_sort(sort),
-            limit=validate_limit(limit, allow_none=True) or 0,
+            limit=validate_limit(limit, changelog_pb2.ListChangesRequest, allow_none=True) or 0,
             page_token=page_token or "",
         )
         if action_required is not None:

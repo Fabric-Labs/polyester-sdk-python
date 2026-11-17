@@ -166,7 +166,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         When ``trigger_id`` is set, only child orders created by that trigger
         are returned (for example TWAP/ladder slice children).
         """
-        validated_limit = validate_limit(limit, allow_none=True)
+        validated_limit = validate_limit(limit, GetOpenOrdersRequest, allow_none=True)
         request = GetOpenOrdersRequest(
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
@@ -219,7 +219,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         raises :class:`PolyesterValidationError` before sending.
         """
         start, end = validate_time_range("orders.list_history", start_ts_ns, end_ts_ns)
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, GetOrderHistoryRequest)
         request = GetOrderHistoryRequest(
             limit=validated_limit,
             include_attached_risk=include_attached_risk,
@@ -286,7 +286,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         )
         if include_execution_history is not None:
             request.include_execution_history = include_execution_history
-        validated_limit = validate_limit(limit, allow_none=True)
+        validated_limit = validate_limit(limit, GetOrderRequest, allow_none=True)
         if validated_limit is not None:
             request.limit = validated_limit
         if page_token:
@@ -1053,7 +1053,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         ``get`` and compare its trades to ``cum_qty``. This helper pages
         execution history and does not treat an empty page as a watermark.
         The result holds the last poll's order, trades and transfers, with that
-        read's ``executions_complete``.
+        read's ``executions_complete``. A settlement leg that several execution
+        pages repeat (one match's fills on more than one page) is kept once, by
+        ``tx_id``, in the order first read.
 
         ``timeout`` (seconds) bounds the whole wait, page reads included: a read
         still in flight when it passes is abandoned, a read that finishes after
@@ -1139,6 +1141,9 @@ async def _get_order_execution_pages(
     requested: set[str] = set()
     trades: list = []
     transfers: list = []
+    # tx_ids of the legs earlier pages returned: a match whose fills span
+    # pages repeats its legs on each, and the contract says to keep them once.
+    seen_tx_ids: set[str] = set()
     order = None
     while True:
         page = await orders.get(
@@ -1153,7 +1158,10 @@ async def _get_order_execution_pages(
                 key = OrderId(page.order.order_id)
             order = page.order
         trades.extend(page.trades)
-        transfers.extend(page.transfers)
+        transfers.extend(
+            leg for leg in page.transfers if not leg.tx_id or leg.tx_id not in seen_tx_ids
+        )
+        seen_tx_ids.update(leg.tx_id for leg in page.transfers if leg.tx_id)
         if not page.next_page_token:
             return GetOrderResult(
                 order=order,

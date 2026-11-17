@@ -161,7 +161,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             raise PolyesterValidationError("sub_account_id is required")
         request = ListSubaccountEventsRequest(
             subaccount_id=parsed_sub,
-            limit=validate_limit(limit),
+            limit=validate_limit(limit, ListSubaccountEventsRequest),
         )
         if page_token:
             request.page_token = page_token

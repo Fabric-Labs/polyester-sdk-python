@@ -45,7 +45,9 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         An empty ``next_page_token`` marks the terminal page.
         """
         request = ListTransfersRequest(
-            limit=validate_limit(limit), reversed=reversed, page_token=page_token
+            limit=validate_limit(limit, ListTransfersRequest),
+            reversed=reversed,
+            page_token=page_token,
         )
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)

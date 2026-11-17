@@ -26,7 +26,6 @@ from polyester.services._symbols import resolve_optional_symbol_id, resolve_symb
 from polyester.services._validation import validate_limit
 from polyester.types.money import Price, resolve_price_ticks
 
-_MAX_LIST_LIMIT = 200
 _IDEMPOTENCY_KEY = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 INT64_MAX = (1 << 63) - 1
 
@@ -221,9 +220,7 @@ class AsyncAlertsService(BaseService):
             status_values = [_enum(status, _STATUSES, "status") for status in statuses]
             if len(set(status_values)) != len(status_values):
                 raise PolyesterValidationError("statuses must not repeat a status")
-        validated_limit = validate_limit(limit, allow_none=True)
-        if validated_limit is not None and not 0 <= validated_limit <= _MAX_LIST_LIMIT:
-            raise PolyesterValidationError(f"limit must be from 0 to {_MAX_LIST_LIMIT}")
+        validated_limit = validate_limit(limit, pb.ListAlertsRequest, allow_none=True)
         if symbol:
             await self._ensure_catalogs()
         resolved_id = resolve_optional_symbol_id(

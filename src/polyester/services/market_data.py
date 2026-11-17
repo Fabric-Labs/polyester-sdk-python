@@ -143,7 +143,7 @@ class AsyncMarketDataService(BaseService):
         ``after_trade_id`` cannot be combined with the time range, side or
         page token.
         """
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, GetTradesRequest)
         if after_trade_id is not None:
             if isinstance(after_trade_id, bool) or not isinstance(after_trade_id, int):
                 raise PolyesterValidationError("get_trades after_trade_id must be an integer")
@@ -392,7 +392,7 @@ def _build_candles_request(
         symbol_id=symbol_id,
         label="get_candles",
     )
-    validated_limit = validate_limit(limit)
+    validated_limit = validate_limit(limit, GetCandlesRequest)
     timeframe_name = TIMEFRAME_ALIASES.get(timeframe, timeframe.upper())
     timeframe_enum = getattr(marketdata_pb2, timeframe_name, None)
     if timeframe_enum is None:

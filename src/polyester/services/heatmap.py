@@ -69,7 +69,7 @@ class AsyncHeatmapService(BaseService):
         smallest supported depth covering it, and 0 as 50; the response's ``depth`` names
         the depth requested. A depth below 0 or above 1000 is refused.
         """
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, GetOrderbookHeatmapRequest)
         if symbol:
             await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(

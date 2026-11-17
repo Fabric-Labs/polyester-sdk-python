@@ -155,7 +155,7 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
         returned for: keep the same account, participation, scope and order;
         only ``limit`` may change.
         """
-        request = ListFlowsRequest(limit=validate_limit(limit))
+        request = ListFlowsRequest(limit=validate_limit(limit, ListFlowsRequest))
         _flow_list_filters(
             request,
             page_token=page_token,
@@ -385,7 +385,7 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
         request = ListFlowsByTxRequest(
             tx_hash=tx_hash,
             lookup_kind=lookup_enum,
-            limit=validate_limit(limit),
+            limit=validate_limit(limit, ListFlowsByTxRequest),
         )
         if page_token:
             request.page_token = page_token

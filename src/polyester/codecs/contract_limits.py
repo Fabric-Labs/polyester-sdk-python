@@ -27,6 +27,27 @@ def contract_uint32_max(message: Any, name: str) -> int:
     raise LookupError(f"{message.DESCRIPTOR.full_name}.{name} has no upper bound")
 
 
+def contract_uint32_range(message: Any, name: str) -> tuple[int, int]:
+    """The inclusive range the contract sets on a ``uint32`` field.
+
+    ``gte`` (or ``gt`` + 1) is the lower bound and ``lte`` (or ``lt`` - 1) the
+    upper; a bound the contract leaves out is the wire type's own, 0 or
+    2**32 - 1.
+    """
+    rules = _rules(message, name).uint32
+    low = 0
+    if rules.HasField("gte"):
+        low = int(rules.gte)
+    elif rules.HasField("gt"):
+        low = int(rules.gt) + 1
+    high = 2**32 - 1
+    if rules.HasField("lte"):
+        high = int(rules.lte)
+    elif rules.HasField("lt"):
+        high = int(rules.lt) - 1
+    return low, high
+
+
 def contract_string_length(message: Any, name: str) -> tuple[int, int]:
     """The ``min_len`` and ``max_len`` the contract sets on a string field."""
     rules = _rules(message, name).string

@@ -55,7 +55,7 @@ class AsyncSystemService(BaseService):
         request = system_pb2.ListStatusEventsRequest(
             states=_enum_values(system_pb2.StatusEventState, states, "states"),
             kinds=_enum_values(system_pb2.StatusEventKind, kinds, "kinds"),
-            limit=validate_limit(limit, allow_none=True) or 0,
+            limit=validate_limit(limit, system_pb2.ListStatusEventsRequest, allow_none=True) or 0,
             page_token=page_token or "",
         )
         return await unary_public_decoded(

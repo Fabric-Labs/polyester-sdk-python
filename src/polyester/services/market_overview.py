@@ -63,7 +63,7 @@ class AsyncMarketOverviewService(BaseService):
         page_token: str = "",
         include_sparklines: bool = False,
     ) -> MarketOverviewList:
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, ListMarketOverviewRequest)
         # Rows are labelled and scaled from the catalogs; only a symbol filter needs them.
         await self._ensure_catalogs(required=bool(symbols))
         request = ListMarketOverviewRequest(

@@ -21,8 +21,9 @@ PRICE_TICK_SCALE = 9
 # Values above this are rejected instead of allocating pathological padding (scale ≥ 65535).
 MAX_PROTOCOL_SCALE = 36
 
-# Strict non-negative decimal: digits with optional fractional part (TS-aligned).
-_STRICT_DECIMAL = re.compile(r"^\d+(?:\.\d+)?$")
+# Strict non-negative decimal: ASCII digits with optional fractional part
+# (TS-aligned). Not \d, which also matches other scripts' digits ("٥").
+_STRICT_DECIMAL = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
 
 
 class FractionalDigitsError(PolyesterValidationError):
@@ -147,6 +148,9 @@ def _decimal_string_from_input(raw: str | Decimal, field_name: str, scale: int) 
         return text or "0"
     if not isinstance(raw, str):
         raise PolyesterValidationError(f"{field_name} must be a decimal string or Decimal")
+    # Checked before trimming: str.strip() also strips non-ASCII spaces.
+    if not raw.isascii():
+        raise PolyesterValidationError(f"{field_name} must be a valid decimal string")
     text = raw.strip()
     if not text or not _STRICT_DECIMAL.match(text):
         raise PolyesterValidationError(f"{field_name} must be a valid decimal string")
@@ -168,6 +172,8 @@ def try_decimal_to_scaled(decimal: str, scale: int) -> tuple[bool, int | None, s
     """Strict decimal→scaled. Returns (ok, scaled, failure_reason). Never rounds."""
     if scale < 0 or scale > MAX_PROTOCOL_SCALE:
         return False, None, "scale"
+    if not decimal.isascii():
+        return False, None, "invalid"
     raw = decimal.strip()
     if not _STRICT_DECIMAL.match(raw):
         return False, None, "invalid"
@@ -264,7 +270,7 @@ def tick_count(value: object, field_name: str, *, allow_zero: bool = False) -> i
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         raise PolyesterValidationError(f"{field_name} must be an integer")
     try:
-        parsed = operator.index(value) if isinstance(value, int) else int(value)
+        parsed = operator.index(value) if isinstance(value, int) else ascii_int(value)
     except ValueError as exc:
         raise PolyesterValidationError(f"{field_name} must be an integer") from exc
     if parsed < 0 or (parsed == 0 and not allow_zero):
@@ -344,8 +350,19 @@ def parse_qty_scaled(raw: str | Decimal, scale: int, field_name: str = "qty") ->
     return scaled
 
 
+def ascii_int(value: str) -> int:
+    """``int(value)`` for a string of ASCII characters only.
+
+    ``int()`` also reads other scripts' digits (``"٥"`` is 5), so a string
+    with any non-ASCII character raises ``ValueError`` instead.
+    """
+    if not value.isascii():
+        raise ValueError("not an ASCII integer")
+    return int(value)
+
+
 def parse_required_uint64_decimal(raw: str, field_name: str) -> int:
-    if not raw or not raw.isdecimal():
+    if not raw or not raw.isascii() or not raw.isdecimal():
         raise PolyesterValidationError(f"{field_name} must be a uint64 decimal string")
     value = int(raw)
     if value > UINT64_MAX:
@@ -384,6 +401,13 @@ def _parse_id(value: str | int, label: str) -> int:
     if isinstance(value, int):
         parsed = operator.index(value)
     elif isinstance(value, str):
+        # A public ID is ASCII only, as the server reads it: other scripts'
+        # digits would read as a decimal ID ("٢٣" as 23, where "23" is base58
+        # 60), and str.strip() would trim non-ASCII spaces.
+        if not value.isascii():
+            raise PolyesterValidationError(
+                f"{label} must be base58 or decimal uint64 in ASCII characters"
+            )
         if not value.strip():
             raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
         if value.isdecimal():

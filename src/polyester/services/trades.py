@@ -6,7 +6,7 @@ from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import user_trades_list_from_proto
 from polyester.codecs.orders import catalog_order_scales, parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_user_trade_batch_bytes
-from polyester.codecs.scalars import UINT64_MAX, id_to_int
+from polyester.codecs.scalars import UINT64_MAX, ascii_int, id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import GetUserTradesRequest
@@ -89,7 +89,7 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
                 raise PolyesterValidationError(
                     "trades.list through_generation must be a positive integer"
                 )
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, GetUserTradesRequest)
         request = GetUserTradesRequest(limit=validated_limit)
         if start is not None:
             request.start_ts_ns = start
@@ -106,7 +106,17 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
         if symbol:
             await self._ensure_catalogs()
         if after_match_id is not None:
-            if not 0 < int(after_match_id) <= UINT64_MAX:
+            try:
+                match_id = (
+                    ascii_int(after_match_id)
+                    if isinstance(after_match_id, str)
+                    else int(after_match_id)
+                )
+            except (TypeError, ValueError) as exc:
+                raise PolyesterValidationError(
+                    "trades.list after_match_id must be a positive uint64 match id"
+                ) from exc
+            if not 0 < match_id <= UINT64_MAX:
                 raise PolyesterValidationError(
                     "trades.list after_match_id must be a positive uint64 match id"
                 )
@@ -116,7 +126,7 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
                 symbol_id=symbol_id,
                 label="trades.list",
             )
-            request.after_match_id = int(after_match_id)
+            request.after_match_id = match_id
         elif symbol is not None or symbol_id is not None:
             request.symbol_id = resolve_symbol_id(
                 self._catalogs,

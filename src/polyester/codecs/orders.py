@@ -52,6 +52,7 @@ from polyester.models.trading import (
 )
 from polyester.types.money import (
     Quantity,
+    resolve_positive_price_ticks,
     resolve_price_ticks,
     resolve_qty_scaled,
     resolve_quote_qty_scaled,
@@ -271,8 +272,8 @@ def create_order_to_wire(
             symbol_id=request.symbol_id,
         ),
         "limit_price_ticks": (
-            resolve_price_ticks(request.price, "price", symbol=request.symbol)
-            if request.price
+            resolve_positive_price_ticks(request.price, "price", symbol=request.symbol)
+            if request.price is not None
             else None
         ),
         "sub_account_id": request.sub_account_id or None,
@@ -371,7 +372,7 @@ def order_intent_from_request(
 
     with _on_grid(PRICE_TICK_SIZE, _limit_price_path(request.tif)):
         price_ticks = (
-            resolve_price_ticks(request.price, "price", symbol=request.symbol)
+            resolve_positive_price_ticks(request.price, "price", symbol=request.symbol)
             if request.price is not None
             else None
         )
@@ -718,11 +719,14 @@ def _resolve_optional_price_ticks(
     *,
     symbol: str | None,
     field_path: str,
+    positive: bool = True,
 ) -> int:
-    """Resolve an attached-exit price; ``field_path`` is its wire path for a
-    ``PRICE_TICK_SIZE`` refusal."""
+    """Resolve an attached-exit or OCO price; ``field_path`` is its wire path
+    for a ``PRICE_TICK_SIZE`` refusal. The price must be positive unless
+    ``positive`` is false, for a caller that refuses 0 itself."""
+    resolve = resolve_positive_price_ticks if positive else resolve_price_ticks
     with _on_grid(PRICE_TICK_SIZE, field_path):
-        return resolve_price_ticks(value, field_name, symbol=symbol)  # type: ignore[arg-type]
+        return resolve(value, field_name, symbol=symbol)  # type: ignore[arg-type]
 
 
 def _risk_execution_from_friendly(
@@ -979,6 +983,7 @@ def _trailing_stop_from_dict(
             "attached_risk.trailing_stop.limit_price",
             symbol=symbol,
             field_path=f"{risk_field}.trailing_stop.limit_price_ticks",
+            positive=False,
         )
         if proto.limit_price_ticks <= 0:
             raise _trailing_limit_error(

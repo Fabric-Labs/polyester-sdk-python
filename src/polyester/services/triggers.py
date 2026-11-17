@@ -167,7 +167,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         Like :meth:`get`, this read resends the same request while the server
         answers ``unavailable`` (HTTP 503), for about 2 seconds.
         """
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, ListTriggersRequest)
         request = ListTriggersRequest(limit=validated_limit)
         if page_token:
             request.page_token = page_token
@@ -755,7 +755,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
 
         from polyester.codecs.decode.triggers import trigger_event_type_from_label
 
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, ListTriggerEventsRequest)
         request = ListTriggerEventsRequest(
             trigger_id=id_to_int(trigger_id, "trigger_id"),
             limit=validated_limit,

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator, Sequence
 
-from polyester.codecs.contract_limits import contract_repeated_items, contract_uint32_max
+from polyester.codecs.contract_limits import (
+    contract_repeated_items,
+    contract_string_length,
+    contract_string_pattern,
+    contract_uint32_max,
+)
 from polyester.codecs.decode.lifecycle import (
     account_flows_list_from_proto,
     flow_from_get_account_flow_response,
@@ -37,6 +43,35 @@ ACCOUNT_FLOWS_MAX_LIMIT = contract_uint32_max(lifecycle_read_pb2.ListAccountFlow
 ACCOUNT_FLOWS_MAX_FILTER_IDS = contract_repeated_items(
     lifecycle_read_pb2.ListAccountFlowsRequest, "unified_asset_ids"
 )[1]
+
+# A lifecycle flow ID, as the contract's rule on GetFlowByIdRequest.flow_id
+# takes it (``flow_`` and base58, 6 to 64 characters).
+_FLOW_ID_MIN_LEN, _FLOW_ID_MAX_LEN = contract_string_length(
+    lifecycle_read_pb2.GetFlowByIdRequest, "flow_id"
+)
+_FLOW_ID_PATTERN = re.compile(
+    contract_string_pattern(lifecycle_read_pb2.GetFlowByIdRequest, "flow_id")
+)
+
+
+# The contract's evm_address rule on ListFlowsRequest.smart_account_address.
+_EVM_ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
+
+
+def _flow_id(value: object, label: str) -> str:
+    """A supplied flow ID as the contract takes it, refused before sending
+    otherwise: ``""``, whitespace and any other character included."""
+    if (
+        not isinstance(value, str)
+        or not _FLOW_ID_MIN_LEN <= len(value) <= _FLOW_ID_MAX_LEN
+        or _FLOW_ID_PATTERN.fullmatch(value) is None
+    ):
+        raise PolyesterValidationError(
+            f"{label} must be a lifecycle flow ID (flow_ and base58, "
+            f"{_FLOW_ID_MIN_LEN} to {_FLOW_ID_MAX_LEN} characters)"
+        )
+    return value
+
 
 _FLOW_KIND_LABELS = "'deposit', 'withdraw' or 'transfer'"
 _FLOW_STATE_LABELS = (
@@ -163,7 +198,15 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
             reversed=reversed,
             participation=participation,
         )
-        if smart_account_address:
+        if smart_account_address is not None:
+            # Only None lists every flow: a supplied address that is not one,
+            # "" or whitespace included, is refused, never read as no filter.
+            if not isinstance(smart_account_address, str) or (
+                _EVM_ADDRESS.fullmatch(smart_account_address) is None
+            ):
+                raise PolyesterValidationError(
+                    "smart_account_address must be a 0x-prefixed 20-byte hex address"
+                )
             request.smart_account_address = smart_account_address
 
         return await unary_public_decoded(
@@ -319,9 +362,7 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
         the account takes no part in is not found. Signed; an API key needs
         ``READ_FUNDING_FLOWS``. The account resolves as for
         :meth:`list_account_flows`."""
-        if not isinstance(flow_id, str) or not flow_id:
-            raise PolyesterValidationError("flow_id is required")
-        request = GetAccountFlowRequest(flow_id=flow_id)
+        request = GetAccountFlowRequest(flow_id=_flow_id(flow_id, "flow_id"))
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
@@ -341,8 +382,12 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
         intent_id: str | None = None,
         flow_id: str | None = None,
     ) -> LifecycleFlowSummary:
-        resolved_flow_id = flow_id or intent_id
-        if not resolved_flow_id:
+        # A supplied flow_id is used or refused, never replaced by intent_id.
+        if flow_id is not None:
+            resolved_flow_id = _flow_id(flow_id, "flow_id")
+        elif intent_id is not None:
+            resolved_flow_id = _flow_id(intent_id, "intent_id")
+        else:
             raise PolyesterValidationError("flow_id or intent_id is required")
         return await unary_public_decoded(
             self._transport,
@@ -402,7 +447,9 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[LifecycleFlowSummary]:
-        if account_id is not None and str(account_id).strip():
+        # Only None is the public feed: a supplied account ID that is not one,
+        # "" or whitespace included, is refused, never read as no account.
+        if account_id is not None:
             return await subscribe_account_proto(
                 self._realtime,
                 channel_template="private:chain:lifecycle:flows:{account_id}:proto",
@@ -421,9 +468,7 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
         *,
         flow_id: str,
     ) -> AsyncSubscription[LifecycleFlowSummary]:
-        if not flow_id.strip():
-            raise PolyesterValidationError("flow_id is required")
-        channel = f"public:chain:lifecycle:flow:{flow_id}:proto"
+        channel = f"public:chain:lifecycle:flow:{_flow_id(flow_id, 'flow_id')}:proto"
         return await subscribe_public_proto(
             self._realtime,
             channel=channel,

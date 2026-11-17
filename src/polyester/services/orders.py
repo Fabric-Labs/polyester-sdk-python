@@ -180,7 +180,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.page_token = page_token
         if validated_limit is not None:
             request.limit = validated_limit
-        if trigger_id is not None and trigger_id != "":
+        if trigger_id is not None:
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
         # Decoded with the pair's catalog scales: a load in progress is
         # awaited, and a failed one leaves the quantities unscaled.
@@ -243,7 +243,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.symbol_id.append(resolved)
         if page_token:
             request.page_token = page_token
-        if trigger_id is not None and trigger_id != "":
+        if trigger_id is not None:
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
         await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
@@ -634,7 +634,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if self._triggers is None:
             raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
         scope = self._resolve_sub_account_id(sub_account_id, account=account)
-        explicit_scope = scope if scope is not None else ""
+        # The resolved account, named explicitly so each step acts on it
+        # whatever the client's default is: "main" for the main account.
+        explicit_scope: dict[str, Any] = (
+            {"sub_account_id": scope} if scope is not None else {"account": "main"}
+        )
         # Each cancel to send, in listing order: a trigger, keyed by its ID,
         # or an OCO, keyed by its order_list_id, with the legs listed.
         targets: dict[tuple[str, str], list[str]] = {}
@@ -643,7 +647,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         page_token: str | None = None
         while True:
             page = await self._triggers.list(
-                sub_account_id=explicit_scope,
+                **explicit_scope,
                 symbol=symbol,
                 status=LIVE_TRIGGER_STATUSES,
                 limit=_STOP_ALL_TRIGGERS_PAGE,
@@ -672,10 +676,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             try:
                 if kind == "oco":
                     await self._triggers.cancel_oco(
-                        order_list_id=target_id, sub_account_id=explicit_scope
+                        order_list_id=target_id, **explicit_scope
                     )
                 else:
-                    await self._triggers.cancel(trigger_id=target_id, sub_account_id=explicit_scope)
+                    await self._triggers.cancel(trigger_id=target_id, **explicit_scope)
             except Exception as exc:
                 if not _stop_all_already_ended(exc):
                     failures.extend(
@@ -684,7 +688,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 continue
             canceled.extend(legs)
         cancel_all = await self.cancel_all(
-            sub_account_id=explicit_scope,
+            **explicit_scope,
             symbol=symbol,
             request_id=request_id,
         )

@@ -153,9 +153,10 @@ def _apply_from_env(overrides: dict[str, Any]) -> dict[str, Any]:
         if api_private_key:
             overrides["api_private_key"] = api_private_key.strip()
     if "default_account_id" not in overrides:
-        account_id = os.getenv(ACCOUNT_ID_ENV)
+        # Configuration, trimmed; a blank variable is unset.
+        account_id = (os.getenv(ACCOUNT_ID_ENV) or "").strip()
         if account_id:
-            overrides["default_account_id"] = account_id.strip()
+            overrides["default_account_id"] = account_id
     if "api_url" not in overrides:
         api_url = os.getenv(API_URL_ENV)
         if api_url:
@@ -185,9 +186,10 @@ class AsyncPolyester:
         catalog_timeout: float | None = None,
     ) -> None:
         """``default_sub_account_id`` scopes every call that takes a sub-account
-        and names none: a public ID string, or the numeric ID as an ``int``. An
-        empty string or ``None`` means the main account. 0, ``False`` and any
-        other type raise :class:`PolyesterValidationError` here.
+        and names none: a base58 public ID string, or the numeric ID as an
+        ``int``. ``None`` means the main account. An empty or blank string, any
+        other string that is not a public ID, 0, ``False`` and any other type
+        raise :class:`PolyesterValidationError` here.
 
         ``recv_window_ms`` is the receive window of every signed API request,
         sent as the signed ``X-API-RECV-WINDOW`` header: the server processes a

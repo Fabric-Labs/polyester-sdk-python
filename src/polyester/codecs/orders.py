@@ -258,6 +258,8 @@ def create_order_to_wire(
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
         raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
 
+    if request.sub_account_id is not None:
+        parse_account_id(request.sub_account_id, "sub_account_id")
     payload = {
         "symbol": request.symbol,
         "symbol_id": request.symbol_id,
@@ -276,7 +278,8 @@ def create_order_to_wire(
             if request.price is not None
             else None
         ),
-        "sub_account_id": request.sub_account_id or None,
+        # Checked above: only None leaves it out.
+        "sub_account_id": request.sub_account_id,
         "client_order_id": optional_client_id(request.client_order_id),
     }
     return omit_none(payload)
@@ -542,7 +545,7 @@ def create_order_to_proto(
             quote_quantity_scale=quote_quantity_scale,
         )
     )
-    if request.sub_account_id is not None and request.sub_account_id != "":
+    if request.sub_account_id is not None:
         proto.subaccount_id = parse_account_id(request.sub_account_id, "sub_account_id")
     return proto
 
@@ -565,7 +568,7 @@ def preview_order_to_proto(
             quote_quantity_scale=quote_quantity_scale,
         )
     )
-    if request.sub_account_id is not None and request.sub_account_id != "":
+    if request.sub_account_id is not None:
         proto.subaccount_id = parse_account_id(request.sub_account_id, "sub_account_id")
     return proto
 
@@ -1642,6 +1645,8 @@ def resolve_quote_quantity_scale(
 
 
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:
-    if value is None or value == "":
+    """A sub-account ID, or ``None`` for none. Only ``None`` means none: ``""``
+    and whitespace are refused, never read as the main account."""
+    if value is None:
         return None
     return parse_account_id(value, "sub_account_id")

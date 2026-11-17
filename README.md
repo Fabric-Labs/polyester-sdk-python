@@ -395,13 +395,15 @@ Calls that act on an account take `account=` and, on most calls, the legacy
 | --- | --- |
 | `None` (unset) | the client's `default_sub_account_id`, or the main account when none is set |
 | `"active"` | the same as `None` |
-| `"main"` or `""` | always the main account, whatever `default_sub_account_id` is |
+| `"main"` | always the main account, whatever `default_sub_account_id` is |
 | a sub-account ID, such as `"Bht3tfQZv8E"` | that sub-account |
-| `{"subaccountId": id}` or `{"sub_account_id": id}` | that sub-account (a public ID string or the numeric ID) |
+| `{"subaccountId": id}` or `{"sub_account_id": id}` | that sub-account (a base58 public ID string or the numeric ID) |
 
-A `sub_account_id` of `""` also means the main account, and a non-empty one
-names a sub-account. Pass `account` or `sub_account_id`, not both. Any other
-`account` value raises `PolyesterValidationError` before sending.
+A `sub_account_id` names a sub-account; leave it out (`None`) for the account
+above. Only `None` means no ID: an empty or blank `account`, `sub_account_id`
+or `default_sub_account_id`, or any other string that is not a base58 public
+ID, raises `PolyesterValidationError` before sending, never reading as the main
+account. Pass `account` or `sub_account_id`, not both.
 
 ## Create and cancel orders
 

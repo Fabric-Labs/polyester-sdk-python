@@ -1,4 +1,5 @@
-"""An empty default sub-account means no scope, on every public order path."""
+"""An empty default sub-account is refused when the client is made, never read
+as no scope; an unset one sends no scope, on every public order path."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import pytest_asyncio
 
 from polyester import AsyncPolyester
 from polyester.codecs.scalars import format_id
+from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2 as orders
 from polyester.gen.orders.v1 import orders_read_pb2 as orders_read
 from polyester.gen.triggers.v1 import triggers_pb2 as triggers
@@ -113,12 +115,12 @@ async def _trigger(client: AsyncPolyester) -> None:
 PATHS = [_batch_replace, _modify, _status, _trigger]
 
 
-@pytest.mark.parametrize("call", PATHS, ids=lambda call: call.__name__)
-async def test_empty_default_sends_no_scope(serve, call) -> None:
+@pytest.mark.parametrize("default", ["", " "])
+async def test_empty_default_is_refused_when_the_client_is_made(serve, default) -> None:
     make, seen = serve
-    await call(make(""))
-    assert len(seen) == 1
-    assert _scope(seen[0]) is None
+    with pytest.raises(PolyesterValidationError, match="default_sub_account_id"):
+        make(default)
+    assert seen == []
 
 
 @pytest.mark.parametrize("call", PATHS, ids=lambda call: call.__name__)

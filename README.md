@@ -345,7 +345,7 @@ Deposit addresses, sub-accounts and Guard Signer status need one too:
 `sub_accounts.get`), `READ_SUBACCOUNT_INVITES` (`sub_accounts.list_invites`, and
 the invites of `sub_accounts.get`) and `READ_GUARD_SIGNER_STATUS`
 (`guard_signer.get_status`). Account statements need `READ_STATEMENTS`
-(`statements.export`, `statements.export_page` and the statement export files);
+(every `statements` call);
 `CONVERT_DUST` converts dust (`dust_conversions.quote`, `dust_conversions.convert`, the
 conversion reads) and `READ_FUNDING_FLOWS` reads the account's own flows
 (`lifecycle.list_account_flows`, `lifecycle.get_account_flow`); `READ_BALANCES` and
@@ -1132,55 +1132,28 @@ change it.
 
 ## Account statements
 
-`client.statements` exports an account's balance movements for a period as
-CSV, for reconciliation and tax reporting. `await client.statements.export(
-start_time=..., end_time=...)` follows every page and returns the whole
-`Statement`; `export_page` returns one `StatementPage` (`csv`,
-`next_page_token`) for callers that stream pages. `start_time` is inclusive and
-`end_time` exclusive, both timezone-aware; the server allows at most 366 days.
-`asset_id` keeps one asset, and `account` / `sub_account_id` choose the account
-as for `transfers.list`, the client's default sub-account included. The call is
-signed; an API key needs `READ_STATEMENTS`.
-
-```python
-from datetime import UTC, datetime
-
-statement = await client.statements.export(
-    start_time=datetime(2026, 10, 1, tzinfo=UTC),
-    end_time=datetime(2026, 11, 1, tzinfo=UTC),
-)
-for row in statement.rows():
-    print(row.time, row.type, row.account, row.asset, row.amount, row.fee, row.balance)
-```
-
-`statement.csv` is RFC 4180 CSV in UTF-8 with CRLF line endings: save it as
-is. Only the first page carries the header row, so the pages concatenate into
-one file. `rows()` (and `parse_statement_csv`) read the columns by header name,
-so the columns a later release appends are ignored, and a statement without
-`flow_id` reads it as `""`. Amounts, fees and balances stay exact decimal
-strings; never parse them as floats.
-
-A statement says how far it is complete: `Statement.complete_through` (and each
-`StatementPage.complete_through`) is the end of the movements it covers,
-exclusive: the earliest of `end_time`, the first page's request time and the
-time through which account history was complete then. When it is before
-`end_time`, request the rest, from `complete_through` to `end_time`, later.
-
-### Statement export files
-
-For a long period, ask for the whole statement as one CSV file produced in the
-background. `statements.create_export(...)` takes the same period, asset and
-account as `export` (at most 366 days) and an `idempotency_key` of 1 to 64
+`client.statements` produces an account's balance movements for a period as
+one CSV file in the background, for reconciliation and tax reporting.
+`statements.create_export(start_time=..., end_time=..., idempotency_key=...)`
+asks for it: `start_time` is inclusive and `end_time` exclusive, both
+timezone-aware, at most 366 days apart. `asset_id` keeps one asset, and
+`account` / `sub_account_id` choose the account as for `transfers.list`, the
+client's default sub-account included. The `idempotency_key` is 1 to 64
 letters, digits, `.`, `_`, `:` or `-`: repeating the create with it returns the
-same export. Poll `statements.get_export(export_id=...)` until its `status` is
-`"ready"` (or `"failed"`, with `failure_reason` `"too_large"` or
-`"unavailable"`); `list_exports` and `iter_exports` list the account's exports,
-newest first. A root account has at most 5 exports queued or processing; another
-create raises `ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, which is not
-retryable: wait for one to finish. An API key needs `READ_STATEMENTS`.
+same export. Every call is signed; an API key needs `READ_STATEMENTS`.
+
+`statements.wait_export(export_id=...)` reads the export until it is final:
+`"ready"`, `"failed"` (with `failure_reason` `"too_large"`, so split the
+period, or `"unavailable"`, so create a new export), `"expired"` or
+`"canceled"`. `get_export` reads it once, and `list_exports` and
+`iter_exports` list the account's exports, newest first; each page also counts
+the root account's exports in progress (`in_progress_exports`) against its
+limit (`max_in_progress_exports`, 5). Another create over the limit raises
+`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, which is not retryable: wait for
+one to finish, or stop one with `statements.cancel_export(export_id=...)`,
+which returns it `"canceled"` at once and deletes any partial file.
 
 ```python
-import asyncio
 from datetime import UTC, datetime
 
 export = await client.statements.create_export(
@@ -1188,17 +1161,21 @@ export = await client.statements.create_export(
     end_time=datetime(2027, 1, 1, tzinfo=UTC),
     idempotency_key="statement-2026",
 )
-while export.status in ("queued", "processing"):
-    await asyncio.sleep(5)
-    export = await client.statements.get_export(export_id=export.export_id)
+export = await client.statements.wait_export(export_id=export.export_id)
 print(export.status, export.movements, export.bytes, export.expires_at)
 ```
 
-A ready file is downloaded over REST only, with an authenticated
-`GET /v1/statements/exports/{export_id}/file` for 7 days: `text/csv`, byte for
-byte the `export` pages for the same account, asset and period up to the
-export's `complete_through`, with `Range` and `If-Range` support. This SDK does
-not wrap the download.
+A ready file is downloadable for 7 days. Servers and scripts download it with
+an authenticated `GET /v1/statements/exports/{export_id}/file`: `text/csv`,
+with `Range` and `If-Range` support. This SDK does not wrap the download;
+`parse_statement_csv(text)` reads the file's rows by header name, so columns a
+later release appends are ignored, and amounts, fees and balances stay exact
+decimal strings; never parse them as floats. A browser saves the file from the
+URL `statements.get_export_download_url(export_id=...)` returns: it needs no
+credentials and works for at most 60 seconds (`expires_at`), so anyone who
+holds it can download the file. It is a `Secret`: printing shows
+`[REDACTED]`; call `url.reveal()` to hand it on, and never share, store or log
+it.
 
 ## Price alerts (devnet)
 

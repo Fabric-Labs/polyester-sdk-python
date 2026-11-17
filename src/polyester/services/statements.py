@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import re
+import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 
@@ -10,23 +12,25 @@ from polyester.codecs.contract_limits import (
     contract_uint32_max,
 )
 from polyester.codecs.decode.statements import (
+    canceled_statement_export_from_proto,
     created_statement_export_from_proto,
+    statement_export_download_url_from_proto,
     statement_export_from_get_response,
     statement_exports_page_from_proto,
-    statement_page_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, id_to_int
-from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
-from polyester.gen.ledger.read.v1 import ledger_read_pb2
+from polyester.errors import (
+    PolyesterResponseContractError,
+    PolyesterTimeoutError,
+    PolyesterValidationError,
+)
 from polyester.gen.ledger.read.v1 import statement_export_pb2 as export_pb2
-from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.statement_export_connect import StatementExportServiceClient
 from polyester.models.statements import (
-    Statement,
     StatementExport,
+    StatementExportDownloadUrl,
     StatementExportsPage,
-    StatementPage,
 )
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
@@ -47,12 +51,16 @@ _EXPORT_PAGE_TOKEN_MAX_LEN = contract_string_length(
 # The longest period one export covers. The contract states it as a rule on
 # the whole request: end_time - start_time <= duration('8784h'), 366 days.
 EXPORT_MAX_PERIOD = timedelta(hours=8784)
+# An export in one of these statuses never changes again.
+EXPORT_FINAL_STATUSES = frozenset({"ready", "failed", "expired", "canceled"})
+_EXPORT_POLL_INITIAL = 1.0
+_EXPORT_POLL_MAX = 15.0
 
 
 class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
-    """Account statements (``ledger.read.v1.LedgerReadService/ExportStatement``):
-    an account's balance movements for a period as CSV, for reconciliation and
-    tax reporting.
+    """Account statements (``ledger.read.v1.StatementExportService``): an
+    account's balance movements for a period, produced in the background as
+    one CSV file, for reconciliation and tax reporting.
 
     Signed like the other ledger reads; an API key needs ``READ_STATEMENTS``
     on its policy (``READ_BALANCES`` does not grant it). A statement covers
@@ -65,81 +73,6 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
     def __init__(self, transport, default_sub_account_id: str | None) -> None:
         super().__init__(transport)
         self._default_sub_account_id = default_sub_account_id
-
-    async def export_page(
-        self,
-        *,
-        start_time: datetime,
-        end_time: datetime,
-        account: AccountScope | None = None,
-        sub_account_id: str | int | None = None,
-        asset_id: int | None = None,
-        page_token: str | None = None,
-    ) -> StatementPage:
-        """One page of the statement for ``start_time`` (inclusive) to
-        ``end_time`` (exclusive), both timezone-aware and sent exact to the
-        microsecond; the server allows at most 366 days. ``asset_id`` keeps
-        one asset (its ``ledger_id``); ``None`` or 0 covers every asset. A
-        page holds at most 2000 ledger movements and never splits an entry;
-        only the first page carries the header row. Pass ``next_page_token``
-        back as ``page_token`` with the same other arguments."""
-        request = self._request(
-            start_time=start_time,
-            end_time=end_time,
-            account=account,
-            sub_account_id=sub_account_id,
-            asset_id=asset_id,
-        )
-        request.page_token = page_token or ""
-        return await unary_auth_decoded(
-            self._transport,
-            LedgerReadServiceClient,
-            lambda client, req: client.export_statement(req),
-            request,
-            statement_page_from_proto,
-        )
-
-    async def export(
-        self,
-        *,
-        start_time: datetime,
-        end_time: datetime,
-        account: AccountScope | None = None,
-        sub_account_id: str | int | None = None,
-        asset_id: int | None = None,
-    ) -> Statement:
-        """The whole statement: every page of ``export_page`` requested with
-        the same arguments and concatenated in order, the header row first.
-        Read its rows with :meth:`Statement.rows`, by column name."""
-        parts: list[str] = []
-        requested: set[str] = set()
-        token = ""
-        complete_through: datetime | None = None
-        while True:
-            page = await self.export_page(
-                start_time=start_time,
-                end_time=end_time,
-                account=account,
-                sub_account_id=sub_account_id,
-                asset_id=asset_id,
-                page_token=token,
-            )
-            if not parts:
-                complete_through = page.complete_through
-            elif page.complete_through != complete_through:
-                # Every page of one statement covers the same period.
-                raise PolyesterResponseContractError(
-                    "ExportStatement", "a later page changes complete_through"
-                )
-            parts.append(page.csv)
-            if not page.next_page_token:
-                return Statement(csv="".join(parts), complete_through=complete_through)
-            if page.next_page_token in requested:
-                raise PolyesterResponseContractError(
-                    "ExportStatement", "next_page_token repeats an earlier page_token"
-                )
-            requested.add(page.next_page_token)
-            token = page.next_page_token
 
     async def create_export(
         self,
@@ -159,8 +92,8 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         days); both times are timezone-aware and sent exact to the
         microsecond. A period still open at create time ends then: the
         export's ``complete_through`` says where. ``asset_id`` keeps one asset;
-        ``None`` or 0 covers every asset. The account resolves as for
-        :meth:`export`. Signed; an API key needs ``READ_STATEMENTS``.
+        ``None`` or 0 covers every asset. The account resolves as described on
+        the class. Signed; an API key needs ``READ_STATEMENTS``.
 
         ``idempotency_key`` is 1 to 64 letters, digits, ``.``, ``_``, ``:`` or
         ``-``, unique per root account, sent exactly as given: repeating the
@@ -168,9 +101,10 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         fields is refused with ``ERROR_CODE_IDEMPOTENCY_KEY_REUSED``. A root
         account has at most 5 exports queued or processing; another create is
         refused with ``ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED``, which is not
-        retryable: wait for one to finish. Poll :meth:`get_export` until the
-        export is ``"ready"`` or ``"failed"``; the file is downloaded over REST
-        (see :class:`~polyester.models.StatementExport`).
+        retryable: wait for one to finish, or cancel one with
+        :meth:`cancel_export`. :meth:`wait_export` reads the export until it
+        is final; the file is downloaded over REST (see
+        :class:`~polyester.models.StatementExport`).
         """
         for name, value in (("start_time", start_time), ("end_time", end_time)):
             if not isinstance(value, datetime) or value.tzinfo is None:
@@ -223,6 +157,77 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
             statement_export_from_get_response,
         )
 
+    async def cancel_export(self, *, export_id: str) -> StatementExport:
+        """Stop a ``"queued"`` or ``"processing"`` export
+        (``StatementExportService/CancelStatementExport``) and return it,
+        ``"canceled"``.
+
+        It stops counting toward the root account's exports in progress at
+        once, so the next export can start, and any partial file is deleted.
+        Canceling a ``"ready"``, ``"failed"`` or ``"expired"`` export raises
+        ``ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE``. Signed; an API key
+        needs ``READ_STATEMENTS``."""
+        request = export_pb2.CancelStatementExportRequest(
+            export_id=id_to_int(export_id, "export_id")
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            StatementExportServiceClient,
+            lambda client, req: client.cancel_statement_export(req),
+            request,
+            canceled_statement_export_from_proto,
+        )
+
+    async def get_export_download_url(self, *, export_id: str) -> StatementExportDownloadUrl:
+        """A short-lived URL of a ``"ready"`` export's file that needs no
+        credentials (``StatementExportService/GetStatementExportDownloadUrl``),
+        for a browser to save the file.
+
+        The URL is a :class:`~polyester.models.Secret`: anyone who holds it can
+        download the file until its ``expires_at``, at most 60 seconds after
+        it was signed, so never share, store or log it. An export not ready
+        raises ``ERROR_CODE_STATEMENT_EXPORT_NOT_READY``; an expired, failed or
+        canceled one ``ERROR_CODE_STATEMENT_EXPORT_EXPIRED``,
+        ``ERROR_CODE_STATEMENT_EXPORT_FAILED`` or
+        ``ERROR_CODE_STATEMENT_EXPORT_CANCELED``. Servers and scripts that hold
+        credentials download with the authenticated
+        ``GET /v1/statements/exports/{export_id}/file`` instead. Signed; an API
+        key needs ``READ_STATEMENTS``."""
+        request = export_pb2.GetStatementExportDownloadUrlRequest(
+            export_id=id_to_int(export_id, "export_id")
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            StatementExportServiceClient,
+            lambda client, req: client.get_statement_export_download_url(req),
+            request,
+            statement_export_download_url_from_proto,
+        )
+
+    async def wait_export(self, *, export_id: str, timeout: float | None = None) -> StatementExport:
+        """Read the export with :meth:`get_export` until it is final
+        (``"ready"``, ``"failed"``, ``"expired"`` or ``"canceled"``, the
+        statuses in ``EXPORT_FINAL_STATUSES``) and return it.
+
+        Reads start 1 s apart and back off to 15 s. Errors are raised as they
+        come. After ``timeout`` seconds (``None`` waits for as long as the
+        export runs), :class:`~polyester.errors.PolyesterTimeoutError` is
+        raised; the export keeps running. Cancelling the call cancels the
+        wait, not the export: use :meth:`cancel_export` for that.
+        """
+        deadline = None if timeout is None else time.monotonic() + max(timeout, 0.0)
+        delay = _EXPORT_POLL_INITIAL
+        while True:
+            export = await self.get_export(export_id=export_id)
+            if export.status in EXPORT_FINAL_STATUSES:
+                return export
+            if deadline is not None and time.monotonic() + delay > deadline:
+                raise PolyesterTimeoutError(
+                    f"statement export {export_id} is still {export.status or 'in progress'}"
+                )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, _EXPORT_POLL_MAX)
+
     async def list_exports(
         self,
         *,
@@ -234,7 +239,8 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         """One page of the account's statement exports, newest first.
         ``limit`` is 0 (the server's 20) to ``LIST_EXPORTS_MAX_LIMIT`` (100);
         pass ``next_page_token`` back as ``page_token``. The account resolves
-        as for :meth:`export`."""
+        as for :meth:`create_export`. The page also counts the root account's
+        exports in progress against its limit."""
         token = page_token or ""
         if not isinstance(token, str) or len(token) > _EXPORT_PAGE_TOKEN_MAX_LEN:
             raise PolyesterValidationError(
@@ -284,35 +290,3 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
                     "ListStatementExports", "next_page_token repeats an earlier page token"
                 )
             token = page.next_page_token
-
-    def _request(
-        self,
-        *,
-        start_time: datetime,
-        end_time: datetime,
-        account: AccountScope | None,
-        sub_account_id: str | int | None,
-        asset_id: int | None,
-    ) -> ledger_read_pb2.ExportStatementRequest:
-        for name, value in (("start_time", start_time), ("end_time", end_time)):
-            if not isinstance(value, datetime):
-                raise PolyesterValidationError(f"{name} is required (a timezone-aware datetime)")
-        request = ledger_read_pb2.ExportStatementRequest()
-        request.start_time.CopyFrom(_timestamp(start_time))
-        request.end_time.CopyFrom(_timestamp(end_time))
-        if asset_id is not None:
-            if (
-                isinstance(asset_id, bool)
-                or not isinstance(asset_id, int)
-                or not (0 <= asset_id < 2**32)
-            ):
-                raise PolyesterValidationError(
-                    "asset_id must be an integer between 0 and 2**32 - 1"
-                )
-            request.asset_id = asset_id
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is not None:
-            request.subaccount_id = parsed_sub
-        return request

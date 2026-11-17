@@ -12,6 +12,7 @@ from polyester._problem import decode_http_problem
 from polyester._redact import url_for_error, url_without_userinfo
 from polyester._redirects import redirect_refusal
 from polyester.auth import ApiKeyCredentials, sign_request_async
+from polyester.codecs.timestamp_window import timestamp_window_from_json
 from polyester.errors import (
     TIMESTAMP_SKEW,
     PolyesterAuthError,
@@ -91,6 +92,7 @@ def _auth_http_error(
     code: str | None = None
     server_message: str | None = None
     problem = None
+    payload: object = None
     try:
         payload = json.loads(body)
         problem = decode_http_problem(payload, status_code)
@@ -105,7 +107,11 @@ def _auth_http_error(
         pass
     if code == TIMESTAMP_SKEW:
         skew_error = PolyesterTimestampSkewError(
-            f"{label}: {TIMESTAMP_SKEW}", status_code=status_code
+            f"{label}: {TIMESTAMP_SKEW}",
+            status_code=status_code,
+            timestamp_window=timestamp_window_from_json(
+                payload.get("timestampWindow") if isinstance(payload, dict) else None
+            ),
         )
         skew_error.problem = problem
         return skew_error

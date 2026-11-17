@@ -1,8 +1,31 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import msgspec
+
+
+class ServerTime(msgspec.Struct, kw_only=True, frozen=True):
+    """The API's clock (``system.v1.SystemService/GetTime``) and the window a
+    signed request's timestamp must fall in.
+
+    ``server_time_ms`` is the server time in milliseconds since the Unix
+    epoch, the clock that checks the ``X-API-TIMESTAMP`` of API-key requests.
+    On a ``TIMESTAMP_SKEW`` refusal (:attr:`PolyesterTimestampSkewError.timestamp_window
+    <polyester.errors.PolyesterTimestampSkewError.timestamp_window>`) the
+    server also names the window it applied: a timestamp is accepted while it
+    is at most ``max_future_ms`` ahead of ``server_time_ms`` and at most
+    ``recv_window_ms`` behind it. Both are ``None`` from ``get_time``.
+    """
+
+    server_time_ms: int
+    recv_window_ms: int | None = None
+    max_future_ms: int | None = None
+
+    @property
+    def server_time(self) -> datetime:
+        """``server_time_ms`` as an aware UTC datetime."""
+        return datetime.fromtimestamp(self.server_time_ms / 1000, tz=UTC)
 
 
 class ServerVersion(msgspec.Struct, kw_only=True, omit_defaults=True):

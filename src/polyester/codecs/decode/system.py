@@ -7,8 +7,9 @@ from polyester.codecs.proto_helpers import (
     optional_timestamp,
     proto_enum_name,
 )
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.system.v1 import system_pb2
-from polyester.models.system import StatusEvent, StatusEventsPage, StatusEventUpdate
+from polyester.models.system import ServerTime, StatusEvent, StatusEventsPage, StatusEventUpdate
 
 
 def _labels(enum_type, values) -> list[str]:
@@ -54,3 +55,10 @@ def status_events_page_from_proto(msg: system_pb2.ListStatusEventsResponse) -> S
         events=[status_event_from_proto(event) for event in msg.events],
         next_page_token=msg.next_page_token,
     )
+
+
+def server_time_from_proto(msg: system_pb2.GetTimeResponse) -> ServerTime:
+    """Decode ``GetTime``; a time at or before the Unix epoch names no time."""
+    if int(msg.server_time_ms) <= 0:
+        raise PolyesterResponseContractError("GetTime", "missing server_time_ms")
+    return ServerTime(server_time_ms=int(msg.server_time_ms))

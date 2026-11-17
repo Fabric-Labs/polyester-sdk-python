@@ -42,7 +42,6 @@ MESSAGES = [
     "chain.lifecycle.v1.ListAccountFlowsResponse",
     "ledger.read.v1.BalanceSeries",
     "ledger.read.v1.GetBalanceHistoryResponse",
-    "ledger.read.v1.ExportStatementResponse",
     "ledger.read.v1.CreateStatementExportRequest",
     "ledger.read.v1.CreateStatementExportResponse",
     "ledger.read.v1.GetStatementExportRequest",

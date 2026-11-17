@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 import msgspec
 
 from polyester.errors import PolyesterResponseContractError
+from polyester.models.secret import Secret
 
 # The statement columns every row carries, by header name. Later releases may
 # append columns: read them by name, never by position.
@@ -57,44 +58,8 @@ class StatementRow(msgspec.Struct, kw_only=True, omit_defaults=True):
     flow_id: str = ""
 
 
-class StatementPage(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """One page of an account statement (``ExportStatement``).
-
-    ``csv`` is RFC 4180 CSV in UTF-8 with CRLF line endings, kept as text. Only
-    the first page starts with the header row, so concatenating the pages in
-    order yields the whole statement. ``next_page_token`` is "" on the last
-    page.
-
-    ``complete_through`` is how far the statement is complete: it covers the
-    movements from ``start_time`` up to ``complete_through``, exclusive. That
-    is the earliest of ``end_time``, the time of the first page's request and
-    the time through which account history was complete then, never before
-    ``start_time``; every page of one statement carries the same value. When
-    it is before ``end_time``, request the rest (from ``complete_through`` to
-    ``end_time``) later. ``None`` when the server sent none.
-    """
-
-    csv: str = ""
-    next_page_token: str = ""
-    complete_through: datetime | None = None
-
-
-class Statement(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """A whole account statement: every page's ``csv`` concatenated in order,
-    starting with the header row. A period without movements holds the header
-    row alone. ``complete_through`` is the end of what it covers, as on
-    :class:`StatementPage`."""
-
-    csv: str = ""
-    complete_through: datetime | None = None
-
-    def rows(self) -> list[StatementRow]:
-        """The statement's rows, oldest first; see :func:`parse_statement_csv`."""
-        return parse_statement_csv(self.csv)
-
-
 def parse_statement_csv(text: str) -> list[StatementRow]:
-    """Parse a statement CSV that starts with its header row.
+    """Parse a statement export's CSV file, which starts with its header row.
 
     Columns are read by header name: their order does not matter, and columns
     this SDK does not know are ignored. A statement without a ``flow_id``
@@ -109,7 +74,7 @@ def parse_statement_csv(text: str) -> list[StatementRow]:
         return _statement_rows(reader)
     except csv.Error as exc:
         raise PolyesterResponseContractError(
-            "ExportStatement", f"statement line {reader.line_num} is not valid CSV: {exc}"
+            "StatementExportFile", f"statement line {reader.line_num} is not valid CSV: {exc}"
         ) from exc
 
 
@@ -126,12 +91,12 @@ def _statement_rows(reader: Iterator[list[str]]) -> list[StatementRow]:
             missing = [name for name in STATEMENT_COLUMNS if name not in index]
             if missing:
                 raise PolyesterResponseContractError(
-                    "ExportStatement", f"statement header lacks column(s) {', '.join(missing)}"
+                    "StatementExportFile", f"statement header lacks column(s) {', '.join(missing)}"
                 )
             continue
         if len(fields) != len(header):
             raise PolyesterResponseContractError(
-                "ExportStatement",
+                "StatementExportFile",
                 f"statement line {line} has {len(fields)} fields, the header {len(header)}",
             )
 
@@ -160,7 +125,7 @@ def _statement_time(value: str, line: int) -> datetime:
         parsed = None
     if parsed is None or parsed.tzinfo is None:
         raise PolyesterResponseContractError(
-            "ExportStatement", f"statement line {line} has an unreadable time {value!r}"
+            "StatementExportFile", f"statement line {line} has an unreadable time {value!r}"
         )
     return parsed.astimezone(UTC)
 
@@ -175,9 +140,10 @@ class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``"ready"`` (downloadable until ``expires_at``), ``"failed"``
     (``failure_reason`` says why: ``"too_large"``, more than 4,000,000 ledger
     movements, so split the period; or ``"unavailable"``, create a new
-    export) or ``"expired"`` (the file was deleted; create a new export).
-    "" when the server names none; ``"UNKNOWN(n)"`` for a value this SDK does
-    not know.
+    export), ``"expired"`` (the file was deleted; create a new export) or
+    ``"canceled"`` (stopped by ``statements.cancel_export``; any partial file
+    was deleted). The last four are final. "" when the server names none;
+    ``"UNKNOWN(n)"`` for a value this SDK does not know.
 
     ``export_id`` and ``subaccount_id`` are public IDs; ``subaccount_id`` is
     "" for a root account. ``asset_id`` is 0 for every asset. The file covers
@@ -186,11 +152,11 @@ class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``expires_at`` (7 days after ``ready_at``) are ``None`` before the file is
     ready.
 
-    The file itself is downloaded over REST only, with an authenticated
-    ``GET /v1/statements/exports/{export_id}/file``: ``text/csv``, byte for
-    byte the ``statements.export`` pages for the same account, asset and
-    period up to ``complete_through``, with ``Range`` and ``If-Range``
-    support. This SDK does not wrap the download.
+    The file itself is downloaded over REST, with an authenticated
+    ``GET /v1/statements/exports/{export_id}/file`` (``text/csv``, with
+    ``Range`` and ``If-Range`` support), or without credentials from the
+    short-lived URL ``statements.get_export_download_url`` returns. This SDK
+    does not wrap the download; :func:`parse_statement_csv` reads the file.
     """
 
     export_id: str
@@ -211,7 +177,34 @@ class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class StatementExportsPage(msgspec.Struct, kw_only=True, omit_defaults=True):
     """One page of an account's statement exports, newest first;
-    ``next_page_token`` is "" on the last page."""
+    ``next_page_token`` is "" on the last page.
+
+    ``in_progress_exports`` counts the root account's exports ``"queued"`` or
+    ``"processing"`` across all its sub-accounts, and
+    ``max_in_progress_exports`` is the most it may have at once; both cover
+    the root account whichever account the page lists.
+    """
 
     exports: list[StatementExport] = []
     next_page_token: str = ""
+    in_progress_exports: int = 0
+    max_in_progress_exports: int = 0
+
+
+class StatementExportDownloadUrl(msgspec.Struct, kw_only=True):
+    """A short-lived link to a ready export's file
+    (``statements.get_export_download_url``).
+
+    ``url`` needs no credentials, so a browser can open it to save the file:
+    anyone who holds it can download the file until ``expires_at``. It is a
+    :class:`~polyester.models.Secret`, so printing or logging the link shows
+    ``[REDACTED]``; call ``url.reveal()`` to hand it on, and never share,
+    store or log it. ``expires_at`` is when the link stops working, at most
+    60 seconds after it was signed; request a new one after it.
+    ``filename`` is the name the download saves the file as,
+    ``statement-<export_id>.csv``.
+    """
+
+    url: Secret[str]
+    expires_at: datetime | None = None
+    filename: str = ""

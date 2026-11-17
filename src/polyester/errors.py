@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from polyester._problem import HTTPProblem
 
 if TYPE_CHECKING:
+    from polyester.models.system import ServerTime
     from polyester.models.trading import OrderFieldViolation
 
 # Stable auth.v1.AuthErrorDetail codes used for MFA control flow.
@@ -423,8 +424,12 @@ class PolyesterTimestampSkewError(PolyesterTransportError):
 
     Retryable: the gateway rejected the request before any service saw it,
     and a retry signs it again with a fresh timestamp. If it persists, the
-    local clock is wrong. For large bursts, bound concurrency so requests do
-    not wait locally past the skew window.
+    local clock is wrong: ``timestamp_window`` (a
+    :class:`~polyester.models.ServerTime`) is the server time of the refusal
+    and the window it applied, ``None`` when the answer names none; measure
+    the offset of this host's clock from ``timestamp_window.server_time_ms``
+    or from ``system.get_time()``. For large bursts, bound concurrency so
+    requests do not wait locally past the skew window.
     """
 
     code = TIMESTAMP_SKEW
@@ -434,9 +439,11 @@ class PolyesterTimestampSkewError(PolyesterTransportError):
         message: str = "API key timestamp is outside the allowed skew window.",
         *,
         status_code: int | None = None,
+        timestamp_window: ServerTime | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.timestamp_window = timestamp_window
 
 
 class PolyesterApiError(PolyesterError):

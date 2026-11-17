@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 
-from polyester.codecs.decode.system import status_events_page_from_proto
+from polyester.codecs.decode.system import server_time_from_proto, status_events_page_from_proto
 from polyester.gen.system.v1 import system_pb2
 from polyester.gen.system.v1.system_connect import SystemServiceClient
-from polyester.models.system import ServerVersion, StatusEvent, StatusEventsPage
+from polyester.models.system import ServerTime, ServerVersion, StatusEvent, StatusEventsPage
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_public_decoded
 from polyester.services._validation import validate_limit
@@ -23,6 +23,25 @@ def server_version_from_proto(msg: system_pb2.GetVersionResponse) -> ServerVersi
 class AsyncSystemService(BaseService):
     """The environment's build and its scheduled maintenance and incidents.
     Needs no API key; calls count against the public per-IP read budget."""
+
+    async def get_time(self) -> ServerTime:
+        """The server time (``GetTime``), the clock that checks the timestamp
+        of requests signed with an API key, so a caller can measure its own
+        clock's offset before signing. Public, never cached.
+
+        A signed request is accepted while its timestamp is at most 1000 ms
+        ahead of the server time and at most its receive window (5000 ms
+        unless the client sets another) behind it; otherwise it raises
+        :class:`~polyester.errors.PolyesterTimestampSkewError`, whose
+        ``timestamp_window`` names the server time of the refusal.
+        """
+        return await unary_public_decoded(
+            self._transport,
+            SystemServiceClient,
+            lambda client, req: client.get_time(req),
+            system_pb2.GetTimeRequest(),
+            server_time_from_proto,
+        )
 
     async def get_version(self) -> ServerVersion:
         return await unary_public_decoded(

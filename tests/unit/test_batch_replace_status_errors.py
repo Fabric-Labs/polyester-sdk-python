@@ -36,7 +36,7 @@ async def test_unavailable_is_the_retryable_server_error(httpserver: HTTPServer)
     orders, transport = _orders_service(httpserver)
     try:
         with pytest.raises(PolyesterServerError) as caught:
-            await orders.get_batch_replace_status(batch_request_id=str(MAX_ID))
+            await orders.get_batch_replace_status(batch_request_id=format_id(MAX_ID))
     finally:
         await transport.aclose()
     assert is_retryable_error(caught.value)
@@ -51,7 +51,7 @@ async def test_not_found_is_not_found_and_not_retryable(httpserver: HTTPServer) 
     orders, transport = _orders_service(httpserver)
     try:
         with pytest.raises(Exception) as caught:
-            await orders.get_batch_replace_status(batch_request_id=str(MAX_ID))
+            await orders.get_batch_replace_status(batch_request_id=format_id(MAX_ID))
     finally:
         await transport.aclose()
     assert is_not_found(caught.value), repr(caught.value)
@@ -59,8 +59,8 @@ async def test_not_found_is_not_found_and_not_retryable(httpserver: HTTPServer) 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("given", [str(MAX_ID), format_id(MAX_ID)])
-async def test_batch_request_id_keeps_all_64_bits(httpserver: HTTPServer, given: str) -> None:
+@pytest.mark.parametrize("given", [MAX_ID, format_id(MAX_ID)])
+async def test_batch_request_id_keeps_all_64_bits(httpserver: HTTPServer, given: str | int) -> None:
     seen: list[int] = []
 
     def handle(request):

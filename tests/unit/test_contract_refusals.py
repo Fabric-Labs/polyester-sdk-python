@@ -23,6 +23,7 @@ from polyester.codecs.oco import create_oco_to_proto
 from polyester.codecs.orders import create_order_to_proto, create_order_to_wire
 from polyester.codecs.scalars import (
     decimal_to_scaled,
+    format_id,
     id_to_int,
     parse_required_uint64_decimal,
     tick_count,
@@ -404,7 +405,8 @@ def test_public_id_with_a_non_ascii_character_is_refused(value: str) -> None:
 def test_ascii_public_ids_decode_as_before() -> None:
     assert id_to_int("23", "order_id") == 60
     assert id_to_int("2nsoduvuPJr", "order_id") == id_to_int("2nsoduvuPJr", "x")
-    assert id_to_int("18446744073709551615", "order_id") == 2**64 - 1
+    assert id_to_int(format_id(2**64 - 1), "order_id") == 2**64 - 1
+    assert id_to_int(2**64 - 1, "order_id") == 2**64 - 1
     assert id_to_int(23, "order_id") == 23
 
 

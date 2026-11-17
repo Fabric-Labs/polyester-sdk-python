@@ -147,9 +147,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``trigger_type`` keeps one strategy: ``stop_loss``, ``take_profit``,
         ``trailing_stop``, ``twap`` or ``ladder``, the labels
         :meth:`create` takes. ``parent_order_id`` keeps the attached-risk
-        triggers of one order (its order ID, base58 or decimal). Either one
-        that is not valid raises ``PolyesterValidationError`` before sending;
-        left out, the list is not filtered by it.
+        triggers of one order (its base58 order ID, or the ID as an int).
+        Either one that is not valid raises ``PolyesterValidationError``
+        before sending; left out, the list is not filtered by it.
 
         ``order_list_id`` keeps the take-profit and the stop-loss of one OCO
         (the ID :meth:`create_oco` returned), and ``client_list_id`` those of

@@ -202,7 +202,7 @@ async def test_write_helpers_refuse_selector_conflicts(helper, scope):
 async def test_write_helpers_refuse_whitespace_scope(helper, scope):
     call, _ = WRITE_HELPERS[helper]
     async with scope_client(42) as (client, seen):
-        with pytest.raises(PolyesterValidationError, match="base58 or decimal"):
+        with pytest.raises(PolyesterValidationError, match="must be a base58 public ID"):
             await call(client, scope)
         assert seen == []
 

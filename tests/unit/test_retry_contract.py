@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from polyester import is_retryable_error, mutation_outcome_unknown
+from polyester.codecs.scalars import format_id
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from tests.unit.test_auth_error_codes import _rest_error
@@ -136,7 +137,7 @@ async def test_ambiguous_read_recovery(httpserver, operation, status, kind, body
         service, transport = _orders_service(httpserver)
         try:
             if operation == "wait":
-                await service.wait_batch_replace(batch_request_id=str(BATCH_ID))
+                await service.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
             else:
                 from polyester.realtime import AsyncRealtimeClient
                 from polyester.realtime.snapshot_then_stream import (
@@ -149,7 +150,7 @@ async def test_ambiguous_read_recovery(httpserver, operation, status, kind, body
                     channel="public:test",
                     decode=lambda b: b,
                     fetch_snapshot=lambda: service.get_batch_replace_status(
-                        batch_request_id=str(BATCH_ID)
+                        batch_request_id=format_id(BATCH_ID)
                     ),
                     read_publication=lambda p: [p],
                     apply_snapshot=lambda s, p: None,
@@ -285,7 +286,7 @@ async def test_client_timeout_read_recovery(operation):
         if operation == "trigger":
             await service.get(trigger_id="9")
         elif operation == "wait":
-            await service.wait_batch_replace(batch_request_id=str(BATCH_ID))
+            await service.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
         else:
             from polyester.realtime import AsyncRealtimeClient
             from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubscription
@@ -296,7 +297,7 @@ async def test_client_timeout_read_recovery(operation):
                 channel="public:test",
                 decode=lambda b: b,
                 fetch_snapshot=lambda: service.get_batch_replace_status(
-                    batch_request_id=str(BATCH_ID)
+                    batch_request_id=format_id(BATCH_ID)
                 ),
                 read_publication=lambda p: [p],
                 apply_snapshot=lambda s, p: None,

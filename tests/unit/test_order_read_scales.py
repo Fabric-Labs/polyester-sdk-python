@@ -293,7 +293,7 @@ async def test_trigger_reads_carry_the_catalog_scales(json_wire: bool, catalogs:
         client.catalogs.hydrate_spot_config({"pairs": [BTC_USDT]})
     expected_scale = 8 if catalogs else None
     try:
-        got = await client.triggers.get(trigger_id="11")
+        got = await client.triggers.get(trigger_id=11)
         listed = (await client.triggers.list()).triggers
         twaps = [got, listed[0]]
         for trigger in twaps:
@@ -414,7 +414,7 @@ async def test_order_reads_scale_from_the_spot_catalog_without_the_funding_confi
                 _assert_scaled(await _read(client, method))
             trade = (await client.trades.list()).trades[0]
             assert trade.qty is not None and trade.qty.scale == 8
-            trigger = await client.triggers.get(trigger_id="11")
+            trigger = await client.triggers.get(trigger_id=11)
             assert trigger is not None and trigger.qty is not None and trigger.qty.scale == 8
 
         # Started right after the client: each read waits for the spot config only.

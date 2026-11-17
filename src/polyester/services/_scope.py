@@ -24,8 +24,8 @@ AccountScope = (
 def _public_id(value: str | int, label: str) -> str:
     """Keep an int ID numeric: return its canonical public string.
 
-    Downstream parsing reads an all-digit string as base58 when it round-trips,
-    so ``str(42)`` would address ID 175. ``format_id`` validates the uint64
+    Downstream parsing reads every string as base58, so ``str(42)`` would
+    address ID 175. ``format_id`` validates the uint64
     range and refuses ``bool``. 0 is refused: on the wire it means unset (the
     main account), so it must not be sent as an explicit ID.
     """

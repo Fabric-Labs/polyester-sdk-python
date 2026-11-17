@@ -165,7 +165,7 @@ async def test_wait_batch_replace_polls_until_no_item_is_admitted(
     _respond(httpserver, _status(_working(0), _refused(1), accepted=2))
     orders, transport = _orders_service(httpserver)
     try:
-        status = await orders.wait_batch_replace(batch_request_id=str(BATCH_ID))
+        status = await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
     finally:
         await transport.aclose()
 
@@ -191,12 +191,12 @@ async def test_wait_batch_replace_stops_at_the_status_window(httpserver: HTTPSer
     started = time.monotonic()
     try:
         with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
-            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID))
+            await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
     finally:
         await transport.aclose()
 
     assert time.monotonic() - started < 2.0
-    assert caught.value.batch_request_id == str(BATCH_ID)
+    assert caught.value.batch_request_id == format_id(BATCH_ID)
     assert caught.value.last_status is not None
     assert caught.value.last_status.items[0].phase == "admitted"
 
@@ -210,7 +210,7 @@ async def test_wait_batch_replace_honours_a_shorter_timeout(httpserver: HTTPServ
     started = time.monotonic()
     try:
         with pytest.raises(PolyesterBatchReplaceTimeoutError):
-            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=0.3)
+            await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID), timeout=0.3)
     finally:
         await transport.aclose()
 
@@ -233,7 +233,7 @@ async def test_wait_batch_replace_polls_through_not_found_until_the_status_appea
     _respond(httpserver, _status(_working(), accepted=1))
     orders, transport = _orders_service(httpserver)
     try:
-        status = await orders.wait_batch_replace(batch_request_id=str(BATCH_ID))
+        status = await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
     finally:
         await transport.aclose()
 
@@ -251,7 +251,7 @@ async def test_wait_batch_replace_not_found_until_the_end_is_a_timeout(
     orders, transport = _orders_service(httpserver)
     try:
         with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
-            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=0.3)
+            await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID), timeout=0.3)
     finally:
         await transport.aclose()
 
@@ -267,7 +267,7 @@ async def test_wait_batch_replace_raises_other_errors(httpserver: HTTPServer) ->
     orders, transport = _orders_service(httpserver)
     try:
         with pytest.raises(PolyesterAuthError):
-            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID))
+            await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
     finally:
         await transport.aclose()
 
@@ -313,7 +313,7 @@ async def test_wait_batch_replace_deadline_bounds_an_in_flight_read(
     started = time.monotonic()
     try:
         with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
-            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=0.4)
+            await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID), timeout=0.4)
         elapsed = time.monotonic() - started
     finally:
         await transport.aclose()
@@ -339,7 +339,7 @@ async def test_wait_batch_replace_persistent_unavailable_ends_in_the_timeout_err
     started = time.monotonic()
     try:
         with pytest.raises(PolyesterBatchReplaceTimeoutError, match="reconcile") as caught:
-            await orders.wait_batch_replace(batch_request_id=str(BATCH_ID))
+            await orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
     finally:
         await transport.aclose()
 
@@ -359,7 +359,7 @@ async def test_wait_batch_replace_caller_cancellation_still_cancels(
     started = time.monotonic()
     try:
         task = asyncio.create_task(
-            orders.wait_batch_replace(batch_request_id=str(BATCH_ID), timeout=5.0)
+            orders.wait_batch_replace(batch_request_id=format_id(BATCH_ID), timeout=5.0)
         )
         await asyncio.sleep(0.2)
         task.cancel()
@@ -388,7 +388,9 @@ async def test_snapshot_refresh_retries_gateway_504_even_when_flag_is_false(http
         realtime=realtime,
         channel="public:test",
         decode=lambda b: b,
-        fetch_snapshot=lambda: orders.get_batch_replace_status(batch_request_id=str(BATCH_ID)),
+        fetch_snapshot=lambda: orders.get_batch_replace_status(
+            batch_request_id=format_id(BATCH_ID)
+        ),
         read_publication=lambda p: [p],
         apply_snapshot=lambda _s, _p: None,
         apply_live_publications=lambda _p: None,

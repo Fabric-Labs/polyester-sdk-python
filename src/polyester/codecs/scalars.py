@@ -377,17 +377,19 @@ def _encode_id(parsed: int) -> str:
     return base58.b58encode_int(parsed).decode("ascii")
 
 
-def _base58_to_int(value: str) -> int:
-    raw = base58.b58decode(value)
-    return int.from_bytes(raw, "big") if raw else 0
+_BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_BASE58_DIGITS = {char: digit for digit, char in enumerate(_BASE58_ALPHABET)}
 
 
 def id_to_int(value: str | int, label: str = "id") -> int:
-    """Decode a base58 or decimal uint64 public ID, refusing one that decodes to 0.
+    """Decode a public ID, refusing one that decodes to 0.
 
-    On the wire 0 is unset and names nothing, so ``"1"`` (``format_id(0)``),
-    ``"0"``, ``"00"`` or ``0`` would send a request for an ID the caller did
-    not mean.
+    A string is base58 only, read character by character as the server reads
+    it: a digit-only string is base58 too (``"123"`` is 60), and anything
+    outside the base58 alphabet is refused, ``0``, whitespace and non-ASCII
+    characters included; nothing is trimmed. An ``int`` names the ID it is.
+    On the wire 0 is unset and names nothing, so ``"1"`` (``format_id(0)``)
+    or ``0`` would send a request for an ID the caller did not mean.
     """
     parsed = _parse_id(value, label)
     if parsed == 0:
@@ -397,38 +399,27 @@ def id_to_int(value: str | int, label: str = "id") -> int:
 
 def _parse_id(value: str | int, label: str) -> int:
     if isinstance(value, bool):
-        raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
+        raise PolyesterValidationError(f"{label} must be a base58 string or an integer ID")
     if isinstance(value, int):
         parsed = operator.index(value)
-    elif isinstance(value, str):
-        # A public ID is ASCII only, as the server reads it: other scripts'
-        # digits would read as a decimal ID ("٢٣" as 23, where "23" is base58
-        # 60), and str.strip() would trim non-ASCII spaces.
-        if not value.isascii():
+        if parsed < 0 or parsed > UINT64_MAX:
+            raise PolyesterValidationError(f"{label} exceeds uint64 range")
+        return parsed
+    if not isinstance(value, str):
+        raise PolyesterValidationError(f"{label} must be a base58 string or an integer ID")
+    if not value:
+        raise PolyesterValidationError(f"{label} must be a base58 public ID, not empty")
+    parsed = 0
+    for char in value:
+        digit = _BASE58_DIGITS.get(char)
+        if digit is None:
             raise PolyesterValidationError(
-                f"{label} must be base58 or decimal uint64 in ASCII characters"
+                f"{label} must be a base58 public ID: {_error_value(repr(value))} has "
+                f"{char!r}, which is not base58; pass an integer ID as an int"
             )
-        if not value.strip():
-            raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
-        if value.isdecimal():
-            # All-digit strings are ambiguous: prefer canonical SDK base58 when it
-            # round-trips via format_id, otherwise treat as decimal.
-            decimal_value = int(value)
-            try:
-                base58_value = _base58_to_int(value)
-            except ValueError:
-                parsed = decimal_value
-            else:
-                parsed = base58_value if _encode_id(base58_value) == value else decimal_value
-        else:
-            try:
-                parsed = _base58_to_int(value)
-            except ValueError as exc:
-                raise PolyesterValidationError(f"{label} must be base58 or decimal uint64") from exc
-    else:
-        raise PolyesterValidationError(f"{label} must be base58 or decimal uint64")
-    if parsed < 0 or parsed > UINT64_MAX:
-        raise PolyesterValidationError(f"{label} exceeds uint64 range")
+        parsed = parsed * 58 + digit
+        if parsed > UINT64_MAX:
+            raise PolyesterValidationError(f"{label} exceeds uint64 range")
     return parsed
 
 
@@ -436,14 +427,17 @@ def parse_account_id(value: str | int, label: str) -> int:
     """Decode an account or sub-account ID as ``id_to_int`` does, which refuses 0.
 
     On the wire 0 is unset: a sub-account ID of 0 is the main account, and an
-    account ID of 0 names no account. So ``"1"`` (``format_id(0)``), ``"0"``,
-    ``"00"`` or ``0`` would address another account than the one named. Omit
-    a sub-account ID to address the main account.
+    account ID of 0 names no account. So ``"1"`` (``format_id(0)``), ``"11"``
+    or ``0`` would address another account than the one named. Omit a
+    sub-account ID to address the main account.
     """
     return id_to_int(value, label)
 
 
 def format_id(value: str | int) -> str:
+    """The canonical base58 public ID of an integer ID, or of a base58 string
+    (re-encoded without leading ``1`` digits). A string that is not base58 is
+    refused, as :func:`id_to_int` refuses it."""
     return _encode_id(_parse_id(value, "id"))
 
 

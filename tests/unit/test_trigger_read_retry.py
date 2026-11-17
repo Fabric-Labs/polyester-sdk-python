@@ -8,6 +8,7 @@ from pytest_httpserver import HTTPServer
 
 from polyester import PolyesterApiError, PolyesterServerError
 from polyester.auth import ApiKeyCredentials
+from polyester.codecs.scalars import format_id
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.services import _retry
 from polyester.services.triggers import AsyncTriggersService
@@ -67,7 +68,7 @@ async def test_get_trigger_retries_unavailable_with_the_same_request(
     )
     triggers, transport = _service(httpserver)
     try:
-        trigger = await triggers.get(trigger_id=str(TRIGGER_ID))
+        trigger = await triggers.get(trigger_id=format_id(TRIGGER_ID))
     finally:
         await transport.aclose()
 
@@ -116,7 +117,7 @@ async def test_trigger_reads_give_up_after_about_two_seconds(
     triggers, transport = _service(httpserver)
     try:
         with pytest.raises(PolyesterServerError, match="catching up"):
-            await triggers.get(trigger_id=str(TRIGGER_ID))
+            await triggers.get(trigger_id=format_id(TRIGGER_ID))
     finally:
         await transport.aclose()
 
@@ -133,7 +134,7 @@ async def test_trigger_reads_do_not_retry_other_errors(httpserver: HTTPServer) -
     triggers, transport = _service(httpserver)
     try:
         with pytest.raises(PolyesterApiError):
-            await triggers.get(trigger_id=str(TRIGGER_ID))
+            await triggers.get(trigger_id=format_id(TRIGGER_ID))
     finally:
         await transport.aclose()
 
@@ -154,8 +155,8 @@ async def test_trigger_events_retry_and_keep_request(httpserver: HTTPServer, res
     triggers, transport = _service(httpserver)
     try:
         result = await triggers.list_events(
-            trigger_id=str(TRIGGER_ID),
-            sub_account_id="12",
+            trigger_id=format_id(TRIGGER_ID),
+            sub_account_id=format_id(12),
             limit=17,
             event_type="fired",
             page_token="next-page",
@@ -185,9 +186,9 @@ async def test_trigger_events_not_found_matches_get(httpserver: HTTPServer) -> N
     triggers, transport = _service(httpserver)
     try:
         with pytest.raises(PolyesterApiError) as get_error:
-            await triggers.get(trigger_id=str(TRIGGER_ID))
+            await triggers.get(trigger_id=format_id(TRIGGER_ID))
         with pytest.raises(type(get_error.value)) as events_error:
-            await triggers.list_events(trigger_id=str(TRIGGER_ID))
+            await triggers.list_events(trigger_id=format_id(TRIGGER_ID))
         assert events_error.value.code == get_error.value.code
     finally:
         await transport.aclose()

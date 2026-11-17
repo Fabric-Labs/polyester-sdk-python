@@ -126,8 +126,8 @@ def test_batch_size_guard_follows_each_operation_limit() -> None:
 def test_batch_cancel_orders_to_proto() -> None:
     proto = batch_cancel_orders_to_proto(
         items=[
-            # "10" is pure decimal (not a canonical base58 encoding).
-            {"key": OrderId("10"), "symbol_id": 3},
+            # The integer order ID 10 (a string ID is base58: "10" is refused).
+            {"key": OrderId(10), "symbol_id": 3},
             {"key": ClientOrderId("cid-9"), "symbol_id": 5},
         ],
         sub_account_id="99",

@@ -2,7 +2,7 @@
 
 On the wire 0 is unset: a sub-account ID of 0 is the main account, and an
 account ID of 0 names no account. ``"1"`` is the public ID of 0
-(``format_id(0)``), and ``"0"`` and ``"00"`` read as decimal 0. Each form an
+(``format_id(0)``), and ``"0"`` and ``"00"`` are no base58 ID at all. Each form an
 ID arrives in is passed to a client against a local server that counts every
 request, and nothing may reach it.
 """
@@ -41,7 +41,8 @@ from polyester.services._scope import resolve_account_id
 from tests.hardening_support import HttpScript, MockHttpServer, ParsedRequest, make_test_credentials
 
 ZERO_STRINGS = ["0", "00", "1"]
-REFUSED = "must be a non-zero"
+# A base58 ID that decodes to 0, or a string that is not base58.
+REFUSED = "must be a (?:non-zero|base58)"
 
 
 def _refuse_all(_req: ParsedRequest) -> HttpScript:

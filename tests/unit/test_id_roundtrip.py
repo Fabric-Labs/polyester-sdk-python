@@ -30,14 +30,16 @@ def test_format_id_id_to_int_round_trip_0_to_200() -> None:
         assert id_to_int(format_id(value)) == value
 
 
-def test_pure_decimal_that_is_not_canonical_base58_parses_as_decimal() -> None:
-    # format_id(10) == "B" (not all-digit). "10" cannot be base58 (has '0'),
-    # so id_to_int must keep the decimal interpretation.
+def test_a_digit_only_string_is_base58_never_decimal() -> None:
+    # "10" has '0', which is not base58: refused, never read as decimal 10.
     assert not format_id(10).isdigit()
-    assert id_to_int("10") == 10
-
-    # "123" base58-decodes, but format_id(decoded) != "123", so stay decimal.
-    assert id_to_int("123") == 123
+    with pytest.raises(PolyesterValidationError):
+        id_to_int("10")
+    # "123" is base58 60, though format_id(60) is "23".
+    assert id_to_int("123") == 60
+    # The integer names the ID it is.
+    assert id_to_int(10) == 10
+    assert id_to_int(123) == 123
 
 
 def test_non_digit_ids_are_base58_only() -> None:

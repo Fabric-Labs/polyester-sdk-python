@@ -2,7 +2,7 @@
 read, statement export cancel and download URL, the server time and the
 timestamp window of a skew refusal, route supply status, partial wallet
 reads, ladder outcomes, preview price band limits, asset market datapoints,
-account activity fields, oversized RPC requests and the refusal codes the API
+account activity and the refusal codes the API
 now answers for triggers, OCOs and attached exits."""
 
 from __future__ import annotations
@@ -41,16 +41,11 @@ from polyester.codecs.orders import create_order_to_proto
 from polyester.codecs.scalars import format_id
 from polyester.codecs.triggers import modify_trigger_to_proto
 from polyester.errors import (
-    REQUEST_TOO_LARGE,
-    PolyesterApiError,
-    PolyesterRateLimitError,
     PolyesterRealtimeError,
     PolyesterResponseContractError,
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
     PolyesterValidationError,
-    is_request_too_large,
-    is_retryable_error,
 )
 from polyester.gen.auth.v1 import auth_pb2, subaccounts_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
@@ -575,32 +570,6 @@ def test_activity_event_names_its_sub_account_and_acting_key() -> None:
     assert (event.subaccount_id, event.actor_api_key_id) == (format_id(12), format_id(34))
     main = subaccount_activity_event_from_proto(subaccounts_pb2.ActivityEvent())
     assert (main.subaccount_id, main.actor_api_key_id) == ("", "")
-
-
-# --- oversized RPC requests ----------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "message",
-    [
-        "request too large",
-        "Request Too Large",
-        "message size 5242881 is larger than configured max 5242880",
-    ],
-)
-def test_oversized_rpc_request_is_refused_not_rate_limited(message: str) -> None:
-    error = map_connect_error(ConnectError(Code.RESOURCE_EXHAUSTED, message))
-    assert isinstance(error, PolyesterApiError)
-    assert not isinstance(error, PolyesterRateLimitError)
-    assert error.code == REQUEST_TOO_LARGE
-    assert is_request_too_large(error)
-    assert not is_retryable_error(error)
-
-
-def test_a_bare_rate_limit_stays_retryable() -> None:
-    error = map_connect_error(ConnectError(Code.RESOURCE_EXHAUSTED, "rate limit exceeded"))
-    assert isinstance(error, PolyesterRateLimitError)
-    assert is_retryable_error(error)
 
 
 # --- refusal codes for trigger, OCO and attached exit fields -------------------------------------

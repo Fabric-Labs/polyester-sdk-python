@@ -34,7 +34,6 @@ from polyester.errors import (
     AUTH_TEMPORARILY_UNAVAILABLE,
     AUTH_TIMESTAMP_SKEW,
     ORDER_PERMISSION_REFUSAL_CODES,
-    REQUEST_TOO_LARGE,
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
@@ -316,13 +315,6 @@ def _map_gateway_problem(exc: GatewayProblemError):
         cause_code=_error_code_from_rest(exc.cause_code) if exc.cause_code else None,
         level_index=exc.level_index,
     )
-
-
-# How the API, and the ConnectRPC library's read limit, name a request body
-# over the size limit in a ``resource_exhausted`` error without a detail.
-_OVERSIZED_REQUEST = re.compile(
-    r"^\s*request too large\s*$|larger than configured max", re.IGNORECASE
-)
 
 
 def retry_delay(error: BaseException, fallback: float) -> float:
@@ -648,11 +640,6 @@ def _map_connect_error(exc: ConnectError):
         )
     if code in ("unavailable", "internal"):
         return PolyesterServerError(error_message, code=future_code)
-    if code == "resource_exhausted" and _OVERSIZED_REQUEST.search(error_message):
-        # A request over the API's size limit, answered as gRPC answers an
-        # oversized message: not a rate limit. Nothing was processed, and the
-        # same request is refused again, so it is never retried.
-        return PolyesterApiError(error_message, code=REQUEST_TOO_LARGE)
     if code == "resource_exhausted":
         # A structured detail supplies the delay first; response headers
         # provide its fallback in map_connect_error.

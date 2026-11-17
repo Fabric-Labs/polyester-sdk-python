@@ -21,7 +21,15 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
-from polyester.codecs.refusal_codes import FEE_ASSET_NOT_ALLOWED, refusal_code
+from polyester.codecs.refusal_codes import (
+    BAD_PRICE,
+    FEE_ASSET_NOT_ALLOWED,
+    SLIPPAGE_TICKS_INVALID,
+    TRAILING_DISTANCE_INVALID,
+    TRIGGER_ACTIVATION_PRICE_INVALID,
+    TRIGGER_PRICE_INVALID,
+    refusal_code,
+)
 from polyester.codecs.scalars import (
     UINT32_MAX,
     FractionalDigitsError,
@@ -35,6 +43,7 @@ from polyester.codecs.scalars import (
     tick_count,
 )
 from polyester.codecs.triggers import (
+    _slippage_bps,
     self_trade_prevention_mode_to_proto,
     trigger_price_source_to_proto,
 )
@@ -937,10 +946,13 @@ def _trailing_stop_from_dict(
             data, field_name="attached_risk.trailing_stop"
         )
     )
-    if dist_ticks is not None:
-        proto.trailing_distance_ticks = tick_count(dist_ticks, "trailing_distance_ticks")
-    else:
-        proto.trailing_distance_bps = validate_bps(dist_bps, "trailing_distance_bps")
+    # A refused value carries the code a standalone trailing stop answers for
+    # the same mistake, as the API answers it for an attached one.
+    with refusal_code(TRAILING_DISTANCE_INVALID):
+        if dist_ticks is not None:
+            proto.trailing_distance_ticks = tick_count(dist_ticks, "trailing_distance_ticks")
+        else:
+            proto.trailing_distance_bps = validate_bps(dist_bps, "trailing_distance_bps")
 
     slip_ticks = _mapping_get(data, "max_slippage_ticks", "maxSlippageTicks")
     slip_bps = _mapping_get(data, "max_slippage_bps", "maxSlippageBps")
@@ -949,12 +961,12 @@ def _trailing_stop_from_dict(
             "trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps"
         )
     if slip_ticks is not None:
-        proto.max_slippage_ticks = tick_count(slip_ticks, "max_slippage_ticks")
+        with refusal_code(SLIPPAGE_TICKS_INVALID):
+            proto.max_slippage_ticks = tick_count(slip_ticks, "max_slippage_ticks")
     if slip_bps is not None:
-        # An attached trailing stop takes at most 9999 bps on either side.
-        proto.max_slippage_bps = validate_bps(
-            slip_bps, "max_slippage_bps", max_value=MAX_SELL_SLIPPAGE_BPS
-        )
+        # An attached trailing stop takes at most 9999 bps on either side: not
+        # positive is SLIPPAGE_BPS_INVALID, 10000 or more MAX_SLIPPAGE_INVALID.
+        proto.max_slippage_bps = _slippage_bps(slip_bps, max_value=MAX_SELL_SLIPPAGE_BPS)
 
     activation = _mapping_get(data, "activation_price", "activationPrice")
     activation_ticks = _mapping_get(data, "activation_price_ticks", "activationPriceTicks")
@@ -962,15 +974,16 @@ def _trailing_stop_from_dict(
         raise PolyesterValidationError(
             "trailing_stop accepts activation_price or activation_price_ticks, not both"
         )
-    if activation is not None:
-        proto.activation_price_ticks = _resolve_optional_price_ticks(
-            activation,
-            "attached_risk.trailing_stop.activation_price",
-            symbol=symbol,
-            field_path=f"{risk_field}.trailing_stop.activation_price_ticks",
-        )
-    elif activation_ticks is not None:
-        proto.activation_price_ticks = tick_count(activation_ticks, "activation_price_ticks")
+    with refusal_code(TRIGGER_ACTIVATION_PRICE_INVALID):
+        if activation is not None:
+            proto.activation_price_ticks = _resolve_optional_price_ticks(
+                activation,
+                "attached_risk.trailing_stop.activation_price",
+                symbol=symbol,
+                field_path=f"{risk_field}.trailing_stop.activation_price_ticks",
+            )
+        elif activation_ticks is not None:
+            proto.activation_price_ticks = tick_count(activation_ticks, "activation_price_ticks")
 
     # The most a buy-back exit pays per unit; the parent order's side decides
     # whether it is required (see risk_policy_from_dict).
@@ -1103,12 +1116,22 @@ def risk_policy_from_dict(
         risk.oco = oco
     if take_profit is not None:
         tp = _risk_leg_from_dict(
-            take_profit, field_name="take_profit", symbol=symbol, risk_field=risk_field
+            take_profit,
+            field_name="take_profit",
+            symbol=symbol,
+            risk_field=risk_field,
+            trigger_price_code=TRIGGER_PRICE_INVALID,
+            limit_price_code=BAD_PRICE,
         )
         risk.take_profit.CopyFrom(tp)
     if stop_loss is not None:
         sl = _risk_leg_from_dict(
-            stop_loss, field_name="stop_loss", symbol=symbol, risk_field=risk_field
+            stop_loss,
+            field_name="stop_loss",
+            symbol=symbol,
+            risk_field=risk_field,
+            trigger_price_code=TRIGGER_PRICE_INVALID,
+            limit_price_code=BAD_PRICE,
         )
         risk.stop_loss.CopyFrom(
             orders_pb2.StopLossPolicy(

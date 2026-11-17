@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from polyester.codecs.ledger_amounts import format_ledger_u128
-from polyester.codecs.proto_helpers import proto_enum_name
+from polyester.codecs.proto_helpers import optional_timestamp, proto_enum_name
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.zipper.v1 import zipper_pb2
 from polyester.models.zipper import (
@@ -16,6 +16,29 @@ from polyester.models.zipper import (
     ZipperChainContractConfig,
     ZipperTokenConfig,
 )
+
+# Statuses whose supply_q and observation time the contract sets.
+_KNOWN_SUPPLY_STATUSES = (zipper_pb2.AVAILABLE, zipper_pb2.STALE)
+
+
+def _supply(supply_q: int, status: int, msg, observed_field: str, scale: int) -> dict:
+    """A route's supply, its status label and observation time: the supply
+    and time only while the status says the supply is known."""
+    known = status in _KNOWN_SUPPLY_STATUSES
+    return {
+        "supply": format_ledger_u128(supply_q, scale=scale) if known else None,
+        "supply_status": proto_enum_name(zipper_pb2.SupplyStatus, status),
+        "supply_observed_at": optional_timestamp(msg, observed_field) if known else None,
+    }
+
+
+def _update_supply(item: zipper_pb2.ZippedAssetSupplyUpdate, scale: int) -> dict:
+    fields = _supply(item.supply_q, int(item.status), item, "observed_at", scale)
+    return {
+        "supply": fields["supply"],
+        "status": fields["supply_status"],
+        "observed_at": fields["supply_observed_at"],
+    }
 
 
 def _token_config(address: str, decimals: int) -> ZipperTokenConfig:
@@ -38,7 +61,7 @@ def _variant_from_proto(
         network_fee_ts_sec=0,
         deposit_min_amount=msg.deposit_min_amount or "",
         withdraw_min_amount=msg.withdraw_min_amount or "",
-        supply=format_ledger_u128(msg.supply_q, scale=quantity_scale),
+        **_supply(msg.supply_q, int(msg.supply_status), msg, "supply_observed_at", quantity_scale),
         source_token=_token_config(msg.source_address, msg.source_decimals),
         z_token=_token_config(msg.ztoken_address, msg.ztoken_decimals),
         deposit_status=proto_enum_name(zipper_pb2.RouteStatus, int(msg.deposit_status)),
@@ -123,7 +146,7 @@ def zipped_asset_supply_batch_from_proto(
         updates.append(
             ZippedAssetSupplyUpdate(
                 zipped_asset_id=int(item.zipped_asset_id),
-                supply=format_ledger_u128(item.supply_q, scale=scale),
+                **_update_supply(item, scale),
             )
         )
     return ZippedAssetSupplyBatch(updates=updates)

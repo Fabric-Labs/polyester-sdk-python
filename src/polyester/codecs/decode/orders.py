@@ -614,6 +614,9 @@ def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDet
         rate_limit=(
             rate_limit_detail_from_proto(msg.rate_limit) if msg.HasField("rate_limit") else None
         ),
+        price_band_limit=(
+            _price(msg.price_band_limit_ticks) if msg.HasField("price_band_limit_ticks") else None
+        ),
     )
 
 

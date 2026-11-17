@@ -5,6 +5,7 @@ from polyester.codecs.decode.balances import balances_list_from_proto
 from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.policies import subaccount_policy_from_proto
 from polyester.codecs.proto_helpers import (
+    format_optional_uint64_id,
     format_uint64_id,
     has_field,
     optional_timestamp,
@@ -148,6 +149,8 @@ def subaccount_activity_event_from_proto(
         user_agent=msg.user_agent,
         actor_account_id=format_uint64_id(msg.actor_account_id),
         payload_json=msg.payload_json,
+        subaccount_id=format_optional_uint64_id(int(msg.subaccount_id)),
+        actor_api_key_id=format_optional_uint64_id(int(msg.actor_api_key_id)),
     )
 
 

@@ -862,12 +862,19 @@ if detail.order is not None:
 ```
 
 A cancel of an order that has already ended, a repeat of the cancel that ended
-it included, raises `PolyesterApiError` `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
-`is_order_already_terminal(err)` tells it apart. Treat it as "already done"
-and read the order for how it ended. A client order ID names its order for at
-least a minute after the order ends; a later cancel by client order ID may
-read `ERROR_CODE_ORDER_UNKNOWN`, so retry by order ID once you have it. Every
-cancel, a repeat included, counts against the cancel rate limit.
+it included, raises `PolyesterApiError` `ERROR_CODE_ORDER_ALREADY_TERMINAL`
+(`failed_precondition`): `is_order_already_terminal(err)` tells it apart. Treat
+it as "already done" and read the order for how it ended. That answer is not
+guaranteed for every ended order: a client order ID names its order for at
+least a minute after the order ends, and an order ID while the exchange can
+still confirm it placed that order (exchange maintenance, such as a market
+listing or a recovery, can end that). After that, a cancel or modify answers
+`ERROR_CODE_ORDER_UNKNOWN` (`not_found`), as for an ID that was never placed.
+So `ERROR_CODE_ORDER_UNKNOWN` does not prove an order never existed: for an
+order you placed, read it with `orders.get` before treating it as lost, and
+treat it as done if it ended. Retrying a cancel by order ID does not tell an
+ended order from an unknown one. Every cancel, a repeat included, counts
+against the cancel rate limit.
 
 `cancel_all(...)` requests cancellation of every matching order. The result
 lists up to 200 of them, oldest first, in `cancelled_orders` (each with
@@ -1618,8 +1625,12 @@ SDK notes:
   the zTokens of the account's smart account wallet live from Polyester Chain
   (`smart_account_address`, and per balance `zipped_asset_id`,
   `unified_asset_id`, `chain_id`, `ztoken_address`, exact `amount_e18` and
-  `amount`). A withdrawal Zipper rejects is refunded there, net of its kept
-  fee: its lifecycle flow ends `refunded`. `account=` or `sub_account_id=`
+  `amount`). A read can be incomplete: `unavailable_assets` lists the zTokens
+  whose balance could not be read (`reason` `"no_contract"`, `"read_failed"` or
+  `"invalid_balance"`), and `is_complete` is false. Their balance is unknown,
+  not zero: show them as unavailable and leave them out of totals. A
+  withdrawal Zipper rejects is refunded there, net of its kept fee: its
+  lifecycle flow ends `refunded`. `account=` or `sub_account_id=`
   selects the account, as in [Choosing the account](#choosing-the-account). An
   API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
@@ -1792,6 +1803,26 @@ such a destination with the step reason `route_suspended`, leaving the funds for
 a later run. The config is cacheable for 10 seconds; read it again to see a
 suspension start or end.
 
+Each variant also says whether its zToken supply is known: `supply_status` is
+`"available"` (current), `"stale"` (not refreshed for longer than expected; may
+no longer be accurate) or `"missing"` (none known yet). `supply` (an exact
+decimal) and `supply_observed_at` are set only while the status is
+`"available"` or `"stale"`, and are `None` otherwise: an unknown supply is
+never 0. `variant.known_supply()` returns the supply only while it is known.
+`zipper.subscribe_zipped_asset_supply` updates carry the same `status` and
+`observed_at`; a route whose supply stops refreshing gets one `"stale"` update
+repeating its last value. A withdrawal to a network whose destination supply is
+missing or stale is refused with `ERROR_CODE_SUPPLY_UNAVAILABLE`, retryable;
+nothing was reserved.
+
+`destination_chain_id` in withdrawals and destination checks is the Polyester
+chain ID of the destination network, `chain_id` of a chain in
+`zipper.get_deposit_withdraw_config()`, not the network's native chain ID
+(`native_chain_id`, such as `11155111`). A native chain ID is refused as the
+caller's mistake: `validate_destination` answers `valid=False` with `code`
+`"unsupported_chain"`, and a withdrawal raises
+`ERROR_CODE_INVALID_DESTINATION_CHAIN`, not retryable.
+
 ## Public market data
 
 Public endpoints do not require an API key. Authenticated endpoints use the
@@ -1854,8 +1885,15 @@ an `editorial` with `description` (plain text), `website_url`,
 `github_url`, `issue_date` (`YYYY-MM-DD`, kept as text) and `issue_price`
 (`AssetIssuePrice` with an exact decimal `amount` and `currency` `"USD"`;
 `None` when unknown, distinct from a known zero), and `editorial_updated_at`.
-Empty strings and lists mean unknown. Assets never edited are omitted. It is
-public and sends no API key.
+Empty strings and lists mean unknown. `market_stats` (an `AssetMarketStats`,
+`None` when the asset has none) holds market datapoints: `circulating_supply`,
+`total_supply`, `max_supply`, `market_cap_usd`, `fully_diluted_market_cap_usd`
+and `rank`, each an `AssetMarketValue` with an exact decimal string `value`, its
+`source` (`"coinmarketcap"` or `"polyester"`) and `as_of`, or `None` when
+unknown; `max_supply_unlimited` is present when the source reports no maximum.
+Keep the values as decimals, never floats. An asset with datapoints and no
+team-written information is listed with an empty `editorial`; assets with
+neither are omitted. It is public and sends no API key.
 
 `orderbook.get(symbol=...)` returns a depth snapshot. When its `available` is
 `False`, the server is building the book or invalidated it: its levels are
@@ -2567,7 +2605,9 @@ single order (for example `ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`) and that order'
 zero-based index among the ladder's orders (`0` is the first). Both are `None`
 for every other error. `PolyesterApiError.retry_at` is when a refused X/Twitter or
 Discord link change (`AUTH_SOCIAL_ACCOUNT_COOLDOWN`,
-`AUTH_SOCIAL_CHANGE_LIMIT_REACHED`) may succeed.
+`AUTH_SOCIAL_CHANGE_LIMIT_REACHED`) may succeed. Before trying a change,
+`social_verification.get(provider=...)` returns `changeAvailableAt`, the same
+time, while the 30-day limit applies, and no value when a change is allowed now.
 
 `PolyesterApiError.violations` names the request fields to fix, each with
 `field_path`, `rule_id` and `message`: from the `orders.v1.ErrorDetail` of a

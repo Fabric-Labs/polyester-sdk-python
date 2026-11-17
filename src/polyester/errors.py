@@ -692,6 +692,12 @@ def is_order_already_terminal(err: BaseException) -> bool:
     has ended, by this cancel or otherwise (filled, expired, canceled),
     including a repeat of the cancel that ended it. Treat it as "already
     done" and read the order for how it ended.
+
+    It matches that code only. Once the exchange can no longer confirm an
+    ended order (by client order ID after at least a minute; by order ID
+    after some exchange maintenance), a cancel or modify of it raises
+    ``ERROR_CODE_ORDER_UNKNOWN`` instead, as for an ID never placed: for an
+    order the caller placed, read it and treat it as done if it ended.
     """
     return isinstance(err, PolyesterApiError) and err.code == ORDER_ALREADY_TERMINAL
 

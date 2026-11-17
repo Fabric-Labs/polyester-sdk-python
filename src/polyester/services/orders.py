@@ -399,6 +399,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         Does not return fee or quote-debit estimates. Accepts the same public
         create shape as :meth:`create`, a request or its keyword arguments;
         the wire request wraps an ``OrderIntent``.
+
+        A limit price past the market's price band previews
+        ``admissible=False`` with ``rejection.code``
+        ``ERROR_CODE_PRICE_BAND_VIOLATION`` and ``rejection.price_band_limit``,
+        the band edge it is past; :meth:`create` checks the band again. Previews
+        are rate limited (``orders.preview``, ``TRADING_READ``): one over the
+        limit raises :class:`~polyester.errors.PolyesterRateLimitError` and is
+        not evaluated, so debounce previews and back off instead of retrying
+        at once.
         """
         normalized = normalize_create_order_request(request, **kwargs)
         normalized = msgspec.structs.replace(
@@ -463,11 +472,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         (this one repeated) or otherwise, raises :class:`PolyesterApiError`
         ``ERROR_CODE_ORDER_ALREADY_TERMINAL``; :func:`is_order_already_terminal`
         tells it apart from other refusals. Treat it as "already done" and read
-        the order for how it ended. A client order ID names its order for at
-        least a minute after the order ends; after that a retry by client
-        order ID may read ``ERROR_CODE_ORDER_UNKNOWN``, so retry by order ID
-        once you have it. Every cancel, a repeat included, counts against the
-        cancel rate limit.
+        the order for how it ended. That answer is not guaranteed for every
+        ended order: a client order ID names its order for at least a minute
+        after the order ends, and an order ID while the exchange can still
+        confirm it placed that order. After that the cancel raises
+        ``ERROR_CODE_ORDER_UNKNOWN`` (``not_found``), as for an ID never
+        placed, so that code does not prove the order never existed: for an
+        order you placed, read it with :meth:`get` and treat it as done if it
+        ended. Retrying by order ID does not tell the two apart. Every cancel,
+        a repeat included, counts against the cancel rate limit.
         """
         if symbol is not None and symbol_id is not None:
             raise PolyesterValidationError("cancel accepts only one of symbol or symbol_id")

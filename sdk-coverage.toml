@@ -84,7 +84,7 @@ reason = "Root portfolio equity history requires an interactive root-account ses
 
 [[allowlist]]
 procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot"
-reason = "Root portfolio equity snapshot requires an interactive root-account session; API keys and subaccount-scoped sessions are not supported."
+reason = "Not wrapped in this SDK yet. The root portfolio equity snapshot accepts a root-account session or, on devnet, a root-scoped API key with READ_BALANCES; subaccount-scoped keys and sessions are not supported."
 
 [[allowlist]]
 procedure = "/auth.v1.AuthService/AcceptTerms"
@@ -168,4 +168,12 @@ reason = "Quick Swap referrals authenticate with an interactive session; Quick S
 
 [[allowlist]]
 service = "notifications.v1.NotificationService"
-reason = "The notification center is not part of the trading SDK surface yet."
+reason = "The notification center is not part of the trading SDK surface yet. Its reads accept a main-account API key with READ_NOTIFICATIONS; the mark calls require an interactive session."
+
+[[allowlist]]
+service = "auth.v1.AccountActivityService"
+reason = "Not wrapped in this SDK yet. ListAccountActivity accepts an API key with READ_ACCOUNT_ACTIVITY; sub_accounts.list_activity reads one sub-account's activity."
+
+[[allowlist]]
+service = "swap.quickswap.v1.QuickSwapExplorerService"
+reason = "The public Quick Swap explorer is outside the trading SDK surface, like the rest of Quick Swap."

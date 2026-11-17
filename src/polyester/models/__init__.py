@@ -25,7 +25,14 @@ from polyester.models.address_book import (
     TransferCounterparty,
     WithdrawWhitelistView,
 )
-from polyester.models.asset_info import AssetEditorialInfo, AssetInfo, AssetIssuePrice
+from polyester.models.asset_info import (
+    AssetEditorialInfo,
+    AssetInfo,
+    AssetIssuePrice,
+    AssetMarketFlag,
+    AssetMarketStats,
+    AssetMarketValue,
+)
 from polyester.models.auth import (
     Ed25519Keypair,
     MeResult,
@@ -226,6 +233,7 @@ from polyester.models.trading import (
     TriggerStopDetails,
     TriggerTrailingDetails,
     TriggerTwapDetails,
+    UnavailableWalletAsset,
     UserTrade,
     UserTradesList,
     WalletBalance,
@@ -465,6 +473,9 @@ __all__ = [
     "AssetEditorialInfo",
     "AssetInfo",
     "AssetIssuePrice",
+    "AssetMarketFlag",
+    "AssetMarketStats",
+    "AssetMarketValue",
     "ChangelogPostSummary",
     "ChangelogPostsPage",
     "ChangelogSection",
@@ -475,6 +486,7 @@ __all__ = [
     "VIPMetricQuality",
     "UsernameHistoryEntry",
     "UsernameHistoryList",
+    "UnavailableWalletAsset",
     "WalletBalance",
     "WalletBalances",
     "WithdrawDestinationValidation",

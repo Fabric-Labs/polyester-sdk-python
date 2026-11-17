@@ -205,6 +205,11 @@ def _trigger_details(
                     triggers_pb2.LadderDistribution, ladder.ladder_distribution
                 ),
                 executed_levels=int(ladder.executed_levels),
+                requested_levels=int(ladder.requested_levels),
+                placed_levels=int(ladder.placed_levels),
+                rejected_levels=int(ladder.rejected_levels),
+                canceled_levels=int(ladder.canceled_levels),
+                outcome=_ladder_outcome(int(ladder.outcome)),
                 executed_qty=(
                     Quantity.from_scaled(
                         executed_scaled,
@@ -588,3 +593,13 @@ def trigger_events_list_from_proto(
         events=[trigger_event_from_proto(item) for item in msg.events],
         next_page_token=msg.next_page_token,
     )
+
+
+def _ladder_outcome(value: int) -> str:
+    """A ``LadderOutcome`` as a lowercase label; "" while the ladder runs."""
+    if value == 0:
+        return ""
+    try:
+        return str(triggers_pb2.LadderOutcome.Name(value)).lower()
+    except ValueError:
+        return str(value)

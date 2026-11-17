@@ -418,9 +418,18 @@ class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class OrderErrorDetail(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Why an order would be refused (``PreviewOrderResult.rejection``).
+
+    ``price_band_limit`` is set only on a preview refused with
+    ``ERROR_CODE_PRICE_BAND_VIOLATION``: the band limit the order's limit price
+    is past, the highest admitted price for a buy and the lowest for a sell,
+    as the market last published its band. ``None`` otherwise.
+    """
+
     code: str = ""
     violations: list[OrderFieldViolation] = []
     rate_limit: RateLimitDetail | None = None
+    price_band_limit: Price | None = None
 
 
 class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -643,12 +652,31 @@ class TriggerTwapDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class TriggerLadderDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A ladder trigger's levels and how their placement went.
+
+    ``requested_levels`` counts the child orders the ladder requested, one per
+    level; ``placed_levels`` those placed on the book, open ones included;
+    ``rejected_levels`` those rejected before they were placed; and
+    ``canceled_levels`` placed ones canceled or expired, partly filled or not
+    (when the ladder itself ends, its open child orders count here). A placed
+    child rejected after a partial fill counts as neither rejected nor
+    canceled. ``outcome`` is ``"all_admitted"``, ``"mixed_rejections"`` or
+    ``"all_children_rejected"`` once the ladder has ended, "" while it runs
+    (and for a ladder rejected at its creation); an outcome this SDK does not
+    know reads as its decimal string.
+    """
+
     ladder_price_min: Price | None = None
     ladder_price_max: Price | None = None
     ladder_levels: int = 0
     ladder_distribution: str = ""
     executed_levels: int = 0
     executed_qty: Quantity | None = None
+    requested_levels: int = 0
+    placed_levels: int = 0
+    rejected_levels: int = 0
+    canceled_levels: int = 0
+    outcome: str = ""
 
 
 class TriggerDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -1305,10 +1333,43 @@ class WalletBalance(msgspec.Struct, kw_only=True, omit_defaults=True):
         return Decimal(format_qty_scaled(int(self.amount_e18 or 0), 18))
 
 
+class UnavailableWalletAsset(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A zToken whose balance a wallet read could not read: its balance is
+    unknown, not zero, and the wallet may hold some of it.
+
+    ``reason`` is ``"no_contract"`` (no zToken contract exists at
+    ``ztoken_address`` on Polyester Chain), ``"read_failed"`` (the chain
+    answered the read with an error) or ``"invalid_balance"`` (the read
+    returned a value that is not a valid balance); "" when the server names
+    none, and a reason this SDK does not know reads as its decimal string.
+    """
+
+    zipped_asset_id: int = 0
+    unified_asset_id: int = 0
+    chain_id: int = 0
+    ztoken_address: str = ""
+    reason: str = ""
+
+
 class WalletBalances(msgspec.Struct, kw_only=True, omit_defaults=True):
     """zTokens held by the account's smart account wallet, read live from
     Polyester Chain, such as the refund of a rejected withdrawal. Ordered by
-    ``zipped_asset_id``."""
+    ``zipped_asset_id``.
+
+    A read can be incomplete: ``unavailable_assets`` lists, by
+    ``zipped_asset_id``, the zTokens whose balance could not be read. An asset
+    missing from ``balances`` is held at zero only when the read
+    :attr:`is_complete`; otherwise it may be in ``unavailable_assets``, with
+    an unknown balance. Show those as unavailable, never as zero, leave them
+    out of any total, and decide nothing that depends on their balance until
+    a later read returns it.
+    """
 
     smart_account_address: str = ""
     balances: list[WalletBalance] = msgspec.field(default_factory=list)
+    unavailable_assets: list[UnavailableWalletAsset] = msgspec.field(default_factory=list)
+
+    @property
+    def is_complete(self) -> bool:
+        """True when every zToken's balance was read."""
+        return not self.unavailable_assets

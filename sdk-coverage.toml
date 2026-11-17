@@ -171,9 +171,5 @@ service = "notifications.v1.NotificationService"
 reason = "The notification center is not part of the trading SDK surface yet. Its reads accept a main-account API key with READ_NOTIFICATIONS; the mark calls require an interactive session."
 
 [[allowlist]]
-service = "auth.v1.AccountActivityService"
-reason = "Not wrapped in this SDK yet. ListAccountActivity accepts an API key with READ_ACCOUNT_ACTIVITY; sub_accounts.list_activity reads one sub-account's activity."
-
-[[allowlist]]
 service = "swap.quickswap.v1.QuickSwapExplorerService"
 reason = "The public Quick Swap explorer is outside the trading SDK surface, like the rest of Quick Swap."

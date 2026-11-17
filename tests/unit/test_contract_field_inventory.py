@@ -31,6 +31,7 @@ from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.lifecycle import AsyncLifecycleService
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.statements import AsyncStatementsService
+from polyester.services.sub_accounts import AsyncSubAccountsService
 
 INVENTORY = Path(__file__).parents[2] / "testdata" / "contract_field_inventory.tsv"
 
@@ -73,6 +74,8 @@ MESSAGES = [
     "transfer.v1.DustConversion",
     # Public contract 0.93.5.
     "auth.v1.TimestampWindow",
+    "auth.v1.ListAccountActivityRequest",
+    "auth.v1.ListAccountActivityResponse",
     "chain.withdraw.v1.GetWalletBalancesResponse",
     "chain.withdraw.v1.UnavailableWalletAsset",
     "chain.zipper.v1.ZippedAssetSupplyUpdate",
@@ -98,6 +101,7 @@ METHODS = {
     "statements.cancel_export": AsyncStatementsService.cancel_export,
     "statements.get_export_download_url": AsyncStatementsService.get_export_download_url,
     "internal_transfers.get_batch": AsyncInternalTransfersService.get_batch,
+    "sub_accounts.list_account_activity": AsyncSubAccountsService.list_account_activity,
     "dust_conversions.list_balances": AsyncDustConversionsService.list_balances,
     "dust_conversions.quote": AsyncDustConversionsService.quote,
     "dust_conversions.convert": AsyncDustConversionsService.convert,

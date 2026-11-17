@@ -116,6 +116,20 @@ async with subscription:
             known[update.id] = update  # update.role: "viewer", "trader", ...
 ```
 
+`sub_accounts.list_account_activity(...)` returns one page of the security and
+activity history of the main account and every sub-account the caller may
+read, newest first; `iter_account_activity(...)` follows every page with the
+same filters. Filter by `sub_account_ids` and `include_main_account` (alone, it
+lists only the main account's own events, which carry no `subaccount_id`),
+`entity_kinds` (`"session"`, `"api_key"`, ...), `event_actions` (`"created"`,
+`"failed"`, ...), `sources`, `api_key_id`, and a timezone-aware `start_time`
+(inclusive) and `end_time` (exclusive). A filter the contract refuses (an
+unknown label, a repeated value or ID, too many values, an empty range) raises
+`PolyesterValidationError` before sending. Each event names its `subaccount_id`
+and, when the actor used an API key, `actor_api_key_id`. A wallet sign-in is a
+`"session"` event, `"created"` or `"failed"`. An API key needs
+`READ_ACCOUNT_ACTIVITY`.
+
 Private streams require an Account ID and the corresponding API-key permission.
 A successful subscribe call means the token exchange and realtime handshake
 completed. The connection and subscription tokens are renewed on the same
@@ -336,10 +350,11 @@ grants exactly its reads: `READ_API_KEYS` (`api_keys.list`, `api_keys.get`),
 (`trading_withdraws.validate_destination`). `READ_API_POLICIES`,
 `READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`, `READ_PROFILE`,
 `READ_ACCOUNT_DIRECTORY`, `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`,
-`READ_CHECKPOINTS`, `READ_REWARDS`, `READ_ACCOUNT_ACTIVITY` (the activity feed
-of the main account and its sub-accounts; `READ_SUBACCOUNT_ACTIVITY` does not
-open it) and `READ_NOTIFICATIONS` (notification reads, on a key scoped to the
-main account) open calls this SDK does not wrap yet.
+`READ_CHECKPOINTS`, `READ_REWARDS` and `READ_NOTIFICATIONS` (notification
+reads, on a key scoped to the main account) open calls this SDK does not wrap
+yet. `READ_ACCOUNT_ACTIVITY` opens `sub_accounts.list_account_activity` and
+`iter_account_activity`, the activity feed of the main account and its
+sub-accounts; `READ_SUBACCOUNT_ACTIVITY` does not open it.
 Deposit addresses, sub-accounts and Guard Signer status need one too:
 `CREATE_DEPOSIT_ADDRESS` (`deposit.create_address`), `READ_DEPOSIT_ADDRESSES`
 (`deposit.list_addresses`), `READ_SUBACCOUNTS` (`sub_accounts.list`,

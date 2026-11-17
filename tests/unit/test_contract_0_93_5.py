@@ -746,3 +746,124 @@ def test_refused_upgrade_without_a_problem_keeps_only_its_status(body: bytes) ->
     )
     assert isinstance(error, PolyesterRealtimeError)
     assert (error.code, error.problem, error.status_code) == (None, None, 426)
+
+
+# --- account activity ----------------------------------------------------------------------------
+
+
+async def test_list_account_activity_sends_every_filter_exactly() -> None:
+    from polyester.gen.auth.v1 import activity_pb2
+
+    reply = activity_pb2.ListAccountActivityResponse(
+        events=[subaccounts_pb2.ActivityEvent(subaccount_id=12, actor_api_key_id=34)],
+        next_page_token="next",
+    )
+    start = datetime(2026, 11, 1, tzinfo=UTC)
+    end = datetime(2026, 11, 17, 0, 0, 0, 123456, tzinfo=UTC)
+    async with _client(_ok(reply)) as (client, requests):
+        page = await client.sub_accounts.list_account_activity(
+            sub_account_ids=[format_id(12), 13],
+            include_main_account=True,
+            entity_kinds=["session", "ACTIVITY_ENTITY_API_KEY"],
+            event_actions=["created", "failed"],
+            sources=["api"],
+            api_key_id=format_id(34),
+            start_time=start,
+            end_time=end,
+            limit=200,
+            page_token="tok",
+        )
+    (request,) = requests
+    assert request.path == "/auth.v1.AccountActivityService/ListAccountActivity"
+    assert request.headers.get("x-api-signature")
+    sent = activity_pb2.ListAccountActivityRequest.FromString(request.body)
+    assert list(sent.subaccount_ids) == [12, 13] and sent.include_main_account
+    assert list(sent.entity_kinds) == [
+        subaccounts_pb2.ACTIVITY_ENTITY_SESSION,
+        subaccounts_pb2.ACTIVITY_ENTITY_API_KEY,
+    ]
+    assert list(sent.event_actions) == [
+        subaccounts_pb2.ACTIVITY_ACTION_CREATED,
+        subaccounts_pb2.ACTIVITY_ACTION_FAILED,
+    ]
+    assert list(sent.sources) == [subaccounts_pb2.ACTIVITY_SOURCE_API]
+    assert sent.api_key_id == 34
+    assert sent.start_time.ToDatetime(tzinfo=UTC) == start
+    assert sent.end_time.ToDatetime(tzinfo=UTC) == end
+    assert (sent.limit, sent.page_token) == (200, "tok")
+    (event,) = page.events
+    assert (event.subaccount_id, event.actor_api_key_id) == (format_id(12), format_id(34))
+    assert page.next_page_token == "next"
+
+
+async def test_list_account_activity_sends_no_filter_when_none_is_given() -> None:
+    from polyester.gen.auth.v1 import activity_pb2
+
+    async with _client(_ok(activity_pb2.ListAccountActivityResponse())) as (client, requests):
+        await client.sub_accounts.list_account_activity()
+    sent = activity_pb2.ListAccountActivityRequest.FromString(requests[0].body)
+    assert sent == activity_pb2.ListAccountActivityRequest()
+
+
+_START = datetime(2026, 11, 1, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"sub_account_ids": [0]},
+        {"sub_account_ids": [""]},
+        {"sub_account_ids": ["12", "12"]},
+        {"sub_account_ids": [12, 12]},
+        {"sub_account_ids": list(range(1, 102))},
+        {"sub_account_ids": "abc"},
+        {"include_main_account": 1},
+        {"entity_kinds": ["unspecified"]},
+        {"entity_kinds": ["nope"]},
+        {"entity_kinds": ["session", "SESSION"]},
+        {"entity_kinds": "session"},
+        {"event_actions": [""]},
+        {"sources": ["ápi"]},
+        {"api_key_id": 0},
+        {"api_key_id": ""},
+        {"start_time": datetime(2026, 11, 1)},
+        {"start_time": _START, "end_time": _START},
+        {"limit": 0},
+        {"limit": 201},
+        {"limit": True},
+        {"page_token": "x" * 513},
+    ],
+)
+async def test_list_account_activity_refuses_what_the_contract_refuses(kwargs) -> None:
+    from polyester.gen.auth.v1 import activity_pb2
+
+    async with _client(_ok(activity_pb2.ListAccountActivityResponse())) as (client, requests):
+        with pytest.raises(PolyesterValidationError):
+            await client.sub_accounts.list_account_activity(**kwargs)
+    assert requests == []
+
+
+async def test_iter_account_activity_follows_pages_with_the_same_filters() -> None:
+    from polyester.gen.auth.v1 import activity_pb2
+
+    pages = {
+        "": activity_pb2.ListAccountActivityResponse(
+            events=[subaccounts_pb2.ActivityEvent(subaccount_id=1)], next_page_token="p2"
+        ),
+        "p2": activity_pb2.ListAccountActivityResponse(
+            events=[subaccounts_pb2.ActivityEvent(subaccount_id=2)]
+        ),
+    }
+
+    def answer(req: ParsedRequest) -> HttpScript:
+        sent = activity_pb2.ListAccountActivityRequest.FromString(req.body)
+        return connect_proto_response(pages[sent.page_token].SerializeToString())
+
+    async with _client(answer) as (client, requests):
+        events = [
+            event
+            async for event in client.sub_accounts.iter_account_activity(sources=["api"])
+        ]
+    assert [event.subaccount_id for event in events] == [format_id(1), format_id(2)]
+    sent = [activity_pb2.ListAccountActivityRequest.FromString(r.body) for r in requests]
+    assert [list(s.sources) for s in sent] == [[subaccounts_pb2.ACTIVITY_SOURCE_API]] * 2

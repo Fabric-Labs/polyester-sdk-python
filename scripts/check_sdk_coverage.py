@@ -645,6 +645,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "any_services": [
             "auth.v1.SubaccountService",
             "auth.v1.SubaccountViewService",
+            "auth.v1.AccountActivityService",
         ],
     },
     {

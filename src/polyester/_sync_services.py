@@ -726,7 +726,9 @@ class SyncSubAccountsService(_SyncSubscribeService):
     """``Polyester`` view of :class:`~polyester.services.AsyncSubAccountsService`."""
 
     get = call(AsyncSubAccountsService.get)
+    iter_account_activity = iterate(AsyncSubAccountsService.iter_account_activity)
     list = call(AsyncSubAccountsService.list)
+    list_account_activity = call(AsyncSubAccountsService.list_account_activity)
     list_activity = call(AsyncSubAccountsService.list_activity)
     list_invites = call(AsyncSubAccountsService.list_invites)
     list_members = call(AsyncSubAccountsService.list_members)

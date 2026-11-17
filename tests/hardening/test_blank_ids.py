@@ -140,8 +140,12 @@ async def test_open_flows_without_an_account_id_is_the_public_feed(monkeypatch) 
         routed.append(channel)
         return "public"
 
-    async def private(_realtime: Any, *, channel_template: str, account_id: Any, **_: Any) -> str:
-        routed.append(channel_template.format(account_id=account_id))
+    async def private(
+        _realtime: Any, *, channel_template: str, account_id: Any, default_account_id: Any, **_: Any
+    ) -> str:
+        # As the real one resolves it before subscribing.
+        resolved = resolve_account_id(account_id, default_account_id)
+        routed.append(channel_template.format(account_id=resolved))
         return "private"
 
     monkeypatch.setattr(lifecycle_module, "subscribe_public_proto", public)
@@ -251,4 +255,25 @@ async def test_a_flow_id_is_still_sent(call: Any) -> None:
     async with zero_id_client() as (client, http):
         with pytest.raises(PolyesterRouteNotFoundError):
             await call(client)
+        assert http.request_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blank", [*BLANKS, " 0x" + "ab" * 20, "0x" + "ab" * 20 + " "])
+async def test_blank_smart_account_address_filter_is_refused_not_dropped(blank: str) -> None:
+    async with zero_id_client() as (client, http):
+        before = http.request_count
+        with pytest.raises(PolyesterValidationError, match="smart_account_address"):
+            await client.lifecycle.list_flows(smart_account_address=blank)
+        assert http.request_count == before, "a request was sent"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("address", [None, "0x" + "ab" * 20])
+async def test_an_absent_or_valid_smart_account_address_filter_still_sends(
+    address: str | None,
+) -> None:
+    async with zero_id_client() as (client, http):
+        with pytest.raises(PolyesterRouteNotFoundError):
+            await client.lifecycle.list_flows(smart_account_address=address)
         assert http.request_count == 1

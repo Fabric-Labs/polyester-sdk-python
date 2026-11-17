@@ -25,6 +25,7 @@ def test_deposit_withdraw_config_from_proto_normalizes_supply_and_tokens() -> No
                         zipped_asset_id=7,
                         chain_id=1,
                         supply_q=1_500_000,
+                        supply_status=zipper_pb2.AVAILABLE,
                         source_address="0xsource",
                         source_decimals=6,
                         ztoken_address="0xz",

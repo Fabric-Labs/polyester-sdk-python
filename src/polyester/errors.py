@@ -428,7 +428,7 @@ class PolyesterTimestampSkewError(PolyesterTransportError):
     :class:`~polyester.models.ServerTime`) is the server time of the refusal
     and the window it applied, ``None`` when the answer names none; measure
     the offset of this host's clock from ``timestamp_window.server_time_ms``
-    or from ``system.get_time()``. For large bursts, bound concurrency so
+    or from ``client.get_time()``. For large bursts, bound concurrency so
     requests do not wait locally past the skew window.
     """
 
@@ -776,8 +776,11 @@ class PolyesterRealtimeError(PolyesterError):
     """Raised for realtime connection, subscription, or decode failures.
 
     ``code`` is the private WebSocket request error code (for example
-    ``FORBIDDEN``); ``close_code`` is the WebSocket close code that ended the
-    stream (for example ``4403``). Both are ``None`` when not applicable.
+    ``FORBIDDEN``), or for a refused WebSocket upgrade the ``code`` of the
+    problem body the server answered (for example
+    ``TOO_MANY_SESSIONS_API_KEY``), with the whole body in ``problem``;
+    ``close_code`` is the WebSocket close code that ended the stream (for
+    example ``4403``). Both are ``None`` when not applicable.
     """
 
     def __init__(

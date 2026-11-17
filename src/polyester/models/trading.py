@@ -420,8 +420,8 @@ class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
 class OrderErrorDetail(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Why an order would be refused (``PreviewOrderResult.rejection``).
 
-    ``price_band_limit`` is set only on a preview refused with
-    ``ERROR_CODE_PRICE_BAND_VIOLATION``: the band limit the order's limit price
+    ``price_band_limit`` is set only on a preview refused with ``code``
+    ``"PRICE_BAND_VIOLATION"``: the band limit the order's limit price
     is past, the highest admitted price for a buy and the lowest for a sell,
     as the market last published its band. ``None`` otherwise.
     """

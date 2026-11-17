@@ -336,7 +336,10 @@ grants exactly its reads: `READ_API_KEYS` (`api_keys.list`, `api_keys.get`),
 (`trading_withdraws.validate_destination`). `READ_API_POLICIES`,
 `READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`, `READ_PROFILE`,
 `READ_ACCOUNT_DIRECTORY`, `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`,
-`READ_CHECKPOINTS` and `READ_REWARDS` open calls this SDK does not wrap yet.
+`READ_CHECKPOINTS`, `READ_REWARDS`, `READ_ACCOUNT_ACTIVITY` (the activity feed
+of the main account and its sub-accounts; `READ_SUBACCOUNT_ACTIVITY` does not
+open it) and `READ_NOTIFICATIONS` (notification reads, on a key scoped to the
+main account) open calls this SDK does not wrap yet.
 Deposit addresses, sub-accounts and Guard Signer status need one too:
 `CREATE_DEPOSIT_ADDRESS` (`deposit.create_address`), `READ_DEPOSIT_ADDRESSES`
 (`deposit.list_addresses`), `READ_SUBACCOUNTS` (`sub_accounts.list`,
@@ -345,11 +348,13 @@ Deposit addresses, sub-accounts and Guard Signer status need one too:
 `sub_accounts.get`), `READ_SUBACCOUNT_INVITES` (`sub_accounts.list_invites`, and
 the invites of `sub_accounts.get`) and `READ_GUARD_SIGNER_STATUS`
 (`guard_signer.get_status`). Account statements need `READ_STATEMENTS`
-(every `statements` call);
-`CONVERT_DUST` converts dust (`dust_conversions.quote`, `dust_conversions.convert`, the
-conversion reads) and `READ_FUNDING_FLOWS` reads the account's own flows
-(`lifecycle.list_account_flows`, `lifecycle.get_account_flow`); `READ_BALANCES` and
-`READ_INTERNAL_TRANSFERS` do not grant it. A key scoped to the main account reaches the main
+(every `statements` call). `CONVERT_DUST` converts dust (`dust_conversions.quote`,
+`dust_conversions.convert`, the conversion reads) and `READ_FUNDING_FLOWS` reads the
+account's own flows (`lifecycle.list_account_flows`, `lifecycle.get_account_flow`);
+`READ_BALANCES` and `READ_INTERNAL_TRANSFERS` do not grant it. These two are product
+actions, valid on sub-account policies too: every sub-account policy includes
+`READ_FUNDING_FLOWS`, and converting a sub-account's dust with an API key needs
+`CONVERT_DUST` on both the key's policy and the sub-account's. A key scoped to the main account reaches the main
 account and the sub-accounts it owns; a key scoped to a sub-account reaches only
 that sub-account. `sub_accounts.get` leaves out the members and invites a key
 may not read instead of failing. The main account's address book needs
@@ -357,7 +362,7 @@ may not read instead of failing. The main account's address book needs
 account, as a sub-account's book already did. `guard_signer.get_status` no
 longer answers an API key for a sub-account another main account shares with
 yours; use a key of the owning main account.
-These permissions are valid on API-key policies only. VIP status and social
+The other permissions above are valid on API-key policies only. VIP status and social
 verification refuse a key scoped to a sub-account. A key without the permission
 raises `PolyesterApiError` whose `auth_error_code(err)` is
 `AUTH_API_KEY_ACCESS_DENIED`; its message names the missing permission. Policy
@@ -1109,6 +1114,17 @@ sent). It needs no API key and sends none. A build made after a release reads
 like `0.10.0-12-g4e21a2f09670`, which is not a semantic version: `release` is
 the part before the first `-`, the release it follows.
 
+`await client.get_time()` returns the API's clock as `ServerTime`:
+`server_time_ms` (milliseconds since the Unix epoch) and `server_time`. It is
+the clock that checks the timestamp of requests signed with an API key, which
+the API accepts while it is at most 1000 ms ahead of the server time and at
+most the receive window (5000 ms unless the client sets another) behind it. It
+needs no API key and is never cached. A request outside that window raises
+`PolyesterTimestampSkewError`, retryable; its `timestamp_window` is a
+`ServerTime` with the server time of the refusal, `recv_window_ms` and
+`max_future_ms` (`None` when the answer names none), so a client can measure
+its clock's offset from the refusal alone.
+
 ## Status events
 
 `await client.list_status_events()` returns the environment's scheduled
@@ -1199,8 +1215,14 @@ raises `PolyesterApiError` whose `auth_error_code(err)` is
   idempotency_key=None)`: `direction` `"above"` fires at a price >= `price`,
   `"below"` at a price <= `price`. `price_source` is `"last"` or `"index"`;
   `None` watches the index price where the market has one and the last price
-  otherwise. `channels` names one or two of `"in_app"` and `"telegram"`. The
-  current price is recorded as `reference_price`; an alert whose condition
+  otherwise. `channels` names one or two of `"in_app"` and `"telegram"`.
+  `"telegram"` needs a Telegram account linked to the account: without one,
+  `create` (and an `update` that leaves the alert with Telegram) raises
+  `PolyesterApiError` `TELEGRAM_NOT_LINKED` and nothing changes; where Telegram
+  alerts are not offered (testnet has in-app alerts only) it raises
+  `TELEGRAM_UNAVAILABLE`, so offer the alert in-app only. Neither is retryable.
+  A Telegram message that cannot be delivered puts the fired alert in the
+  notification inbox. The current price is recorded as `reference_price`; an alert whose condition
   already holds starts with `armed` false and fires only after the price moves
   back and crosses again. Name the market with `symbol=`, `symbol_id=` or both.
   A `Price` bound to a market (`Price.from_ticks(..., symbol="ETH-USDT")`) is

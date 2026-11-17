@@ -401,8 +401,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         the wire request wraps an ``OrderIntent``.
 
         A limit price past the market's price band previews
-        ``admissible=False`` with ``rejection.code``
-        ``ERROR_CODE_PRICE_BAND_VIOLATION`` and ``rejection.price_band_limit``,
+        ``admissible=False`` with ``rejection.code`` ``"PRICE_BAND_VIOLATION"``
+        and ``rejection.price_band_limit``,
         the band edge it is past; :meth:`create` checks the band again. Previews
         are rate limited (``orders.preview``, ``TRADING_READ``): one over the
         limit raises :class:`~polyester.errors.PolyesterRateLimitError` and is

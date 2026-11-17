@@ -246,7 +246,7 @@ def _oco(**overrides: Any):
 @pytest.mark.parametrize(
     ("overrides", "code"),
     [
-        ({"qty": "0"}, "ERROR_CODE_BAD_QTY"),
+        ({"qty": "0"}, "ERROR_CODE_TRIGGER_QTY_INVALID"),
         ({"take_profit": {"trigger_price": "-1"}}, "ERROR_CODE_TRIGGER_PRICE_INVALID"),
         ({"stop_loss": {"trigger_price_ticks": 0}}, "ERROR_CODE_TRIGGER_PRICE_INVALID"),
         (

@@ -15,7 +15,7 @@ class ServerTime(msgspec.Struct, kw_only=True, frozen=True):
     <polyester.errors.PolyesterTimestampSkewError.timestamp_window>`) the
     server also names the window it applied: a timestamp is accepted while it
     is at most ``max_future_ms`` ahead of ``server_time_ms`` and at most
-    ``recv_window_ms`` behind it. Both are ``None`` from ``get_time``.
+    ``recv_window_ms`` behind it. Both are ``None`` from ``client.get_time()``.
     """
 
     server_time_ms: int

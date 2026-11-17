@@ -23,18 +23,23 @@ CONFIG_JSON = """
   "assets": [
     {"asset": "BONK", "ledgerId": 45, "variants": [
       {"zippedAssetId": 245, "chainId": 1, "supplyQ": "3582802",
+       "supplyStatus": "AVAILABLE",
        "sourceDecimals": 18, "ztokenDecimals": 18}]},
     {"asset": "SHIB", "ledgerId": 47, "variants": [
       {"zippedAssetId": 247, "chainId": 1, "supplyQ": "2232802",
+       "supplyStatus": "AVAILABLE",
        "sourceDecimals": 18, "ztokenDecimals": 18}]},
     {"asset": "USDT", "ledgerId": 11, "quantityScale": 6, "variants": [
       {"zippedAssetId": 3, "chainId": 1, "supplyQ": "1500000",
+       "supplyStatus": "AVAILABLE",
        "sourceDecimals": 6, "ztokenDecimals": 18}]},
     {"asset": "BTC", "ledgerId": 12, "quantityScale": 8, "variants": [
       {"zippedAssetId": 1, "chainId": 1, "supplyQ": "150000000",
+       "supplyStatus": "AVAILABLE",
        "sourceDecimals": 8, "ztokenDecimals": 18}]},
     {"asset": "ETH", "ledgerId": 13, "quantityScale": 18, "variants": [
       {"zippedAssetId": 13, "chainId": 1, "supplyQ": "1500000000000000000",
+       "supplyStatus": "AVAILABLE",
        "sourceDecimals": 0, "ztokenDecimals": 18}]}
   ]
 }
@@ -94,7 +99,9 @@ def test_live_supply_batch_reads_zero_scale_supply_as_whole_units() -> None:
     catalogs.hydrate_zipper_config(deposit_withdraw_config_from_proto(_config_proto()))
     batch = zipper_pb2.ZippedAssetSupplyBatch(
         updates=[
-            zipper_pb2.ZippedAssetSupplyUpdate(zipped_asset_id=zid, supply_q=q)
+            zipper_pb2.ZippedAssetSupplyUpdate(
+                zipped_asset_id=zid, supply_q=q, status=zipper_pb2.AVAILABLE
+            )
             for zid, q in [
                 (245, 3_582_802),
                 (247, 2_232_802),

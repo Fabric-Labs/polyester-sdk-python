@@ -71,6 +71,22 @@ MESSAGES = [
     "transfer.v1.DustAssetPrice",
     "transfer.v1.DustSource",
     "transfer.v1.DustConversion",
+    # Public contract 0.93.5.
+    "auth.v1.TimestampWindow",
+    "chain.withdraw.v1.GetWalletBalancesResponse",
+    "chain.withdraw.v1.UnavailableWalletAsset",
+    "chain.zipper.v1.ZippedAssetSupplyUpdate",
+    "ledger.read.v1.CancelStatementExportRequest",
+    "ledger.read.v1.CancelStatementExportResponse",
+    "ledger.read.v1.GetStatementExportDownloadUrlRequest",
+    "ledger.read.v1.GetStatementExportDownloadUrlResponse",
+    "marketdata.v1.AssetMarketFlag",
+    "marketdata.v1.AssetMarketStats",
+    "marketdata.v1.AssetMarketValue",
+    "system.v1.GetTimeResponse",
+    "transfer.v1.GetInternalTransferBatchRequest",
+    "transfer.v1.GetInternalTransferBatchResponse",
+    "triggers.v1.LadderDetails",
 ]
 
 METHODS = {
@@ -79,6 +95,9 @@ METHODS = {
     "statements.create_export": AsyncStatementsService.create_export,
     "statements.get_export": AsyncStatementsService.get_export,
     "statements.list_exports": AsyncStatementsService.list_exports,
+    "statements.cancel_export": AsyncStatementsService.cancel_export,
+    "statements.get_export_download_url": AsyncStatementsService.get_export_download_url,
+    "internal_transfers.get_batch": AsyncInternalTransfersService.get_batch,
     "dust_conversions.list_balances": AsyncDustConversionsService.list_balances,
     "dust_conversions.quote": AsyncDustConversionsService.quote,
     "dust_conversions.convert": AsyncDustConversionsService.convert,

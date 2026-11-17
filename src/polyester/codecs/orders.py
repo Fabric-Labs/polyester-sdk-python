@@ -52,6 +52,7 @@ from polyester.models.trading import (
 )
 from polyester.types.money import (
     Quantity,
+    resolve_positive_price_ticks,
     resolve_price_ticks,
     resolve_qty_scaled,
     resolve_quote_qty_scaled,
@@ -257,6 +258,8 @@ def create_order_to_wire(
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
         raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
 
+    if request.sub_account_id is not None:
+        parse_account_id(request.sub_account_id, "sub_account_id")
     payload = {
         "symbol": request.symbol,
         "symbol_id": request.symbol_id,
@@ -271,11 +274,12 @@ def create_order_to_wire(
             symbol_id=request.symbol_id,
         ),
         "limit_price_ticks": (
-            resolve_price_ticks(request.price, "price", symbol=request.symbol)
-            if request.price
+            resolve_positive_price_ticks(request.price, "price", symbol=request.symbol)
+            if request.price is not None
             else None
         ),
-        "sub_account_id": request.sub_account_id or None,
+        # Checked above: only None leaves it out.
+        "sub_account_id": request.sub_account_id,
         "client_order_id": optional_client_id(request.client_order_id),
     }
     return omit_none(payload)
@@ -371,7 +375,7 @@ def order_intent_from_request(
 
     with _on_grid(PRICE_TICK_SIZE, _limit_price_path(request.tif)):
         price_ticks = (
-            resolve_price_ticks(request.price, "price", symbol=request.symbol)
+            resolve_positive_price_ticks(request.price, "price", symbol=request.symbol)
             if request.price is not None
             else None
         )
@@ -541,7 +545,7 @@ def create_order_to_proto(
             quote_quantity_scale=quote_quantity_scale,
         )
     )
-    if request.sub_account_id is not None and request.sub_account_id != "":
+    if request.sub_account_id is not None:
         proto.subaccount_id = parse_account_id(request.sub_account_id, "sub_account_id")
     return proto
 
@@ -564,7 +568,7 @@ def preview_order_to_proto(
             quote_quantity_scale=quote_quantity_scale,
         )
     )
-    if request.sub_account_id is not None and request.sub_account_id != "":
+    if request.sub_account_id is not None:
         proto.subaccount_id = parse_account_id(request.sub_account_id, "sub_account_id")
     return proto
 
@@ -718,11 +722,14 @@ def _resolve_optional_price_ticks(
     *,
     symbol: str | None,
     field_path: str,
+    positive: bool = True,
 ) -> int:
-    """Resolve an attached-exit price; ``field_path`` is its wire path for a
-    ``PRICE_TICK_SIZE`` refusal."""
+    """Resolve an attached-exit or OCO price; ``field_path`` is its wire path
+    for a ``PRICE_TICK_SIZE`` refusal. The price must be positive unless
+    ``positive`` is false, for a caller that refuses 0 itself."""
+    resolve = resolve_positive_price_ticks if positive else resolve_price_ticks
     with _on_grid(PRICE_TICK_SIZE, field_path):
-        return resolve_price_ticks(value, field_name, symbol=symbol)  # type: ignore[arg-type]
+        return resolve(value, field_name, symbol=symbol)  # type: ignore[arg-type]
 
 
 def _risk_execution_from_friendly(
@@ -979,6 +986,7 @@ def _trailing_stop_from_dict(
             "attached_risk.trailing_stop.limit_price",
             symbol=symbol,
             field_path=f"{risk_field}.trailing_stop.limit_price_ticks",
+            positive=False,
         )
         if proto.limit_price_ticks <= 0:
             raise _trailing_limit_error(
@@ -1637,6 +1645,8 @@ def resolve_quote_quantity_scale(
 
 
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:
-    if value is None or value == "":
+    """A sub-account ID, or ``None`` for none. Only ``None`` means none: ``""``
+    and whitespace are refused, never read as the main account."""
+    if value is None:
         return None
     return parse_account_id(value, "sub_account_id")

@@ -40,7 +40,11 @@ from polyester.errors import PolyesterValidationError
 from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
-from polyester.types.money import resolve_price_ticks, resolve_qty_scaled
+from polyester.types.money import (
+    resolve_positive_price_ticks,
+    resolve_price_ticks,
+    resolve_qty_scaled,
+)
 
 TRIGGER_TYPE_TO_PROTO = {
     "stop_loss": "STOP_LOSS",
@@ -226,7 +230,7 @@ def _conditional_child(
         )
     with refusal_code(BAD_PRICE):
         price_ticks = (
-            resolve_price_ticks(limit_price, "limit_price", symbol=symbol)  # type: ignore[arg-type]
+            resolve_positive_price_ticks(limit_price, "limit_price", symbol=symbol)  # type: ignore[arg-type]
             if limit_price is not None
             else None
         )
@@ -400,7 +404,7 @@ def create_trigger_to_proto(
         )
         if trigger_price is not None:
             with refusal_code(TRIGGER_PRICE_INVALID):
-                conditional.trigger_price_ticks = resolve_price_ticks(
+                conditional.trigger_price_ticks = resolve_positive_price_ticks(
                     trigger_price, "trigger_price", symbol=symbol
                 )  # type: ignore[arg-type]
         conditional.child.CopyFrom(
@@ -461,7 +465,7 @@ def create_trigger_to_proto(
                 )
         if activation_price is not None:
             with refusal_code(TRIGGER_ACTIVATION_PRICE_INVALID):
-                trailing.activation_price_ticks = resolve_price_ticks(
+                trailing.activation_price_ticks = resolve_positive_price_ticks(
                     activation_price, "activation_price", symbol=symbol
                 )  # type: ignore[arg-type]
             if side_key == "buy" and trailing.limit_price_ticks < trailing.activation_price_ticks:
@@ -509,7 +513,7 @@ def create_trigger_to_proto(
         if order_key == "limit":
             if limit_price is not None:
                 with refusal_code(BAD_PRICE):
-                    twap.limit_gtc.price_ticks = resolve_price_ticks(
+                    twap.limit_gtc.price_ticks = resolve_positive_price_ticks(
                         limit_price, "limit_price", symbol=symbol
                     )  # type: ignore[arg-type]
             else:
@@ -541,11 +545,11 @@ def create_trigger_to_proto(
         price_max_ticks = None
         with refusal_code(TRIGGER_PRICE_INVALID):
             if ladder_price_min is not None:
-                price_min_ticks = resolve_price_ticks(
+                price_min_ticks = resolve_positive_price_ticks(
                     ladder_price_min, "ladder_price_min", symbol=symbol
                 )  # type: ignore[arg-type]
             if ladder_price_max is not None:
-                price_max_ticks = resolve_price_ticks(
+                price_max_ticks = resolve_positive_price_ticks(
                     ladder_price_max, "ladder_price_max", symbol=symbol
                 )  # type: ignore[arg-type]
         if (
@@ -654,7 +658,7 @@ def modify_trigger_to_proto(
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
     if trigger_price is not None:
         with refusal_code(TRIGGER_PRICE_INVALID):
-            proto.trigger_price_ticks = resolve_price_ticks(
+            proto.trigger_price_ticks = resolve_positive_price_ticks(
                 trigger_price, "trigger_price", symbol=symbol
             )
     with refusal_code(TRAILING_DISTANCE_INVALID):
@@ -663,10 +667,9 @@ def modify_trigger_to_proto(
                 trailing_distance_ticks, "trailing_distance_ticks"
             )
         if trailing_distance_bps is not None:
+            # 1 to 10000, as at create: the contract has no clearing zero.
             proto.trailing_distance_bps = validate_bps(
-                trailing_distance_bps,
-                "trailing_distance_bps",
-                allow_clear=True,
+                trailing_distance_bps, "trailing_distance_bps"
             )
     if activation_price is not None:
         with refusal_code(TRIGGER_ACTIVATION_PRICE_INVALID):

@@ -309,12 +309,12 @@ async def test_cancel_oco_sends_the_id_and_reads_the_status(oco_client) -> None:
     assert request.subaccount_id == SUB
 
 
-async def test_cancel_oco_takes_a_decimal_id_and_the_main_account(oco_client) -> None:
+async def test_cancel_oco_takes_an_integer_id_and_the_main_account(oco_client) -> None:
     client, server = oco_client
     server.answers["CancelOco"] = _ok(
         triggers.CancelOcoResponse(order_list_id=LIST_ID, status=triggers.STATUS_CANCELED)
     )
-    await client.triggers.cancel_oco(order_list_id=str(LIST_ID))
+    await client.triggers.cancel_oco(order_list_id=LIST_ID)
     [request] = server.requests("CancelOco")
     assert request.order_list_id == LIST_ID
     assert not request.HasField("subaccount_id")
@@ -367,7 +367,7 @@ async def test_batch_cancel_sends_the_ids_in_order_and_reads_each_result(oco_cli
     client, server = oco_client
     server.answers["BatchCancelTriggers"] = _batch_answer
     result = await client.triggers.batch_cancel(
-        trigger_ids=[format_id(TP_ID), str(SL_ID)],
+        trigger_ids=[format_id(TP_ID), SL_ID],
         request_id="tpsl-cancel-all-7f3a",
         sub_account_id=format_id(SUB),
     )
@@ -421,7 +421,8 @@ async def test_batch_cancel_takes_fifty_ids(oco_client) -> None:
         ([TP_ID, format_id(TP_ID)], None, r"trigger_ids\[1\] repeats"),
         ([TP_ID, 0], None, r"trigger_ids\[1\] must be a non-zero"),
         (["1"], None, r"trigger_ids\[0\] must be a non-zero"),
-        (["not base58!"], None, r"trigger_ids\[0\] must be base58 or decimal"),
+        (["not base58!"], None, r"trigger_ids\[0\] must be a base58 public ID"),
+        ([str(SL_ID)], None, r"trigger_ids\[0\] must be a base58 public ID"),
         (str(TP_ID), None, "trigger_ids must be a list"),
         ([TP_ID], "bad id", "request_id contains invalid characters"),
         ([TP_ID], "x" * 65, "request_id must be 1 to 64 characters"),

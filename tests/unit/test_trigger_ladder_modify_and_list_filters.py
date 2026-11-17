@@ -182,7 +182,8 @@ async def test_list_sends_the_trigger_type(label: str, value: int) -> None:
 @pytest.mark.parametrize(
     ("parent", "expected"),
     [
-        ("18446744073709551615", 18446744073709551615),
+        (format_uint64_id(18446744073709551615), 18446744073709551615),
+        (18446744073709551615, 18446744073709551615),
         (42, 42),
         (format_uint64_id(9_007_199_254_740_993), 9_007_199_254_740_993),
     ],

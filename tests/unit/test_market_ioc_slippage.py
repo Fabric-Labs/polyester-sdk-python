@@ -10,6 +10,7 @@ from polyester.codecs.orders import (
     normalize_create_order_request,
     preview_order_to_proto,
 )
+from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.services.orders import AsyncOrdersService
@@ -142,7 +143,7 @@ def _catalogs() -> CatalogManager:
 @pytest.mark.asyncio
 async def test_create_service_sends_market_slippage_on_wire() -> None:
     capture = CaptureUnary(orders_pb2.CreateOrderResponse(order_id=42))
-    service = AsyncOrdersService(MagicMock(), _catalogs(), "123")
+    service = AsyncOrdersService(MagicMock(), _catalogs(), format_id(123))
     with patch("polyester.services.orders.unary_auth_decoded", capture):
         await service.create(
             symbol="BTC-USDT",

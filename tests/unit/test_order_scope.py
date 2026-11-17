@@ -162,8 +162,7 @@ WRITE_HELPERS = {
     ({}, "default"),
     ({"account": "main"}, None),
     ({"account": "active"}, "default"),
-    ({"sub_account_id": ""}, None),
-    ({"account": ""}, None),
+    ({"sub_account_id": None}, "default"),
     ({"sub_account_id": format_id(44)}, 44),
     ({"account": format_id(44)}, 44),
     ({"account": {"subaccountId": format_id(44)}}, 44),
@@ -198,11 +197,21 @@ async def test_write_helpers_refuse_selector_conflicts(helper, scope):
 
 
 @pytest.mark.parametrize("helper", sorted(WRITE_HELPERS))
-@pytest.mark.parametrize("scope", [{"sub_account_id": "  "}, {"account": "\t"}])
+@pytest.mark.parametrize(
+    "scope",
+    [
+        {"sub_account_id": "  "},
+        {"account": "\t"},
+        # Empty is supplied, not absent: never the main account.
+        {"sub_account_id": ""},
+        {"account": ""},
+        {"account": {"subaccountId": ""}},
+    ],
+)
 async def test_write_helpers_refuse_whitespace_scope(helper, scope):
     call, _ = WRITE_HELPERS[helper]
     async with scope_client(42) as (client, seen):
-        with pytest.raises(PolyesterValidationError, match="base58 or decimal"):
+        with pytest.raises(PolyesterValidationError, match="must be a base58 public ID"):
             await call(client, scope)
         assert seen == []
 
@@ -224,7 +233,6 @@ async def test_typed_order_requests_refuse_selector_conflicts(helper, account, o
     (None, "main", None),
     (None, "active", 42),
     (None, format_id(44), 44),
-    ("", None, None),
     (format_id(44), None, 44),
 ])
 async def test_typed_order_requests_send_the_resolved_scope(helper, request_scope, account, want):
@@ -238,7 +246,7 @@ async def test_typed_order_requests_send_the_resolved_scope(helper, request_scop
 
 @pytest.mark.parametrize("typed", [False, True])
 @pytest.mark.parametrize("override", ["", format_id(42), format_id(44)])
-@pytest.mark.parametrize("top", [None, "", format_id(44)])
+@pytest.mark.parametrize("top", [None, format_id(44)])
 async def test_batch_refuses_item_scope(typed, override, top):
     async with scope_client(42) as (client, seen):
         item = dict(**order_input(), sub_account_id=override)
@@ -259,7 +267,7 @@ ITEM_SCOPES = [
 
 
 @pytest.mark.parametrize("item_scope", ITEM_SCOPES)
-@pytest.mark.parametrize("top", [None, "", format_id(44)])
+@pytest.mark.parametrize("top", [None, format_id(44)])
 async def test_batch_cancel_refuses_item_scope(item_scope, top):
     async with scope_client(42) as (client, seen):
         with pytest.raises(PolyesterValidationError, match="batch-level sub_account_id"):
@@ -270,7 +278,7 @@ async def test_batch_cancel_refuses_item_scope(item_scope, top):
 
 
 @pytest.mark.parametrize("item_scope", ITEM_SCOPES)
-@pytest.mark.parametrize("top", [None, "", format_id(44)])
+@pytest.mark.parametrize("top", [None, format_id(44)])
 async def test_batch_replace_refuses_item_scope(item_scope, top):
     async with scope_client(42) as (client, seen):
         with pytest.raises(PolyesterValidationError, match="batch-level sub_account_id"):

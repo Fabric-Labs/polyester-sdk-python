@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
+from google.protobuf.message import Message
+
+from polyester.codecs.contract_limits import contract_uint32_range
 from polyester.codecs.orderbook import exact_int
 from polyester.codecs.scalars import UINT64_MAX, exact_integer
 from polyester.errors import PolyesterValidationError
@@ -10,6 +13,7 @@ from polyester.errors import PolyesterValidationError
 @overload
 def validate_limit(
     limit: int,
+    request: type[Message],
     *,
     label: str = "limit",
     allow_none: Literal[False] = False,
@@ -19,6 +23,7 @@ def validate_limit(
 @overload
 def validate_limit(
     limit: int | None,
+    request: type[Message],
     *,
     label: str = "limit",
     allow_none: Literal[True],
@@ -27,17 +32,22 @@ def validate_limit(
 
 def validate_limit(
     limit: int | None,
+    request: type[Message],
     *,
     label: str = "limit",
     allow_none: bool = False,
 ) -> int | None:
-    """Wire-safety for pagination limits (no SDK-wide max policy).
+    """A page limit as ``request`` takes it, refused before sending when the
+    contract refuses it.
 
     Accepts any exact integer (``__index__``, as NumPy integers implement) and
     returns it as a plain ``int``; rejects ``bool`` and non-integers such as
-    ``float`` so values cannot silently coerce on the wire. Endpoint/server
-    protos remain the authority for allowed ranges. Optional limits omit when
-    ``None`` so server defaults are preserved.
+    ``float`` so values cannot silently coerce on the wire. The value must be
+    within the range the contract's validation rule on ``request.limit``
+    sets, read from the generated descriptor: a limit above its maximum, or
+    0 where the contract bounds it from 1, raises
+    :class:`PolyesterValidationError`. ``None`` (with ``allow_none``) is
+    omitted, so the server default applies.
     """
     if limit is None:
         if allow_none:
@@ -46,6 +56,9 @@ def validate_limit(
     value = exact_int(limit)
     if value is None:
         raise PolyesterValidationError(f"{label} must be an integer")
+    low, high = contract_uint32_range(request, "limit")
+    if not low <= value <= high:
+        raise PolyesterValidationError(f"{label} {value} is outside {low}..{high}")
     return value
 
 

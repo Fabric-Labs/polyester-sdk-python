@@ -131,13 +131,20 @@ async def test_create_order_does_not_preflight_pair_constraints() -> None:
 @pytest.mark.parametrize("limit", [True, 1.5, "10"])
 def test_list_limit_rejects_non_integers(limit: object) -> None:
     with pytest.raises(PolyesterValidationError, match="limit"):
-        validate_limit(limit)  # type: ignore[arg-type]
+        validate_limit(limit, marketdata_pb2.GetCandlesRequest)  # type: ignore[arg-type]
 
 
-def test_list_limit_allows_values_outside_former_1000_cap() -> None:
-    assert validate_limit(1001) == 1001
-    assert validate_limit(0) == 0
-    assert validate_limit(None, allow_none=True) is None
+def test_list_limit_follows_the_contract_range_of_its_request() -> None:
+    # GetCandlesRequest.limit is 0 (the server default) to 10000.
+    assert validate_limit(1001, marketdata_pb2.GetCandlesRequest) == 1001
+    assert validate_limit(10000, marketdata_pb2.GetCandlesRequest) == 10000
+    assert validate_limit(0, marketdata_pb2.GetCandlesRequest) == 0
+    assert validate_limit(None, marketdata_pb2.GetCandlesRequest, allow_none=True) is None
+    with pytest.raises(PolyesterValidationError, match="limit 10001 is outside 0..10000"):
+        validate_limit(10001, marketdata_pb2.GetCandlesRequest)
+    # GetOrderHistoryRequest.limit is 1 to 1000.
+    with pytest.raises(PolyesterValidationError, match="limit 0 is outside 1..1000"):
+        validate_limit(0, orders_read_pb2.GetOrderHistoryRequest)
 
 
 def test_trigger_label_decoders_use_sdk_validation_error() -> None:

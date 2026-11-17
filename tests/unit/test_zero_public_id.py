@@ -1,7 +1,7 @@
 """A public ID that decodes to 0 names nothing.
 
-``"1"`` is the base58 form of 0, ``"0"`` and ``"00"`` the decimal, and ``0``
-the integer. Every call that takes one refuses it with
+``"1"`` and ``"11"`` are base58 forms of 0 and ``0`` the integer; ``"0"`` and
+``"00"`` are no base58 ID at all. Every call that takes one refuses it with
 ``PolyesterValidationError`` and sends no request.
 """
 
@@ -19,7 +19,8 @@ from polyester.codecs.scalars import format_id, id_to_int
 from polyester.errors import PolyesterValidationError
 from polyester.models import OrderId
 
-ZERO_IDS: list[str | int] = ["1", "0", "00", 0]
+ZERO_IDS: list[str | int] = ["1", "11", 0]
+NOT_BASE58_IDS = ["0", "00"]
 TEST_KEY = "0123456789abcdef" * 4
 
 Call = Callable[[AsyncPolyester, Any], Awaitable[object]]
@@ -64,15 +65,21 @@ async def test_call_refuses_a_public_id_that_decodes_to_zero(
         for raw in ZERO_IDS:
             with pytest.raises(PolyesterValidationError, match="non-zero"):
                 await CALLS[name](client, raw)
+        for raw in NOT_BASE58_IDS:
+            with pytest.raises(PolyesterValidationError, match="base58"):
+                await CALLS[name](client, raw)
     assert requests == []
 
 
 def test_id_to_int_refuses_zero_and_keeps_other_ids() -> None:
-    for raw in ["1", "0", "00", 0]:
+    for raw in ["1", "11", 0]:
         with pytest.raises(PolyesterValidationError, match="must be a non-zero ID, not 0"):
             id_to_int(raw, "trigger_id")
+    for raw in ["0", "00", "10"]:
+        with pytest.raises(PolyesterValidationError, match="trigger_id must be a base58 public ID"):
+            id_to_int(raw, "trigger_id")
     assert id_to_int("2", "trigger_id") == 1
-    assert id_to_int("10", "trigger_id") == 10
+    assert id_to_int(10, "trigger_id") == 10
     assert id_to_int(format_id(1 << 63), "trigger_id") == 1 << 63
     # Formatting 0 is unchanged: it still reads "1".
     assert format_id(0) == "1"

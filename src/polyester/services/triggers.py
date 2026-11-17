@@ -147,9 +147,9 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         ``trigger_type`` keeps one strategy: ``stop_loss``, ``take_profit``,
         ``trailing_stop``, ``twap`` or ``ladder``, the labels
         :meth:`create` takes. ``parent_order_id`` keeps the attached-risk
-        triggers of one order (its order ID, base58 or decimal). Either one
-        that is not valid raises ``PolyesterValidationError`` before sending;
-        left out, the list is not filtered by it.
+        triggers of one order (its base58 order ID, or the ID as an int).
+        Either one that is not valid raises ``PolyesterValidationError``
+        before sending; left out, the list is not filtered by it.
 
         ``order_list_id`` keeps the take-profit and the stop-loss of one OCO
         (the ID :meth:`create_oco` returned), and ``client_list_id`` those of
@@ -167,7 +167,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         Like :meth:`get`, this read resends the same request while the server
         answers ``unavailable`` (HTTP 503), for about 2 seconds.
         """
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, ListTriggersRequest)
         request = ListTriggersRequest(limit=validated_limit)
         if page_token:
             request.page_token = page_token
@@ -755,7 +755,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
 
         from polyester.codecs.decode.triggers import trigger_event_type_from_label
 
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, ListTriggerEventsRequest)
         request = ListTriggerEventsRequest(
             trigger_id=id_to_int(trigger_id, "trigger_id"),
             limit=validated_limit,

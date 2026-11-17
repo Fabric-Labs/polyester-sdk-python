@@ -166,7 +166,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         When ``trigger_id`` is set, only child orders created by that trigger
         are returned (for example TWAP/ladder slice children).
         """
-        validated_limit = validate_limit(limit, allow_none=True)
+        validated_limit = validate_limit(limit, GetOpenOrdersRequest, allow_none=True)
         request = GetOpenOrdersRequest(
             include_attached_risk=include_attached_risk,
             include_attached_risk_state=include_attached_risk_state,
@@ -180,7 +180,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.page_token = page_token
         if validated_limit is not None:
             request.limit = validated_limit
-        if trigger_id is not None and trigger_id != "":
+        if trigger_id is not None:
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
         # Decoded with the pair's catalog scales: a load in progress is
         # awaited, and a failed one leaves the quantities unscaled.
@@ -219,7 +219,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         raises :class:`PolyesterValidationError` before sending.
         """
         start, end = validate_time_range("orders.list_history", start_ts_ns, end_ts_ns)
-        validated_limit = validate_limit(limit)
+        validated_limit = validate_limit(limit, GetOrderHistoryRequest)
         request = GetOrderHistoryRequest(
             limit=validated_limit,
             include_attached_risk=include_attached_risk,
@@ -243,7 +243,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             request.symbol_id.append(resolved)
         if page_token:
             request.page_token = page_token
-        if trigger_id is not None and trigger_id != "":
+        if trigger_id is not None:
             request.trigger_id = id_to_int(trigger_id, "trigger_id")
         await self._ensure_catalogs(required=False)
         return await unary_auth_decoded(
@@ -286,7 +286,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         )
         if include_execution_history is not None:
             request.include_execution_history = include_execution_history
-        validated_limit = validate_limit(limit, allow_none=True)
+        validated_limit = validate_limit(limit, GetOrderRequest, allow_none=True)
         if validated_limit is not None:
             request.limit = validated_limit
         if page_token:
@@ -634,7 +634,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         if self._triggers is None:
             raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
         scope = self._resolve_sub_account_id(sub_account_id, account=account)
-        explicit_scope = scope if scope is not None else ""
+        # The resolved account, named explicitly so each step acts on it
+        # whatever the client's default is: "main" for the main account.
+        explicit_scope: dict[str, Any] = (
+            {"sub_account_id": scope} if scope is not None else {"account": "main"}
+        )
         # Each cancel to send, in listing order: a trigger, keyed by its ID,
         # or an OCO, keyed by its order_list_id, with the legs listed.
         targets: dict[tuple[str, str], list[str]] = {}
@@ -643,7 +647,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         page_token: str | None = None
         while True:
             page = await self._triggers.list(
-                sub_account_id=explicit_scope,
+                **explicit_scope,
                 symbol=symbol,
                 status=LIVE_TRIGGER_STATUSES,
                 limit=_STOP_ALL_TRIGGERS_PAGE,
@@ -672,10 +676,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             try:
                 if kind == "oco":
                     await self._triggers.cancel_oco(
-                        order_list_id=target_id, sub_account_id=explicit_scope
+                        order_list_id=target_id, **explicit_scope
                     )
                 else:
-                    await self._triggers.cancel(trigger_id=target_id, sub_account_id=explicit_scope)
+                    await self._triggers.cancel(trigger_id=target_id, **explicit_scope)
             except Exception as exc:
                 if not _stop_all_already_ended(exc):
                     failures.extend(
@@ -684,7 +688,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 continue
             canceled.extend(legs)
         cancel_all = await self.cancel_all(
-            sub_account_id=explicit_scope,
+            **explicit_scope,
             symbol=symbol,
             request_id=request_id,
         )
@@ -1053,7 +1057,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         ``get`` and compare its trades to ``cum_qty``. This helper pages
         execution history and does not treat an empty page as a watermark.
         The result holds the last poll's order, trades and transfers, with that
-        read's ``executions_complete``.
+        read's ``executions_complete``. A settlement leg that several execution
+        pages repeat (one match's fills on more than one page) is kept once, by
+        ``tx_id``, in the order first read.
 
         ``timeout`` (seconds) bounds the whole wait, page reads included: a read
         still in flight when it passes is abandoned, a read that finishes after
@@ -1139,6 +1145,9 @@ async def _get_order_execution_pages(
     requested: set[str] = set()
     trades: list = []
     transfers: list = []
+    # tx_ids of the legs earlier pages returned: a match whose fills span
+    # pages repeats its legs on each, and the contract says to keep them once.
+    seen_tx_ids: set[str] = set()
     order = None
     while True:
         page = await orders.get(
@@ -1153,7 +1162,10 @@ async def _get_order_execution_pages(
                 key = OrderId(page.order.order_id)
             order = page.order
         trades.extend(page.trades)
-        transfers.extend(page.transfers)
+        transfers.extend(
+            leg for leg in page.transfers if not leg.tx_id or leg.tx_id not in seen_tx_ids
+        )
+        seen_tx_ids.update(leg.tx_id for leg in page.transfers if leg.tx_id)
         if not page.next_page_token:
             return GetOrderResult(
                 order=order,

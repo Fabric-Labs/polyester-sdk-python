@@ -292,6 +292,24 @@ def resolve_price_ticks(
     return parse_price_ticks(value, field_name)
 
 
+def resolve_positive_price_ticks(
+    value: str | Decimal | Price,
+    field_name: str = "price",
+    *,
+    symbol: str | None = None,
+) -> int:
+    """Resolve a price the contract requires to be positive.
+
+    A price of 0 in any form (``"0"``, ``"0.00"``, ``Decimal(0)``,
+    ``Price.from_ticks(0)``) is refused: on the wire a 0 price reads as no
+    price, so it would be sent as if it had been left out.
+    """
+    ticks = resolve_price_ticks(value, field_name, symbol=symbol)
+    if ticks <= 0:
+        raise PolyesterValidationError(f"{field_name} must be positive")
+    return ticks
+
+
 def resolve_qty_scaled(
     value: str | Decimal | Quantity,
     scale: int,

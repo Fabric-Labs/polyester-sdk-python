@@ -2,7 +2,7 @@
 
 On the wire 0 is unset: a sub-account ID of 0 is the main account, and an
 account ID of 0 names no account. ``"1"`` is the public ID of 0
-(``format_id(0)``), and ``"0"`` and ``"00"`` read as decimal 0. Each form an
+(``format_id(0)``), and ``"0"`` and ``"00"`` are no base58 ID at all. Each form an
 ID arrives in is passed to a client against a local server that counts every
 request, and nothing may reach it.
 """
@@ -41,7 +41,8 @@ from polyester.services._scope import resolve_account_id
 from tests.hardening_support import HttpScript, MockHttpServer, ParsedRequest, make_test_credentials
 
 ZERO_STRINGS = ["0", "00", "1"]
-REFUSED = "must be a non-zero"
+# A base58 ID that decodes to 0, or a string that is not base58.
+REFUSED = "must be a (?:non-zero|base58)"
 
 
 def _refuse_all(_req: ParsedRequest) -> HttpScript:
@@ -197,16 +198,24 @@ async def test_zero_sub_account_id_is_refused_before_sending(name: str, zero: st
                 raise AssertionError(f"{name} {form} {zero!r}: {exc!r}") from exc
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("zero", ZERO_STRINGS)
-@pytest.mark.parametrize("name", sorted(SCOPED_CALLS))
-async def test_zero_default_sub_account_id_is_refused_before_sending(name: str, zero: str) -> None:
-    async with zero_id_client(default_sub_account_id=zero) as (client, http):
-        await _refused(SCOPED_CALLS[name](client, {}), http, "sub_account_id")
+def test_zero_default_sub_account_id_is_refused_when_the_client_is_made(zero: str) -> None:
+    # Refused before any call can be made, so none can address the main account.
+    creds = make_test_credentials()
+    with pytest.raises(PolyesterValidationError, match=f"default_sub_account_id {REFUSED}"):
+        AsyncPolyester(
+            api_url="http://127.0.0.1:9",
+            api_key_id=creds.key_id,
+            api_private_key=creds.private_key,
+            hydrate_catalogs=False,
+            default_sub_account_id=zero,
+        )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scope", [{}, {"sub_account_id": ""}, {"sub_account_id": format_id(42)}])
+@pytest.mark.parametrize(
+    "scope", [{}, {"sub_account_id": None}, {"sub_account_id": format_id(42)}]
+)
 async def test_omitted_and_non_zero_sub_accounts_still_send(scope: dict[str, Any]) -> None:
     async with zero_id_client() as (client, http):
         with pytest.raises(PolyesterRouteNotFoundError):  # the server refuses every call
@@ -315,7 +324,8 @@ def test_zero_address_book_entry_codec_is_refused() -> None:
 def test_non_zero_codec_ids_are_kept() -> None:
     assert parse_optional_subaccount_id(format_id(42)) == 42
     assert parse_optional_subaccount_id(None) is None
-    assert parse_optional_subaccount_id("") is None
+    with pytest.raises(PolyesterValidationError, match="sub_account_id"):
+        parse_optional_subaccount_id("")  # supplied, so not absent
     assert cancel_all_orders_to_proto(sub_account_id=format_id(42)).subaccount_id == 42
 
 

@@ -46,7 +46,7 @@ def test_scoped_sub_account_id_prefers_account_scope() -> None:
         )
         == "scoped"
     )
-    assert scoped_sub_account_id(sub_account_id="legacy", default="default") == "legacy"
+    assert scoped_sub_account_id(sub_account_id="Legacy", default="default") == "Legacy"
 
 
 def test_scoped_sub_account_mixin_on_service() -> None:

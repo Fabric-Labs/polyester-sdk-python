@@ -16,7 +16,8 @@ from polyester.codecs.orderbook import (
 )
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import heatmap_pb2 as heatmap
-from polyester.services._validation import validate_limit
+from polyester.gen.marketdata.v1 import marketdata_pb2
+from polyester.services._validation import validate_limit as _validate_limit
 from tests.unit.test_heatmap_requests import _with_client
 from tests.unit.test_orderbook_depth_delta_binding import _snapshot_service
 from tests.unit.test_orderbook_published_depths import (
@@ -25,6 +26,11 @@ from tests.unit.test_orderbook_published_depths import (
     next_view,
     subscribed_channel,
 )
+
+
+def validate_limit(value):
+    """A candle page limit, which the contract takes from 0 to 10000."""
+    return _validate_limit(value, marketdata_pb2.GetCandlesRequest)
 
 
 class Index:

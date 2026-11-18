@@ -143,9 +143,9 @@ class PrivateOrdersError:
     ``kind`` names the step that failed: ``connection_token``,
     ``subscription_token``, ``connection``, ``decode``, ``request`` or
     ``refresh``, or ``internal`` when the stream's own handling of the
-    connection failed unexpectedly (the connection is dropped and resumed from
-    the last applied cursor). A failure that ends the stream is raised from
-    iteration instead.
+    connection failed unexpectedly (the connection is dropped, unless it
+    already was, and resumed from the last applied cursor). A failure that
+    ends the stream is raised from iteration instead.
     """
 
     kind: str

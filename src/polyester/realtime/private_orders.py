@@ -65,6 +65,11 @@ SUBSCRIBE_ACK_TIMEOUT = 30.0
 # A malformed frame (4400) and a rejected connect token (4403) recur on every reconnect.
 TERMINAL_CLOSE_CODES = frozenset({4400, 4403})
 HEARTBEAT_TIMEOUT_CLOSE_CODE = 4000
+# Closes a connection whose own handling failed.
+INTERNAL_ERROR_CLOSE_CODE = 1011
+# Unexpected failures of the stream's own handling, with no connection up for
+# STABLE_CONNECTION between them, after which the stream ends instead of reconnecting.
+MAX_INTERNAL_FAILURES = 3
 
 
 def private_ws_url(api_url: str) -> str:
@@ -89,6 +94,13 @@ def _is_terminal_token_error(exc: BaseException) -> bool:
     """A refused token stays refused, and so does a redirect of its request;
     other failures (timeouts, 5xx) are retried."""
     return isinstance(exc, (PolyesterAuthError, PolyesterRedirectError, PolyesterValidationError))
+
+
+def _internal_error(exc: Exception) -> PolyesterRealtimeError:
+    """An unexpected failure of the stream's own handling; ``exc`` is its cause."""
+    error = PolyesterRealtimeError(f"private order stream failed: {type(exc).__name__}: {exc}")
+    error.__cause__ = exc
+    return error
 
 
 def _request_error_code(code: int) -> str:
@@ -176,6 +188,8 @@ class PrivateOrderStream:
         self._outbox: asyncio.Queue[bytes] | None = None
         self._run_task: asyncio.Task[None] | None = None
         self._tasks: set[asyncio.Task[Any]] = set()
+        # A task working for the current connection failed; _run recovers from it.
+        self._failure: Exception | None = None
         self._request_seq = 0
         self._closed = False
 
@@ -357,6 +371,7 @@ class PrivateOrderStream:
 
     async def _run(self) -> None:
         attempt = 0
+        failures = 0
         try:
             while self._owns_connection():
                 try:
@@ -398,12 +413,32 @@ class PrivateOrderStream:
                     await asyncio.sleep(_backoff_delay(attempt))
                     attempt += 1
                     continue
-                closed, stable = await self._serve(ws, token)
-                if stable:
+                served_at = time.monotonic()
+                failure: PolyesterRealtimeError | None = None
+                try:
+                    closed = await self._serve(ws, token)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    # Nothing of the frame that failed was applied: recovery resumes
+                    # from the last applied cursor.
+                    closed = _Closed(INTERNAL_ERROR_CLOSE_CODE)
+                    failure = _internal_error(exc)
+                else:
+                    if self._failure is not None:
+                        failure = _internal_error(self._failure)
+                self._failure = None
+                if time.monotonic() - served_at >= STABLE_CONNECTION:
                     attempt = 0
+                    failures = 0
                 if not self._owns_connection():
                     return
-                if closed.code in TERMINAL_CLOSE_CODES:
+                if failure is not None:
+                    failures += 1
+                    if failures >= MAX_INTERNAL_FAILURES:
+                        self._terminate_all(failure)
+                        return
+                elif closed.code in TERMINAL_CLOSE_CODES:
                     self._terminate_all(
                         PolyesterRealtimeError(
                             closed.reason or f"private WebSocket closed with code {closed.code}",
@@ -411,12 +446,14 @@ class PrivateOrderStream:
                         )
                     )
                     return
-                # A close that reconnects is not an error.
+                # A close that reconnects is not an error; a failure of this
+                # stream's own handling is, though it reconnects too.
                 for s in list(self._subs.values()):
                     if not s.confirmed:
                         self._terminate(
                             s,
-                            PolyesterRealtimeError(
+                            failure
+                            or PolyesterRealtimeError(
                                 f"private WebSocket closed with code {closed.code} "
                                 "before the subscription was confirmed",
                                 close_code=closed.code,
@@ -425,22 +462,27 @@ class PrivateOrderStream:
                     elif s.state == "connected":
                         s.state = "disconnected"
                         self._deliver(s, PrivateOrdersDisconnected())
+                if failure is not None:
+                    self._report_all("internal", failure)
                 if not self._owns_connection():
                     return
                 await asyncio.sleep(_backoff_delay(attempt))
                 attempt += 1
+        except Exception as exc:
+            # A failure outside a connection's handling leaves nothing to recover with.
+            if self._owns_connection():
+                self._terminate_all(_internal_error(exc))
         finally:
             if self._run_task is asyncio.current_task():
                 self._run_task = None
 
-    async def _serve(self, ws: ClientConnection, token: str) -> tuple[_Closed, bool]:
+    async def _serve(self, ws: ClientConnection, token: str) -> _Closed:
         """Authenticate, subscribe every account, and read until the socket closes."""
         outbox: asyncio.Queue[bytes] = asyncio.Queue()
         self._ws = ws
         self._outbox = outbox
         writer = asyncio.create_task(self._write(ws, outbox))
         closed = _Closed(code=1000)
-        auth_at = time.monotonic()
         try:
             self._send(ws, pb.ClientMessage(auth=pb.Auth(token=token)))
             self._authenticated = True
@@ -457,15 +499,18 @@ class PrivateOrderStream:
                     closed = _Closed(frame.code, frame.reason) if frame else _Closed(1006)
                     break
                 self._on_frame(ws, raw)
+        except Exception:
+            closed = _Closed(INTERNAL_ERROR_CLOSE_CODE, "internal error")
+            raise
         finally:
             writer.cancel()
             if self._ws is ws:
                 self._detach()
-            if closed.code == HEARTBEAT_TIMEOUT_CLOSE_CODE:
-                self._spawn(ws.close(closed.code, closed.reason))
+            if closed.code in (HEARTBEAT_TIMEOUT_CLOSE_CODE, INTERNAL_ERROR_CLOSE_CODE):
+                self._close_soon(ws, closed.code, closed.reason)
             else:
-                self._spawn(ws.close(1000))
-        return closed, time.monotonic() - auth_at >= STABLE_CONNECTION
+                self._close_soon(ws)
+        return closed
 
     async def _write(self, ws: ClientConnection, outbox: asyncio.Queue[bytes]) -> None:
         with contextlib.suppress(ConnectionClosed):
@@ -500,13 +545,41 @@ class PrivateOrderStream:
             if task is not current:
                 task.cancel()
         if ws is not None:
-            self._spawn(ws.close(1000))
+            self._close_soon(ws)
 
     def _spawn(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
         task = asyncio.create_task(coro)
         self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        task.add_done_callback(self._supervise)
         return task
+
+    def _supervise(self, task: asyncio.Task[Any]) -> None:
+        self._tasks.discard(task)
+        if task.cancelled():
+            return
+        error = task.exception()
+        if isinstance(error, Exception):
+            self._fail_connection(error)
+
+    def _fail_connection(self, error: Exception) -> None:
+        """A task working for the connection failed: drop the connection, and
+        ``_run`` reports it and recovers as when a frame's handling fails."""
+        if self._closed or not self._subs:
+            return
+        ws = self._ws
+        if ws is None:
+            # Its connection is already gone and the stream is reconnecting.
+            self._report_all("internal", _internal_error(error))
+            return
+        if self._failure is None:
+            self._failure = error
+        self._close_soon(ws, INTERNAL_ERROR_CLOSE_CODE, "internal error")
+
+    def _close_soon(self, ws: ClientConnection, code: int = 1000, reason: str = "") -> None:
+        """Close a socket in the background; it no longer carries the stream."""
+        task = asyncio.create_task(ws.close(code, reason))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     def _next_request_id(self) -> str:
         self._request_seq += 1
@@ -735,8 +808,9 @@ class PrivateOrderStream:
                 s.ready = True
                 self._deliver(s, PrivateOrdersReady())
         elif kind == "unavailable":
+            stale_order_ids = tuple(stale_order_ids_from_proto(msg.unavailable))
             s.stale = True
-            s.stale_order_ids = tuple(stale_order_ids_from_proto(msg.unavailable))
+            s.stale_order_ids = stale_order_ids
             self._deliver(s, PrivateOrdersStale(stale=True, order_ids=list(s.stale_order_ids)))
         elif kind == "available":
             s.stale = False
@@ -789,10 +863,14 @@ class PrivateOrderStream:
             s.cursor = ""
             self._resubscribe(ws, s)
             return
+        # Build the whole next state first: a failure leaves the last applied
+        # view and cursor in place.
+        view = {order.order_id: raw for order, raw in zip(orders, staged, strict=True)}
+        event = PrivateOrdersSnapshot(orders=orders)
         s.cursor = end.cursor
         s.retries = 0
-        s.orders = {order.order_id: raw for order, raw in zip(orders, staged, strict=True)}
-        self._deliver(s, PrivateOrdersSnapshot(orders=orders))
+        s.orders = view
+        self._deliver(s, event)
 
     def _on_unit(self, ws: ClientConnection, s: _Subscription, unit: pb.Unit) -> None:
         try:
@@ -802,11 +880,15 @@ class PrivateOrderStream:
             self._report(s, "decode", exc)
             self._resubscribe(ws, s)
             return
+        # Build the whole change first: a failure applies none of the unit, so
+        # the cursor before it still resumes it.
+        changed = [
+            (order.order_id, raw) for order, raw in zip(event.orders, unit.orders, strict=True)
+        ]
         s.cursor = unit.next_cursor
         s.retries = 0
         if s.orders is not None:
-            for order, raw in zip(event.orders, unit.orders, strict=True):
-                s.orders[order.order_id] = raw
+            s.orders.update(changed)
             for order_id in event.removed_order_ids:
                 s.orders.pop(order_id, None)
         self._deliver(s, event)

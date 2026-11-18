@@ -84,6 +84,13 @@ class WithdrawDestinationValidationCode(int, metaclass=_enum_type_wrapper.EnumTy
     POLYESTER_SMART_ACCOUNT: _ClassVar[WithdrawDestinationValidationCode]
     TOKEN_CONTRACT: _ClassVar[WithdrawDestinationValidationCode]
     DENYLISTED_ADDRESS: _ClassVar[WithdrawDestinationValidationCode]
+
+class WalletAssetUnavailableReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    UNAVAILABLE_UNSPECIFIED: _ClassVar[WalletAssetUnavailableReason]
+    NO_CONTRACT: _ClassVar[WalletAssetUnavailableReason]
+    READ_FAILED: _ClassVar[WalletAssetUnavailableReason]
+    INVALID_BALANCE: _ClassVar[WalletAssetUnavailableReason]
 ERROR_CODE_UNSPECIFIED: ErrorCode
 ERROR_CODE_INSUFFICIENT_FUNDS: ErrorCode
 ERROR_CODE_INVALID_REQUEST: ErrorCode
@@ -145,6 +152,10 @@ UNSUPPORTED_CHAIN: WithdrawDestinationValidationCode
 POLYESTER_SMART_ACCOUNT: WithdrawDestinationValidationCode
 TOKEN_CONTRACT: WithdrawDestinationValidationCode
 DENYLISTED_ADDRESS: WithdrawDestinationValidationCode
+UNAVAILABLE_UNSPECIFIED: WalletAssetUnavailableReason
+NO_CONTRACT: WalletAssetUnavailableReason
+READ_FAILED: WalletAssetUnavailableReason
+INVALID_BALANCE: WalletAssetUnavailableReason
 
 class CreateTradingWithdrawResponse(_message.Message):
     __slots__ = ("intent_id",)
@@ -251,9 +262,25 @@ class WalletBalance(_message.Message):
     def __init__(self, zipped_asset_id: _Optional[int] = ..., unified_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., ztoken_address: _Optional[str] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ...) -> None: ...
 
 class GetWalletBalancesResponse(_message.Message):
-    __slots__ = ("smart_account_address", "balances")
+    __slots__ = ("smart_account_address", "balances", "unavailable_assets")
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     BALANCES_FIELD_NUMBER: _ClassVar[int]
+    UNAVAILABLE_ASSETS_FIELD_NUMBER: _ClassVar[int]
     smart_account_address: str
     balances: _containers.RepeatedCompositeFieldContainer[WalletBalance]
-    def __init__(self, smart_account_address: _Optional[str] = ..., balances: _Optional[_Iterable[_Union[WalletBalance, _Mapping]]] = ...) -> None: ...
+    unavailable_assets: _containers.RepeatedCompositeFieldContainer[UnavailableWalletAsset]
+    def __init__(self, smart_account_address: _Optional[str] = ..., balances: _Optional[_Iterable[_Union[WalletBalance, _Mapping]]] = ..., unavailable_assets: _Optional[_Iterable[_Union[UnavailableWalletAsset, _Mapping]]] = ...) -> None: ...
+
+class UnavailableWalletAsset(_message.Message):
+    __slots__ = ("zipped_asset_id", "unified_asset_id", "chain_id", "ztoken_address", "reason")
+    ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    UNIFIED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    ZTOKEN_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    zipped_asset_id: int
+    unified_asset_id: int
+    chain_id: int
+    ztoken_address: str
+    reason: WalletAssetUnavailableReason
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., unified_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., ztoken_address: _Optional[str] = ..., reason: _Optional[_Union[WalletAssetUnavailableReason, str]] = ...) -> None: ...

@@ -59,7 +59,7 @@ METHOD_CHANNEL: SocialVerificationMethod
 METHOD_DM: SocialVerificationMethod
 
 class SocialVerification(_message.Message):
-    __slots__ = ("id", "provider", "method", "handle", "provider_user_id", "display_name", "challenge_code", "status", "requested_at", "expires_at", "verified_at", "attempts", "last_error", "error_code", "updated_at", "retry_after")
+    __slots__ = ("id", "provider", "method", "handle", "provider_user_id", "display_name", "challenge_code", "status", "requested_at", "expires_at", "verified_at", "attempts", "last_error", "error_code", "updated_at", "retry_after", "change_available_at")
     ID_FIELD_NUMBER: _ClassVar[int]
     PROVIDER_FIELD_NUMBER: _ClassVar[int]
     METHOD_FIELD_NUMBER: _ClassVar[int]
@@ -76,6 +76,7 @@ class SocialVerification(_message.Message):
     ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     RETRY_AFTER_FIELD_NUMBER: _ClassVar[int]
+    CHANGE_AVAILABLE_AT_FIELD_NUMBER: _ClassVar[int]
     id: int
     provider: SocialProvider
     method: SocialVerificationMethod
@@ -92,7 +93,8 @@ class SocialVerification(_message.Message):
     error_code: _auth_pb2.AuthErrorCode
     updated_at: _timestamp_pb2.Timestamp
     retry_after: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ..., provider_user_id: _Optional[str] = ..., display_name: _Optional[str] = ..., challenge_code: _Optional[str] = ..., status: _Optional[_Union[SocialVerificationStatus, str]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verified_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., attempts: _Optional[int] = ..., last_error: _Optional[str] = ..., error_code: _Optional[_Union[_auth_pb2.AuthErrorCode, str]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    change_available_at: _timestamp_pb2.Timestamp
+    def __init__(self, id: _Optional[int] = ..., provider: _Optional[_Union[SocialProvider, str]] = ..., method: _Optional[_Union[SocialVerificationMethod, str]] = ..., handle: _Optional[str] = ..., provider_user_id: _Optional[str] = ..., display_name: _Optional[str] = ..., challenge_code: _Optional[str] = ..., status: _Optional[_Union[SocialVerificationStatus, str]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., verified_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., attempts: _Optional[int] = ..., last_error: _Optional[str] = ..., error_code: _Optional[_Union[_auth_pb2.AuthErrorCode, str]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., change_available_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class StartSocialVerificationRequest(_message.Message):
     __slots__ = ("provider", "method", "handle")

@@ -52,6 +52,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_DUST_TARGET_UNAVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_DUST_BALANCE_CHANGED: _ClassVar[ErrorCode]
     ERROR_CODE_DUST_CONVERSION_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_BATCH_TOO_MANY_SOURCES: _ClassVar[ErrorCode]
 
 class InternalTransferStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -63,16 +64,16 @@ class InternalTransferStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
 class InternalTransferBatchStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     BATCH_STATUS_UNSPECIFIED: _ClassVar[InternalTransferBatchStatus]
-    BATCH_SUBMITTED: _ClassVar[InternalTransferBatchStatus]
     BATCH_REFUSED: _ClassVar[InternalTransferBatchStatus]
+    BATCH_PROCESSING: _ClassVar[InternalTransferBatchStatus]
+    BATCH_ACCEPTED: _ClassVar[InternalTransferBatchStatus]
 
 class InternalTransferBatchLegStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     LEG_STATUS_UNSPECIFIED: _ClassVar[InternalTransferBatchLegStatus]
-    LEG_ACCEPTED: _ClassVar[InternalTransferBatchLegStatus]
-    LEG_PENDING: _ClassVar[InternalTransferBatchLegStatus]
-    LEG_REFUSED: _ClassVar[InternalTransferBatchLegStatus]
-    LEG_NOT_SUBMITTED: _ClassVar[InternalTransferBatchLegStatus]
+    LEG_PROCESSING: _ClassVar[InternalTransferBatchLegStatus]
+    LEG_CREDITED: _ClassVar[InternalTransferBatchLegStatus]
+    LEG_NOT_MOVED: _ClassVar[InternalTransferBatchLegStatus]
 ERROR_CODE_UNSPECIFIED: ErrorCode
 ERROR_CODE_INSUFFICIENT_FUNDS: ErrorCode
 ERROR_CODE_INVALID_REQUEST: ErrorCode
@@ -110,18 +111,19 @@ ERROR_CODE_DUST_BUSY: ErrorCode
 ERROR_CODE_DUST_TARGET_UNAVAILABLE: ErrorCode
 ERROR_CODE_DUST_BALANCE_CHANGED: ErrorCode
 ERROR_CODE_DUST_CONVERSION_FAILED: ErrorCode
+ERROR_CODE_BATCH_TOO_MANY_SOURCES: ErrorCode
 INTERNAL_TRANSFER_STATUS_UNSPECIFIED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_ACCEPTED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_REJECTED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_FAILED: InternalTransferStatus
 BATCH_STATUS_UNSPECIFIED: InternalTransferBatchStatus
-BATCH_SUBMITTED: InternalTransferBatchStatus
 BATCH_REFUSED: InternalTransferBatchStatus
+BATCH_PROCESSING: InternalTransferBatchStatus
+BATCH_ACCEPTED: InternalTransferBatchStatus
 LEG_STATUS_UNSPECIFIED: InternalTransferBatchLegStatus
-LEG_ACCEPTED: InternalTransferBatchLegStatus
-LEG_PENDING: InternalTransferBatchLegStatus
-LEG_REFUSED: InternalTransferBatchLegStatus
-LEG_NOT_SUBMITTED: InternalTransferBatchLegStatus
+LEG_PROCESSING: InternalTransferBatchLegStatus
+LEG_CREDITED: InternalTransferBatchLegStatus
+LEG_NOT_MOVED: InternalTransferBatchLegStatus
 
 class CreateInternalTransferRequest(_message.Message):
     __slots__ = ("subaccount_id", "destination_account_id", "destination_subaccount_id", "destination_smart_account_address", "asset_id", "amount_e18", "idempotency_key")
@@ -206,13 +208,12 @@ class BatchCreateInternalTransfersRequest(_message.Message):
     def __init__(self, legs: _Optional[_Iterable[_Union[InternalTransferBatchLeg, _Mapping]]] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class InternalTransferBatchLegResult(_message.Message):
-    __slots__ = ("leg_index", "status", "request_id", "transfer_id", "flow_id", "accepted_at_ts_ns", "asset_id", "asset_code", "amount_e18", "destination", "error_code", "error_message")
+    __slots__ = ("leg_index", "status", "transfer_id", "flow_id", "credited_at_ts_ns", "asset_id", "asset_code", "amount_e18", "destination", "error_code", "error_message")
     LEG_INDEX_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_ID_FIELD_NUMBER: _ClassVar[int]
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
-    ACCEPTED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    CREDITED_AT_TS_NS_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     ASSET_CODE_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
@@ -221,19 +222,34 @@ class InternalTransferBatchLegResult(_message.Message):
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     leg_index: int
     status: InternalTransferBatchLegStatus
-    request_id: str
     transfer_id: str
     flow_id: str
-    accepted_at_ts_ns: int
+    credited_at_ts_ns: int
     asset_id: int
     asset_code: str
     amount_e18: _u128_pb2.U128
     destination: ResolvedDestination
     error_code: ErrorCode
     error_message: str
-    def __init__(self, leg_index: _Optional[int] = ..., status: _Optional[_Union[InternalTransferBatchLegStatus, str]] = ..., request_id: _Optional[str] = ..., transfer_id: _Optional[str] = ..., flow_id: _Optional[str] = ..., accepted_at_ts_ns: _Optional[int] = ..., asset_id: _Optional[int] = ..., asset_code: _Optional[str] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination: _Optional[_Union[ResolvedDestination, _Mapping]] = ..., error_code: _Optional[_Union[ErrorCode, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    def __init__(self, leg_index: _Optional[int] = ..., status: _Optional[_Union[InternalTransferBatchLegStatus, str]] = ..., transfer_id: _Optional[str] = ..., flow_id: _Optional[str] = ..., credited_at_ts_ns: _Optional[int] = ..., asset_id: _Optional[int] = ..., asset_code: _Optional[str] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination: _Optional[_Union[ResolvedDestination, _Mapping]] = ..., error_code: _Optional[_Union[ErrorCode, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class BatchCreateInternalTransfersResponse(_message.Message):
+    __slots__ = ("request_id", "status", "legs")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    LEGS_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    status: InternalTransferBatchStatus
+    legs: _containers.RepeatedCompositeFieldContainer[InternalTransferBatchLegResult]
+    def __init__(self, request_id: _Optional[str] = ..., status: _Optional[_Union[InternalTransferBatchStatus, str]] = ..., legs: _Optional[_Iterable[_Union[InternalTransferBatchLegResult, _Mapping]]] = ...) -> None: ...
+
+class GetInternalTransferBatchRequest(_message.Message):
+    __slots__ = ("request_id",)
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    def __init__(self, request_id: _Optional[str] = ...) -> None: ...
+
+class GetInternalTransferBatchResponse(_message.Message):
     __slots__ = ("request_id", "status", "legs")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]

@@ -1,5 +1,8 @@
+import datetime
+
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
+from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -22,6 +25,13 @@ class RouteStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STATUS_UNSPECIFIED: _ClassVar[RouteStatus]
     NORMAL: _ClassVar[RouteStatus]
     SUSPENDED: _ClassVar[RouteStatus]
+
+class SupplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SUPPLY_UNSPECIFIED: _ClassVar[SupplyStatus]
+    AVAILABLE: _ClassVar[SupplyStatus]
+    STALE: _ClassVar[SupplyStatus]
+    MISSING: _ClassVar[SupplyStatus]
 MEMO_UNSPECIFIED: MemoRequirement
 REQUIRED: MemoRequirement
 OPTIONAL: MemoRequirement
@@ -29,6 +39,10 @@ NOT_SUPPORTED: MemoRequirement
 STATUS_UNSPECIFIED: RouteStatus
 NORMAL: RouteStatus
 SUSPENDED: RouteStatus
+SUPPLY_UNSPECIFIED: SupplyStatus
+AVAILABLE: SupplyStatus
+STALE: SupplyStatus
+MISSING: SupplyStatus
 
 class ChainConfig(_message.Message):
     __slots__ = ("chain_id", "code", "name", "native_chain_id", "native_currency_symbol", "explorer_url", "icon", "required_confirmations", "confirmation_time_seconds", "is_case_sensitive", "min_address_length", "max_address_length", "memo_requirement", "memo_label", "memo_format_hint")
@@ -65,7 +79,7 @@ class ChainConfig(_message.Message):
     def __init__(self, chain_id: _Optional[int] = ..., code: _Optional[str] = ..., name: _Optional[str] = ..., native_chain_id: _Optional[str] = ..., native_currency_symbol: _Optional[str] = ..., explorer_url: _Optional[str] = ..., icon: _Optional[str] = ..., required_confirmations: _Optional[int] = ..., confirmation_time_seconds: _Optional[int] = ..., is_case_sensitive: _Optional[bool] = ..., min_address_length: _Optional[int] = ..., max_address_length: _Optional[int] = ..., memo_requirement: _Optional[_Union[MemoRequirement, str]] = ..., memo_label: _Optional[str] = ..., memo_format_hint: _Optional[str] = ...) -> None: ...
 
 class AssetChainVariant(_message.Message):
-    __slots__ = ("zipped_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount", "supply_q", "deposit_status", "withdrawal_status")
+    __slots__ = ("zipped_asset_id", "chain_id", "is_native_asset", "network_fee", "ztoken_address", "source_address", "source_decimals", "ztoken_decimals", "deposit_min_amount", "withdraw_min_amount", "supply_q", "deposit_status", "withdrawal_status", "supply_status", "supply_observed_at")
     ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     IS_NATIVE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -79,6 +93,8 @@ class AssetChainVariant(_message.Message):
     SUPPLY_Q_FIELD_NUMBER: _ClassVar[int]
     DEPOSIT_STATUS_FIELD_NUMBER: _ClassVar[int]
     WITHDRAWAL_STATUS_FIELD_NUMBER: _ClassVar[int]
+    SUPPLY_STATUS_FIELD_NUMBER: _ClassVar[int]
+    SUPPLY_OBSERVED_AT_FIELD_NUMBER: _ClassVar[int]
     zipped_asset_id: int
     chain_id: int
     is_native_asset: bool
@@ -92,15 +108,21 @@ class AssetChainVariant(_message.Message):
     supply_q: int
     deposit_status: RouteStatus
     withdrawal_status: RouteStatus
-    def __init__(self, zipped_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., is_native_asset: _Optional[bool] = ..., network_fee: _Optional[str] = ..., ztoken_address: _Optional[str] = ..., source_address: _Optional[str] = ..., source_decimals: _Optional[int] = ..., ztoken_decimals: _Optional[int] = ..., deposit_min_amount: _Optional[str] = ..., withdraw_min_amount: _Optional[str] = ..., supply_q: _Optional[int] = ..., deposit_status: _Optional[_Union[RouteStatus, str]] = ..., withdrawal_status: _Optional[_Union[RouteStatus, str]] = ...) -> None: ...
+    supply_status: SupplyStatus
+    supply_observed_at: _timestamp_pb2.Timestamp
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., chain_id: _Optional[int] = ..., is_native_asset: _Optional[bool] = ..., network_fee: _Optional[str] = ..., ztoken_address: _Optional[str] = ..., source_address: _Optional[str] = ..., source_decimals: _Optional[int] = ..., ztoken_decimals: _Optional[int] = ..., deposit_min_amount: _Optional[str] = ..., withdraw_min_amount: _Optional[str] = ..., supply_q: _Optional[int] = ..., deposit_status: _Optional[_Union[RouteStatus, str]] = ..., withdrawal_status: _Optional[_Union[RouteStatus, str]] = ..., supply_status: _Optional[_Union[SupplyStatus, str]] = ..., supply_observed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ZippedAssetSupplyUpdate(_message.Message):
-    __slots__ = ("zipped_asset_id", "supply_q")
+    __slots__ = ("zipped_asset_id", "supply_q", "status", "observed_at")
     ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     SUPPLY_Q_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    OBSERVED_AT_FIELD_NUMBER: _ClassVar[int]
     zipped_asset_id: int
     supply_q: int
-    def __init__(self, zipped_asset_id: _Optional[int] = ..., supply_q: _Optional[int] = ...) -> None: ...
+    status: SupplyStatus
+    observed_at: _timestamp_pb2.Timestamp
+    def __init__(self, zipped_asset_id: _Optional[int] = ..., supply_q: _Optional[int] = ..., status: _Optional[_Union[SupplyStatus, str]] = ..., observed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ZippedAssetSupplyBatch(_message.Message):
     __slots__ = ("updates",)

@@ -55,6 +55,8 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     READ_STATEMENTS: _ClassVar[PolicyAction]
     CONVERT_DUST: _ClassVar[PolicyAction]
     READ_FUNDING_FLOWS: _ClassVar[PolicyAction]
+    READ_NOTIFICATIONS: _ClassVar[PolicyAction]
+    READ_ACCOUNT_ACTIVITY: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -92,6 +94,8 @@ MANAGE_PRICE_ALERTS: PolicyAction
 READ_STATEMENTS: PolicyAction
 CONVERT_DUST: PolicyAction
 READ_FUNDING_FLOWS: PolicyAction
+READ_NOTIFICATIONS: PolicyAction
+READ_ACCOUNT_ACTIVITY: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()

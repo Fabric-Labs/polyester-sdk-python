@@ -516,7 +516,7 @@ class SetVaultStatusResponse(_message.Message):
     def __init__(self, vault: _Optional[_Union[AffiliateVault, _Mapping]] = ...) -> None: ...
 
 class QuickSwapSummary(_message.Message):
-    __slots__ = ("swap_id", "idempotency_key", "status", "reason", "is_terminal", "terms", "fees", "charged_fees", "created_at", "updated_at")
+    __slots__ = ("swap_id", "idempotency_key", "status", "reason", "is_terminal", "terms", "fees", "charged_fees", "created_at", "updated_at", "deposited_value_usd", "delivered_value_usd")
     SWAP_ID_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
@@ -527,6 +527,8 @@ class QuickSwapSummary(_message.Message):
     CHARGED_FEES_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    DEPOSITED_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    DELIVERED_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
     swap_id: int
     idempotency_key: str
     status: _quickswap_pb2.QuickSwapStatus
@@ -537,7 +539,9 @@ class QuickSwapSummary(_message.Message):
     charged_fees: _containers.RepeatedCompositeFieldContainer[_quickswap_pb2.ChargedFee]
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[_quickswap_pb2.QuickSwapStatus, str]] = ..., reason: _Optional[_Union[_quickswap_pb2.QuickSwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., terms: _Optional[_Union[_quickswap_pb2.QuickSwapTerms, _Mapping]] = ..., fees: _Optional[_Union[_quickswap_pb2.RequestedFees, _Mapping]] = ..., charged_fees: _Optional[_Iterable[_Union[_quickswap_pb2.ChargedFee, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    deposited_value_usd: _quickswap_pb2.TokenAmount
+    delivered_value_usd: _quickswap_pb2.TokenAmount
+    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[_quickswap_pb2.QuickSwapStatus, str]] = ..., reason: _Optional[_Union[_quickswap_pb2.QuickSwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., terms: _Optional[_Union[_quickswap_pb2.QuickSwapTerms, _Mapping]] = ..., fees: _Optional[_Union[_quickswap_pb2.RequestedFees, _Mapping]] = ..., charged_fees: _Optional[_Iterable[_Union[_quickswap_pb2.ChargedFee, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deposited_value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., delivered_value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
 
 class QuickSwapBrokerServiceGetQuickSwapRequest(_message.Message):
     __slots__ = ("broker", "swap_id")
@@ -594,18 +598,22 @@ class GetFeeTotalsRequest(_message.Message):
     def __init__(self, broker: _Optional[str] = ..., group_by: _Optional[_Union[FeeTotalsGrouping, str]] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., vault_account_id: _Optional[int] = ...) -> None: ...
 
 class FeeTotal(_message.Message):
-    __slots__ = ("vault_account_id", "period_start", "asset_id", "amount", "swap_count")
+    __slots__ = ("vault_account_id", "period_start", "asset_id", "amount", "swap_count", "value_usd", "unvalued_count")
     VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     PERIOD_START_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
     SWAP_COUNT_FIELD_NUMBER: _ClassVar[int]
+    VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
     vault_account_id: int
     period_start: _timestamp_pb2.Timestamp
     asset_id: int
     amount: _quickswap_pb2.TokenAmount
     swap_count: int
-    def __init__(self, vault_account_id: _Optional[int] = ..., period_start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., swap_count: _Optional[int] = ...) -> None: ...
+    value_usd: _quickswap_pb2.TokenAmount
+    unvalued_count: int
+    def __init__(self, vault_account_id: _Optional[int] = ..., period_start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., swap_count: _Optional[int] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unvalued_count: _Optional[int] = ...) -> None: ...
 
 class GetFeeTotalsResponse(_message.Message):
     __slots__ = ("totals",)
@@ -634,26 +642,40 @@ class StatusCount(_message.Message):
     def __init__(self, status: _Optional[_Union[_quickswap_pb2.QuickSwapStatus, str]] = ..., count: _Optional[int] = ...) -> None: ...
 
 class AssetVolume(_message.Message):
-    __slots__ = ("asset_id", "amount")
+    __slots__ = ("asset_id", "amount", "value_usd", "unvalued_count")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     amount: _quickswap_pb2.TokenAmount
-    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+    value_usd: _quickswap_pb2.TokenAmount
+    unvalued_count: int
+    def __init__(self, asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unvalued_count: _Optional[int] = ...) -> None: ...
 
 class FeeSplit(_message.Message):
-    __slots__ = ("asset_id", "service_fee", "broker_fee", "affiliate_fee", "referral_fee")
+    __slots__ = ("asset_id", "service_fee", "broker_fee", "affiliate_fee", "referral_fee", "service_fee_usd", "broker_fee_usd", "affiliate_fee_usd", "referral_fee_usd", "unvalued_count")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     SERVICE_FEE_FIELD_NUMBER: _ClassVar[int]
     BROKER_FEE_FIELD_NUMBER: _ClassVar[int]
     AFFILIATE_FEE_FIELD_NUMBER: _ClassVar[int]
     REFERRAL_FEE_FIELD_NUMBER: _ClassVar[int]
+    SERVICE_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    BROKER_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    AFFILIATE_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    REFERRAL_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     service_fee: _quickswap_pb2.TokenAmount
     broker_fee: _quickswap_pb2.TokenAmount
     affiliate_fee: _quickswap_pb2.TokenAmount
     referral_fee: _quickswap_pb2.TokenAmount
-    def __init__(self, asset_id: _Optional[int] = ..., service_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., broker_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., affiliate_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., referral_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+    service_fee_usd: _quickswap_pb2.TokenAmount
+    broker_fee_usd: _quickswap_pb2.TokenAmount
+    affiliate_fee_usd: _quickswap_pb2.TokenAmount
+    referral_fee_usd: _quickswap_pb2.TokenAmount
+    unvalued_count: int
+    def __init__(self, asset_id: _Optional[int] = ..., service_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., broker_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., affiliate_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., referral_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., service_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., broker_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., affiliate_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., referral_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unvalued_count: _Optional[int] = ...) -> None: ...
 
 class BrokerStatsPeriod(_message.Message):
     __slots__ = ("period_start", "created_count", "statuses", "deposited", "delivered", "fees")

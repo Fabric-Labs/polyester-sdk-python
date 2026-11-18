@@ -84,6 +84,16 @@ class GetVersionResponse(_message.Message):
     environment: str
     def __init__(self, version: _Optional[str] = ..., commit: _Optional[str] = ..., environment: _Optional[str] = ...) -> None: ...
 
+class GetTimeRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetTimeResponse(_message.Message):
+    __slots__ = ("server_time_ms",)
+    SERVER_TIME_MS_FIELD_NUMBER: _ClassVar[int]
+    server_time_ms: int
+    def __init__(self, server_time_ms: _Optional[int] = ...) -> None: ...
+
 class StatusEventUpdate(_message.Message):
     __slots__ = ("id", "message", "created_at")
     ID_FIELD_NUMBER: _ClassVar[int]

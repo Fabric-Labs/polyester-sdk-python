@@ -3,12 +3,22 @@ import datetime
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class AssetDataSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SOURCE_UNSPECIFIED: _ClassVar[AssetDataSource]
+    COINMARKETCAP: _ClassVar[AssetDataSource]
+    POLYESTER: _ClassVar[AssetDataSource]
+SOURCE_UNSPECIFIED: AssetDataSource
+COINMARKETCAP: AssetDataSource
+POLYESTER: AssetDataSource
 
 class AssetIssuePrice(_message.Message):
     __slots__ = ("amount", "currency")
@@ -42,15 +52,53 @@ class AssetEditorialInfo(_message.Message):
     issue_price: AssetIssuePrice
     def __init__(self, description: _Optional[str] = ..., website_url: _Optional[str] = ..., whitepaper_url: _Optional[str] = ..., explorer_urls: _Optional[_Iterable[str]] = ..., x_url: _Optional[str] = ..., telegram_url: _Optional[str] = ..., discord_url: _Optional[str] = ..., github_url: _Optional[str] = ..., issue_date: _Optional[str] = ..., issue_price: _Optional[_Union[AssetIssuePrice, _Mapping]] = ...) -> None: ...
 
+class AssetMarketValue(_message.Message):
+    __slots__ = ("value", "source", "as_of")
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    AS_OF_FIELD_NUMBER: _ClassVar[int]
+    value: str
+    source: AssetDataSource
+    as_of: _timestamp_pb2.Timestamp
+    def __init__(self, value: _Optional[str] = ..., source: _Optional[_Union[AssetDataSource, str]] = ..., as_of: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class AssetMarketFlag(_message.Message):
+    __slots__ = ("source", "as_of")
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    AS_OF_FIELD_NUMBER: _ClassVar[int]
+    source: AssetDataSource
+    as_of: _timestamp_pb2.Timestamp
+    def __init__(self, source: _Optional[_Union[AssetDataSource, str]] = ..., as_of: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class AssetMarketStats(_message.Message):
+    __slots__ = ("circulating_supply", "total_supply", "max_supply", "max_supply_unlimited", "market_cap_usd", "fully_diluted_market_cap_usd", "rank")
+    CIRCULATING_SUPPLY_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_SUPPLY_FIELD_NUMBER: _ClassVar[int]
+    MAX_SUPPLY_FIELD_NUMBER: _ClassVar[int]
+    MAX_SUPPLY_UNLIMITED_FIELD_NUMBER: _ClassVar[int]
+    MARKET_CAP_USD_FIELD_NUMBER: _ClassVar[int]
+    FULLY_DILUTED_MARKET_CAP_USD_FIELD_NUMBER: _ClassVar[int]
+    RANK_FIELD_NUMBER: _ClassVar[int]
+    circulating_supply: AssetMarketValue
+    total_supply: AssetMarketValue
+    max_supply: AssetMarketValue
+    max_supply_unlimited: AssetMarketFlag
+    market_cap_usd: AssetMarketValue
+    fully_diluted_market_cap_usd: AssetMarketValue
+    rank: AssetMarketValue
+    def __init__(self, circulating_supply: _Optional[_Union[AssetMarketValue, _Mapping]] = ..., total_supply: _Optional[_Union[AssetMarketValue, _Mapping]] = ..., max_supply: _Optional[_Union[AssetMarketValue, _Mapping]] = ..., max_supply_unlimited: _Optional[_Union[AssetMarketFlag, _Mapping]] = ..., market_cap_usd: _Optional[_Union[AssetMarketValue, _Mapping]] = ..., fully_diluted_market_cap_usd: _Optional[_Union[AssetMarketValue, _Mapping]] = ..., rank: _Optional[_Union[AssetMarketValue, _Mapping]] = ...) -> None: ...
+
 class AssetInfo(_message.Message):
-    __slots__ = ("asset_id", "editorial", "editorial_updated_at")
+    __slots__ = ("asset_id", "editorial", "editorial_updated_at", "market_stats")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     EDITORIAL_FIELD_NUMBER: _ClassVar[int]
     EDITORIAL_UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    MARKET_STATS_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     editorial: AssetEditorialInfo
     editorial_updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, asset_id: _Optional[int] = ..., editorial: _Optional[_Union[AssetEditorialInfo, _Mapping]] = ..., editorial_updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    market_stats: AssetMarketStats
+    def __init__(self, asset_id: _Optional[int] = ..., editorial: _Optional[_Union[AssetEditorialInfo, _Mapping]] = ..., editorial_updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., market_stats: _Optional[_Union[AssetMarketStats, _Mapping]] = ...) -> None: ...
 
 class ListAssetInfoRequest(_message.Message):
     __slots__ = ("asset_ids",)

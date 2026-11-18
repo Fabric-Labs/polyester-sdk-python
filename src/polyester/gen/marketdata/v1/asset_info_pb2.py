@@ -26,7 +26,7 @@ from polyester.gen.buf.validate import validate_pb2 as buf_dot_validate_dot_vali
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1emarketdata/v1/asset_info.proto\x12\rmarketdata.v1\x1a\x1b\x62uf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"E\n\x0f\x41ssetIssuePrice\x12\x16\n\x06\x61mount\x18\x01 \x01(\tR\x06\x61mount\x12\x1a\n\x08\x63urrency\x18\x02 \x01(\tR\x08\x63urrency\"\xfb\x02\n\x12\x41ssetEditorialInfo\x12 \n\x0b\x64\x65scription\x18\x01 \x01(\tR\x0b\x64\x65scription\x12\x1f\n\x0bwebsite_url\x18\x02 \x01(\tR\nwebsiteUrl\x12%\n\x0ewhitepaper_url\x18\x03 \x01(\tR\rwhitepaperUrl\x12#\n\rexplorer_urls\x18\x04 \x03(\tR\x0c\x65xplorerUrls\x12\x13\n\x05x_url\x18\x05 \x01(\tR\x04xUrl\x12!\n\x0ctelegram_url\x18\x06 \x01(\tR\x0btelegramUrl\x12\x1f\n\x0b\x64iscord_url\x18\x07 \x01(\tR\ndiscordUrl\x12\x1d\n\ngithub_url\x18\x08 \x01(\tR\tgithubUrl\x12\x1d\n\nissue_date\x18\t \x01(\tR\tissueDate\x12?\n\x0bissue_price\x18\n \x01(\x0b\x32\x1e.marketdata.v1.AssetIssuePriceR\nissuePrice\"\xb5\x01\n\tAssetInfo\x12\x19\n\x08\x61sset_id\x18\x01 \x01(\rR\x07\x61ssetId\x12?\n\teditorial\x18\x02 \x01(\x0b\x32!.marketdata.v1.AssetEditorialInfoR\teditorial\x12L\n\x14\x65\x64itorial_updated_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x12\x65\x64itorialUpdatedAt\"J\n\x14ListAssetInfoRequest\x12\x32\n\tasset_ids\x18\x01 \x03(\rB\x15\xbaH\x12\x92\x01\x0f\x10\xe8\x07\"\n*\x08\x18\xff\xff\xff\xff\x07 \x00R\x08\x61ssetIds\"P\n\x15ListAssetInfoResponse\x12\x37\n\nasset_info\x18\x01 \x03(\x0b\x32\x18.marketdata.v1.AssetInfoR\tassetInfoBHZFgithub.com/Fabric-Labs/polyester-sdk-go/gen/marketdata/v1;marketdatav1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1emarketdata/v1/asset_info.proto\x12\rmarketdata.v1\x1a\x1b\x62uf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"E\n\x0f\x41ssetIssuePrice\x12\x16\n\x06\x61mount\x18\x01 \x01(\tR\x06\x61mount\x12\x1a\n\x08\x63urrency\x18\x02 \x01(\tR\x08\x63urrency\"\xfb\x02\n\x12\x41ssetEditorialInfo\x12 \n\x0b\x64\x65scription\x18\x01 \x01(\tR\x0b\x64\x65scription\x12\x1f\n\x0bwebsite_url\x18\x02 \x01(\tR\nwebsiteUrl\x12%\n\x0ewhitepaper_url\x18\x03 \x01(\tR\rwhitepaperUrl\x12#\n\rexplorer_urls\x18\x04 \x03(\tR\x0c\x65xplorerUrls\x12\x13\n\x05x_url\x18\x05 \x01(\tR\x04xUrl\x12!\n\x0ctelegram_url\x18\x06 \x01(\tR\x0btelegramUrl\x12\x1f\n\x0b\x64iscord_url\x18\x07 \x01(\tR\ndiscordUrl\x12\x1d\n\ngithub_url\x18\x08 \x01(\tR\tgithubUrl\x12\x1d\n\nissue_date\x18\t \x01(\tR\tissueDate\x12?\n\x0bissue_price\x18\n \x01(\x0b\x32\x1e.marketdata.v1.AssetIssuePriceR\nissuePrice\"\x91\x01\n\x10\x41ssetMarketValue\x12\x14\n\x05value\x18\x01 \x01(\tR\x05value\x12\x36\n\x06source\x18\x02 \x01(\x0e\x32\x1e.marketdata.v1.AssetDataSourceR\x06source\x12/\n\x05\x61s_of\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x04\x61sOf\"z\n\x0f\x41ssetMarketFlag\x12\x36\n\x06source\x18\x01 \x01(\x0e\x32\x1e.marketdata.v1.AssetDataSourceR\x06source\x12/\n\x05\x61s_of\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x04\x61sOf\"\x95\x04\n\x10\x41ssetMarketStats\x12N\n\x12\x63irculating_supply\x18\x01 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketValueR\x11\x63irculatingSupply\x12\x42\n\x0ctotal_supply\x18\x02 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketValueR\x0btotalSupply\x12>\n\nmax_supply\x18\x03 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketValueR\tmaxSupply\x12P\n\x14max_supply_unlimited\x18\x04 \x01(\x0b\x32\x1e.marketdata.v1.AssetMarketFlagR\x12maxSupplyUnlimited\x12\x45\n\x0emarket_cap_usd\x18\x05 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketValueR\x0cmarketCapUsd\x12_\n\x1c\x66ully_diluted_market_cap_usd\x18\x06 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketValueR\x18\x66ullyDilutedMarketCapUsd\x12\x33\n\x04rank\x18\x07 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketValueR\x04rank\"\xf9\x01\n\tAssetInfo\x12\x19\n\x08\x61sset_id\x18\x01 \x01(\rR\x07\x61ssetId\x12?\n\teditorial\x18\x02 \x01(\x0b\x32!.marketdata.v1.AssetEditorialInfoR\teditorial\x12L\n\x14\x65\x64itorial_updated_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x12\x65\x64itorialUpdatedAt\x12\x42\n\x0cmarket_stats\x18\x04 \x01(\x0b\x32\x1f.marketdata.v1.AssetMarketStatsR\x0bmarketStats\"J\n\x14ListAssetInfoRequest\x12\x32\n\tasset_ids\x18\x01 \x03(\rB\x15\xbaH\x12\x92\x01\x0f\x10\xe8\x07\"\n*\x08\x18\xff\xff\xff\xff\x07 \x00R\x08\x61ssetIds\"P\n\x15ListAssetInfoResponse\x12\x37\n\nasset_info\x18\x01 \x03(\x0b\x32\x18.marketdata.v1.AssetInfoR\tassetInfo*K\n\x0f\x41ssetDataSource\x12\x16\n\x12SOURCE_UNSPECIFIED\x10\x00\x12\x11\n\rCOINMARKETCAP\x10\x01\x12\r\n\tPOLYESTER\x10\x02\x42HZFgithub.com/Fabric-Labs/polyester-sdk-go/gen/marketdata/v1;marketdatav1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,14 +36,22 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'ZFgithub.com/Fabric-Labs/polyester-sdk-go/gen/marketdata/v1;marketdatav1'
   _globals['_LISTASSETINFOREQUEST'].fields_by_name['asset_ids']._loaded_options = None
   _globals['_LISTASSETINFOREQUEST'].fields_by_name['asset_ids']._serialized_options = b'\272H\022\222\001\017\020\350\007\"\n*\010\030\377\377\377\377\007 \000'
+  _globals['_ASSETDATASOURCE']._serialized_start=1782
+  _globals['_ASSETDATASOURCE']._serialized_end=1857
   _globals['_ASSETISSUEPRICE']._serialized_start=111
   _globals['_ASSETISSUEPRICE']._serialized_end=180
   _globals['_ASSETEDITORIALINFO']._serialized_start=183
   _globals['_ASSETEDITORIALINFO']._serialized_end=562
-  _globals['_ASSETINFO']._serialized_start=565
-  _globals['_ASSETINFO']._serialized_end=746
-  _globals['_LISTASSETINFOREQUEST']._serialized_start=748
-  _globals['_LISTASSETINFOREQUEST']._serialized_end=822
-  _globals['_LISTASSETINFORESPONSE']._serialized_start=824
-  _globals['_LISTASSETINFORESPONSE']._serialized_end=904
+  _globals['_ASSETMARKETVALUE']._serialized_start=565
+  _globals['_ASSETMARKETVALUE']._serialized_end=710
+  _globals['_ASSETMARKETFLAG']._serialized_start=712
+  _globals['_ASSETMARKETFLAG']._serialized_end=834
+  _globals['_ASSETMARKETSTATS']._serialized_start=837
+  _globals['_ASSETMARKETSTATS']._serialized_end=1370
+  _globals['_ASSETINFO']._serialized_start=1373
+  _globals['_ASSETINFO']._serialized_end=1622
+  _globals['_LISTASSETINFOREQUEST']._serialized_start=1624
+  _globals['_LISTASSETINFOREQUEST']._serialized_end=1698
+  _globals['_LISTASSETINFORESPONSE']._serialized_start=1700
+  _globals['_LISTASSETINFORESPONSE']._serialized_end=1780
 # @@protoc_insertion_point(module_scope)

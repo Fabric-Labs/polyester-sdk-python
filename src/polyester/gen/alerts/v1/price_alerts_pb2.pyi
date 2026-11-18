@@ -29,6 +29,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
     SUBACCOUNT_KEY_REFUSED: _ClassVar[ErrorCode]
     ALERT_UPDATE_LIMIT_REACHED: _ClassVar[ErrorCode]
+    TELEGRAM_NOT_LINKED: _ClassVar[ErrorCode]
+    TELEGRAM_UNAVAILABLE: _ClassVar[ErrorCode]
 
 class AlertDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -74,6 +76,8 @@ IDEMPOTENCY_CONFLICT: ErrorCode
 SERVICE_UNAVAILABLE: ErrorCode
 SUBACCOUNT_KEY_REFUSED: ErrorCode
 ALERT_UPDATE_LIMIT_REACHED: ErrorCode
+TELEGRAM_NOT_LINKED: ErrorCode
+TELEGRAM_UNAVAILABLE: ErrorCode
 DIRECTION_UNSPECIFIED: AlertDirection
 ABOVE: AlertDirection
 BELOW: AlertDirection

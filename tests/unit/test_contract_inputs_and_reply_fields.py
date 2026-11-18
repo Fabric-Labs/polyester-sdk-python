@@ -94,6 +94,25 @@ async def test_asset_ids_within_the_contract_range_are_sent(ids: list[int]) -> N
     assert list(sent.asset_ids) == ids
 
 
+async def test_more_asset_ids_than_the_contract_allows_are_refused_before_sending() -> None:
+    from polyester.services.market_data import ASSET_IDS_MAX
+
+    assert ASSET_IDS_MAX == 1000  # max_items: 1000
+    async with _client() as (client, requests):
+        with pytest.raises(PolyesterValidationError, match="asset_ids"):
+            await client.market_data.list_asset_info(list(range(1, 1002)))
+    assert requests == []
+
+
+async def test_as_many_asset_ids_as_the_contract_allows_are_sent() -> None:
+    async with _client() as (client, requests):
+        with pytest.raises(PolyesterError):  # the mock answers 500
+            await client.market_data.list_asset_info(list(range(1, 1001)))
+    assert len(requests) == 1
+    sent = asset_info_pb2.ListAssetInfoRequest.FromString(requests[0].body)
+    assert len(sent.asset_ids) == 1000
+
+
 # --- deposit address chain -----------------------------------------------------------------------
 # deposit.proto, CreateDepositAddressRequest:
 #   uint32 chain_id = 2 [(buf.validate.field).uint32.gt = 0];   (no ignore-if-zero)

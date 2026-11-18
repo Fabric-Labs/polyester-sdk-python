@@ -1,5 +1,5 @@
 # Every field of the request and reply messages public contracts 1945423c,
-# 5c2119f and 0.93.5 added or changed, and of the messages nested in their new replies. A guard
+# 5c2119f and c35662b added or changed, and of the messages nested in their new replies. A guard
 # test walks these messages and fails when a field is missing here or listed
 # but gone, or when a covered name is not an attribute of the named model, so
 # no field of them is dropped by accident.

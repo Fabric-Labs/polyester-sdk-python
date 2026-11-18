@@ -72,7 +72,7 @@ MESSAGES = [
     "transfer.v1.DustAssetPrice",
     "transfer.v1.DustSource",
     "transfer.v1.DustConversion",
-    # Public contract 0.93.5.
+    # Public contract c35662b (0.93.5).
     "auth.v1.TimestampWindow",
     "auth.v1.ListAccountActivityRequest",
     "auth.v1.ListAccountActivityResponse",

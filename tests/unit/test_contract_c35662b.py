@@ -1,4 +1,4 @@
-"""Public contract 0.93.5: all-or-nothing internal transfer batches and their
+"""Public contract c35662b (0.93.5): all-or-nothing internal transfer batches and their
 read, statement export cancel and download URL, the server time and the
 timestamp window of a skew refusal, route supply status, partial wallet
 reads, ladder outcomes, preview price band limits, asset market datapoints,

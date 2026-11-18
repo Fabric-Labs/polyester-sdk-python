@@ -52,7 +52,7 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     )
     proto = batch_create_orders_to_proto(
         items=[dict_item, struct_item],
-        sub_account_id="123",
+        sub_account_id="23",
         request_id="req-create-1",
         allow_partial=True,
         quantity_scale=8,
@@ -60,7 +60,7 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
     assert proto.request_id == "req-create-1"
     # allow_partial was removed from the wire (POLY-3701); the arg is ignored.
     assert "allow_partial" not in {f.name for f in proto.DESCRIPTOR.fields}
-    assert proto.subaccount_id == id_to_int("123")
+    assert proto.subaccount_id == id_to_int("23")
     assert len(proto.items) == 2
     assert proto.items[0].symbol_id == 1
     assert proto.items[0].side == orders_pb2.BUY
@@ -287,13 +287,13 @@ def test_batch_replace_encodes_admission_request() -> None:
             )
         ],
         symbol_id=7,
-        sub_account_id="123",
+        sub_account_id="23",
         request_id="request-1",
         quantity_scale=6,
     )
     assert proto.symbol_id == 7
     assert proto.request_id == "request-1"
-    assert proto.subaccount_id == id_to_int("123")
+    assert proto.subaccount_id == id_to_int("23")
     assert proto.items[0].order_id == 10
     assert proto.items[0].new_price_ticks == 100_000_000_000
     assert proto.items[0].new_qty_scaled == 250_000

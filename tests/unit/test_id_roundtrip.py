@@ -35,8 +35,11 @@ def test_a_digit_only_string_is_base58_never_decimal() -> None:
     assert not format_id(10).isdigit()
     with pytest.raises(PolyesterValidationError):
         id_to_int("10")
-    # "123" is base58 60, though format_id(60) is "23".
-    assert id_to_int("123") == 60
+    # "123" would be base58 60, another spelling of format_id(60) == "23":
+    # only the canonical spelling is accepted.
+    assert id_to_int("23") == 60
+    with pytest.raises(PolyesterValidationError, match="canonical"):
+        id_to_int("123")
     # The integer names the ID it is.
     assert id_to_int(10) == 10
     assert id_to_int(123) == 123

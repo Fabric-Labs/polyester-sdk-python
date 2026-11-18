@@ -34,6 +34,7 @@ from polyester.errors import (
     AUTH_TEMPORARILY_UNAVAILABLE,
     AUTH_TIMESTAMP_SKEW,
     ORDER_PERMISSION_REFUSAL_CODES,
+    REQUEST_TOO_LARGE,
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
@@ -56,6 +57,7 @@ from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.api.v1 import request_error_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from polyester.models.trading import OrderFieldViolation
@@ -94,6 +96,7 @@ _DETAIL_MESSAGES: tuple[type[Message], ...] = (
     ledger_read_pb2.ErrorDetail,
     alerts_pb2.ErrorDetail,
     ratelimit_pb2.RateLimitDetail,
+    request_error_pb2.RequestErrorDetail,
 )
 
 # alerts.v1 codes answered as server errors: PRICE_UNAVAILABLE changed nothing
@@ -442,6 +445,16 @@ def _map_connect_error(exc: ConnectError):
             )
         for unpacked in unpacked_details:
             full_name = unpacked.DESCRIPTOR.full_name
+            if full_name == "polyester.api.v1.RequestErrorDetail":
+                # The typed answer to a request over the size limit: never a
+                # rate limit, and the same request is refused again. A code
+                # this SDK does not know leaves the error as it reads without
+                # the detail.
+                if unpacked.code == request_error_pb2.REQUEST_TOO_LARGE:
+                    too_large = PolyesterApiError(error_message, code=REQUEST_TOO_LARGE)
+                    too_large.limit_bytes = int(unpacked.limit_bytes) or None
+                    return too_large
+                continue
             if full_name == "alerts.v1.ErrorDetail":
                 code_name = error_code_name(alerts_pb2.ErrorCode, unpacked.code)
                 if code_name == "SUBACCOUNT_KEY_REFUSED":

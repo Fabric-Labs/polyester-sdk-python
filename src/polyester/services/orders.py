@@ -581,14 +581,27 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         side: str | None = None,
         dry_run: bool = False,
         request_id: str | None = None,
+        include_triggers: bool = False,
     ) -> CancelAllOrdersResult:
         """Cancel every matching open order, including those triggers placed.
 
-        Triggers keep running: a standalone stop-loss, take-profit, trailing
-        stop or TWAP can still place new orders. An attached leg whose exit
-        order is canceled ends, and so do its OCO siblings, so the position
-        loses that protection. To stop all automated trading, use
-        :meth:`stop_all_trading`, which cancels the triggers first.
+        Without ``include_triggers`` triggers keep running: a standalone
+        stop-loss, take-profit, trailing stop or TWAP can still place new
+        orders. An attached leg whose exit order is canceled ends, and so do
+        its OCO siblings, so the position loses that protection. With
+        ``include_triggers=True`` one request halts all automated trading on
+        the matched symbols and side: every trigger and attached leg created
+        before the request was accepted ends canceled (reason
+        ``cancel_all``), releases its reserved funds and places no order
+        after the response; ``matched_triggers`` counts them.
+
+        What a cancel-all covers is fixed when its ``request_id`` is first
+        admitted: every matching order admitted before it, from any interface,
+        and none admitted after. An order whose create, modify or replace
+        answered before the cancel-all was sent is covered; one still in flight
+        or with an unknown outcome may be admitted after it and stay open, so
+        send a second cancel-all once those calls have answered. The result
+        confirms admission, not completion.
         """
         if symbol or symbols:
             await self._ensure_catalogs()
@@ -604,6 +617,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             side=side,
             dry_run=dry_run,
             request_id=request_id,
+            include_triggers=include_triggers,
         )
         return await unary_auth_decoded(
             self._transport,
@@ -998,11 +1012,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         symbol: str | None = None,
         side: str | None = None,
         request_id: str | None = None,
+        include_triggers: bool = False,
     ) -> CancelAllAfterResult:
         """Arm the dead-man switch: cancel open orders after ``timeout_sec``
-        unless it is armed again. Like :meth:`cancel_all` it leaves triggers
-        running, and an attached leg whose exit order it cancels ends (with its
-        OCO siblings); cancel triggers first to stop all automated trading.
+        unless it is armed again. Like :meth:`cancel_all`, without
+        ``include_triggers`` it leaves triggers running, and an attached leg
+        whose exit order it cancels ends (with its OCO siblings). With
+        ``include_triggers=True`` the switch also stops every trigger created
+        before its expiry time, even when the expiry is processed later; a
+        trigger created at or after that time is not stopped.
 
         ``timeout_sec`` is an ``int``, 10 to 120, or 0 to disarm the switch;
         any other value raises ``PolyesterValidationError`` before sending."""
@@ -1016,6 +1034,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             ),
             side=side,
             request_id=request_id,
+            include_triggers=include_triggers,
         )
         return await unary_auth_decoded(
             self._transport,

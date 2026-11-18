@@ -1386,6 +1386,12 @@ CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC = 10
 CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC = 120
 
 
+def _include_triggers(value: object, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise PolyesterValidationError(f"{label} include_triggers must be a bool")
+    return value
+
+
 def cancel_all_after_to_proto(
     *,
     sub_account_id: str | int | None = None,
@@ -1393,6 +1399,7 @@ def cancel_all_after_to_proto(
     symbol_id: int | None = None,
     side: str | None = None,
     request_id: str | None = None,
+    include_triggers: bool = False,
 ) -> orders_pb2.CancelAllAfterRequest:
     timeout = exact_integer(
         timeout_sec,
@@ -1411,6 +1418,7 @@ def cancel_all_after_to_proto(
     proto = orders_pb2.CancelAllAfterRequest(
         request_id=optional_request_id(request_id) or f"cancel-after-{uuid.uuid4().hex[:12]}",
         timeout_sec=timeout,
+        include_triggers=_include_triggers(include_triggers, "cancel_all_after"),
     )
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
@@ -1535,10 +1543,12 @@ def cancel_all_orders_to_proto(
     side: str | None = None,
     dry_run: bool = False,
     request_id: str | None = None,
+    include_triggers: bool = False,
 ) -> orders_pb2.CancelAllOrdersRequest:
     proto = orders_pb2.CancelAllOrdersRequest(
         request_id=optional_request_id(request_id) or f"cancel-all-{uuid.uuid4().hex[:12]}",
         dry_run=dry_run,
+        include_triggers=_include_triggers(include_triggers, "cancel_all"),
     )
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")

@@ -72,6 +72,14 @@ class AsyncSocialVerificationService(BaseService):
         A Telegram link awaiting the user's confirmation reads
         ``STATUS_AWAITING_CONFIRMATION`` with the ``handle`` of the Telegram
         account that sent the code; confirming and unlinking need a session.
+
+        ``changeAvailableAt`` (RFC 3339 UTC) is when the linked X/Twitter or
+        Discord account may be changed or unlinked again: each provider allows
+        one change or unlink per 30 days. It is absent when a change is
+        allowed now, and always for Telegram. A first link, a link after an
+        unlink and a re-verification of the linked X/Twitter handle are not
+        changes. A change refused inside the window raises
+        ``AUTH_SOCIAL_CHANGE_LIMIT_REACHED`` before any step-up is asked.
         """
         request = sv_pb2.GetSocialVerificationRequest(
             provider=resolve_proto_enum(

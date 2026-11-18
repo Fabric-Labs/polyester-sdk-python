@@ -67,6 +67,8 @@ def _enrich_asset_chains(
                 deposit_min_amount=variant.deposit_min_amount,
                 withdraw_min_amount=variant.withdraw_min_amount,
                 supply=variant.supply,
+                supply_status=variant.supply_status,
+                supply_observed_at=variant.supply_observed_at,
                 source_token=variant.source_token,
                 z_token=variant.z_token,
                 deposit_status=variant.deposit_status,

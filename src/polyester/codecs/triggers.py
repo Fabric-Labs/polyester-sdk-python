@@ -23,6 +23,7 @@ from polyester.codecs.refusal_codes import (
     SLIPPAGE_TICKS_INVALID,
     TRAILING_DISTANCE_INVALID,
     TRIGGER_ACTIVATION_PRICE_INVALID,
+    TRIGGER_PATCH_EMPTY,
     TRIGGER_PRICE_INVALID,
     TRIGGER_QTY_INVALID,
     TWAP_DURATION_INVALID,
@@ -642,7 +643,8 @@ def modify_trigger_to_proto(
         raise PolyesterValidationError(
             "modify requires at least one of trigger_price, "
             "trailing_distance_ticks, trailing_distance_bps, activation_price, "
-            "max_slippage_ticks, or max_slippage_bps"
+            "max_slippage_ticks, or max_slippage_bps",
+            code=TRIGGER_PATCH_EMPTY,
         )
     if symbol_id < 0:
         raise PolyesterValidationError("modify trigger symbol_id must not be negative")

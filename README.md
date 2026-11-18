@@ -116,6 +116,20 @@ async with subscription:
             known[update.id] = update  # update.role: "viewer", "trader", ...
 ```
 
+`sub_accounts.list_account_activity(...)` returns one page of the security and
+activity history of the main account and every sub-account the caller may
+read, newest first; `iter_account_activity(...)` follows every page with the
+same filters. Filter by `sub_account_ids` and `include_main_account` (alone, it
+lists only the main account's own events, which carry no `subaccount_id`),
+`entity_kinds` (`"session"`, `"api_key"`, ...), `event_actions` (`"created"`,
+`"failed"`, ...), `sources`, `api_key_id`, and a timezone-aware `start_time`
+(inclusive) and `end_time` (exclusive). A filter the contract refuses (an
+unknown label, a repeated value or ID, too many values, an empty range) raises
+`PolyesterValidationError` before sending. Each event names its `subaccount_id`
+and, when the actor used an API key, `actor_api_key_id`. A wallet sign-in is a
+`"session"` event, `"created"` or `"failed"`. An API key needs
+`READ_ACCOUNT_ACTIVITY`.
+
 Private streams require an Account ID and the corresponding API-key permission.
 A successful subscribe call means the token exchange and realtime handshake
 completed. The connection and subscription tokens are renewed on the same
@@ -336,7 +350,11 @@ grants exactly its reads: `READ_API_KEYS` (`api_keys.list`, `api_keys.get`),
 (`trading_withdraws.validate_destination`). `READ_API_POLICIES`,
 `READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`, `READ_PROFILE`,
 `READ_ACCOUNT_DIRECTORY`, `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`,
-`READ_CHECKPOINTS` and `READ_REWARDS` open calls this SDK does not wrap yet.
+`READ_CHECKPOINTS`, `READ_REWARDS` and `READ_NOTIFICATIONS` (notification
+reads, on a key scoped to the main account) open calls this SDK does not wrap
+yet. `READ_ACCOUNT_ACTIVITY` opens `sub_accounts.list_account_activity` and
+`iter_account_activity`, the activity feed of the main account and its
+sub-accounts; `READ_SUBACCOUNT_ACTIVITY` does not open it.
 Deposit addresses, sub-accounts and Guard Signer status need one too:
 `CREATE_DEPOSIT_ADDRESS` (`deposit.create_address`), `READ_DEPOSIT_ADDRESSES`
 (`deposit.list_addresses`), `READ_SUBACCOUNTS` (`sub_accounts.list`,
@@ -345,11 +363,13 @@ Deposit addresses, sub-accounts and Guard Signer status need one too:
 `sub_accounts.get`), `READ_SUBACCOUNT_INVITES` (`sub_accounts.list_invites`, and
 the invites of `sub_accounts.get`) and `READ_GUARD_SIGNER_STATUS`
 (`guard_signer.get_status`). Account statements need `READ_STATEMENTS`
-(`statements.export`, `statements.export_page` and the statement export files);
-`CONVERT_DUST` converts dust (`dust_conversions.quote`, `dust_conversions.convert`, the
-conversion reads) and `READ_FUNDING_FLOWS` reads the account's own flows
-(`lifecycle.list_account_flows`, `lifecycle.get_account_flow`); `READ_BALANCES` and
-`READ_INTERNAL_TRANSFERS` do not grant it. A key scoped to the main account reaches the main
+(every `statements` call). `CONVERT_DUST` converts dust (`dust_conversions.quote`,
+`dust_conversions.convert`, the conversion reads) and `READ_FUNDING_FLOWS` reads the
+account's own flows (`lifecycle.list_account_flows`, `lifecycle.get_account_flow`);
+`READ_BALANCES` and `READ_INTERNAL_TRANSFERS` do not grant it. These two are product
+actions, valid on sub-account policies too: every sub-account policy includes
+`READ_FUNDING_FLOWS`, and converting a sub-account's dust with an API key needs
+`CONVERT_DUST` on both the key's policy and the sub-account's. A key scoped to the main account reaches the main
 account and the sub-accounts it owns; a key scoped to a sub-account reaches only
 that sub-account. `sub_accounts.get` leaves out the members and invites a key
 may not read instead of failing. The main account's address book needs
@@ -357,7 +377,7 @@ may not read instead of failing. The main account's address book needs
 account, as a sub-account's book already did. `guard_signer.get_status` no
 longer answers an API key for a sub-account another main account shares with
 yours; use a key of the owning main account.
-These permissions are valid on API-key policies only. VIP status and social
+The other permissions above are valid on API-key policies only. VIP status and social
 verification refuse a key scoped to a sub-account. A key without the permission
 raises `PolyesterApiError` whose `auth_error_code(err)` is
 `AUTH_API_KEY_ACCESS_DENIED`; its message names the missing permission. Policy
@@ -862,12 +882,19 @@ if detail.order is not None:
 ```
 
 A cancel of an order that has already ended, a repeat of the cancel that ended
-it included, raises `PolyesterApiError` `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
-`is_order_already_terminal(err)` tells it apart. Treat it as "already done"
-and read the order for how it ended. A client order ID names its order for at
-least a minute after the order ends; a later cancel by client order ID may
-read `ERROR_CODE_ORDER_UNKNOWN`, so retry by order ID once you have it. Every
-cancel, a repeat included, counts against the cancel rate limit.
+it included, raises `PolyesterApiError` `ERROR_CODE_ORDER_ALREADY_TERMINAL`
+(`failed_precondition`): `is_order_already_terminal(err)` tells it apart. Treat
+it as "already done" and read the order for how it ended. That answer is not
+guaranteed for every ended order: a client order ID names its order for at
+least a minute after the order ends, and an order ID while the exchange can
+still confirm it placed that order (exchange maintenance, such as a market
+listing or a recovery, can end that). After that, a cancel or modify answers
+`ERROR_CODE_ORDER_UNKNOWN` (`not_found`), as for an ID that was never placed.
+So `ERROR_CODE_ORDER_UNKNOWN` does not prove an order never existed: for an
+order you placed, read it with `orders.get` before treating it as lost, and
+treat it as done if it ended. Retrying a cancel by order ID does not tell an
+ended order from an unknown one. Every cancel, a repeat included, counts
+against the cancel rate limit.
 
 `cancel_all(...)` requests cancellation of every matching order. The result
 lists up to 200 of them, oldest first, in `cancelled_orders` (each with
@@ -1102,6 +1129,17 @@ sent). It needs no API key and sends none. A build made after a release reads
 like `0.10.0-12-g4e21a2f09670`, which is not a semantic version: `release` is
 the part before the first `-`, the release it follows.
 
+`await client.get_time()` returns the API's clock as `ServerTime`:
+`server_time_ms` (milliseconds since the Unix epoch) and `server_time`. It is
+the clock that checks the timestamp of requests signed with an API key, which
+the API accepts while it is at most 1000 ms ahead of the server time and at
+most the receive window (5000 ms unless the client sets another) behind it. It
+needs no API key and is never cached. A request outside that window raises
+`PolyesterTimestampSkewError`, retryable; its `timestamp_window` is a
+`ServerTime` with the server time of the refusal, `recv_window_ms` and
+`max_future_ms` (`None` when the answer names none), so a client can measure
+its clock's offset from the refusal alone.
+
 ## Status events
 
 `await client.list_status_events()` returns the environment's scheduled
@@ -1132,55 +1170,28 @@ change it.
 
 ## Account statements
 
-`client.statements` exports an account's balance movements for a period as
-CSV, for reconciliation and tax reporting. `await client.statements.export(
-start_time=..., end_time=...)` follows every page and returns the whole
-`Statement`; `export_page` returns one `StatementPage` (`csv`,
-`next_page_token`) for callers that stream pages. `start_time` is inclusive and
-`end_time` exclusive, both timezone-aware; the server allows at most 366 days.
-`asset_id` keeps one asset, and `account` / `sub_account_id` choose the account
-as for `transfers.list`, the client's default sub-account included. The call is
-signed; an API key needs `READ_STATEMENTS`.
-
-```python
-from datetime import UTC, datetime
-
-statement = await client.statements.export(
-    start_time=datetime(2026, 10, 1, tzinfo=UTC),
-    end_time=datetime(2026, 11, 1, tzinfo=UTC),
-)
-for row in statement.rows():
-    print(row.time, row.type, row.account, row.asset, row.amount, row.fee, row.balance)
-```
-
-`statement.csv` is RFC 4180 CSV in UTF-8 with CRLF line endings: save it as
-is. Only the first page carries the header row, so the pages concatenate into
-one file. `rows()` (and `parse_statement_csv`) read the columns by header name,
-so the columns a later release appends are ignored, and a statement without
-`flow_id` reads it as `""`. Amounts, fees and balances stay exact decimal
-strings; never parse them as floats.
-
-A statement says how far it is complete: `Statement.complete_through` (and each
-`StatementPage.complete_through`) is the end of the movements it covers,
-exclusive: the earliest of `end_time`, the first page's request time and the
-time through which account history was complete then. When it is before
-`end_time`, request the rest, from `complete_through` to `end_time`, later.
-
-### Statement export files
-
-For a long period, ask for the whole statement as one CSV file produced in the
-background. `statements.create_export(...)` takes the same period, asset and
-account as `export` (at most 366 days) and an `idempotency_key` of 1 to 64
+`client.statements` produces an account's balance movements for a period as
+one CSV file in the background, for reconciliation and tax reporting.
+`statements.create_export(start_time=..., end_time=..., idempotency_key=...)`
+asks for it: `start_time` is inclusive and `end_time` exclusive, both
+timezone-aware, at most 366 days apart. `asset_id` keeps one asset, and
+`account` / `sub_account_id` choose the account as for `transfers.list`, the
+client's default sub-account included. The `idempotency_key` is 1 to 64
 letters, digits, `.`, `_`, `:` or `-`: repeating the create with it returns the
-same export. Poll `statements.get_export(export_id=...)` until its `status` is
-`"ready"` (or `"failed"`, with `failure_reason` `"too_large"` or
-`"unavailable"`); `list_exports` and `iter_exports` list the account's exports,
-newest first. A root account has at most 5 exports queued or processing; another
-create raises `ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, which is not
-retryable: wait for one to finish. An API key needs `READ_STATEMENTS`.
+same export. Every call is signed; an API key needs `READ_STATEMENTS`.
+
+`statements.wait_export(export_id=...)` reads the export until it is final:
+`"ready"`, `"failed"` (with `failure_reason` `"too_large"`, so split the
+period, or `"unavailable"`, so create a new export), `"expired"` or
+`"canceled"`. `get_export` reads it once, and `list_exports` and
+`iter_exports` list the account's exports, newest first; each page also counts
+the root account's exports in progress (`in_progress_exports`) against its
+limit (`max_in_progress_exports`, 5). Another create over the limit raises
+`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, which is not retryable: wait for
+one to finish, or stop one with `statements.cancel_export(export_id=...)`,
+which returns it `"canceled"` at once and deletes any partial file.
 
 ```python
-import asyncio
 from datetime import UTC, datetime
 
 export = await client.statements.create_export(
@@ -1188,17 +1199,21 @@ export = await client.statements.create_export(
     end_time=datetime(2027, 1, 1, tzinfo=UTC),
     idempotency_key="statement-2026",
 )
-while export.status in ("queued", "processing"):
-    await asyncio.sleep(5)
-    export = await client.statements.get_export(export_id=export.export_id)
+export = await client.statements.wait_export(export_id=export.export_id)
 print(export.status, export.movements, export.bytes, export.expires_at)
 ```
 
-A ready file is downloaded over REST only, with an authenticated
-`GET /v1/statements/exports/{export_id}/file` for 7 days: `text/csv`, byte for
-byte the `export` pages for the same account, asset and period up to the
-export's `complete_through`, with `Range` and `If-Range` support. This SDK does
-not wrap the download.
+A ready file is downloadable for 7 days. Servers and scripts download it with
+an authenticated `GET /v1/statements/exports/{export_id}/file`: `text/csv`,
+with `Range` and `If-Range` support. This SDK does not wrap the download;
+`parse_statement_csv(text)` reads the file's rows by header name, so columns a
+later release appends are ignored, and amounts, fees and balances stay exact
+decimal strings; never parse them as floats. A browser saves the file from the
+URL `statements.get_export_download_url(export_id=...)` returns: it needs no
+credentials and works for at most 60 seconds (`expires_at`), so anyone who
+holds it can download the file. It is a `Secret`: printing shows
+`[REDACTED]`; call `url.reveal()` to hand it on, and never share, store or log
+it.
 
 ## Price alerts (devnet)
 
@@ -1215,8 +1230,14 @@ raises `PolyesterApiError` whose `auth_error_code(err)` is
   idempotency_key=None)`: `direction` `"above"` fires at a price >= `price`,
   `"below"` at a price <= `price`. `price_source` is `"last"` or `"index"`;
   `None` watches the index price where the market has one and the last price
-  otherwise. `channels` names one or two of `"in_app"` and `"telegram"`. The
-  current price is recorded as `reference_price`; an alert whose condition
+  otherwise. `channels` names one or two of `"in_app"` and `"telegram"`.
+  `"telegram"` needs a Telegram account linked to the account: without one,
+  `create` (and an `update` that leaves the alert with Telegram) raises
+  `PolyesterApiError` `TELEGRAM_NOT_LINKED` and nothing changes; where Telegram
+  alerts are not offered (testnet has in-app alerts only) it raises
+  `TELEGRAM_UNAVAILABLE`, so offer the alert in-app only. Neither is retryable.
+  A Telegram message that cannot be delivered puts the fired alert in the
+  notification inbox. The current price is recorded as `reference_price`; an alert whose condition
   already holds starts with `armed` false and fires only after the price moves
   back and crosses again. Name the market with `symbol=`, `symbol_id=` or both.
   A `Price` bound to a market (`Price.from_ticks(..., symbol="ETH-USDT")`) is
@@ -1641,8 +1662,12 @@ SDK notes:
   the zTokens of the account's smart account wallet live from Polyester Chain
   (`smart_account_address`, and per balance `zipped_asset_id`,
   `unified_asset_id`, `chain_id`, `ztoken_address`, exact `amount_e18` and
-  `amount`). A withdrawal Zipper rejects is refunded there, net of its kept
-  fee: its lifecycle flow ends `refunded`. `account=` or `sub_account_id=`
+  `amount`). A read can be incomplete: `unavailable_assets` lists the zTokens
+  whose balance could not be read (`reason` `"no_contract"`, `"read_failed"` or
+  `"invalid_balance"`), and `is_complete` is false. Their balance is unknown,
+  not zero: show them as unavailable and leave them out of totals. A
+  withdrawal Zipper rejects is refunded there, net of its kept fee: its
+  lifecycle flow ends `refunded`. `account=` or `sub_account_id=`
   selects the account, as in [Choosing the account](#choosing-the-account). An
   API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
@@ -1815,6 +1840,26 @@ such a destination with the step reason `route_suspended`, leaving the funds for
 a later run. The config is cacheable for 10 seconds; read it again to see a
 suspension start or end.
 
+Each variant also says whether its zToken supply is known: `supply_status` is
+`"available"` (current), `"stale"` (not refreshed for longer than expected; may
+no longer be accurate) or `"missing"` (none known yet). `supply` (an exact
+decimal) and `supply_observed_at` are set only while the status is
+`"available"` or `"stale"`, and are `None` otherwise: an unknown supply is
+never 0. `variant.known_supply()` returns the supply only while it is known.
+`zipper.subscribe_zipped_asset_supply` updates carry the same `status` and
+`observed_at`; a route whose supply stops refreshing gets one `"stale"` update
+repeating its last value. A withdrawal to a network whose destination supply is
+missing or stale is refused with `ERROR_CODE_SUPPLY_UNAVAILABLE`, retryable;
+nothing was reserved.
+
+`destination_chain_id` in withdrawals and destination checks is the Polyester
+chain ID of the destination network, `chain_id` of a chain in
+`zipper.get_deposit_withdraw_config()`, not the network's native chain ID
+(`native_chain_id`, such as `11155111`). A native chain ID is refused as the
+caller's mistake: `validate_destination` answers `valid=False` with `code`
+`"unsupported_chain"`, and a withdrawal raises
+`ERROR_CODE_INVALID_DESTINATION_CHAIN`, not retryable.
+
 ## Public market data
 
 Public endpoints do not require an API key. Authenticated endpoints use the
@@ -1877,8 +1922,15 @@ an `editorial` with `description` (plain text), `website_url`,
 `github_url`, `issue_date` (`YYYY-MM-DD`, kept as text) and `issue_price`
 (`AssetIssuePrice` with an exact decimal `amount` and `currency` `"USD"`;
 `None` when unknown, distinct from a known zero), and `editorial_updated_at`.
-Empty strings and lists mean unknown. Assets never edited are omitted. It is
-public and sends no API key.
+Empty strings and lists mean unknown. `market_stats` (an `AssetMarketStats`,
+`None` when the asset has none) holds market datapoints: `circulating_supply`,
+`total_supply`, `max_supply`, `market_cap_usd`, `fully_diluted_market_cap_usd`
+and `rank`, each an `AssetMarketValue` with an exact decimal string `value`, its
+`source` (`"coinmarketcap"` or `"polyester"`) and `as_of`, or `None` when
+unknown; `max_supply_unlimited` is present when the source reports no maximum.
+Keep the values as decimals, never floats. An asset with datapoints and no
+team-written information is listed with an empty `editorial`; assets with
+neither are omitted. It is public and sends no API key.
 
 `orderbook.get(symbol=...)` returns a depth snapshot. When its `available` is
 `False`, the server is building the book or invalidated it: its levels are
@@ -2590,7 +2642,9 @@ single order (for example `ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`) and that order'
 zero-based index among the ladder's orders (`0` is the first). Both are `None`
 for every other error. `PolyesterApiError.retry_at` is when a refused X/Twitter or
 Discord link change (`AUTH_SOCIAL_ACCOUNT_COOLDOWN`,
-`AUTH_SOCIAL_CHANGE_LIMIT_REACHED`) may succeed.
+`AUTH_SOCIAL_CHANGE_LIMIT_REACHED`) may succeed. Before trying a change,
+`social_verification.get(provider=...)` returns `changeAvailableAt`, the same
+time, while the 30-day limit applies, and no value when a change is allowed now.
 
 `PolyesterApiError.violations` names the request fields to fix, each with
 `field_path`, `rule_id` and `message`: from the `orders.v1.ErrorDetail` of a

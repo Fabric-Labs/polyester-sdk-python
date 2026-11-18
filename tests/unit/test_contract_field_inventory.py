@@ -31,6 +31,7 @@ from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.lifecycle import AsyncLifecycleService
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.statements import AsyncStatementsService
+from polyester.services.sub_accounts import AsyncSubAccountsService
 
 INVENTORY = Path(__file__).parents[2] / "testdata" / "contract_field_inventory.tsv"
 
@@ -42,7 +43,6 @@ MESSAGES = [
     "chain.lifecycle.v1.ListAccountFlowsResponse",
     "ledger.read.v1.BalanceSeries",
     "ledger.read.v1.GetBalanceHistoryResponse",
-    "ledger.read.v1.ExportStatementResponse",
     "ledger.read.v1.CreateStatementExportRequest",
     "ledger.read.v1.CreateStatementExportResponse",
     "ledger.read.v1.GetStatementExportRequest",
@@ -72,6 +72,24 @@ MESSAGES = [
     "transfer.v1.DustAssetPrice",
     "transfer.v1.DustSource",
     "transfer.v1.DustConversion",
+    # Public contract c35662b (0.93.5).
+    "auth.v1.TimestampWindow",
+    "auth.v1.ListAccountActivityRequest",
+    "auth.v1.ListAccountActivityResponse",
+    "chain.withdraw.v1.GetWalletBalancesResponse",
+    "chain.withdraw.v1.UnavailableWalletAsset",
+    "chain.zipper.v1.ZippedAssetSupplyUpdate",
+    "ledger.read.v1.CancelStatementExportRequest",
+    "ledger.read.v1.CancelStatementExportResponse",
+    "ledger.read.v1.GetStatementExportDownloadUrlRequest",
+    "ledger.read.v1.GetStatementExportDownloadUrlResponse",
+    "marketdata.v1.AssetMarketFlag",
+    "marketdata.v1.AssetMarketStats",
+    "marketdata.v1.AssetMarketValue",
+    "system.v1.GetTimeResponse",
+    "transfer.v1.GetInternalTransferBatchRequest",
+    "transfer.v1.GetInternalTransferBatchResponse",
+    "triggers.v1.LadderDetails",
 ]
 
 METHODS = {
@@ -80,6 +98,10 @@ METHODS = {
     "statements.create_export": AsyncStatementsService.create_export,
     "statements.get_export": AsyncStatementsService.get_export,
     "statements.list_exports": AsyncStatementsService.list_exports,
+    "statements.cancel_export": AsyncStatementsService.cancel_export,
+    "statements.get_export_download_url": AsyncStatementsService.get_export_download_url,
+    "internal_transfers.get_batch": AsyncInternalTransfersService.get_batch,
+    "sub_accounts.list_account_activity": AsyncSubAccountsService.list_account_activity,
     "dust_conversions.list_balances": AsyncDustConversionsService.list_balances,
     "dust_conversions.quote": AsyncDustConversionsService.quote,
     "dust_conversions.convert": AsyncDustConversionsService.convert,

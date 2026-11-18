@@ -1,5 +1,5 @@
-# Every field of the request and reply messages public contracts 1945423c
-# and 5c2119f added or changed, and of the messages nested in their new replies. A guard
+# Every field of the request and reply messages public contracts 1945423c,
+# 5c2119f and c35662b added or changed, and of the messages nested in their new replies. A guard
 # test walks these messages and fails when a field is missing here or listed
 # but gone, or when a covered name is not an attribute of the named model, so
 # no field of them is dropped by accident.
@@ -11,6 +11,22 @@
 auth.v1.AuthErrorDetail.code	covered	PolyesterApiError.code
 auth.v1.AuthErrorDetail.message	covered	PolyesterApiError.message
 auth.v1.AuthErrorDetail.retry_after	covered	PolyesterApiError.retry_at
+auth.v1.AuthErrorDetail.timestamp_window	covered	PolyesterTimestampSkewError.timestamp_window
+auth.v1.ListAccountActivityRequest.api_key_id	covered	sub_accounts.list_account_activity api_key_id
+auth.v1.ListAccountActivityRequest.end_time	covered	sub_accounts.list_account_activity end_time
+auth.v1.ListAccountActivityRequest.entity_kinds	covered	sub_accounts.list_account_activity entity_kinds
+auth.v1.ListAccountActivityRequest.event_actions	covered	sub_accounts.list_account_activity event_actions
+auth.v1.ListAccountActivityRequest.include_main_account	covered	sub_accounts.list_account_activity include_main_account
+auth.v1.ListAccountActivityRequest.limit	covered	sub_accounts.list_account_activity limit
+auth.v1.ListAccountActivityRequest.page_token	covered	sub_accounts.list_account_activity page_token
+auth.v1.ListAccountActivityRequest.sources	covered	sub_accounts.list_account_activity sources
+auth.v1.ListAccountActivityRequest.start_time	covered	sub_accounts.list_account_activity start_time
+auth.v1.ListAccountActivityRequest.subaccount_ids	covered	sub_accounts.list_account_activity sub_account_ids
+auth.v1.ListAccountActivityResponse.events	covered	SubAccountActivityList.events
+auth.v1.ListAccountActivityResponse.next_page_token	covered	SubAccountActivityList.next_page_token
+auth.v1.TimestampWindow.max_future_ms	covered	ServerTime.max_future_ms
+auth.v1.TimestampWindow.recv_window_ms	covered	ServerTime.recv_window_ms
+auth.v1.TimestampWindow.server_time_ms	covered	ServerTime.server_time_ms
 chain.lifecycle.v1.GetAccountFlowRequest.flow_id	covered	lifecycle.get_account_flow flow_id
 chain.lifecycle.v1.GetAccountFlowRequest.subaccount_id	covered	lifecycle.get_account_flow account, sub_account_id
 chain.lifecycle.v1.GetAccountFlowResponse.flow	covered	LifecycleFlowSummary (the flow's summary; detail steps are not modelled, as for get_flow)
@@ -29,30 +45,47 @@ chain.lifecycle.v1.ListAccountFlowsRequest.unified_asset_ids	covered	lifecycle.l
 chain.lifecycle.v1.ListAccountFlowsRequest.zipped_asset_ids	covered	lifecycle.list_account_flows zipped_asset_ids
 chain.lifecycle.v1.ListAccountFlowsResponse.flows	covered	LifecycleFlowsList.flows
 chain.lifecycle.v1.ListAccountFlowsResponse.next_page_token	covered	LifecycleFlowsList.next_page_token
+chain.withdraw.v1.GetWalletBalancesResponse.balances	covered	WalletBalances.balances
+chain.withdraw.v1.GetWalletBalancesResponse.smart_account_address	covered	WalletBalances.smart_account_address
+chain.withdraw.v1.GetWalletBalancesResponse.unavailable_assets	covered	WalletBalances.unavailable_assets
+chain.withdraw.v1.UnavailableWalletAsset.chain_id	covered	UnavailableWalletAsset.chain_id
+chain.withdraw.v1.UnavailableWalletAsset.reason	covered	UnavailableWalletAsset.reason
+chain.withdraw.v1.UnavailableWalletAsset.unified_asset_id	covered	UnavailableWalletAsset.unified_asset_id
+chain.withdraw.v1.UnavailableWalletAsset.zipped_asset_id	covered	UnavailableWalletAsset.zipped_asset_id
+chain.withdraw.v1.UnavailableWalletAsset.ztoken_address	covered	UnavailableWalletAsset.ztoken_address
+chain.zipper.v1.ZippedAssetSupplyUpdate.observed_at	covered	ZippedAssetSupplyUpdate.observed_at
+chain.zipper.v1.ZippedAssetSupplyUpdate.status	covered	ZippedAssetSupplyUpdate.status
+chain.zipper.v1.ZippedAssetSupplyUpdate.supply_q	covered	ZippedAssetSupplyUpdate.supply
+chain.zipper.v1.ZippedAssetSupplyUpdate.zipped_asset_id	covered	ZippedAssetSupplyUpdate.zipped_asset_id
 ledger.read.v1.BalanceSeries.account_code	covered	BalanceHistorySeries.account_code
 ledger.read.v1.BalanceSeries.asset_id	covered	BalanceHistorySeries.asset_id
 ledger.read.v1.BalanceSeries.balance	covered	BalanceHistorySeries.balance
+ledger.read.v1.CancelStatementExportRequest.export_id	covered	statements.cancel_export export_id
+ledger.read.v1.CancelStatementExportResponse.export	covered	StatementExport
 ledger.read.v1.CreateStatementExportRequest.asset_id	covered	statements.create_export asset_id
 ledger.read.v1.CreateStatementExportRequest.end_time	covered	statements.create_export end_time
 ledger.read.v1.CreateStatementExportRequest.idempotency_key	covered	statements.create_export idempotency_key
 ledger.read.v1.CreateStatementExportRequest.start_time	covered	statements.create_export start_time
 ledger.read.v1.CreateStatementExportRequest.subaccount_id	covered	statements.create_export account, sub_account_id
 ledger.read.v1.CreateStatementExportResponse.export	covered	StatementExport
-ledger.read.v1.ExportStatementResponse.complete_through	covered	StatementPage.complete_through
-ledger.read.v1.ExportStatementResponse.csv	covered	StatementPage.csv
-ledger.read.v1.ExportStatementResponse.next_page_token	covered	StatementPage.next_page_token
 ledger.read.v1.GetBalanceHistoryResponse.bucket	covered	BalanceHistory.bucket
 ledger.read.v1.GetBalanceHistoryResponse.end_ts_sec	covered	BalanceHistory.end_ts_sec
 ledger.read.v1.GetBalanceHistoryResponse.points	covered	BalanceHistory.points
 ledger.read.v1.GetBalanceHistoryResponse.range	covered	BalanceHistory.range
 ledger.read.v1.GetBalanceHistoryResponse.series	covered	BalanceHistory.series
 ledger.read.v1.GetBalanceHistoryResponse.start_ts_sec	covered	BalanceHistory.start_ts_sec
+ledger.read.v1.GetStatementExportDownloadUrlRequest.export_id	covered	statements.get_export_download_url export_id
+ledger.read.v1.GetStatementExportDownloadUrlResponse.expires_at	covered	StatementExportDownloadUrl.expires_at
+ledger.read.v1.GetStatementExportDownloadUrlResponse.filename	covered	StatementExportDownloadUrl.filename
+ledger.read.v1.GetStatementExportDownloadUrlResponse.url	covered	StatementExportDownloadUrl.url
 ledger.read.v1.GetStatementExportRequest.export_id	covered	statements.get_export export_id
 ledger.read.v1.GetStatementExportResponse.export	covered	StatementExport
 ledger.read.v1.ListStatementExportsRequest.limit	covered	statements.list_exports limit
 ledger.read.v1.ListStatementExportsRequest.page_token	covered	statements.list_exports page_token
 ledger.read.v1.ListStatementExportsRequest.subaccount_id	covered	statements.list_exports account, sub_account_id
 ledger.read.v1.ListStatementExportsResponse.exports	covered	StatementExportsPage.exports
+ledger.read.v1.ListStatementExportsResponse.in_progress_exports	covered	StatementExportsPage.in_progress_exports
+ledger.read.v1.ListStatementExportsResponse.max_in_progress_exports	covered	StatementExportsPage.max_in_progress_exports
 ledger.read.v1.ListStatementExportsResponse.next_page_token	covered	StatementExportsPage.next_page_token
 ledger.read.v1.StatementExport.asset_id	covered	StatementExport.asset_id
 ledger.read.v1.StatementExport.bytes	covered	StatementExport.bytes
@@ -68,6 +101,18 @@ ledger.read.v1.StatementExport.ready_at	covered	StatementExport.ready_at
 ledger.read.v1.StatementExport.start_time	covered	StatementExport.start_time
 ledger.read.v1.StatementExport.status	covered	StatementExport.status
 ledger.read.v1.StatementExport.subaccount_id	covered	StatementExport.subaccount_id
+marketdata.v1.AssetMarketFlag.as_of	covered	AssetMarketFlag.as_of
+marketdata.v1.AssetMarketFlag.source	covered	AssetMarketFlag.source
+marketdata.v1.AssetMarketStats.circulating_supply	covered	AssetMarketStats.circulating_supply
+marketdata.v1.AssetMarketStats.fully_diluted_market_cap_usd	covered	AssetMarketStats.fully_diluted_market_cap_usd
+marketdata.v1.AssetMarketStats.market_cap_usd	covered	AssetMarketStats.market_cap_usd
+marketdata.v1.AssetMarketStats.max_supply	covered	AssetMarketStats.max_supply
+marketdata.v1.AssetMarketStats.max_supply_unlimited	covered	AssetMarketStats.max_supply_unlimited
+marketdata.v1.AssetMarketStats.rank	covered	AssetMarketStats.rank
+marketdata.v1.AssetMarketStats.total_supply	covered	AssetMarketStats.total_supply
+marketdata.v1.AssetMarketValue.as_of	covered	AssetMarketValue.as_of
+marketdata.v1.AssetMarketValue.source	covered	AssetMarketValue.source
+marketdata.v1.AssetMarketValue.value	covered	AssetMarketValue.value
 orderbook.v1.GetOrderBookRequest.depth	covered	orderbook.get depth (sent as given; 0 is the default 50)
 orderbook.v1.GetOrderBookRequest.symbol_id	covered	orderbook.get symbol (resolved to its ID from the spot catalog)
 orderbook.v1.GetOrderBookResponse.asks	covered	OrderbookData.asks
@@ -82,8 +127,10 @@ orders.v1.ErrorDetail.cause_code	covered	PolyesterApiError.cause_code, Polyester
 orders.v1.ErrorDetail.code	covered	PolyesterApiError.code, PolyesterValidationError.code, PolyesterRateLimitError.code
 orders.v1.ErrorDetail.existing_order_id	covered	PolyesterApiError.existing_order_id
 orders.v1.ErrorDetail.level_index	covered	PolyesterApiError.level_index, PolyesterRateLimitError.level_index
+orders.v1.ErrorDetail.price_band_limit_ticks	covered	OrderErrorDetail.price_band_limit
 orders.v1.ErrorDetail.rate_limit	covered	PolyesterRateLimitError.detail
 orders.v1.ErrorDetail.violations	covered	PolyesterApiError.violations, PolyesterValidationError.violations
+system.v1.GetTimeResponse.server_time_ms	covered	ServerTime.server_time_ms
 transfer.v1.BatchCreateInternalTransfersRequest.idempotency_key	covered	internal_transfers.batch_create idempotency_key
 transfer.v1.BatchCreateInternalTransfersRequest.legs	covered	internal_transfers.batch_create legs
 transfer.v1.BatchCreateInternalTransfersResponse.legs	covered	InternalTransferBatchResult.legs
@@ -118,22 +165,25 @@ transfer.v1.DustSource.asset_id	covered	DustSource.asset_id
 transfer.v1.GetDustConversionRequest.conversion_id	covered	dust_conversions.get conversion_id
 transfer.v1.GetDustConversionRequest.subaccount_id	covered	dust_conversions.get account, sub_account_id
 transfer.v1.GetDustConversionResponse.conversion	covered	DustConversion
+transfer.v1.GetInternalTransferBatchRequest.request_id	covered	internal_transfers.get_batch request_id
+transfer.v1.GetInternalTransferBatchResponse.legs	covered	InternalTransferBatchResult.legs
+transfer.v1.GetInternalTransferBatchResponse.request_id	covered	InternalTransferBatchResult.request_id
+transfer.v1.GetInternalTransferBatchResponse.status	covered	InternalTransferBatchResult.status
 transfer.v1.InternalTransferBatchLeg.amount_e18	covered	InternalTransferLeg.quantity, quantity_scale
 transfer.v1.InternalTransferBatchLeg.asset_id	covered	InternalTransferLeg.asset_id
 transfer.v1.InternalTransferBatchLeg.destination_account_id	covered	InternalTransferLeg.destination_account_id
 transfer.v1.InternalTransferBatchLeg.destination_smart_account_address	covered	InternalTransferLeg.destination_smart_account_address
 transfer.v1.InternalTransferBatchLeg.destination_subaccount_id	covered	InternalTransferLeg.destination_subaccount_id
 transfer.v1.InternalTransferBatchLeg.subaccount_id	covered	InternalTransferLeg.account, sub_account_id
-transfer.v1.InternalTransferBatchLegResult.accepted_at_ts_ns	covered	InternalTransferBatchLegResult.accepted_at_ts_ns
 transfer.v1.InternalTransferBatchLegResult.amount_e18	covered	InternalTransferBatchLegResult.quantity
 transfer.v1.InternalTransferBatchLegResult.asset_code	covered	InternalTransferBatchLegResult.asset_code
 transfer.v1.InternalTransferBatchLegResult.asset_id	covered	InternalTransferBatchLegResult.asset_id
+transfer.v1.InternalTransferBatchLegResult.credited_at_ts_ns	covered	InternalTransferBatchLegResult.credited_at_ts_ns
 transfer.v1.InternalTransferBatchLegResult.destination	covered	InternalTransferBatchLegResult.destination
 transfer.v1.InternalTransferBatchLegResult.error_code	covered	InternalTransferBatchLegResult.error_code
 transfer.v1.InternalTransferBatchLegResult.error_message	covered	InternalTransferBatchLegResult.error_message
 transfer.v1.InternalTransferBatchLegResult.flow_id	covered	InternalTransferBatchLegResult.flow_id
 transfer.v1.InternalTransferBatchLegResult.leg_index	covered	InternalTransferBatchLegResult.leg_index
-transfer.v1.InternalTransferBatchLegResult.request_id	covered	InternalTransferBatchLegResult.request_id
 transfer.v1.InternalTransferBatchLegResult.status	covered	InternalTransferBatchLegResult.status
 transfer.v1.InternalTransferBatchLegResult.transfer_id	covered	InternalTransferBatchLegResult.transfer_id
 transfer.v1.ListDustBalancesRequest.subaccount_id	covered	dust_conversions.list_balances account, sub_account_id
@@ -163,3 +213,14 @@ transfer.v1.QuoteDustConversionResponse.target_asset_id	covered	DustQuote.target
 transfer.v1.ResolvedDestination.root_account_public_id	covered	ResolvedDestination.root_account_public_id
 transfer.v1.ResolvedDestination.smart_account_address	covered	ResolvedDestination.smart_account_address
 transfer.v1.ResolvedDestination.subaccount_public_id	covered	ResolvedDestination.subaccount_public_id
+triggers.v1.LadderDetails.canceled_levels	covered	TriggerLadderDetails.canceled_levels
+triggers.v1.LadderDetails.executed_levels	covered	TriggerLadderDetails.executed_levels
+triggers.v1.LadderDetails.executed_qty_scaled	covered	TriggerLadderDetails.executed_qty
+triggers.v1.LadderDetails.ladder_distribution	covered	TriggerLadderDetails.ladder_distribution
+triggers.v1.LadderDetails.ladder_levels	covered	TriggerLadderDetails.ladder_levels
+triggers.v1.LadderDetails.ladder_price_max_ticks	covered	TriggerLadderDetails.ladder_price_max
+triggers.v1.LadderDetails.ladder_price_min_ticks	covered	TriggerLadderDetails.ladder_price_min
+triggers.v1.LadderDetails.outcome	covered	TriggerLadderDetails.outcome
+triggers.v1.LadderDetails.placed_levels	covered	TriggerLadderDetails.placed_levels
+triggers.v1.LadderDetails.rejected_levels	covered	TriggerLadderDetails.rejected_levels
+triggers.v1.LadderDetails.requested_levels	covered	TriggerLadderDetails.requested_levels

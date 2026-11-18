@@ -418,9 +418,18 @@ class OrderFieldViolation(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class OrderErrorDetail(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Why an order would be refused (``PreviewOrderResult.rejection``).
+
+    ``price_band_limit`` is set only on a preview refused with ``code``
+    ``"PRICE_BAND_VIOLATION"``: the band limit the order's limit price
+    is past, the highest admitted price for a buy and the lowest for a sell,
+    as the market last published its band. ``None`` otherwise.
+    """
+
     code: str = ""
     violations: list[OrderFieldViolation] = []
     rate_limit: RateLimitDetail | None = None
+    price_band_limit: Price | None = None
 
 
 class PreviewOrderResult(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -643,12 +652,31 @@ class TriggerTwapDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class TriggerLadderDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A ladder trigger's levels and how their placement went.
+
+    ``requested_levels`` counts the child orders the ladder requested, one per
+    level; ``placed_levels`` those placed on the book, open ones included;
+    ``rejected_levels`` those rejected before they were placed; and
+    ``canceled_levels`` placed ones canceled or expired, partly filled or not
+    (when the ladder itself ends, its open child orders count here). A placed
+    child rejected after a partial fill counts as neither rejected nor
+    canceled. ``outcome`` is ``"all_admitted"``, ``"mixed_rejections"`` or
+    ``"all_children_rejected"`` once the ladder has ended, "" while it runs
+    (and for a ladder rejected at its creation); an outcome this SDK does not
+    know reads as its decimal string.
+    """
+
     ladder_price_min: Price | None = None
     ladder_price_max: Price | None = None
     ladder_levels: int = 0
     ladder_distribution: str = ""
     executed_levels: int = 0
     executed_qty: Quantity | None = None
+    requested_levels: int = 0
+    placed_levels: int = 0
+    rejected_levels: int = 0
+    canceled_levels: int = 0
+    outcome: str = ""
 
 
 class TriggerDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -873,30 +901,29 @@ class InternalTransferLeg(msgspec.Struct, kw_only=True):
 
 
 class InternalTransferBatchLegResult(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """The outcome of one leg of a batch, in request order.
+    """The state of one leg of a batch, in request order.
 
-    ``status`` is ``"accepted"`` (the transfer has a durable ``transfer_id``),
-    ``"pending"`` (the outcome is not known yet; the transfer runs to its
-    outcome without the caller: retry the batch with the same idempotency key
-    to read it), ``"refused"`` (no funds moved; ``error_code`` says why) or
-    ``"not_submitted"`` (the leg did not run: its batch was refused, or the
-    request ended before the leg started; a retry with the same key runs it).
-    ``error_code`` is the transfer error as a lowercase label without the
-    ``ERROR_CODE_`` prefix, such as ``"insufficient_funds"``; "" for an
-    accepted or not-submitted leg, and ``"UNKNOWN_ERROR_CODE(n)"`` for a code
-    this SDK does not know. ``accepted_at_ts_ns`` is the acceptance time in
-    nanoseconds since the Unix epoch, ``None`` before the leg is accepted.
-    ``quantity`` is the echoed amount, exact at 18 decimals. ``destination``
-    is the destination the server resolved for the leg, ``None`` when the
-    reply carries none.
+    A batch moves as one, so every leg has the status its batch's status
+    admits: ``"credited"`` (the leg is credited to its destination;
+    ``credited_at_ts_ns`` and ``flow_id`` say when and which lifecycle flow),
+    ``"processing"`` (the leg's outcome is the batch's, not known yet) or
+    ``"not_moved"`` (its batch was refused and the leg moved nothing).
+    ``transfer_id`` is the leg's stable transfer identifier, set once the
+    batch is processing or accepted. ``error_code`` is set only on the legs
+    that caused a refusal: the transfer error as a lowercase label without
+    the ``ERROR_CODE_`` prefix, such as ``"insufficient_funds"``, and
+    ``"UNKNOWN_ERROR_CODE(n)"`` for a code this SDK does not know.
+    ``credited_at_ts_ns`` is the credit time in nanoseconds since the Unix
+    epoch, ``None`` before the leg is credited. ``quantity`` is the echoed
+    amount, exact at 18 decimals. ``destination`` is the destination the
+    server resolved for the leg, ``None`` when the reply carries none.
     """
 
     leg_index: int = 0
     status: str = ""
-    request_id: str = ""
     transfer_id: str = ""
     flow_id: str = ""
-    accepted_at_ts_ns: int | None = None
+    credited_at_ts_ns: int | None = None
     asset_id: int = 0
     asset_code: str = ""
     quantity: AssetAmount | None = None
@@ -917,15 +944,17 @@ class ResolvedDestination(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class InternalTransferBatchResult(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """The receipt of a batch of internal transfers.
+    """A batch of internal transfers, which moves as one: every leg is
+    credited, or none moves.
 
-    ``status`` is ``"submitted"`` (every leg passed its checks; legs then ran
-    in order and independently, and are not atomic: read each leg) or
-    ``"refused"`` (at least one leg failed its checks, so no leg ran, no funds
-    moved and no step-up was used; the failed legs are ``"refused"``, the
-    others ``"not_submitted"``). ``request_id`` is the batch's identifier,
-    "" when it was refused. ``legs`` holds one result per requested leg, in
-    request order.
+    ``status`` is ``"accepted"`` (every leg is credited), ``"processing"``
+    (the outcome is not known yet; the batch completes on its own and ends
+    accepted or refused: read it with ``internal_transfers.get_batch`` or
+    ``wait_batch``) or ``"refused"`` (nothing moved, and nothing will under
+    this idempotency key; the legs that caused it carry ``error_code``).
+    ``request_id`` is the batch's identifier, "" when it was refused before it
+    was accepted for processing. ``legs`` holds one result per requested leg,
+    in request order.
     """
 
     request_id: str = ""
@@ -1304,10 +1333,43 @@ class WalletBalance(msgspec.Struct, kw_only=True, omit_defaults=True):
         return Decimal(format_qty_scaled(int(self.amount_e18 or 0), 18))
 
 
+class UnavailableWalletAsset(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """A zToken whose balance a wallet read could not read: its balance is
+    unknown, not zero, and the wallet may hold some of it.
+
+    ``reason`` is ``"no_contract"`` (no zToken contract exists at
+    ``ztoken_address`` on Polyester Chain), ``"read_failed"`` (the chain
+    answered the read with an error) or ``"invalid_balance"`` (the read
+    returned a value that is not a valid balance); "" when the server names
+    none, and a reason this SDK does not know reads as its decimal string.
+    """
+
+    zipped_asset_id: int = 0
+    unified_asset_id: int = 0
+    chain_id: int = 0
+    ztoken_address: str = ""
+    reason: str = ""
+
+
 class WalletBalances(msgspec.Struct, kw_only=True, omit_defaults=True):
     """zTokens held by the account's smart account wallet, read live from
     Polyester Chain, such as the refund of a rejected withdrawal. Ordered by
-    ``zipped_asset_id``."""
+    ``zipped_asset_id``.
+
+    A read can be incomplete: ``unavailable_assets`` lists, by
+    ``zipped_asset_id``, the zTokens whose balance could not be read. An asset
+    missing from ``balances`` is held at zero only when the read
+    :attr:`is_complete`; otherwise it may be in ``unavailable_assets``, with
+    an unknown balance. Show those as unavailable, never as zero, leave them
+    out of any total, and decide nothing that depends on their balance until
+    a later read returns it.
+    """
 
     smart_account_address: str = ""
     balances: list[WalletBalance] = msgspec.field(default_factory=list)
+    unavailable_assets: list[UnavailableWalletAsset] = msgspec.field(default_factory=list)
+
+    @property
+    def is_complete(self) -> bool:
+        """True when every zToken's balance was read."""
+        return not self.unavailable_assets

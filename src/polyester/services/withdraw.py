@@ -286,6 +286,14 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         remain authoritative. An API key needs ``READ_WITHDRAW_VALIDATION`` on
         its policy; ``EXTERNAL_WITHDRAW`` alone no longer allows this check.
         It moves no value, so retrying it is safe.
+
+        ``destination_chain_id`` is the Polyester chain ID of the destination
+        network, ``chain_id`` of a chain in
+        ``zipper.get_deposit_withdraw_config()``, not its native chain ID
+        (``native_chain_id``, such as ``11155111``): a native chain ID answers
+        ``valid=False`` with ``code`` ``"unsupported_chain"``. Every withdrawal
+        to an external chain takes the same ID and refuses another with
+        ``ERROR_CODE_INVALID_DESTINATION_CHAIN``, which is not retryable.
         """
         chain_id = exact_integer(
             destination_chain_id,
@@ -320,9 +328,13 @@ class AsyncWithdrawService(ScopedSubAccountMixin, BaseService):
         A withdrawal Zipper rejects is refunded there, net of its kept fee, as
         zTokens: its flow ends ``refunded``. ``sub_account_id`` (or the
         client's default) selects a sub-account; none reads the main account.
-        An API key needs ``READ_BALANCES`` on its policy. A failed chain read
-        raises a retryable ``unavailable`` error; an account without a wallet
-        is refused ``failed_precondition`` (``SOURCE_SMART_ACCOUNT_UNAVAILABLE``).
+        An API key needs ``READ_BALANCES`` on its policy. A read can be
+        incomplete: the zTokens whose balance could not be read are listed in
+        ``unavailable_assets``, with an unknown balance, never zero (see
+        :class:`~polyester.models.WalletBalances`). When no balance can be read
+        at all, it raises a retryable ``unavailable`` error; an account without
+        a wallet is refused ``failed_precondition``
+        (``SOURCE_SMART_ACCOUNT_UNAVAILABLE``).
         """
         request = withdraw_pb2.GetWalletBalancesRequest()
         parsed_sub = parse_optional_subaccount_id(

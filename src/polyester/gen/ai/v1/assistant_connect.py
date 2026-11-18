@@ -36,6 +36,9 @@ class AssistantService(Protocol):
     async def list_messages(self, request: ai_dot_v1_dot_assistant__pb2.ListMessagesRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.ListMessagesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_message_image(self, request: ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def list_memories(self, request: ai_dot_v1_dot_assistant__pb2.ListMemoriesRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.ListMemoriesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -55,6 +58,18 @@ class AssistantService(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def set_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def set_model_key(self, request: ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_model_key(self, request: ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def delete_model_key(self, request: ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_usage(self, request: ai_dot_v1_dot_assistant__pb2.GetUsageRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetUsageResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -122,6 +137,16 @@ class AssistantServiceASGIApplication(ConnectASGIApplication[AssistantService]):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.list_messages,
+                ),
+                "/ai.v1.AssistantService/GetMessageImage": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetMessageImage",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_message_image,
                 ),
                 "/ai.v1.AssistantService/ListMemories": Endpoint.unary(
                     method=MethodInfo(
@@ -192,6 +217,46 @@ class AssistantServiceASGIApplication(ConnectASGIApplication[AssistantService]):
                         idempotency_level=IdempotencyLevel.IDEMPOTENT,
                     ),
                     function=svc.set_telegram_approval_limits,
+                ),
+                "/ai.v1.AssistantService/SetModelKey": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SetModelKey",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.set_model_key,
+                ),
+                "/ai.v1.AssistantService/GetModelKey": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetModelKey",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_model_key,
+                ),
+                "/ai.v1.AssistantService/DeleteModelKey": Endpoint.unary(
+                    method=MethodInfo(
+                        name="DeleteModelKey",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.delete_model_key,
+                ),
+                "/ai.v1.AssistantService/GetUsage": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetUsage",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetUsageRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetUsageResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_usage,
                 ),
             },
             interceptors=interceptors,
@@ -324,6 +389,28 @@ class AssistantServiceClient(ConnectClient):
                 service_name="ai.v1.AssistantService",
                 input=ai_dot_v1_dot_assistant__pb2.ListMessagesRequest,
                 output=ai_dot_v1_dot_assistant__pb2.ListMessagesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def get_message_image(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetMessageImage",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse,
                 idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
@@ -477,6 +564,90 @@ class AssistantServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def set_model_key(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetModelKey",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest,
+                output=ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_model_key(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetModelKey",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def delete_model_key(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="DeleteModelKey",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest,
+                output=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_usage(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetUsageRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetUsageResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetUsage",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetUsageRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetUsageResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
 
 
 
@@ -494,6 +665,8 @@ class AssistantServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_messages(self, request: ai_dot_v1_dot_assistant__pb2.ListMessagesRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.ListMessagesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_message_image(self, request: ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_memories(self, request: ai_dot_v1_dot_assistant__pb2.ListMemoriesRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.ListMemoriesResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def delete_memory(self, request: ai_dot_v1_dot_assistant__pb2.DeleteMemoryRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.DeleteMemoryResponse:
@@ -507,6 +680,14 @@ class AssistantServiceSync(Protocol):
     def get_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetTelegramApprovalLimitsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def set_telegram_approval_limits(self, request: ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.SetTelegramApprovalLimitsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def set_model_key(self, request: ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_model_key(self, request: ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def delete_model_key(self, request: ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_usage(self, request: ai_dot_v1_dot_assistant__pb2.GetUsageRequest, ctx: RequestContext) -> ai_dot_v1_dot_assistant__pb2.GetUsageResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -573,6 +754,16 @@ class AssistantServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.list_messages,
+                ),
+                "/ai.v1.AssistantService/GetMessageImage": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetMessageImage",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_message_image,
                 ),
                 "/ai.v1.AssistantService/ListMemories": EndpointSync.unary(
                     method=MethodInfo(
@@ -643,6 +834,46 @@ class AssistantServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.IDEMPOTENT,
                     ),
                     function=service.set_telegram_approval_limits,
+                ),
+                "/ai.v1.AssistantService/SetModelKey": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SetModelKey",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.set_model_key,
+                ),
+                "/ai.v1.AssistantService/GetModelKey": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetModelKey",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_model_key,
+                ),
+                "/ai.v1.AssistantService/DeleteModelKey": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="DeleteModelKey",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.delete_model_key,
+                ),
+                "/ai.v1.AssistantService/GetUsage": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetUsage",
+                        service_name="ai.v1.AssistantService",
+                        input=ai_dot_v1_dot_assistant__pb2.GetUsageRequest,
+                        output=ai_dot_v1_dot_assistant__pb2.GetUsageResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_usage,
                 ),
             },
             interceptors=interceptors,
@@ -775,6 +1006,28 @@ class AssistantServiceClientSync(ConnectClientSync):
                 service_name="ai.v1.AssistantService",
                 input=ai_dot_v1_dot_assistant__pb2.ListMessagesRequest,
                 output=ai_dot_v1_dot_assistant__pb2.ListMessagesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def get_message_image(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetMessageImage",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetMessageImageRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetMessageImageResponse,
                 idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
@@ -926,6 +1179,90 @@ class AssistantServiceClientSync(ConnectClientSync):
             ),
             headers=headers,
             timeout_ms=timeout_ms,
+        )
+
+    def set_model_key(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetModelKey",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.SetModelKeyRequest,
+                output=ai_dot_v1_dot_assistant__pb2.SetModelKeyResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_model_key(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetModelKey",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetModelKeyRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetModelKeyResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def delete_model_key(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="DeleteModelKey",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyRequest,
+                output=ai_dot_v1_dot_assistant__pb2.DeleteModelKeyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_usage(
+        self,
+        request: ai_dot_v1_dot_assistant__pb2.GetUsageRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ai_dot_v1_dot_assistant__pb2.GetUsageResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetUsage",
+                service_name="ai.v1.AssistantService",
+                input=ai_dot_v1_dot_assistant__pb2.GetUsageRequest,
+                output=ai_dot_v1_dot_assistant__pb2.GetUsageResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
         )
 
 

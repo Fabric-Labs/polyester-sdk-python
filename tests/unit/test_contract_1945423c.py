@@ -263,14 +263,13 @@ def _legs(count: int) -> list[InternalTransferLeg]:
     ]
 
 
-def _accepted(index: int, **overrides) -> it_pb2.InternalTransferBatchLegResult:
+def _credited(index: int, **overrides) -> it_pb2.InternalTransferBatchLegResult:
     fields = dict(
         leg_index=index,
-        status=it_pb2.LEG_ACCEPTED,
-        request_id=f"r{index}",
+        status=it_pb2.LEG_CREDITED,
         transfer_id=f"t{index}",
         flow_id=f"flow_{index}",
-        accepted_at_ts_ns=1_763_000_000_123_456_789,
+        credited_at_ts_ns=1_763_000_000_123_456_789,
         asset_id=1,
         asset_code="USDT",
         amount_e18=_u128(E18 // 2),
@@ -281,22 +280,9 @@ def _accepted(index: int, **overrides) -> it_pb2.InternalTransferBatchLegResult:
 
 async def test_batch_create_sends_every_leg_exactly_and_reads_each_outcome() -> None:
     reply = it_pb2.BatchCreateInternalTransfersResponse(
-        request_id="batch-1",
-        status=it_pb2.BATCH_SUBMITTED,
-        legs=[
-            _accepted(0),
-            it_pb2.InternalTransferBatchLegResult(
-                leg_index=1,
-                status=it_pb2.LEG_REFUSED,
-                request_id="r1",
-                asset_id=3,
-                error_code=it_pb2.ERROR_CODE_INSUFFICIENT_FUNDS,
-                error_message="insufficient funds",
-            ),
-            it_pb2.InternalTransferBatchLegResult(
-                leg_index=2, status=it_pb2.LEG_PENDING, request_id="r2"
-            ),
-        ],
+        request_id="1234",
+        status=it_pb2.BATCH_ACCEPTED,
+        legs=[_credited(0), _credited(1, asset_id=3), _credited(2, asset_id=4)],
     )
     async with _client(_ok(reply), default_sub_account_id=format_id(SUB)) as (client, requests):
         result = await client.internal_transfers.batch_create(
@@ -335,14 +321,34 @@ async def test_batch_create_sends_every_leg_exactly_and_reads_each_outcome() -> 
     )
     assert third.subaccount_id == SUB + 1 and third.destination_subaccount_id == 77
     assert (third.amount_e18.hi << 64) | third.amount_e18.lo == 1_234_567 * 10**12
-    assert (result.request_id, result.status) == ("batch-1", "submitted")
-    accepted, refused, pending = result.legs
-    assert accepted.status == "accepted" and accepted.transfer_id == "t0"
-    assert accepted.accepted_at_ts_ns == 1_763_000_000_123_456_789
-    assert accepted.quantity is not None and accepted.quantity.as_decimal() == Decimal("0.5")
-    assert (refused.status, refused.error_code) == ("refused", "insufficient_funds")
-    assert refused.accepted_at_ts_ns is None
-    assert (pending.status, pending.error_code) == ("pending", "")
+    assert (result.request_id, result.status) == ("1234", "accepted")
+    credited = result.legs[0]
+    assert credited.status == "credited" and credited.transfer_id == "t0"
+    assert credited.flow_id == "flow_0"
+    assert credited.credited_at_ts_ns == 1_763_000_000_123_456_789
+    assert credited.quantity is not None and credited.quantity.as_decimal() == Decimal("0.5")
+    assert [leg.status for leg in result.legs] == ["credited"] * 3
+
+
+async def test_batch_create_reads_a_processing_batch() -> None:
+    reply = it_pb2.BatchCreateInternalTransfersResponse(
+        request_id="1234",
+        status=it_pb2.BATCH_PROCESSING,
+        legs=[
+            it_pb2.InternalTransferBatchLegResult(
+                leg_index=i, status=it_pb2.LEG_PROCESSING, transfer_id=f"t{i}"
+            )
+            for i in range(2)
+        ],
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        result = await client.internal_transfers.batch_create(idempotency_key="k", legs=_legs(2))
+    assert (result.request_id, result.status) == ("1234", "processing")
+    assert [(leg.status, leg.transfer_id) for leg in result.legs] == [
+        ("processing", "t0"),
+        ("processing", "t1"),
+    ]
+    assert result.legs[0].credited_at_ts_ns is None
 
 
 async def test_batch_create_reads_a_refused_batch() -> None:
@@ -351,47 +357,87 @@ async def test_batch_create_reads_a_refused_batch() -> None:
         legs=[
             it_pb2.InternalTransferBatchLegResult(
                 leg_index=0,
-                status=it_pb2.LEG_REFUSED,
+                status=it_pb2.LEG_NOT_MOVED,
                 error_code=it_pb2.ERROR_CODE_DUST_BUSY + 100,
             ),
-            it_pb2.InternalTransferBatchLegResult(leg_index=1, status=it_pb2.LEG_NOT_SUBMITTED),
+            it_pb2.InternalTransferBatchLegResult(leg_index=1, status=it_pb2.LEG_NOT_MOVED),
+            it_pb2.InternalTransferBatchLegResult(
+                leg_index=2,
+                status=it_pb2.LEG_NOT_MOVED,
+                error_code=it_pb2.ERROR_CODE_BATCH_TOO_MANY_SOURCES,
+            ),
         ],
     )
     async with _client(_ok(reply)) as (client, _requests):
-        result = await client.internal_transfers.batch_create(idempotency_key="k", legs=_legs(2))
+        result = await client.internal_transfers.batch_create(idempotency_key="k", legs=_legs(3))
     assert (result.request_id, result.status) == ("", "refused")
-    assert [leg.status for leg in result.legs] == ["refused", "not_submitted"]
+    assert [leg.status for leg in result.legs] == ["not_moved"] * 3
     assert result.legs[0].error_code == f"UNKNOWN_ERROR_CODE({it_pb2.ERROR_CODE_DUST_BUSY + 100})"
+    assert result.legs[1].error_code == ""
+    assert result.legs[2].error_code == "batch_too_many_sources"
+
+
+def _not_moved(index: int) -> it_pb2.InternalTransferBatchLegResult:
+    return it_pb2.InternalTransferBatchLegResult(leg_index=index, status=it_pb2.LEG_NOT_MOVED)
+
+
+def _processing(index: int, **overrides) -> it_pb2.InternalTransferBatchLegResult:
+    fields = dict(leg_index=index, status=it_pb2.LEG_PROCESSING, transfer_id=f"t{index}")
+    fields.update(overrides)
+    return it_pb2.InternalTransferBatchLegResult(**fields)
 
 
 @pytest.mark.parametrize(
     "reply",
     [
-        it_pb2.BatchCreateInternalTransfersResponse(request_id="b", legs=[_accepted(0)]),
+        # No batch status.
+        it_pb2.BatchCreateInternalTransfersResponse(request_id="1", legs=[_credited(0)]),
+        # An accepted or processing batch without its request ID.
         it_pb2.BatchCreateInternalTransfersResponse(
-            status=it_pb2.BATCH_SUBMITTED, legs=[_accepted(0)]
+            status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0)]
         ),
         it_pb2.BatchCreateInternalTransfersResponse(
-            request_id="b", status=it_pb2.BATCH_SUBMITTED, legs=[_accepted(0), _accepted(1)]
+            status=it_pb2.BATCH_PROCESSING, legs=[_processing(0)]
+        ),
+        # Another leg count or order than requested.
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0), _credited(1)]
         ),
         it_pb2.BatchCreateInternalTransfersResponse(
-            request_id="b", status=it_pb2.BATCH_SUBMITTED, legs=[_accepted(1)]
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(1)]
+        ),
+        # A credited or processing leg without its transfer ID.
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0, transfer_id="")]
         ),
         it_pb2.BatchCreateInternalTransfersResponse(
-            request_id="b", status=it_pb2.BATCH_SUBMITTED, legs=[_accepted(0, transfer_id="")]
+            request_id="1", status=it_pb2.BATCH_PROCESSING, legs=[_processing(0, transfer_id="")]
+        ),
+        # A credited leg without the flow or credit time the contract sets on it.
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0, flow_id="")]
         ),
         it_pb2.BatchCreateInternalTransfersResponse(
-            request_id="b",
-            status=it_pb2.BATCH_SUBMITTED,
-            legs=[it_pb2.InternalTransferBatchLegResult(status=it_pb2.LEG_PENDING)],
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0, credited_at_ts_ns=0)]
         ),
+        # A leg without a known status.
         it_pb2.BatchCreateInternalTransfersResponse(
-            request_id="b",
-            status=it_pb2.BATCH_SUBMITTED,
+            request_id="1",
+            status=it_pb2.BATCH_ACCEPTED,
             legs=[it_pb2.InternalTransferBatchLegResult(status=it_pb2.LEG_STATUS_UNSPECIFIED)],
         ),
+        # A leg whose status its batch's status does not admit.
         it_pb2.BatchCreateInternalTransfersResponse(
-            status=it_pb2.BATCH_REFUSED, legs=[_accepted(0)]
+            status=it_pb2.BATCH_REFUSED, legs=[_credited(0)]
+        ),
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_processing(0)]
+        ),
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_PROCESSING, legs=[_not_moved(0)]
+        ),
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_not_moved(0)]
         ),
     ],
 )
@@ -405,7 +451,6 @@ async def test_batch_create_refuses_a_reply_that_breaks_the_contract(reply) -> N
     "kwargs",
     [
         {"idempotency_key": "k", "legs": []},
-        {"idempotency_key": "k", "legs": _legs(11)},
         {"idempotency_key": "", "legs": _legs(1)},
         {"idempotency_key": "k" * 129, "legs": _legs(1)},
         {"idempotency_key": "k", "legs": _legs(1)[0]},
@@ -439,14 +484,15 @@ async def test_batch_create_refuses_what_it_cannot_send_before_sending(kwargs) -
     assert requests == []
 
 
-async def test_batch_create_takes_ten_legs() -> None:
+async def test_batch_create_sends_more_than_ten_legs_and_leaves_the_limit_to_the_server() -> None:
+    # The contract sets no rule on the most legs; the server takes up to 500.
     reply = it_pb2.BatchCreateInternalTransfersResponse(
-        request_id="b", status=it_pb2.BATCH_SUBMITTED, legs=[_accepted(i) for i in range(10)]
+        request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(i) for i in range(501)]
     )
     async with _client(_ok(reply)) as (client, requests):
-        result = await client.internal_transfers.batch_create(idempotency_key="k", legs=_legs(10))
-    assert len(result.legs) == 10
-    assert len(it_pb2.BatchCreateInternalTransfersRequest.FromString(requests[0].body).legs) == 10
+        result = await client.internal_transfers.batch_create(idempotency_key="k", legs=_legs(501))
+    assert len(result.legs) == 501
+    assert len(it_pb2.BatchCreateInternalTransfersRequest.FromString(requests[0].body).legs) == 501
 
 
 # --- dust conversion -----------------------------------------------------------------------------
@@ -774,31 +820,6 @@ async def test_create_export_takes_a_366_day_period() -> None:
     assert len(requests) == 1
 
 
-async def test_statement_export_reads_complete_through_and_refuses_a_change_between_pages() -> None:
-    through = datetime(2026, 11, 13, 3, 4, 5, 123456, tzinfo=UTC)
-    pages = {
-        "": ledger_read_pb2.ExportStatementResponse(
-            csv="h\r\n", next_page_token="p2", complete_through=_ts(through)
-        ),
-        "p2": ledger_read_pb2.ExportStatementResponse(csv="r\r\n", complete_through=_ts(through)),
-    }
-
-    def answer(req: ParsedRequest) -> HttpScript:
-        sent = ledger_read_pb2.ExportStatementRequest.FromString(req.body)
-        return connect_proto_response(pages[sent.page_token].SerializeToString())
-
-    async with _client(answer) as (client, _requests):
-        page = await client.statements.export_page(start_time=_START, end_time=_END)
-        statement = await client.statements.export(start_time=_START, end_time=_END)
-    assert page.complete_through == through
-    assert statement.complete_through == through and statement.csv == "h\r\nr\r\n"
-
-    pages["p2"] = ledger_read_pb2.ExportStatementResponse(csv="r\r\n")
-    async with _client(answer) as (client, _requests):
-        with pytest.raises(PolyesterResponseContractError, match="complete_through"):
-            await client.statements.export(start_time=_START, end_time=_END)
-
-
 # --- error codes and retry classification --------------------------------------------------------
 
 _TRANSFER = "transfer.v1.ErrorDetail"
@@ -1054,9 +1075,9 @@ async def test_batch_create_reads_each_legs_resolved_destination() -> None:
         smart_account_address=_ADDRESS,
     )
     reply = it_pb2.BatchCreateInternalTransfersResponse(
-        request_id="batch-1",
-        status=it_pb2.BATCH_SUBMITTED,
-        legs=[_accepted(0, destination=destination), _accepted(1)],
+        request_id="1",
+        status=it_pb2.BATCH_ACCEPTED,
+        legs=[_credited(0, destination=destination), _credited(1)],
     )
     async with _client(_ok(reply)) as (client, _requests):
         result = await client.internal_transfers.batch_create(legs=_legs(2), idempotency_key="k")

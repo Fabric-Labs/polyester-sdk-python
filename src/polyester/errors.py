@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from polyester._problem import HTTPProblem
 
 if TYPE_CHECKING:
+    from polyester.models.system import ServerTime
     from polyester.models.trading import OrderFieldViolation
 
 # Stable auth.v1.AuthErrorDetail codes used for MFA control flow.
@@ -423,8 +424,12 @@ class PolyesterTimestampSkewError(PolyesterTransportError):
 
     Retryable: the gateway rejected the request before any service saw it,
     and a retry signs it again with a fresh timestamp. If it persists, the
-    local clock is wrong. For large bursts, bound concurrency so requests do
-    not wait locally past the skew window.
+    local clock is wrong: ``timestamp_window`` (a
+    :class:`~polyester.models.ServerTime`) is the server time of the refusal
+    and the window it applied, ``None`` when the answer names none; measure
+    the offset of this host's clock from ``timestamp_window.server_time_ms``
+    or from ``client.get_time()``. For large bursts, bound concurrency so
+    requests do not wait locally past the skew window.
     """
 
     code = TIMESTAMP_SKEW
@@ -434,9 +439,11 @@ class PolyesterTimestampSkewError(PolyesterTransportError):
         message: str = "API key timestamp is outside the allowed skew window.",
         *,
         status_code: int | None = None,
+        timestamp_window: ServerTime | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.timestamp_window = timestamp_window
 
 
 class PolyesterApiError(PolyesterError):
@@ -685,6 +692,12 @@ def is_order_already_terminal(err: BaseException) -> bool:
     has ended, by this cancel or otherwise (filled, expired, canceled),
     including a repeat of the cancel that ended it. Treat it as "already
     done" and read the order for how it ended.
+
+    It matches that code only. Once the exchange can no longer confirm an
+    ended order (by client order ID after at least a minute; by order ID
+    after some exchange maintenance), a cancel or modify of it raises
+    ``ERROR_CODE_ORDER_UNKNOWN`` instead, as for an ID never placed: for an
+    order the caller placed, read it and treat it as done if it ended.
     """
     return isinstance(err, PolyesterApiError) and err.code == ORDER_ALREADY_TERMINAL
 
@@ -763,8 +776,11 @@ class PolyesterRealtimeError(PolyesterError):
     """Raised for realtime connection, subscription, or decode failures.
 
     ``code`` is the private WebSocket request error code (for example
-    ``FORBIDDEN``); ``close_code`` is the WebSocket close code that ended the
-    stream (for example ``4403``). Both are ``None`` when not applicable.
+    ``FORBIDDEN``), or for a refused WebSocket upgrade the ``code`` of the
+    problem body the server answered (for example
+    ``TOO_MANY_SESSIONS_API_KEY``), with the whole body in ``problem``;
+    ``close_code`` is the WebSocket close code that ended the stream (for
+    example ``4403``). Both are ``None`` when not applicable.
     """
 
     def __init__(

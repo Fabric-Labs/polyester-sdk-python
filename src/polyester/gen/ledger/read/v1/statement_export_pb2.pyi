@@ -22,6 +22,7 @@ class StatementExportStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STATEMENT_EXPORT_STATUS_READY: _ClassVar[StatementExportStatus]
     STATEMENT_EXPORT_STATUS_FAILED: _ClassVar[StatementExportStatus]
     STATEMENT_EXPORT_STATUS_EXPIRED: _ClassVar[StatementExportStatus]
+    STATEMENT_EXPORT_STATUS_CANCELED: _ClassVar[StatementExportStatus]
 
 class StatementExportFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -34,6 +35,7 @@ STATEMENT_EXPORT_STATUS_PROCESSING: StatementExportStatus
 STATEMENT_EXPORT_STATUS_READY: StatementExportStatus
 STATEMENT_EXPORT_STATUS_FAILED: StatementExportStatus
 STATEMENT_EXPORT_STATUS_EXPIRED: StatementExportStatus
+STATEMENT_EXPORT_STATUS_CANCELED: StatementExportStatus
 STATEMENT_EXPORT_FAILURE_REASON_UNSPECIFIED: StatementExportFailureReason
 STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE: StatementExportFailureReason
 STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE: StatementExportFailureReason
@@ -102,6 +104,34 @@ class GetStatementExportResponse(_message.Message):
     export: StatementExport
     def __init__(self, export: _Optional[_Union[StatementExport, _Mapping]] = ...) -> None: ...
 
+class GetStatementExportDownloadUrlRequest(_message.Message):
+    __slots__ = ("export_id",)
+    EXPORT_ID_FIELD_NUMBER: _ClassVar[int]
+    export_id: int
+    def __init__(self, export_id: _Optional[int] = ...) -> None: ...
+
+class GetStatementExportDownloadUrlResponse(_message.Message):
+    __slots__ = ("url", "expires_at", "filename")
+    URL_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    FILENAME_FIELD_NUMBER: _ClassVar[int]
+    url: str
+    expires_at: _timestamp_pb2.Timestamp
+    filename: str
+    def __init__(self, url: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., filename: _Optional[str] = ...) -> None: ...
+
+class CancelStatementExportRequest(_message.Message):
+    __slots__ = ("export_id",)
+    EXPORT_ID_FIELD_NUMBER: _ClassVar[int]
+    export_id: int
+    def __init__(self, export_id: _Optional[int] = ...) -> None: ...
+
+class CancelStatementExportResponse(_message.Message):
+    __slots__ = ("export",)
+    EXPORT_FIELD_NUMBER: _ClassVar[int]
+    export: StatementExport
+    def __init__(self, export: _Optional[_Union[StatementExport, _Mapping]] = ...) -> None: ...
+
 class ListStatementExportsRequest(_message.Message):
     __slots__ = ("subaccount_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -113,9 +143,13 @@ class ListStatementExportsRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListStatementExportsResponse(_message.Message):
-    __slots__ = ("exports", "next_page_token")
+    __slots__ = ("exports", "next_page_token", "in_progress_exports", "max_in_progress_exports")
     EXPORTS_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    IN_PROGRESS_EXPORTS_FIELD_NUMBER: _ClassVar[int]
+    MAX_IN_PROGRESS_EXPORTS_FIELD_NUMBER: _ClassVar[int]
     exports: _containers.RepeatedCompositeFieldContainer[StatementExport]
     next_page_token: str
-    def __init__(self, exports: _Optional[_Iterable[_Union[StatementExport, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    in_progress_exports: int
+    max_in_progress_exports: int
+    def __init__(self, exports: _Optional[_Iterable[_Union[StatementExport, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., in_progress_exports: _Optional[int] = ..., max_in_progress_exports: _Optional[int] = ...) -> None: ...

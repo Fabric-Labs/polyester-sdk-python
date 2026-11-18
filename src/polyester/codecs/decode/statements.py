@@ -7,17 +7,13 @@ from polyester.codecs.proto_helpers import (
     optional_timestamp,
 )
 from polyester.errors import PolyesterResponseContractError
-from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.ledger.read.v1 import statement_export_pb2 as export_pb2
-from polyester.models.statements import StatementExport, StatementExportsPage, StatementPage
-
-
-def statement_page_from_proto(msg: ledger_read_pb2.ExportStatementResponse) -> StatementPage:
-    return StatementPage(
-        csv=msg.csv,
-        next_page_token=msg.next_page_token,
-        complete_through=optional_timestamp(msg, "complete_through"),
-    )
+from polyester.models.secret import Secret
+from polyester.models.statements import (
+    StatementExport,
+    StatementExportDownloadUrl,
+    StatementExportsPage,
+)
 
 
 def _label(enum, value: int, prefix: str) -> str:
@@ -84,4 +80,28 @@ def statement_exports_page_from_proto(
     return StatementExportsPage(
         exports=[statement_export_from_proto(item, "ListStatementExports") for item in msg.exports],
         next_page_token=msg.next_page_token,
+        in_progress_exports=int(msg.in_progress_exports),
+        max_in_progress_exports=int(msg.max_in_progress_exports),
+    )
+
+
+def canceled_statement_export_from_proto(
+    msg: export_pb2.CancelStatementExportResponse,
+) -> StatementExport:
+    return _required_export(msg, "CancelStatementExport")
+
+
+def statement_export_download_url_from_proto(
+    msg: export_pb2.GetStatementExportDownloadUrlResponse,
+) -> StatementExportDownloadUrl:
+    operation = "GetStatementExportDownloadUrl"
+    expires_at = optional_timestamp(msg, "expires_at")
+    if not msg.url:
+        raise PolyesterResponseContractError(operation, "missing url")
+    if expires_at is None:
+        raise PolyesterResponseContractError(operation, "missing expires_at")
+    if not msg.filename:
+        raise PolyesterResponseContractError(operation, "missing filename")
+    return StatementExportDownloadUrl(
+        url=Secret(msg.url), expires_at=expires_at, filename=msg.filename
     )

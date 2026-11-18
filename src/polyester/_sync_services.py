@@ -621,17 +621,19 @@ class SyncTransfersService(_SyncSubscribeService):
 class SyncStatementsService(_SyncService):
     """``Polyester`` view of :class:`~polyester.services.AsyncStatementsService`."""
 
+    cancel_export = call(AsyncStatementsService.cancel_export)
     create_export = call(AsyncStatementsService.create_export)
-    export = call(AsyncStatementsService.export)
-    export_page = call(AsyncStatementsService.export_page)
     get_export = call(AsyncStatementsService.get_export)
+    get_export_download_url = call(AsyncStatementsService.get_export_download_url)
     iter_exports = iterate(AsyncStatementsService.iter_exports)
     list_exports = call(AsyncStatementsService.list_exports)
+    wait_export = call(AsyncStatementsService.wait_export)
 
 
 class SyncSystemService(_SyncService):
     """``Polyester`` view of :class:`~polyester.services.AsyncSystemService`."""
 
+    get_time = call(AsyncSystemService.get_time)
     get_version = call(AsyncSystemService.get_version)
     iter_status_events = iterate(AsyncSystemService.iter_status_events)
     list_status_events = call(AsyncSystemService.list_status_events)
@@ -642,6 +644,8 @@ class SyncInternalTransfersService(_SyncService):
 
     batch_create = call(AsyncInternalTransfersService.batch_create)
     create = call(AsyncInternalTransfersService.create)
+    get_batch = call(AsyncInternalTransfersService.get_batch)
+    wait_batch = call(AsyncInternalTransfersService.wait_batch)
 
 
 class SyncDustConversionsService(_SyncService):
@@ -722,7 +726,9 @@ class SyncSubAccountsService(_SyncSubscribeService):
     """``Polyester`` view of :class:`~polyester.services.AsyncSubAccountsService`."""
 
     get = call(AsyncSubAccountsService.get)
+    iter_account_activity = iterate(AsyncSubAccountsService.iter_account_activity)
     list = call(AsyncSubAccountsService.list)
+    list_account_activity = call(AsyncSubAccountsService.list_account_activity)
     list_activity = call(AsyncSubAccountsService.list_activity)
     list_invites = call(AsyncSubAccountsService.list_invites)
     list_members = call(AsyncSubAccountsService.list_members)

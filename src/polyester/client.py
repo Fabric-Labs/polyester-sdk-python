@@ -75,7 +75,7 @@ from polyester.gen.chain.zipper.v1.zipper_connect import ZipperServiceClient
 from polyester.gen.chain.zipper.v1.zipper_pb2 import GetDepositWithdrawConfigRequest
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import GetSpotConfigRequest
-from polyester.models.system import ServerVersion, StatusEvent, StatusEventsPage
+from polyester.models.system import ServerTime, ServerVersion, StatusEvent, StatusEventsPage
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -440,6 +440,12 @@ class AsyncPolyester:
         ``environment``. Needs no API key and sends none."""
         return await self._system.get_version()
 
+    async def get_time(self) -> ServerTime:
+        """The API's clock, the one that checks signed request timestamps.
+        Needs no API key and sends none. See
+        :meth:`AsyncSystemService.get_time`."""
+        return await self._system.get_time()
+
     async def list_status_events(
         self,
         *,
@@ -711,6 +717,11 @@ class Polyester:
         return run_on_loop(
             self._loop, self._client.get_version, what="Polyester.get_version()"
         )
+
+    def get_time(self) -> ServerTime:
+        """The API's clock, the one that checks signed request timestamps.
+        Needs no API key and sends none."""
+        return run_on_loop(self._loop, self._client.get_time, what="Polyester.get_time()")
 
     def list_status_events(
         self,

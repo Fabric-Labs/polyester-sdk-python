@@ -27,7 +27,6 @@ _ENUM_CODES = frozenset(
 # Contract REST codes that no generated error enum names.
 _REST_ONLY_CODES = frozenset(
     {
-        "API_KEY_ACTION_DENY",
         "API_KEY_POLICY_NOT_FOUND",
         "INVALID_BEFORE_TS_NS",
         "INVALID_DEPTH",
@@ -42,10 +41,8 @@ _REST_ONLY_CODES = frozenset(
         "INVALID_TRIGGER_STATUS",
         "ORDER_ID_REQUIRED",
         "REQUEST_TOO_LARGE",
-        "ROLE_ACTION_DENY",
         "ROLE_SPOT_TRADE_DENY",
         "SERVER_ERROR",
-        "SUBACCOUNT_POLICY_DENY",
         "TRAILING_STOP_ORDER_TYPE_UNSUPPORTED",
         "TRIGGER_ID_REQUIRED",
     }

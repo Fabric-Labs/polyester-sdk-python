@@ -35,6 +35,13 @@ class MFAChallengePurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MFA_CHALLENGE_PURPOSE_UNSPECIFIED: _ClassVar[MFAChallengePurpose]
     MFA_CHALLENGE_PURPOSE_SESSION_ELEVATION: _ClassVar[MFAChallengePurpose]
     MFA_CHALLENGE_PURPOSE_FRESH_STEP_UP: _ClassVar[MFAChallengePurpose]
+
+class RecentMFAAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RECENT_MFA_ACTION_UNSPECIFIED: _ClassVar[RecentMFAAction]
+    RECENT_MFA_ACTION_TELEGRAM_LINK: _ClassVar[RecentMFAAction]
+    RECENT_MFA_ACTION_ASSISTANT_ACCESS: _ClassVar[RecentMFAAction]
+    RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS: _ClassVar[RecentMFAAction]
 SESSION_LEVEL_UNSPECIFIED: SessionLevel
 PRIMARY_AUTHENTICATED: SessionLevel
 MFA_ELEVATED: SessionLevel
@@ -46,6 +53,10 @@ MFA_FACTOR_TYPE_RECOVERY_CODE: MFAFactorType
 MFA_CHALLENGE_PURPOSE_UNSPECIFIED: MFAChallengePurpose
 MFA_CHALLENGE_PURPOSE_SESSION_ELEVATION: MFAChallengePurpose
 MFA_CHALLENGE_PURPOSE_FRESH_STEP_UP: MFAChallengePurpose
+RECENT_MFA_ACTION_UNSPECIFIED: RecentMFAAction
+RECENT_MFA_ACTION_TELEGRAM_LINK: RecentMFAAction
+RECENT_MFA_ACTION_ASSISTANT_ACCESS: RecentMFAAction
+RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS: RecentMFAAction
 
 class SessionInfo(_message.Message):
     __slots__ = ("session_id", "session_level", "authentication_methods", "auth_time")
@@ -274,6 +285,28 @@ class ReleaseFreshStepUpRequest(_message.Message):
     def __init__(self, step_up_id: _Optional[str] = ..., request_id: _Optional[str] = ..., action_type: _Optional[str] = ..., subject: _Optional[str] = ..., claim_nonce: _Optional[str] = ..., reason: _Optional[str] = ...) -> None: ...
 
 class ReleaseFreshStepUpResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetRecentMFARequest(_message.Message):
+    __slots__ = ("action",)
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    action: RecentMFAAction
+    def __init__(self, action: _Optional[_Union[RecentMFAAction, str]] = ...) -> None: ...
+
+class GetRecentMFAResponse(_message.Message):
+    __slots__ = ("open", "expires_at")
+    OPEN_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    open: bool
+    expires_at: _timestamp_pb2.Timestamp
+    def __init__(self, open: _Optional[bool] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class EndRecentMFARequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class EndRecentMFAResponse(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.balances import u128_from_proto
+from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.models import (
+    UnavailableWalletAsset,
     WalletBalance,
     WalletBalances,
     WithdrawDestinationValidation,
@@ -60,5 +62,15 @@ def wallet_balances_from_proto(msg: withdraw_pb2.GetWalletBalancesResponse) -> W
                 amount_e18=u128_from_proto(item.amount_e18),
             )
             for item in msg.balances
+        ],
+        unavailable_assets=[
+            UnavailableWalletAsset(
+                zipped_asset_id=int(item.zipped_asset_id),
+                unified_asset_id=int(item.unified_asset_id),
+                chain_id=int(item.chain_id),
+                ztoken_address=str(item.ztoken_address or ""),
+                reason=proto_enum_name(withdraw_pb2.WalletAssetUnavailableReason, int(item.reason)),
+            )
+            for item in msg.unavailable_assets
         ],
     )

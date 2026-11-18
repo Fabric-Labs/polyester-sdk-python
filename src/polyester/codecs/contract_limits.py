@@ -87,3 +87,11 @@ def contract_repeated_items(message: Any, name: str) -> tuple[int, int]:
     if not rules.HasField("max_items"):
         raise LookupError(f"{message.DESCRIPTOR.full_name}.{name} has no max_items")
     return int(rules.min_items), int(rules.max_items)
+
+
+def contract_repeated_items_min(message: Any, name: str) -> int:
+    """The ``min_items`` the contract sets on a repeated field."""
+    rules = _rules(message, name).repeated
+    if not rules.HasField("min_items"):
+        raise LookupError(f"{message.DESCRIPTOR.full_name}.{name} has no min_items")
+    return int(rules.min_items)

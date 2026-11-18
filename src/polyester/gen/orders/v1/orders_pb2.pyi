@@ -263,6 +263,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_PEG_REFERENCE_UNAVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_INVALID_PEG: _ClassVar[ErrorCode]
     ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_CLIENT_LIST_ID_INVALID: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -530,6 +531,7 @@ ERROR_CODE_PEG_LIMIT_VIOLATION: ErrorCode
 ERROR_CODE_PEG_REFERENCE_UNAVAILABLE: ErrorCode
 ERROR_CODE_INVALID_PEG: ErrorCode
 ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE: ErrorCode
+ERROR_CODE_CLIENT_LIST_ID_INVALID: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource
@@ -733,20 +735,22 @@ class FieldViolation(_message.Message):
     def __init__(self, field_path: _Optional[str] = ..., rule_id: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code", "violations", "rate_limit", "existing_order_id", "cause_code", "level_index")
+    __slots__ = ("code", "violations", "rate_limit", "existing_order_id", "cause_code", "level_index", "price_band_limit_ticks")
     CODE_FIELD_NUMBER: _ClassVar[int]
     VIOLATIONS_FIELD_NUMBER: _ClassVar[int]
     RATE_LIMIT_FIELD_NUMBER: _ClassVar[int]
     EXISTING_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     CAUSE_CODE_FIELD_NUMBER: _ClassVar[int]
     LEVEL_INDEX_FIELD_NUMBER: _ClassVar[int]
+    PRICE_BAND_LIMIT_TICKS_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     violations: _containers.RepeatedCompositeFieldContainer[FieldViolation]
     rate_limit: _types_pb2.RateLimitDetail
     existing_order_id: int
     cause_code: ErrorCode
     level_index: int
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ..., existing_order_id: _Optional[int] = ..., cause_code: _Optional[_Union[ErrorCode, str]] = ..., level_index: _Optional[int] = ...) -> None: ...
+    price_band_limit_ticks: int
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., violations: _Optional[_Iterable[_Union[FieldViolation, _Mapping]]] = ..., rate_limit: _Optional[_Union[_types_pb2.RateLimitDetail, _Mapping]] = ..., existing_order_id: _Optional[int] = ..., cause_code: _Optional[_Union[ErrorCode, str]] = ..., level_index: _Optional[int] = ..., price_band_limit_ticks: _Optional[int] = ...) -> None: ...
 
 class RiskMarketIoc(_message.Message):
     __slots__ = ()

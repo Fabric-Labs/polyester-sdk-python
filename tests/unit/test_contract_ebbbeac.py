@@ -23,19 +23,15 @@ from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.auth.v1 import api_keys_pb2, policies_pb2, subaccounts_pb2
 from polyester.gen.chain.zipper.v1 import zipper_pb2
-from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.marketdata.v1 import asset_info_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.system.v1 import system_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import (
     AssetIssuePrice,
-    Statement,
-    StatementRow,
     ZippedAssetSupplyUpdate,
     parse_statement_csv,
 )
-from polyester.services.statements import AsyncStatementsService
 from polyester.transport import TransportConfig, TransportFactory
 from tests.hardening_support import (
     MockHttpServer,
@@ -83,122 +79,6 @@ async def _server(respond: Responder, *, signed: bool = True):
 
 
 # --- account statements --------------------------------------------------------------------------
-
-
-def _statement_pages(req: ParsedRequest) -> Message:
-    sent = ledger_read_pb2.ExportStatementRequest.FromString(req.body)
-    pages = {
-        "": ledger_read_pb2.ExportStatementResponse(csv=HEADER + ROW_1, next_page_token="p2"),
-        "p2": ledger_read_pb2.ExportStatementResponse(csv=ROW_2, next_page_token=""),
-    }
-    return pages[sent.page_token]
-
-
-async def test_export_follows_every_page_with_the_same_request_and_concatenates() -> None:
-    async with _server(_statement_pages) as (_, transport, requests):
-        statement = await AsyncStatementsService(transport, None).export(
-            start_time=START, end_time=END, asset_id=7
-        )
-    assert statement == Statement(csv=HEADER + ROW_1 + ROW_2)
-    sent = [ledger_read_pb2.ExportStatementRequest.FromString(r.body) for r in requests]
-    assert [r.path for r in requests] == ["/ledger.read.v1.LedgerReadService/ExportStatement"] * 2
-    assert [s.page_token for s in sent] == ["", "p2"]
-    for request in sent:
-        # Exact to the microsecond, the same fields on every page.
-        assert request.start_time == _ts(START)
-        assert request.start_time.nanos == 123_456_000
-        assert request.end_time == _ts(END)
-        assert request.asset_id == 7
-        assert not request.HasField("subaccount_id")
-    # Signed like the other ledger reads.
-    assert all(r.headers.get("x-api-key-id") == "ak_test" for r in requests)
-    assert all(r.headers.get("x-api-signature") for r in requests)
-    rows = statement.rows()
-    assert [row.flow_id for row in rows] == ["f1", ""]
-    assert rows[1] == StatementRow(
-        time=datetime(2026, 10, 3, 8, 12, 45, 123456, tzinfo=UTC),
-        entry_id="27419385013475392811",
-        type="trade",
-        account="trading",
-        asset="BTC",
-        amount="0.1",
-        fee="0",
-        balance="1.1",
-        link_id="77",
-    )
-
-
-async def test_export_page_applies_the_default_sub_account_unless_named() -> None:
-    sub = format_id(9_000_000_001)
-    other = format_id(9_000_000_002)
-    async with _server(_statement_pages) as (_, transport, requests):
-        service = AsyncStatementsService(transport, sub)
-        await service.export_page(start_time=START, end_time=END)
-        await service.export_page(start_time=START, end_time=END, sub_account_id=other)
-        await service.export_page(start_time=START, end_time=END, account="active")
-        await service.export_page(start_time=START, end_time=END, account="main")
-    sent = [ledger_read_pb2.ExportStatementRequest.FromString(r.body) for r in requests]
-    assert [s.subaccount_id for s in sent] == [9_000_000_001, 9_000_000_002, 9_000_000_001, 0]
-    assert not sent[3].HasField("subaccount_id")
-    assert all(s.asset_id == 0 for s in sent)
-
-
-async def test_export_page_returns_one_page_as_sent() -> None:
-    async with _server(_statement_pages) as (_, transport, _requests):
-        page = await AsyncStatementsService(transport, None).export_page(
-            start_time=START, end_time=END
-        )
-    assert page.csv == HEADER + ROW_1
-    assert page.next_page_token == "p2"
-
-
-async def test_client_statements_use_the_configured_default_sub_account() -> None:
-    sub = format_id(9_000_000_001)
-    async with _server(_statement_pages) as (url, _transport, requests):
-        client = AsyncPolyester(
-            api_url=url,
-            hydrate_catalogs=False,
-            api_key_id="ak_test",
-            api_private_key=_PRIVATE_KEY,
-            default_sub_account_id=sub,
-        )
-        try:
-            await client.statements.export_page(start_time=START, end_time=END)
-        finally:
-            await client.aclose()
-    (sent,) = requests
-    assert ledger_read_pb2.ExportStatementRequest.FromString(sent.body).subaccount_id == (
-        9_000_000_001
-    )
-    assert sent.headers.get("x-api-key-id") == "ak_test"
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"start_time": None, "end_time": END},
-        {"start_time": START, "end_time": None},
-        {"start_time": "2026-10-01T00:00:00Z", "end_time": END},
-        {"start_time": START.replace(tzinfo=None), "end_time": END},
-        {"start_time": START, "end_time": END, "asset_id": -1},
-        {"start_time": START, "end_time": END, "asset_id": True},
-    ],
-)
-async def test_export_refuses_what_it_cannot_send_before_sending(kwargs) -> None:
-    async with _server(_statement_pages) as (_, transport, requests):
-        with pytest.raises(PolyesterValidationError):
-            await AsyncStatementsService(transport, None).export(**kwargs)
-    assert requests == []
-
-
-async def test_export_rejects_a_repeated_page_token() -> None:
-    def respond(req: ParsedRequest) -> Message:
-        return ledger_read_pb2.ExportStatementResponse(csv=HEADER, next_page_token="again")
-
-    async with _server(respond) as (_, transport, requests):
-        with pytest.raises(PolyesterResponseContractError):
-            await AsyncStatementsService(transport, None).export(start_time=START, end_time=END)
-    assert len(requests) == 2
 
 
 def test_statement_csv_reads_columns_by_header_name() -> None:

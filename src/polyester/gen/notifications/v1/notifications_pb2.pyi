@@ -26,6 +26,7 @@ class NotificationType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PRICE_ALERT: _ClassVar[NotificationType]
     TELEGRAM_APPROVAL: _ClassVar[NotificationType]
     BROKER_ALLOWLIST_CHANGE: _ClassVar[NotificationType]
+    TELEGRAM_LINKED: _ClassVar[NotificationType]
 
 class NotificationCategory(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -71,6 +72,7 @@ TYPE_UNSPECIFIED: NotificationType
 PRICE_ALERT: NotificationType
 TELEGRAM_APPROVAL: NotificationType
 BROKER_ALLOWLIST_CHANGE: NotificationType
+TELEGRAM_LINKED: NotificationType
 CATEGORY_UNSPECIFIED: NotificationCategory
 ALERTS: NotificationCategory
 SECURITY: NotificationCategory
@@ -102,7 +104,7 @@ class ErrorDetail(_message.Message):
     def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class Notification(_message.Message):
-    __slots__ = ("notification_id", "type", "category", "title", "text", "created_at", "read_at", "price_alert", "telegram_approval", "broker_allowlist")
+    __slots__ = ("notification_id", "type", "category", "title", "text", "created_at", "read_at", "price_alert", "telegram_approval", "broker_allowlist", "telegram_link")
     NOTIFICATION_ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
@@ -113,6 +115,7 @@ class Notification(_message.Message):
     PRICE_ALERT_FIELD_NUMBER: _ClassVar[int]
     TELEGRAM_APPROVAL_FIELD_NUMBER: _ClassVar[int]
     BROKER_ALLOWLIST_FIELD_NUMBER: _ClassVar[int]
+    TELEGRAM_LINK_FIELD_NUMBER: _ClassVar[int]
     notification_id: int
     type: NotificationType
     category: NotificationCategory
@@ -123,7 +126,8 @@ class Notification(_message.Message):
     price_alert: PriceAlertNotice
     telegram_approval: TelegramApprovalNotice
     broker_allowlist: BrokerAllowlistNotice
-    def __init__(self, notification_id: _Optional[int] = ..., type: _Optional[_Union[NotificationType, str]] = ..., category: _Optional[_Union[NotificationCategory, str]] = ..., title: _Optional[str] = ..., text: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., read_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., price_alert: _Optional[_Union[PriceAlertNotice, _Mapping]] = ..., telegram_approval: _Optional[_Union[TelegramApprovalNotice, _Mapping]] = ..., broker_allowlist: _Optional[_Union[BrokerAllowlistNotice, _Mapping]] = ...) -> None: ...
+    telegram_link: TelegramLinkNotice
+    def __init__(self, notification_id: _Optional[int] = ..., type: _Optional[_Union[NotificationType, str]] = ..., category: _Optional[_Union[NotificationCategory, str]] = ..., title: _Optional[str] = ..., text: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., read_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., price_alert: _Optional[_Union[PriceAlertNotice, _Mapping]] = ..., telegram_approval: _Optional[_Union[TelegramApprovalNotice, _Mapping]] = ..., broker_allowlist: _Optional[_Union[BrokerAllowlistNotice, _Mapping]] = ..., telegram_link: _Optional[_Union[TelegramLinkNotice, _Mapping]] = ...) -> None: ...
 
 class PriceAlertNotice(_message.Message):
     __slots__ = ("alert_id", "symbol_id", "direction", "price_source", "price_ticks", "triggered_price_ticks", "triggered_at")
@@ -288,3 +292,9 @@ class MarkAllNotificationsReadResponse(_message.Message):
     CHANGED_FIELD_NUMBER: _ClassVar[int]
     changed: int
     def __init__(self, changed: _Optional[int] = ...) -> None: ...
+
+class TelegramLinkNotice(_message.Message):
+    __slots__ = ("linked_at",)
+    LINKED_AT_FIELD_NUMBER: _ClassVar[int]
+    linked_at: _timestamp_pb2.Timestamp
+    def __init__(self, linked_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...

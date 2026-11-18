@@ -55,15 +55,22 @@ def internal_transfer_from_proto(
 
 
 _BATCH_STATUS_LABELS = {
-    internal_transfer_pb2.BATCH_SUBMITTED: "submitted",
     internal_transfer_pb2.BATCH_REFUSED: "refused",
+    internal_transfer_pb2.BATCH_PROCESSING: "processing",
+    internal_transfer_pb2.BATCH_ACCEPTED: "accepted",
 }
 
 _LEG_STATUS_LABELS = {
-    internal_transfer_pb2.LEG_ACCEPTED: "accepted",
-    internal_transfer_pb2.LEG_PENDING: "pending",
-    internal_transfer_pb2.LEG_REFUSED: "refused",
-    internal_transfer_pb2.LEG_NOT_SUBMITTED: "not_submitted",
+    internal_transfer_pb2.LEG_PROCESSING: "processing",
+    internal_transfer_pb2.LEG_CREDITED: "credited",
+    internal_transfer_pb2.LEG_NOT_MOVED: "not_moved",
+}
+
+# The only leg status each batch status admits: a batch moves as one.
+_LEG_STATUS_OF_BATCH = {
+    "refused": "not_moved",
+    "processing": "processing",
+    "accepted": "credited",
 }
 
 
@@ -81,30 +88,34 @@ def transfer_error_label(code: int) -> str:
 
 
 def _batch_leg_from_proto(
-    msg: internal_transfer_pb2.InternalTransferBatchLegResult,
+    msg: internal_transfer_pb2.InternalTransferBatchLegResult, *, operation: str
 ) -> InternalTransferBatchLegResult:
-    operation = "BatchCreateInternalTransfers"
     status = _LEG_STATUS_LABELS.get(msg.status)  # type: ignore[call-overload]
     if status is None:
         raise PolyesterResponseContractError(
             operation, f"leg {msg.leg_index} has no known status ({int(msg.status)})"
         )
-    if status in ("accepted", "pending") and not msg.request_id:
+    if status in ("processing", "credited") and not msg.transfer_id:
         raise PolyesterResponseContractError(
-            operation, f"{status} leg {msg.leg_index} is missing request_id"
+            operation, f"{status} leg {msg.leg_index} is missing transfer_id"
         )
-    if status == "accepted" and not msg.transfer_id:
+    # The contract sets a leg's lifecycle flow and credit time once it is
+    # credited: a credited leg without them is not a receipt of a credit.
+    if status == "credited" and not msg.flow_id:
         raise PolyesterResponseContractError(
-            operation, f"accepted leg {msg.leg_index} is missing transfer_id"
+            operation, f"credited leg {msg.leg_index} is missing flow_id"
+        )
+    if status == "credited" and not msg.credited_at_ts_ns:
+        raise PolyesterResponseContractError(
+            operation, f"credited leg {msg.leg_index} is missing credited_at_ts_ns"
         )
     asset_id = int(msg.asset_id)
     return InternalTransferBatchLegResult(
         leg_index=int(msg.leg_index),
         status=status,
-        request_id=msg.request_id,
         transfer_id=msg.transfer_id,
         flow_id=msg.flow_id,
-        accepted_at_ts_ns=int(msg.accepted_at_ts_ns) or None,
+        credited_at_ts_ns=int(msg.credited_at_ts_ns) or None,
         asset_id=asset_id,
         asset_code=msg.asset_code,
         quantity=AssetAmount.from_scaled(
@@ -128,31 +139,51 @@ def _batch_leg_from_proto(
 
 
 def internal_transfer_batch_from_proto(
-    msg: internal_transfer_pb2.BatchCreateInternalTransfersResponse, *, leg_count: int
+    msg: internal_transfer_pb2.BatchCreateInternalTransfersResponse
+    | internal_transfer_pb2.GetInternalTransferBatchResponse,
+    *,
+    leg_count: int | None = None,
+    request_id: str | None = None,
+    operation: str = "BatchCreateInternalTransfers",
 ) -> InternalTransferBatchResult:
-    """Decode a batch reply to a request of ``leg_count`` legs.
+    """Decode a batch answer, from a create of ``leg_count`` legs or a read
+    of the batch ``request_id``.
 
-    It must name a known batch status, carry its ``request_id`` when
-    submitted, and answer every requested leg once, in request order.
+    It must name a known batch status and carry its ``request_id`` unless
+    refused (a read must answer the batch it named), answer every requested
+    leg once in request order, give a processing or credited leg its
+    ``transfer_id`` and a credited leg its ``flow_id`` and
+    ``credited_at_ts_ns``, and give every leg the one status its batch
+    status admits: ``"credited"`` for an accepted batch, ``"processing"`` for
+    a processing one and ``"not_moved"`` for a refused one.
     """
-    operation = "BatchCreateInternalTransfers"
     status = _BATCH_STATUS_LABELS.get(msg.status)  # type: ignore[call-overload]
     if status is None:
         raise PolyesterResponseContractError(
             operation, f"no known batch status ({int(msg.status)})"
         )
-    if status == "submitted" and not msg.request_id:
-        raise PolyesterResponseContractError(operation, "submitted batch is missing request_id")
-    if len(msg.legs) != leg_count:
+    if status != "refused" and not msg.request_id:
+        raise PolyesterResponseContractError(operation, f"{status} batch is missing request_id")
+    if request_id is not None and msg.request_id != request_id:
+        raise PolyesterResponseContractError(
+            operation, f"answered batch {msg.request_id!r} for {request_id!r}"
+        )
+    if leg_count is not None and len(msg.legs) != leg_count:
         raise PolyesterResponseContractError(
             operation, f"answered {len(msg.legs)} legs for {leg_count} requested"
         )
+    if not msg.legs:
+        raise PolyesterResponseContractError(operation, "batch has no legs")
     for index, leg in enumerate(msg.legs):
         if leg.leg_index != index:
             raise PolyesterResponseContractError(
                 operation, f"leg {index} answered as leg_index {leg.leg_index}"
             )
-    legs = [_batch_leg_from_proto(leg) for leg in msg.legs]
-    if status == "refused" and any(leg.status == "accepted" for leg in legs):
-        raise PolyesterResponseContractError(operation, "refused batch has an accepted leg")
+    legs = [_batch_leg_from_proto(leg, operation=operation) for leg in msg.legs]
+    expected = _LEG_STATUS_OF_BATCH[status]
+    for leg in legs:
+        if leg.status != expected:
+            raise PolyesterResponseContractError(
+                operation, f"{status} batch has a {leg.status} leg {leg.leg_index}"
+            )
     return InternalTransferBatchResult(request_id=msg.request_id, status=status, legs=legs)

@@ -17,7 +17,7 @@ def patch_zipper_catalog_supply(
     if not updates:
         return catalog
 
-    supply_by_id = {item.zipped_asset_id: item.supply for item in updates}
+    update_by_id = {item.zipped_asset_id: item for item in updates}
     changed = False
     next_assets: list[ZipperEnrichedAssetConfig] = []
 
@@ -25,8 +25,12 @@ def patch_zipper_catalog_supply(
         asset_changed = False
         next_chains: list[ZipperEnrichedAssetChain] = []
         for chain in asset.chains:
-            supply = supply_by_id.get(chain.zipped_asset_id)
-            if supply is None or supply == chain.supply:
+            update = update_by_id.get(chain.zipped_asset_id)
+            if update is None or (
+                update.supply == chain.supply
+                and update.status == chain.supply_status
+                and update.observed_at == chain.supply_observed_at
+            ):
                 next_chains.append(chain)
                 continue
             asset_changed = True
@@ -54,7 +58,9 @@ def patch_zipper_catalog_supply(
                     network_fee_ts_sec=chain.network_fee_ts_sec,
                     deposit_min_amount=chain.deposit_min_amount,
                     withdraw_min_amount=chain.withdraw_min_amount,
-                    supply=supply,
+                    supply=update.supply,
+                    supply_status=update.status,
+                    supply_observed_at=update.observed_at,
                     source_token=chain.source_token,
                     z_token=chain.z_token,
                     deposit_status=chain.deposit_status,

@@ -36,6 +36,14 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
     KEY_SETUP_NOT_FOUND: _ClassVar[ErrorCode]
     KEY_SETUP_NOT_REGISTERED: _ClassVar[ErrorCode]
+    CONVERSATION_ADVANCED: _ClassVar[ErrorCode]
+    MODEL_KEY_REJECTED: _ClassVar[ErrorCode]
+    MODEL_KEY_NO_QUOTA: _ClassVar[ErrorCode]
+    MODEL_KEY_MODEL_UNAVAILABLE: _ClassVar[ErrorCode]
+    IMAGE_TOO_LARGE: _ClassVar[ErrorCode]
+    IMAGE_TYPE_UNSUPPORTED: _ClassVar[ErrorCode]
+    TOO_MANY_IMAGES: _ClassVar[ErrorCode]
+    IMAGE_NOT_FOUND: _ClassVar[ErrorCode]
 
 class MessageRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -51,6 +59,9 @@ class FailureCategory(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PERMISSION_DENIED: _ClassVar[FailureCategory]
     MODEL_UNAVAILABLE: _ClassVar[FailureCategory]
     UNEXPECTED_ERROR: _ClassVar[FailureCategory]
+    MODEL_KEY_REFUSED: _ClassVar[FailureCategory]
+    DAILY_LIMIT_REACHED: _ClassVar[FailureCategory]
+    ASSISTANT_PAUSED: _ClassVar[FailureCategory]
 
 class ApprovalDecision(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -88,6 +99,20 @@ class AssistantKeyView(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     ASSISTANT_KEY_VIEW_UNSPECIFIED: _ClassVar[AssistantKeyView]
     ASSISTANT_KEY_VIEW_FULL: _ClassVar[AssistantKeyView]
+
+class ModelKeyCheck(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    KEY_CHECK_UNSPECIFIED: _ClassVar[ModelKeyCheck]
+    KEY_VALID: _ClassVar[ModelKeyCheck]
+    KEY_REJECTED: _ClassVar[ModelKeyCheck]
+    KEY_NO_QUOTA: _ClassVar[ModelKeyCheck]
+    KEY_MODEL_UNAVAILABLE: _ClassVar[ModelKeyCheck]
+
+class FundingMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    FUNDING_UNSPECIFIED: _ClassVar[FundingMode]
+    CREDITS: _ClassVar[FundingMode]
+    OWN_KEY: _ClassVar[FundingMode]
 
 class DisplaySetting(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -166,6 +191,14 @@ USAGE_LIMIT_REACHED: ErrorCode
 SERVICE_UNAVAILABLE: ErrorCode
 KEY_SETUP_NOT_FOUND: ErrorCode
 KEY_SETUP_NOT_REGISTERED: ErrorCode
+CONVERSATION_ADVANCED: ErrorCode
+MODEL_KEY_REJECTED: ErrorCode
+MODEL_KEY_NO_QUOTA: ErrorCode
+MODEL_KEY_MODEL_UNAVAILABLE: ErrorCode
+IMAGE_TOO_LARGE: ErrorCode
+IMAGE_TYPE_UNSUPPORTED: ErrorCode
+TOO_MANY_IMAGES: ErrorCode
+IMAGE_NOT_FOUND: ErrorCode
 ROLE_UNSPECIFIED: MessageRole
 USER: MessageRole
 ASSISTANT: MessageRole
@@ -175,6 +208,9 @@ BUDGET_EXCEEDED: FailureCategory
 PERMISSION_DENIED: FailureCategory
 MODEL_UNAVAILABLE: FailureCategory
 UNEXPECTED_ERROR: FailureCategory
+MODEL_KEY_REFUSED: FailureCategory
+DAILY_LIMIT_REACHED: FailureCategory
+ASSISTANT_PAUSED: FailureCategory
 DECISION_UNSPECIFIED: ApprovalDecision
 APPROVE: ApprovalDecision
 REJECT: ApprovalDecision
@@ -194,6 +230,14 @@ ACCOUNT_SELECTION_UNSPECIFIED: AccountSelection
 ACCOUNT_SELECTION_NONE: AccountSelection
 ASSISTANT_KEY_VIEW_UNSPECIFIED: AssistantKeyView
 ASSISTANT_KEY_VIEW_FULL: AssistantKeyView
+KEY_CHECK_UNSPECIFIED: ModelKeyCheck
+KEY_VALID: ModelKeyCheck
+KEY_REJECTED: ModelKeyCheck
+KEY_NO_QUOTA: ModelKeyCheck
+KEY_MODEL_UNAVAILABLE: ModelKeyCheck
+FUNDING_UNSPECIFIED: FundingMode
+CREDITS: FundingMode
+OWN_KEY: FundingMode
 SETTING_UNSPECIFIED: DisplaySetting
 APPEARANCE: DisplaySetting
 LANGUAGE: DisplaySetting
@@ -255,18 +299,42 @@ class Conversation(_message.Message):
     def __init__(self, conversation_id: _Optional[int] = ..., title: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Message(_message.Message):
-    __slots__ = ("message_id", "role", "text", "created_at", "run_id")
+    __slots__ = ("message_id", "role", "text", "created_at", "run_id", "images")
     MESSAGE_ID_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    IMAGES_FIELD_NUMBER: _ClassVar[int]
     message_id: int
     role: MessageRole
     text: str
     created_at: _timestamp_pb2.Timestamp
     run_id: int
-    def __init__(self, message_id: _Optional[int] = ..., role: _Optional[_Union[MessageRole, str]] = ..., text: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., run_id: _Optional[int] = ...) -> None: ...
+    images: _containers.RepeatedCompositeFieldContainer[MessageImage]
+    def __init__(self, message_id: _Optional[int] = ..., role: _Optional[_Union[MessageRole, str]] = ..., text: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., run_id: _Optional[int] = ..., images: _Optional[_Iterable[_Union[MessageImage, _Mapping]]] = ...) -> None: ...
+
+class MessageImage(_message.Message):
+    __slots__ = ("image_id", "mime_type", "width", "height", "size_bytes")
+    IMAGE_ID_FIELD_NUMBER: _ClassVar[int]
+    MIME_TYPE_FIELD_NUMBER: _ClassVar[int]
+    WIDTH_FIELD_NUMBER: _ClassVar[int]
+    HEIGHT_FIELD_NUMBER: _ClassVar[int]
+    SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    image_id: int
+    mime_type: str
+    width: int
+    height: int
+    size_bytes: int
+    def __init__(self, image_id: _Optional[int] = ..., mime_type: _Optional[str] = ..., width: _Optional[int] = ..., height: _Optional[int] = ..., size_bytes: _Optional[int] = ...) -> None: ...
+
+class ImageAttachment(_message.Message):
+    __slots__ = ("data", "mime_type")
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    MIME_TYPE_FIELD_NUMBER: _ClassVar[int]
+    data: bytes
+    mime_type: str
+    def __init__(self, data: _Optional[bytes] = ..., mime_type: _Optional[str] = ...) -> None: ...
 
 class Memory(_message.Message):
     __slots__ = ("memory_id", "text", "created_at", "conversation_id", "kind")
@@ -1028,6 +1096,18 @@ class AssistantKey(_message.Message):
     label: str
     def __init__(self, subaccount_id: _Optional[int] = ..., key_id: _Optional[str] = ..., public_key_ed25519: _Optional[bytes] = ..., state: _Optional[_Union[AssistantKeyState, str]] = ..., label: _Optional[str] = ...) -> None: ...
 
+class ModelKey(_message.Message):
+    __slots__ = ("suffix", "added_at", "last_check", "checked_at")
+    SUFFIX_FIELD_NUMBER: _ClassVar[int]
+    ADDED_AT_FIELD_NUMBER: _ClassVar[int]
+    LAST_CHECK_FIELD_NUMBER: _ClassVar[int]
+    CHECKED_AT_FIELD_NUMBER: _ClassVar[int]
+    suffix: str
+    added_at: _timestamp_pb2.Timestamp
+    last_check: ModelKeyCheck
+    checked_at: _timestamp_pb2.Timestamp
+    def __init__(self, suffix: _Optional[str] = ..., added_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_check: _Optional[_Union[ModelKeyCheck, str]] = ..., checked_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
 class AssistantKeyAccount(_message.Message):
     __slots__ = ("subaccount_id",)
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -1067,7 +1147,7 @@ class CurrentPage(_message.Message):
     def __init__(self, destination_id: _Optional[str] = ..., route: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
 
 class SendMessageRequest(_message.Message):
-    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings", "account_selection")
+    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings", "account_selection", "expected_latest_run_id", "images")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
@@ -1076,6 +1156,8 @@ class SendMessageRequest(_message.Message):
     PAGE_FIELD_NUMBER: _ClassVar[int]
     DISPLAY_SETTINGS_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_SELECTION_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_LATEST_RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    IMAGES_FIELD_NUMBER: _ClassVar[int]
     conversation_id: int
     text: str
     idempotency_key: str
@@ -1084,7 +1166,9 @@ class SendMessageRequest(_message.Message):
     page: CurrentPage
     display_settings: _containers.RepeatedScalarFieldContainer[DisplaySetting]
     account_selection: AccountSelection
-    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ..., account_selection: _Optional[_Union[AccountSelection, str]] = ...) -> None: ...
+    expected_latest_run_id: int
+    images: _containers.RepeatedCompositeFieldContainer[ImageAttachment]
+    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ..., account_selection: _Optional[_Union[AccountSelection, str]] = ..., expected_latest_run_id: _Optional[int] = ..., images: _Optional[_Iterable[_Union[ImageAttachment, _Mapping]]] = ...) -> None: ...
 
 class SendMessageResponse(_message.Message):
     __slots__ = ("run_id", "conversation_id")
@@ -1165,6 +1249,20 @@ class ListMessagesResponse(_message.Message):
     messages: _containers.RepeatedCompositeFieldContainer[Message]
     next_page_token: str
     def __init__(self, messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class GetMessageImageRequest(_message.Message):
+    __slots__ = ("image_id",)
+    IMAGE_ID_FIELD_NUMBER: _ClassVar[int]
+    image_id: int
+    def __init__(self, image_id: _Optional[int] = ...) -> None: ...
+
+class GetMessageImageResponse(_message.Message):
+    __slots__ = ("data", "mime_type")
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    MIME_TYPE_FIELD_NUMBER: _ClassVar[int]
+    data: bytes
+    mime_type: str
+    def __init__(self, data: _Optional[bytes] = ..., mime_type: _Optional[str] = ...) -> None: ...
 
 class ListMemoriesRequest(_message.Message):
     __slots__ = ("limit", "page_token")
@@ -1263,3 +1361,63 @@ class SetTelegramApprovalLimitsResponse(_message.Message):
     LIMITS_FIELD_NUMBER: _ClassVar[int]
     limits: TelegramApprovalLimits
     def __init__(self, limits: _Optional[_Union[TelegramApprovalLimits, _Mapping]] = ...) -> None: ...
+
+class SetModelKeyRequest(_message.Message):
+    __slots__ = ("api_key",)
+    API_KEY_FIELD_NUMBER: _ClassVar[int]
+    api_key: str
+    def __init__(self, api_key: _Optional[str] = ...) -> None: ...
+
+class SetModelKeyResponse(_message.Message):
+    __slots__ = ("key",)
+    KEY_FIELD_NUMBER: _ClassVar[int]
+    key: ModelKey
+    def __init__(self, key: _Optional[_Union[ModelKey, _Mapping]] = ...) -> None: ...
+
+class GetModelKeyRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetModelKeyResponse(_message.Message):
+    __slots__ = ("key",)
+    KEY_FIELD_NUMBER: _ClassVar[int]
+    key: ModelKey
+    def __init__(self, key: _Optional[_Union[ModelKey, _Mapping]] = ...) -> None: ...
+
+class DeleteModelKeyRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class DeleteModelKeyResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetUsageRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class TierCredits(_message.Message):
+    __slots__ = ("vip_tier", "daily_free_credits")
+    VIP_TIER_FIELD_NUMBER: _ClassVar[int]
+    DAILY_FREE_CREDITS_FIELD_NUMBER: _ClassVar[int]
+    vip_tier: int
+    daily_free_credits: int
+    def __init__(self, vip_tier: _Optional[int] = ..., daily_free_credits: _Optional[int] = ...) -> None: ...
+
+class GetUsageResponse(_message.Message):
+    __slots__ = ("funding_mode", "vip_tier", "free_credits", "free_credits_used", "free_credits_left", "resets_at", "next_tier")
+    FUNDING_MODE_FIELD_NUMBER: _ClassVar[int]
+    VIP_TIER_FIELD_NUMBER: _ClassVar[int]
+    FREE_CREDITS_FIELD_NUMBER: _ClassVar[int]
+    FREE_CREDITS_USED_FIELD_NUMBER: _ClassVar[int]
+    FREE_CREDITS_LEFT_FIELD_NUMBER: _ClassVar[int]
+    RESETS_AT_FIELD_NUMBER: _ClassVar[int]
+    NEXT_TIER_FIELD_NUMBER: _ClassVar[int]
+    funding_mode: FundingMode
+    vip_tier: int
+    free_credits: int
+    free_credits_used: int
+    free_credits_left: int
+    resets_at: _timestamp_pb2.Timestamp
+    next_tier: TierCredits
+    def __init__(self, funding_mode: _Optional[_Union[FundingMode, str]] = ..., vip_tier: _Optional[int] = ..., free_credits: _Optional[int] = ..., free_credits_used: _Optional[int] = ..., free_credits_left: _Optional[int] = ..., resets_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., next_tier: _Optional[_Union[TierCredits, _Mapping]] = ...) -> None: ...

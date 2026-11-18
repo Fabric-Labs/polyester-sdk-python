@@ -9,8 +9,9 @@ from polyester.codecs.correlation_id import check_correlation_id
 from polyester.codecs.orders import _risk_leg_from_dict, _risk_leg_model_to_dict
 from polyester.codecs.refusal_codes import (
     BAD_PRICE,
-    BAD_QTY,
+    CLIENT_LIST_ID_INVALID,
     TRIGGER_PRICE_INVALID,
+    TRIGGER_QTY_INVALID,
     refusal_code,
 )
 from polyester.codecs.scalars import parse_account_id
@@ -37,11 +38,15 @@ def validate_client_list_id(value: object, field_name: str = "client_list_id") -
     rule: 1 to 36 ASCII letters, digits, ``.``, ``_``, ``:``, ``/`` or ``-``.
 
     The ID is returned, and sent, exactly as given: it is not stripped or
-    normalized, so an ID with outer spaces is refused.
+    normalized, so an ID with outer spaces is refused. A refusal carries
+    ``ERROR_CODE_CLIENT_LIST_ID_INVALID``, the code the API answers.
     """
     if not isinstance(value, str):
-        raise PolyesterValidationError(f"{field_name} must be a string")
-    return check_correlation_id(value, field_name, CLIENT_LIST_ID_MAX_LEN)
+        raise PolyesterValidationError(
+            f"{field_name} must be a string", code=CLIENT_LIST_ID_INVALID
+        )
+    with refusal_code(CLIENT_LIST_ID_INVALID):
+        return check_correlation_id(value, field_name, CLIENT_LIST_ID_MAX_LEN)
 
 
 def _oco_leg(leg: RiskLeg | dict[str, Any], *, field_name: str, symbol: str) -> triggers_pb2.OcoLeg:
@@ -97,7 +102,8 @@ def create_oco_to_proto(
     side_key = side.lower() if isinstance(side, str) else ""
     if side_key not in ("buy", "sell"):
         raise PolyesterValidationError("side must be buy or sell")
-    with refusal_code(BAD_QTY):
+    # A refused OCO quantity answers TRIGGER_QTY_INVALID, as a trigger's does.
+    with refusal_code(TRIGGER_QTY_INVALID):
         qty_scaled = resolve_qty_scaled(
             qty,  # type: ignore[arg-type]
             quantity_scale,

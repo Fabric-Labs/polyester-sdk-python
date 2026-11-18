@@ -87,6 +87,7 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_REPLAY_DETECTED: _ClassVar[AuthErrorCode]
     AUTH_SOCIAL_ACCOUNT_COOLDOWN: _ClassVar[AuthErrorCode]
     AUTH_SOCIAL_CHANGE_LIMIT_REACHED: _ClassVar[AuthErrorCode]
+    AUTH_RECENT_MFA_EXPIRED: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -154,6 +155,7 @@ AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR: AuthErrorCode
 AUTH_REPLAY_DETECTED: AuthErrorCode
 AUTH_SOCIAL_ACCOUNT_COOLDOWN: AuthErrorCode
 AUTH_SOCIAL_CHANGE_LIMIT_REACHED: AuthErrorCode
+AUTH_RECENT_MFA_EXPIRED: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")
@@ -224,14 +226,26 @@ class MeResponse(_message.Message):
     def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
 
 class AuthErrorDetail(_message.Message):
-    __slots__ = ("code", "message", "retry_after")
+    __slots__ = ("code", "message", "retry_after", "timestamp_window")
     CODE_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     RETRY_AFTER_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_WINDOW_FIELD_NUMBER: _ClassVar[int]
     code: AuthErrorCode
     message: str
     retry_after: _timestamp_pb2.Timestamp
-    def __init__(self, code: _Optional[_Union[AuthErrorCode, str]] = ..., message: _Optional[str] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    timestamp_window: TimestampWindow
+    def __init__(self, code: _Optional[_Union[AuthErrorCode, str]] = ..., message: _Optional[str] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., timestamp_window: _Optional[_Union[TimestampWindow, _Mapping]] = ...) -> None: ...
+
+class TimestampWindow(_message.Message):
+    __slots__ = ("server_time_ms", "recv_window_ms", "max_future_ms")
+    SERVER_TIME_MS_FIELD_NUMBER: _ClassVar[int]
+    RECV_WINDOW_MS_FIELD_NUMBER: _ClassVar[int]
+    MAX_FUTURE_MS_FIELD_NUMBER: _ClassVar[int]
+    server_time_ms: int
+    recv_window_ms: int
+    max_future_ms: int
+    def __init__(self, server_time_ms: _Optional[int] = ..., recv_window_ms: _Optional[int] = ..., max_future_ms: _Optional[int] = ...) -> None: ...
 
 class AcceptTermsRequest(_message.Message):
     __slots__ = ()

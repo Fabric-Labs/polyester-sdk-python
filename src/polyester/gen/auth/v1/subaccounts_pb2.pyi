@@ -582,7 +582,7 @@ class GetSubaccountResponse(_message.Message):
     def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ..., api_keys: _Optional[_Iterable[_Union[_api_keys_pb2.ApiKey, _Mapping]]] = ..., members: _Optional[_Iterable[_Union[SubaccountMemberView, _Mapping]]] = ..., invites: _Optional[_Iterable[_Union[SubaccountInvite, _Mapping]]] = ..., policy: _Optional[_Union[_policies_pb2.SubaccountPolicyView, _Mapping]] = ..., balances: _Optional[_Union[_ledger_read_pb2.GetBalancesResponse, _Mapping]] = ...) -> None: ...
 
 class ActivityEvent(_message.Message):
-    __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json")
+    __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json", "subaccount_id", "actor_api_key_id")
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     ENTITY_KIND_FIELD_NUMBER: _ClassVar[int]
     EVENT_ACTION_FIELD_NUMBER: _ClassVar[int]
@@ -591,6 +591,8 @@ class ActivityEvent(_message.Message):
     USER_AGENT_FIELD_NUMBER: _ClassVar[int]
     ACTOR_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     PAYLOAD_JSON_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_API_KEY_ID_FIELD_NUMBER: _ClassVar[int]
     created_at: _timestamp_pb2.Timestamp
     entity_kind: ActivityEntityKind
     event_action: ActivityEventAction
@@ -599,7 +601,9 @@ class ActivityEvent(_message.Message):
     user_agent: str
     actor_account_id: int
     payload_json: str
-    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[_Union[ActivityEntityKind, str]] = ..., event_action: _Optional[_Union[ActivityEventAction, str]] = ..., source: _Optional[_Union[ActivityEventSource, str]] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ...) -> None: ...
+    subaccount_id: int
+    actor_api_key_id: int
+    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[_Union[ActivityEntityKind, str]] = ..., event_action: _Optional[_Union[ActivityEventAction, str]] = ..., source: _Optional[_Union[ActivityEventSource, str]] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., actor_api_key_id: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountEventsRequest(_message.Message):
     __slots__ = ("subaccount_id", "limit", "page_token")

@@ -24,6 +24,12 @@ class StatementExportService(Protocol):
     async def get_statement_export(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_statement_export_download_url(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def cancel_statement_export(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def list_statement_exports(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.ListStatementExportsRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.ListStatementExportsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -52,6 +58,26 @@ class StatementExportServiceASGIApplication(ConnectASGIApplication[StatementExpo
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.get_statement_export,
+                ),
+                "/ledger.read.v1.StatementExportService/GetStatementExportDownloadUrl": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetStatementExportDownloadUrl",
+                        service_name="ledger.read.v1.StatementExportService",
+                        input=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest,
+                        output=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_statement_export_download_url,
+                ),
+                "/ledger.read.v1.StatementExportService/CancelStatementExport": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CancelStatementExport",
+                        service_name="ledger.read.v1.StatementExportService",
+                        input=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest,
+                        output=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.cancel_statement_export,
                 ),
                 "/ledger.read.v1.StatementExportService/ListStatementExports": Endpoint.unary(
                     method=MethodInfo(
@@ -119,6 +145,48 @@ class StatementExportServiceClient(ConnectClient):
             use_get=use_get,
         )
 
+    async def get_statement_export_download_url(
+        self,
+        request: ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetStatementExportDownloadUrl",
+                service_name="ledger.read.v1.StatementExportService",
+                input=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest,
+                output=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def cancel_statement_export(
+        self,
+        request: ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelStatementExport",
+                service_name="ledger.read.v1.StatementExportService",
+                input=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest,
+                output=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def list_statement_exports(
         self,
         request: ledger_dot_read_dot_v1_dot_statement__export__pb2.ListStatementExportsRequest,
@@ -150,6 +218,10 @@ class StatementExportServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_statement_export(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_statement_export_download_url(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def cancel_statement_export(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_statement_exports(self, request: ledger_dot_read_dot_v1_dot_statement__export__pb2.ListStatementExportsRequest, ctx: RequestContext) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.ListStatementExportsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -177,6 +249,26 @@ class StatementExportServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.get_statement_export,
+                ),
+                "/ledger.read.v1.StatementExportService/GetStatementExportDownloadUrl": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetStatementExportDownloadUrl",
+                        service_name="ledger.read.v1.StatementExportService",
+                        input=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest,
+                        output=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_statement_export_download_url,
+                ),
+                "/ledger.read.v1.StatementExportService/CancelStatementExport": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CancelStatementExport",
+                        service_name="ledger.read.v1.StatementExportService",
+                        input=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest,
+                        output=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.cancel_statement_export,
                 ),
                 "/ledger.read.v1.StatementExportService/ListStatementExports": EndpointSync.unary(
                     method=MethodInfo(
@@ -242,6 +334,48 @@ class StatementExportServiceClientSync(ConnectClientSync):
             headers=headers,
             timeout_ms=timeout_ms,
             use_get=use_get,
+        )
+
+    def get_statement_export_download_url(
+        self,
+        request: ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetStatementExportDownloadUrl",
+                service_name="ledger.read.v1.StatementExportService",
+                input=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlRequest,
+                output=ledger_dot_read_dot_v1_dot_statement__export__pb2.GetStatementExportDownloadUrlResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def cancel_statement_export(
+        self,
+        request: ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelStatementExport",
+                service_name="ledger.read.v1.StatementExportService",
+                input=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportRequest,
+                output=ledger_dot_read_dot_v1_dot_statement__export__pb2.CancelStatementExportResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
         )
 
     def list_statement_exports(

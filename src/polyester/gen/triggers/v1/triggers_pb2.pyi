@@ -169,6 +169,13 @@ class LadderDistribution(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     LINEAR: _ClassVar[LadderDistribution]
     GEOMETRIC: _ClassVar[LadderDistribution]
     WEIGHTED_FAVORABLE: _ClassVar[LadderDistribution]
+
+class LadderOutcome(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    LADDER_OUTCOME_UNSPECIFIED: _ClassVar[LadderOutcome]
+    ALL_ADMITTED: _ClassVar[LadderOutcome]
+    MIXED_REJECTIONS: _ClassVar[LadderOutcome]
+    ALL_CHILDREN_REJECTED: _ClassVar[LadderOutcome]
 TRIGGER_TYPE_UNSPECIFIED: TriggerType
 STOP_LOSS: TriggerType
 TAKE_PROFIT: TriggerType
@@ -305,6 +312,10 @@ LADDER_DISTRIBUTION_UNSPECIFIED: LadderDistribution
 LINEAR: LadderDistribution
 GEOMETRIC: LadderDistribution
 WEIGHTED_FAVORABLE: LadderDistribution
+LADDER_OUTCOME_UNSPECIFIED: LadderOutcome
+ALL_ADMITTED: LadderOutcome
+MIXED_REJECTIONS: LadderOutcome
+ALL_CHILDREN_REJECTED: LadderOutcome
 
 class TriggerMarketIoc(_message.Message):
     __slots__ = ("max_slippage_ticks", "max_slippage_bps")
@@ -827,20 +838,30 @@ class TwapDetails(_message.Message):
     def __init__(self, twap_duration_ms: _Optional[int] = ..., twap_slice_interval_ms: _Optional[int] = ..., slice_idx: _Optional[int] = ..., slice_count: _Optional[int] = ..., executed_qty_scaled: _Optional[int] = ...) -> None: ...
 
 class LadderDetails(_message.Message):
-    __slots__ = ("ladder_price_min_ticks", "ladder_price_max_ticks", "ladder_levels", "ladder_distribution", "executed_qty_scaled", "executed_levels")
+    __slots__ = ("ladder_price_min_ticks", "ladder_price_max_ticks", "ladder_levels", "ladder_distribution", "executed_qty_scaled", "executed_levels", "requested_levels", "placed_levels", "rejected_levels", "canceled_levels", "outcome")
     LADDER_PRICE_MIN_TICKS_FIELD_NUMBER: _ClassVar[int]
     LADDER_PRICE_MAX_TICKS_FIELD_NUMBER: _ClassVar[int]
     LADDER_LEVELS_FIELD_NUMBER: _ClassVar[int]
     LADDER_DISTRIBUTION_FIELD_NUMBER: _ClassVar[int]
     EXECUTED_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     EXECUTED_LEVELS_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_LEVELS_FIELD_NUMBER: _ClassVar[int]
+    PLACED_LEVELS_FIELD_NUMBER: _ClassVar[int]
+    REJECTED_LEVELS_FIELD_NUMBER: _ClassVar[int]
+    CANCELED_LEVELS_FIELD_NUMBER: _ClassVar[int]
+    OUTCOME_FIELD_NUMBER: _ClassVar[int]
     ladder_price_min_ticks: int
     ladder_price_max_ticks: int
     ladder_levels: int
     ladder_distribution: LadderDistribution
     executed_qty_scaled: int
     executed_levels: int
-    def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ..., executed_qty_scaled: _Optional[int] = ..., executed_levels: _Optional[int] = ...) -> None: ...
+    requested_levels: int
+    placed_levels: int
+    rejected_levels: int
+    canceled_levels: int
+    outcome: LadderOutcome
+    def __init__(self, ladder_price_min_ticks: _Optional[int] = ..., ladder_price_max_ticks: _Optional[int] = ..., ladder_levels: _Optional[int] = ..., ladder_distribution: _Optional[_Union[LadderDistribution, str]] = ..., executed_qty_scaled: _Optional[int] = ..., executed_levels: _Optional[int] = ..., requested_levels: _Optional[int] = ..., placed_levels: _Optional[int] = ..., rejected_levels: _Optional[int] = ..., canceled_levels: _Optional[int] = ..., outcome: _Optional[_Union[LadderOutcome, str]] = ...) -> None: ...
 
 class Trigger(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "status", "parent_order_id", "order_list_id", "cancel_reason", "failure_reason", "qty_scaled", "fee_asset", "self_trade_prevention_mode", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "stop", "trailing", "twap_state", "ladder_state", "client_trigger_id", "client_list_id", "created_at", "updated_at", "armed_at", "completed_at", "version")

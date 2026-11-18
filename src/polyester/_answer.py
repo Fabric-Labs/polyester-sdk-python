@@ -11,6 +11,7 @@ from contextlib import suppress
 from math import isfinite
 from typing import Any
 
+from polyester._problem import HTTPProblem, decode_http_problem, loads_bounded
 from polyester.errors import PolyesterError, PolyesterRealtimeError
 
 
@@ -47,7 +48,23 @@ def refused_upgrade(exc: BaseException, message: str) -> PolyesterRealtimeError 
     if not isinstance(exc, InvalidStatus):
         return None
     response = exc.response
-    error = PolyesterRealtimeError(message)
+    # The API answers a refused upgrade with a problem body naming its code
+    # (``TOO_MANY_SESSIONS_API_KEY``, ``METHOD_NOT_ALLOWED``, ...), as for a
+    # REST refusal; an answer without one keeps only its status.
+    problem = _problem_of(response.body, response.status_code)
+    error = PolyesterRealtimeError(message, code=problem.code if problem else None)
+    error.problem = problem
     error.__cause__ = exc
     attach_answer(error, response.status_code, response.headers)
     return error
+
+
+def _problem_of(body: object, status: int) -> HTTPProblem | None:
+    if not isinstance(body, bytes | bytearray) or not body:
+        return None
+    try:
+        # Bounded, so an integer too long to convert costs the body nothing.
+        payload = loads_bounded(bytes(body))
+    except ValueError:
+        return None
+    return decode_http_problem(payload, status)

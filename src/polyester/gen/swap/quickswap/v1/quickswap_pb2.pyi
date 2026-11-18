@@ -67,6 +67,7 @@ class QuickSwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DEPOSIT_ADDRESS_NOT_ISSUED: _ClassVar[QuickSwapReason]
     INTERMEDIATE_BELOW_MINIMUM: _ClassVar[QuickSwapReason]
     MARKET_CLOSED: _ClassVar[QuickSwapReason]
+    SOURCE_WALLET_SCREENING_FAILED: _ClassVar[QuickSwapReason]
 
 class WithdrawalRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -88,6 +89,7 @@ class WithdrawalState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
 class QuickSwapStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     STATUS_UNSPECIFIED: _ClassVar[QuickSwapStatus]
+    REJECTED: _ClassVar[QuickSwapStatus]
     ALLOCATING: _ClassVar[QuickSwapStatus]
     AWAITING_DEPOSIT: _ClassVar[QuickSwapStatus]
     WAITING_FOR_CAPACITY: _ClassVar[QuickSwapStatus]
@@ -159,6 +161,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     VAULT_ALLOWLIST_NOT_READY: _ClassVar[ErrorCode]
     ROUTE_SUSPENDED: _ClassVar[ErrorCode]
     INVITE_VOID: _ClassVar[ErrorCode]
+    SOURCE_WALLET_REJECTED: _ClassVar[ErrorCode]
+    PAGE_TOKEN_INVALID: _ClassVar[ErrorCode]
 BASIS_UNSPECIFIED: QuoteBasis
 SOURCE_AMOUNT: QuoteBasis
 DESTINATION_AMOUNT: QuoteBasis
@@ -199,6 +203,7 @@ DEPOSIT_ADDRESS_RETIRED: QuickSwapReason
 DEPOSIT_ADDRESS_NOT_ISSUED: QuickSwapReason
 INTERMEDIATE_BELOW_MINIMUM: QuickSwapReason
 MARKET_CLOSED: QuickSwapReason
+SOURCE_WALLET_SCREENING_FAILED: QuickSwapReason
 ROLE_UNSPECIFIED: WithdrawalRole
 DESTINATION: WithdrawalRole
 REFUND: WithdrawalRole
@@ -211,6 +216,7 @@ FINALIZED: WithdrawalState
 FAILED: WithdrawalState
 NOT_SENT: WithdrawalState
 STATUS_UNSPECIFIED: QuickSwapStatus
+REJECTED: QuickSwapStatus
 ALLOCATING: QuickSwapStatus
 AWAITING_DEPOSIT: QuickSwapStatus
 WAITING_FOR_CAPACITY: QuickSwapStatus
@@ -279,6 +285,8 @@ ALLOWLIST_CHANGE_PENDING: ErrorCode
 VAULT_ALLOWLIST_NOT_READY: ErrorCode
 ROUTE_SUSPENDED: ErrorCode
 INVITE_VOID: ErrorCode
+SOURCE_WALLET_REJECTED: ErrorCode
+PAGE_TOKEN_INVALID: ErrorCode
 
 class TokenAmount(_message.Message):
     __slots__ = ("base_units", "decimals")
@@ -582,7 +590,7 @@ class Withdrawal(_message.Message):
     def __init__(self, index: _Optional[int] = ..., role: _Optional[_Union[WithdrawalRole, str]] = ..., deposit_index: _Optional[int] = ..., zipped_asset_id: _Optional[int] = ..., address: _Optional[str] = ..., memo: _Optional[str] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., network_fee: _Optional[_Union[TokenAmount, _Mapping]] = ..., state: _Optional[_Union[WithdrawalState, str]] = ..., tx_hash: _Optional[str] = ..., submitted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finalized_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow_id: _Optional[str] = ..., unsent_amount: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
 
 class QuickSwap(_message.Message):
-    __slots__ = ("swap_id", "idempotency_key", "status", "reason", "is_terminal", "terms", "destination_address", "destination_memo", "return_address", "return_memo", "refund_zipped_asset_id", "refund_address", "refund_memo", "quote", "deposit_instructions", "screening", "deposits", "deposits_truncated", "execution", "withdrawals", "withdrawals_truncated", "created_at", "updated_at", "terminal_at", "version", "fee_schedule_version", "fees", "charged_fees")
+    __slots__ = ("swap_id", "idempotency_key", "status", "reason", "is_terminal", "terms", "destination_address", "destination_memo", "return_address", "return_memo", "refund_zipped_asset_id", "refund_address", "refund_memo", "quote", "deposit_instructions", "screening", "deposits", "deposits_truncated", "execution", "withdrawals", "withdrawals_truncated", "created_at", "updated_at", "terminal_at", "version", "fee_schedule_version", "fees", "charged_fees", "deposited_value_usd", "delivered_value_usd")
     SWAP_ID_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
@@ -611,6 +619,8 @@ class QuickSwap(_message.Message):
     FEE_SCHEDULE_VERSION_FIELD_NUMBER: _ClassVar[int]
     FEES_FIELD_NUMBER: _ClassVar[int]
     CHARGED_FEES_FIELD_NUMBER: _ClassVar[int]
+    DEPOSITED_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    DELIVERED_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
     swap_id: int
     idempotency_key: str
     status: QuickSwapStatus
@@ -639,7 +649,9 @@ class QuickSwap(_message.Message):
     fee_schedule_version: int
     fees: RequestedFees
     charged_fees: _containers.RepeatedCompositeFieldContainer[ChargedFee]
-    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[QuickSwapStatus, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., destination_address: _Optional[str] = ..., destination_memo: _Optional[str] = ..., return_address: _Optional[str] = ..., return_memo: _Optional[str] = ..., refund_zipped_asset_id: _Optional[int] = ..., refund_address: _Optional[str] = ..., refund_memo: _Optional[str] = ..., quote: _Optional[_Union[QuickSwapQuote, _Mapping]] = ..., deposit_instructions: _Optional[_Union[DepositInstructions, _Mapping]] = ..., screening: _Optional[_Union[Screening, _Mapping]] = ..., deposits: _Optional[_Iterable[_Union[Deposit, _Mapping]]] = ..., deposits_truncated: _Optional[bool] = ..., execution: _Optional[_Union[ExecutionProgress, _Mapping]] = ..., withdrawals: _Optional[_Iterable[_Union[Withdrawal, _Mapping]]] = ..., withdrawals_truncated: _Optional[bool] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., terminal_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., version: _Optional[int] = ..., fee_schedule_version: _Optional[int] = ..., fees: _Optional[_Union[RequestedFees, _Mapping]] = ..., charged_fees: _Optional[_Iterable[_Union[ChargedFee, _Mapping]]] = ...) -> None: ...
+    deposited_value_usd: TokenAmount
+    delivered_value_usd: TokenAmount
+    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[QuickSwapStatus, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., destination_address: _Optional[str] = ..., destination_memo: _Optional[str] = ..., return_address: _Optional[str] = ..., return_memo: _Optional[str] = ..., refund_zipped_asset_id: _Optional[int] = ..., refund_address: _Optional[str] = ..., refund_memo: _Optional[str] = ..., quote: _Optional[_Union[QuickSwapQuote, _Mapping]] = ..., deposit_instructions: _Optional[_Union[DepositInstructions, _Mapping]] = ..., screening: _Optional[_Union[Screening, _Mapping]] = ..., deposits: _Optional[_Iterable[_Union[Deposit, _Mapping]]] = ..., deposits_truncated: _Optional[bool] = ..., execution: _Optional[_Union[ExecutionProgress, _Mapping]] = ..., withdrawals: _Optional[_Iterable[_Union[Withdrawal, _Mapping]]] = ..., withdrawals_truncated: _Optional[bool] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., terminal_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., version: _Optional[int] = ..., fee_schedule_version: _Optional[int] = ..., fees: _Optional[_Union[RequestedFees, _Mapping]] = ..., charged_fees: _Optional[_Iterable[_Union[ChargedFee, _Mapping]]] = ..., deposited_value_usd: _Optional[_Union[TokenAmount, _Mapping]] = ..., delivered_value_usd: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
 
 class RequestedFees(_message.Message):
     __slots__ = ("broker_bps", "affiliates")
@@ -650,28 +662,32 @@ class RequestedFees(_message.Message):
     def __init__(self, broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ...) -> None: ...
 
 class ChargedFee(_message.Message):
-    __slots__ = ("kind", "account_id", "asset_id", "amount")
+    __slots__ = ("kind", "account_id", "asset_id", "amount", "value_usd")
     KIND_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    VALUE_USD_FIELD_NUMBER: _ClassVar[int]
     kind: FeeKind
     account_id: int
     asset_id: int
     amount: TokenAmount
-    def __init__(self, kind: _Optional[_Union[FeeKind, str]] = ..., account_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
+    value_usd: TokenAmount
+    def __init__(self, kind: _Optional[_Union[FeeKind, str]] = ..., account_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
 
 class QuoteQuickSwapRequest(_message.Message):
-    __slots__ = ("terms", "broker_bps", "affiliates", "referral_code")
+    __slots__ = ("terms", "broker_bps", "affiliates", "referral_code", "source_wallet")
     TERMS_FIELD_NUMBER: _ClassVar[int]
     BROKER_BPS_FIELD_NUMBER: _ClassVar[int]
     AFFILIATES_FIELD_NUMBER: _ClassVar[int]
     REFERRAL_CODE_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_WALLET_FIELD_NUMBER: _ClassVar[int]
     terms: QuickSwapTerms
     broker_bps: int
     affiliates: _containers.RepeatedCompositeFieldContainer[AffiliateShare]
     referral_code: str
-    def __init__(self, terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., referral_code: _Optional[str] = ...) -> None: ...
+    source_wallet: str
+    def __init__(self, terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., referral_code: _Optional[str] = ..., source_wallet: _Optional[str] = ...) -> None: ...
 
 class QuoteQuickSwapResponse(_message.Message):
     __slots__ = ("quote",)

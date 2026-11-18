@@ -89,6 +89,10 @@ class SubAccountActivityEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     user_agent: str = ""
     actor_account_id: str = ""
     payload_json: str = ""
+    # The sub-account the event belongs to, "" for the main account's own
+    # events; and the API key the actor used, "" for a session. Public IDs.
+    subaccount_id: str = ""
+    actor_api_key_id: str = ""
 
 
 class SubAccountActivityList(msgspec.Struct, kw_only=True, omit_defaults=True):

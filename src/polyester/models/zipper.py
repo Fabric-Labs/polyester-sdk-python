@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import msgspec
+
+# Supply status labels of ``supply_status`` (``status`` on a supply update).
+SUPPLY_STATUS_AVAILABLE = "available"
+SUPPLY_STATUS_STALE = "stale"
+SUPPLY_STATUS_MISSING = "missing"
+# The statuses whose supply is known: current, or no longer refreshed.
+_KNOWN_SUPPLY = (SUPPLY_STATUS_AVAILABLE, SUPPLY_STATUS_STALE)
 
 # Route status labels of ``deposit_status`` and ``withdrawal_status``.
 ROUTE_STATUS_NORMAL = "normal"
@@ -8,8 +17,21 @@ ROUTE_STATUS_SUSPENDED = "suspended"
 
 
 class ZippedAssetSupplyUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One route's zToken supply from the supply stream.
+
+    ``status`` is ``"available"`` (current) or ``"stale"`` (not refreshed for
+    longer than expected; may no longer be accurate). A route whose supply
+    stops being refreshed gets one ``"stale"`` update repeating its last value
+    and ``observed_at``; its next reading makes it ``"available"`` again.
+    ``supply`` is the exact decimal in whole units, ``None`` when the update
+    names no known status. ``observed_at`` is when the supply was read from
+    Polyester Chain, ``None`` when not sent.
+    """
+
     zipped_asset_id: int
-    supply: str = "0"
+    supply: str | None = None
+    status: str = ""
+    observed_at: datetime | None = None
 
 
 class ZippedAssetSupplyBatch(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -29,7 +51,17 @@ class ZipperAssetChainVariant(msgspec.Struct, kw_only=True, omit_defaults=True):
     network_fee_ts_sec: int = 0
     deposit_min_amount: str = ""
     withdraw_min_amount: str = ""
-    supply: str = "0"
+    # The route's zToken supply, an exact decimal in whole units, and whether
+    # it is known: supply_status is "available" (current), "stale" (not
+    # refreshed for longer than expected; may no longer be accurate) or
+    # "missing" (no supply is known yet); "" when the server names none, and a
+    # status this SDK does not know reads as its decimal string. supply and
+    # supply_observed_at (when it was read from Polyester Chain) are set only
+    # while the status is "available" or "stale", None otherwise: an unknown
+    # supply is never 0, and a "0" supply then is a real supply of zero.
+    supply: str | None = None
+    supply_status: str = ""
+    supply_observed_at: datetime | None = None
     source_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     z_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     # Whether this route accepts new deposits and new withdrawals: "normal",
@@ -45,6 +77,11 @@ class ZipperAssetChainVariant(msgspec.Struct, kw_only=True, omit_defaults=True):
     # return to the account).
     deposit_status: str = ""
     withdrawal_status: str = ""
+
+    def known_supply(self) -> str | None:
+        """The route's supply while it is known (``"available"`` or
+        ``"stale"``), else ``None``: never read an unknown supply as 0."""
+        return self.supply if self.supply_status in _KNOWN_SUPPLY else None
 
     def accepts_deposits(self) -> bool:
         """True only while the route's deposit status is ``"normal"``."""
@@ -124,7 +161,17 @@ class ZipperEnrichedAssetChain(msgspec.Struct, kw_only=True, omit_defaults=True)
     network_fee_ts_sec: int = 0
     deposit_min_amount: str = ""
     withdraw_min_amount: str = ""
-    supply: str = "0"
+    # The route's zToken supply, an exact decimal in whole units, and whether
+    # it is known: supply_status is "available" (current), "stale" (not
+    # refreshed for longer than expected; may no longer be accurate) or
+    # "missing" (no supply is known yet); "" when the server names none, and a
+    # status this SDK does not know reads as its decimal string. supply and
+    # supply_observed_at (when it was read from Polyester Chain) are set only
+    # while the status is "available" or "stale", None otherwise: an unknown
+    # supply is never 0, and a "0" supply then is a real supply of zero.
+    supply: str | None = None
+    supply_status: str = ""
+    supply_observed_at: datetime | None = None
     source_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     z_token: ZipperTokenConfig = msgspec.field(default_factory=ZipperTokenConfig)
     # Whether this route accepts new deposits and new withdrawals: "normal",
@@ -140,6 +187,11 @@ class ZipperEnrichedAssetChain(msgspec.Struct, kw_only=True, omit_defaults=True)
     # return to the account).
     deposit_status: str = ""
     withdrawal_status: str = ""
+
+    def known_supply(self) -> str | None:
+        """The route's supply while it is known (``"available"`` or
+        ``"stale"``), else ``None``: never read an unknown supply as 0."""
+        return self.supply if self.supply_status in _KNOWN_SUPPLY else None
 
     def accepts_deposits(self) -> bool:
         """True only while the route's deposit status is ``"normal"``."""

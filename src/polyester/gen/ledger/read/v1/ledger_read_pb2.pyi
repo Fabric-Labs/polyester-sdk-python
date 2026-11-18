@@ -1,8 +1,5 @@
-import datetime
-
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
-from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.ledger.v1 import catalog_pb2 as _catalog_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
@@ -60,6 +57,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_STATEMENT_EXPORT_NOT_READY: _ClassVar[ErrorCode]
     ERROR_CODE_STATEMENT_EXPORT_EXPIRED: _ClassVar[ErrorCode]
     ERROR_CODE_STATEMENT_EXPORT_FAILED: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_EXPORT_CANCELED: _ClassVar[ErrorCode]
 RANGE_UNSPECIFIED: BalanceRange
 DAY_1: BalanceRange
 DAY_7: BalanceRange
@@ -94,6 +93,8 @@ ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED: ErrorCode
 ERROR_CODE_STATEMENT_EXPORT_NOT_READY: ErrorCode
 ERROR_CODE_STATEMENT_EXPORT_EXPIRED: ErrorCode
 ERROR_CODE_STATEMENT_EXPORT_FAILED: ErrorCode
+ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE: ErrorCode
+ERROR_CODE_STATEMENT_EXPORT_CANCELED: ErrorCode
 
 class GetBalancesRequest(_message.Message):
     __slots__ = ("subaccount_id",)
@@ -368,30 +369,6 @@ class ListTransfersResponse(_message.Message):
     transfers: _containers.RepeatedCompositeFieldContainer[TransferRow]
     next_page_token: str
     def __init__(self, transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
-
-class ExportStatementRequest(_message.Message):
-    __slots__ = ("subaccount_id", "start_time", "end_time", "asset_id", "page_token")
-    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    START_TIME_FIELD_NUMBER: _ClassVar[int]
-    END_TIME_FIELD_NUMBER: _ClassVar[int]
-    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
-    subaccount_id: int
-    start_time: _timestamp_pb2.Timestamp
-    end_time: _timestamp_pb2.Timestamp
-    asset_id: int
-    page_token: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
-
-class ExportStatementResponse(_message.Message):
-    __slots__ = ("csv", "next_page_token", "complete_through")
-    CSV_FIELD_NUMBER: _ClassVar[int]
-    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
-    COMPLETE_THROUGH_FIELD_NUMBER: _ClassVar[int]
-    csv: str
-    next_page_token: str
-    complete_through: _timestamp_pb2.Timestamp
-    def __init__(self, csv: _Optional[str] = ..., next_page_token: _Optional[str] = ..., complete_through: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
     __slots__ = ("code",)

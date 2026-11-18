@@ -22,6 +22,10 @@ from polyester.codecs.decode.ratelimit import (
     retry_after_seconds_from_detail,
 )
 from polyester.codecs.proto_helpers import error_code_name, format_uint64_id, u128_to_str
+from polyester.codecs.timestamp_window import (
+    timestamp_window_from_json,
+    timestamp_window_from_proto,
+)
 from polyester.errors import (
     API_KEY_AUTH_ERROR_CODES,
     AUTH_REPLAY_CAPACITY_EXHAUSTED,
@@ -388,7 +392,8 @@ def _map_connect_error(exc: ConnectError):
             return mapped
     if (exc.message or "").strip() == TIMESTAMP_SKEW:
         return PolyesterTimestampSkewError(
-            status_code=401 if exc.code.value == "unauthenticated" else None
+            status_code=401 if exc.code.value == "unauthenticated" else None,
+            timestamp_window=timestamp_window_from_json(getattr(exc, "timestamp_window", None)),
         )
     if (exc.message or "").strip() == AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED:
         # A REST problem body (HTTP 412) the gateway answered instead of a
@@ -489,6 +494,11 @@ def _map_connect_error(exc: ConnectError):
                     return PolyesterTimestampSkewError(
                         message,
                         status_code=401 if exc.code.value == "unauthenticated" else None,
+                        timestamp_window=(
+                            timestamp_window_from_proto(unpacked.timestamp_window)
+                            if unpacked.HasField("timestamp_window")
+                            else None
+                        ),
                     )
                 if code_name == AUTH_REPLAY_CAPACITY_EXHAUSTED:
                     # Valid credentials, not processed: a retryable rate refusal.

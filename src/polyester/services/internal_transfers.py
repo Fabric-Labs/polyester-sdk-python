@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.contract_limits import contract_repeated_items, contract_string_length
+from polyester.codecs.contract_limits import (
+    contract_repeated_items_min,
+    contract_string_length,
+    contract_string_pattern,
+)
 from polyester.codecs.decode.internal_transfers import (
     internal_transfer_batch_from_proto,
     internal_transfer_from_proto,
@@ -18,6 +23,7 @@ from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransfer
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
     BatchCreateInternalTransfersRequest,
     CreateInternalTransferRequest,
+    GetInternalTransferBatchRequest,
     InternalTransferBatchLeg,
 )
 from polyester.models import (
@@ -27,17 +33,26 @@ from polyester.models import (
 )
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._poll import poll_until_final
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.types.money import AssetAmount
 
-# Legs one BatchCreateInternalTransfers request takes, and the length of its
-# idempotency key, from the contract's validation rules.
-BATCH_MIN_LEGS, BATCH_MAX_LEGS = contract_repeated_items(
-    BatchCreateInternalTransfersRequest, "legs"
-)
+# The fewest legs one BatchCreateInternalTransfers request takes, the length
+# of its idempotency key, and the form of a batch request ID, from the
+# contract's validation rules. The contract sets no rule on the most legs: the
+# server refuses a batch over its documented limits.
+BATCH_MIN_LEGS = contract_repeated_items_min(BatchCreateInternalTransfersRequest, "legs")
 BATCH_IDEMPOTENCY_KEY_MIN_LEN, BATCH_IDEMPOTENCY_KEY_MAX_LEN = contract_string_length(
     BatchCreateInternalTransfersRequest, "idempotency_key"
 )
+BATCH_REQUEST_ID_MIN_LEN, BATCH_REQUEST_ID_MAX_LEN = contract_string_length(
+    GetInternalTransferBatchRequest, "request_id"
+)
+_BATCH_REQUEST_ID_PATTERN = re.compile(
+    contract_string_pattern(GetInternalTransferBatchRequest, "request_id")
+)
+_BATCH_POLL_INITIAL = 0.25
+_BATCH_POLL_MAX = 2.0
 
 
 class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
@@ -96,24 +111,30 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         legs: Sequence[InternalTransferLeg | Mapping[str, Any]],
         idempotency_key: str,
     ) -> InternalTransferBatchResult:
-        """Submit up to ``BATCH_MAX_LEGS`` (10) Trading to Trading transfers
-        authorized by one MFA check (``BatchCreateInternalTransfers``).
+        """Move Trading to Trading transfers together, authorized by one MFA
+        check (``BatchCreateInternalTransfers``): every leg is credited, or
+        none moves.
 
         Each leg (an :class:`~polyester.models.InternalTransferLeg`, or a
         mapping of its fields) is checked as ``create`` checks its arguments.
-        The server checks every leg before any runs: if one fails, the batch is
-        ``"refused"`` and nothing moves. Otherwise legs run in order and
-        independently; they are not atomic, so a leg can be refused (for
-        example ``"insufficient_funds"``) after earlier legs were accepted.
-        Read each leg's ``status``.
+        The server takes at most 500 legs debiting at most 50 distinct source
+        account and asset pairs from at most 10 source accounts, each source,
+        destination and asset combination once; it refuses a larger batch
+        (``ERROR_CODE_BATCH_TOO_MANY_SOURCES`` for too many source accounts).
+
+        The result's ``status`` is ``"accepted"`` (every leg credited),
+        ``"refused"`` (nothing moved, and nothing will under this key; the legs
+        that caused it carry ``error_code``) or ``"processing"`` (the outcome
+        is not known yet and the batch completes on its own: follow it with
+        :meth:`wait_batch` or :meth:`get_batch` by its ``request_id``).
 
         ``idempotency_key`` (1 to 128 characters, sent exactly as given) covers
-        the whole batch. Retry with the same key and the same legs in the same
-        order: accepted legs answer the same transfers, and legs not yet
-        accepted run again. A ``"pending"`` leg's outcome is not known yet:
-        retry the batch with the same key to read it. Different legs under the
-        key are refused with ``ERROR_CODE_IDEMPOTENCY_CONFLICT``. Each leg counts
-        as one internal transfer against the rate limit.
+        the whole batch. A retry with the same key and the same legs in the
+        same order returns the batch's current state; different legs under the
+        key are refused with ``ERROR_CODE_IDEMPOTENCY_CONFLICT``. A refused
+        batch is final for its key: submit a new batch under a new key. A
+        ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the batch
+        outweighs the account's burst: split it instead of retrying.
         """
         if not isinstance(idempotency_key, str) or not (
             BATCH_IDEMPOTENCY_KEY_MIN_LEN <= len(idempotency_key) <= BATCH_IDEMPOTENCY_KEY_MAX_LEN
@@ -124,9 +145,9 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
             )
         if isinstance(legs, str | bytes | Mapping) or not isinstance(legs, Sequence):
             raise PolyesterValidationError("legs must be a sequence of InternalTransferLeg")
-        if not BATCH_MIN_LEGS <= len(legs) <= BATCH_MAX_LEGS:
+        if len(legs) < BATCH_MIN_LEGS:
             raise PolyesterValidationError(
-                f"batch_create takes {BATCH_MIN_LEGS} to {BATCH_MAX_LEGS} legs; got {len(legs)}"
+                f"batch_create takes at least {BATCH_MIN_LEGS} leg; got {len(legs)}"
             )
         request = BatchCreateInternalTransfersRequest(idempotency_key=idempotency_key)
         for index, raw in enumerate(legs):
@@ -150,6 +171,54 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.batch_create_internal_transfers(req),
             request,
             lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
+        )
+
+    async def get_batch(self, *, request_id: str) -> InternalTransferBatchResult:
+        """A batch's current outcome and the state of every leg, by the
+        ``request_id`` :meth:`batch_create` returned
+        (``GetInternalTransferBatch``), answered as the batch was answered.
+
+        It neither submits nor retries the batch and needs no fresh MFA. The
+        caller must be allowed to read the transfers of every source account
+        of the batch. ``request_id`` is the decimal string the batch carries:
+        1 to 39 ASCII digits without a leading zero.
+        """
+        checked = _batch_request_id(request_id)
+        return await unary_auth_decoded(
+            self._transport,
+            InternalTransferServiceClient,
+            lambda client, req: client.get_internal_transfer_batch(req),
+            GetInternalTransferBatchRequest(request_id=checked),
+            lambda msg: internal_transfer_batch_from_proto(
+                msg, request_id=checked, operation="GetInternalTransferBatch"
+            ),
+        )
+
+    async def wait_batch(
+        self, *, request_id: str, timeout: float | None = None
+    ) -> InternalTransferBatchResult:
+        """Read the batch with :meth:`get_batch` until it is no longer
+        ``"processing"``, and return it: ``"accepted"`` or ``"refused"``.
+
+        Reads start 250 ms apart and back off to 2 s. Errors are raised as
+        they come. After ``timeout`` seconds (``None`` waits for as long as
+        the batch processes), :class:`~polyester.errors.PolyesterTimeoutError`
+        is raised: the batch still completes on its own, so read it again
+        later. The timeout bounds each read and wait: a read still in flight
+        at the deadline is cancelled, and none is returned after it.
+        Cancelling the call cancels the wait.
+        """
+        checked = _batch_request_id(request_id)
+        return await poll_until_final(
+            lambda: self.get_batch(request_id=checked),
+            lambda batch: batch.status != "processing",
+            timeout=timeout,
+            initial=_BATCH_POLL_INITIAL,
+            maximum=_BATCH_POLL_MAX,
+            expired=lambda _last: (
+                f"internal transfer batch {checked} is still processing; "
+                "it completes on its own, so read it again later"
+            ),
         )
 
     def _fill_transfer(
@@ -203,6 +272,19 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
             )
         if has_destination_address:
             target.destination_smart_account_address = destination_address
+
+
+def _batch_request_id(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or not BATCH_REQUEST_ID_MIN_LEN <= len(value) <= BATCH_REQUEST_ID_MAX_LEN
+        or _BATCH_REQUEST_ID_PATTERN.fullmatch(value) is None
+    ):
+        raise PolyesterValidationError(
+            f"request_id must be {BATCH_REQUEST_ID_MIN_LEN} to {BATCH_REQUEST_ID_MAX_LEN} "
+            "ASCII digits without a leading zero, as batch_create returned it"
+        )
+    return value
 
 
 def _leg(raw: object, index: int) -> InternalTransferLeg:

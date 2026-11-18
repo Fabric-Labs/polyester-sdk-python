@@ -144,7 +144,7 @@ reason = "The Polyester assistant accepts only interactive session tokens; API k
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/SetAssistantKeys"
-reason = "Assistant key setup requires an interactive session with a fresh MFA step-up or the session's recent-MFA window; API keys are not accepted. Devnet only."
+reason = "Assistant key setup requires an interactive session with MFA (the website's MFA-elevated session); API keys are not accepted. Devnet only."
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/ListAssistantKeys"
@@ -156,7 +156,7 @@ reason = "Assistant key revocation requires an interactive session; API keys are
 
 [[allowlist]]
 procedure = "/auth.v1.SocialVerificationService/ConfirmSocialVerification"
-reason = "Confirming a Telegram link requires an interactive session with a fresh MFA step-up or the session's recent-MFA window; API keys are not accepted."
+reason = "Confirming a Telegram link requires an interactive session with MFA (the website's MFA-elevated session); API keys are not accepted."
 
 [[allowlist]]
 procedure = "/auth.v1.SocialVerificationService/UnlinkSocialAccount"

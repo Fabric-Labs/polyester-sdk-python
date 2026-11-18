@@ -10,12 +10,15 @@ import pytest
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.decode.triggers import get_trigger_from_proto, trigger_from_proto
+from polyester.codecs.orderbook import depth_tier_value
 from polyester.codecs.realtime_decode import decode_trigger_bytes
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import OrderbookData
 from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.services.orderbook import AsyncOrderbookService
+
+_TIER_10 = depth_tier_value(10)
 
 
 def _level(price: int, qty: int) -> orderbook_pb2.PriceLevel:
@@ -25,7 +28,11 @@ def _level(price: int, qty: int) -> orderbook_pb2.PriceLevel:
 def test_snapshot_read_reports_available() -> None:
     book = orderbook_from_proto(
         orderbook_pb2.GetOrderBookResponse(
-            book_seq=5, available=True, bids=[_level(100, 1)], asks=[_level(101, 2)]
+            book_seq=5,
+            available=True,
+            bids=[_level(100, 1)],
+            asks=[_level(101, 2)],
+            depth=_TIER_10,
         ),
         symbol="BTC-USDT",
         depth=10,
@@ -37,7 +44,7 @@ def test_snapshot_read_reports_available() -> None:
 
 def test_unavailable_snapshot_read_is_unknown_not_empty() -> None:
     book = orderbook_from_proto(
-        orderbook_pb2.GetOrderBookResponse(book_seq=5, available=False),
+        orderbook_pb2.GetOrderBookResponse(book_seq=5, available=False, depth=_TIER_10),
         symbol="BTC-USDT",
         depth=10,
         quantity_scale=8,
@@ -49,7 +56,7 @@ def test_unavailable_snapshot_read_is_unknown_not_empty() -> None:
 def test_snapshot_read_reports_the_wire_available_even_with_levels() -> None:
     # ``available`` is the server's value; levels do not imply it.
     book = orderbook_from_proto(
-        orderbook_pb2.GetOrderBookResponse(book_seq=5, asks=[_level(101, 2)]),
+        orderbook_pb2.GetOrderBookResponse(book_seq=5, asks=[_level(101, 2)], depth=_TIER_10),
         symbol="BTC-USDT",
         depth=10,
         quantity_scale=8,

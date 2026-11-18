@@ -12,11 +12,11 @@ from polyester.codecs.heatmap import (
     resolve_heatmap_interval,
     resolve_heatmap_quantity_mode,
 )
+from polyester.codecs.orderbook import depth_tier_value
 from polyester.codecs.realtime_decode import decode_heatmap_live_bucket_bytes
 from polyester.gen.marketdata.v1.heatmap_connect import HeatmapServiceClient
 from polyester.gen.marketdata.v1.heatmap_pb2 import (
     GetOrderbookHeatmapRequest,
-    HeatmapDepth,
     HeatmapTimeRange,
 )
 from polyester.models import ApiData
@@ -79,7 +79,7 @@ class AsyncHeatmapService(BaseService):
             label="heatmap.get",
         )
         interval_enum = resolve_heatmap_interval(interval)
-        depth_enum = HeatmapDepth.Value(f"DEPTH_{heatmap_depth(depth)}")
+        depth_enum = depth_tier_value(heatmap_depth(depth))
         qty_enum = resolve_heatmap_quantity_mode(quantity_mode)
 
         request = GetOrderbookHeatmapRequest(

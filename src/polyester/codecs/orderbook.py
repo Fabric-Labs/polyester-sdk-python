@@ -2,16 +2,24 @@ import operator
 from typing import SupportsIndex
 
 from polyester.errors import PolyesterValidationError
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 
-# Depths the server publishes on the delta stream. It also accepts a subscribe at
-# any other depth, and then never sends anything on it.
+# Depths the server publishes on the delta stream, a subset of the snapshot
+# tiers; it refuses a subscription at any other depth.
 ORDERBOOK_STREAM_DEPTHS = (1, 20, 50, 200, 500)
 
 # The depth a snapshot request of 0 (unset) selects.
 ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH = 50
 
-# The snapshot request's depth is a uint32 level count per side.
-_UINT32_MAX = 2**32 - 1
+# Levels per side of every ``DepthTier`` a snapshot is served at, ascending,
+# read from the contract's enum.
+ORDERBOOK_SNAPSHOT_DEPTHS = tuple(
+    sorted(
+        int(name.removeprefix("DEPTH_"))
+        for name in depth_tier_pb2.DepthTier.DESCRIPTOR.values_by_name
+        if name.removeprefix("DEPTH_").isdigit()
+    )
+)
 
 
 def exact_int(value: object) -> int | None:
@@ -26,28 +34,48 @@ def exact_int(value: object) -> int | None:
     return operator.index(value)
 
 
-def orderbook_snapshot_wire_depth(depth: int) -> int:
-    """``depth`` as ``orderbook.get`` sends it: a plain ``int`` level count per side.
-
-    0 selects the server's default of 50. Any other value is sent unchanged: the largest
-    depth the server accepts is the ``max_depth`` every snapshot reports, and a depth above
-    it is refused by the server (``INVALID_ARGUMENT``), never truncated. A negative depth, a
-    depth above the uint32 range, or a value that is not an integer, is refused.
+def orderbook_snapshot_tier(depth: int) -> depth_tier_pb2.DepthTier:
+    """``depth`` as ``orderbook.get`` sends it: the ``DepthTier`` of that many
+    levels per side, one of ``ORDERBOOK_SNAPSHOT_DEPTHS``; 0 sends no tier,
+    which the server serves at 50. A level count that is no tier, a negative
+    one, or a value that is not an integer, is refused: the contract takes
+    only defined tiers.
     """
     value = exact_int(depth)
-    if value is None or value < 0 or value > _UINT32_MAX:
+    if value == 0:
+        return depth_tier_pb2.DEPTH_UNSPECIFIED
+    if value is None or value not in ORDERBOOK_SNAPSHOT_DEPTHS:
         raise PolyesterValidationError(
-            f"orderbook snapshot depth must be an integer from 0 to {_UINT32_MAX}, got {depth!r}"
+            "orderbook depth must be one of "
+            f"{', '.join(map(str, ORDERBOOK_SNAPSHOT_DEPTHS))} levels per side, or 0 for the "
+            f"default of {ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH}; got {depth!r}"
         )
-    return value
+    return depth_tier_value(value)
 
 
 def orderbook_snapshot_depth(depth: int) -> int:
     """Levels per side a snapshot of ``depth`` holds at most: ``depth``, or 50 for 0.
 
-    Refuses what :func:`orderbook_snapshot_wire_depth` refuses.
+    Refuses what :func:`orderbook_snapshot_tier` refuses.
     """
-    return orderbook_snapshot_wire_depth(depth) or ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
+    orderbook_snapshot_tier(depth)
+    return exact_int(depth) or ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
+
+
+def depth_tier_value(levels: int) -> depth_tier_pb2.DepthTier:
+    """The ``DepthTier`` of ``levels`` per side, which must be a tier."""
+    return depth_tier_pb2.DepthTier.Value(f"DEPTH_{levels}")
+
+
+def depth_tier_levels(tier: int) -> int | None:
+    """Levels per side of a ``DepthTier``; ``None`` for no tier or one this SDK
+    does not know."""
+    try:
+        name = str(depth_tier_pb2.DepthTier.Name(tier))
+    except ValueError:
+        return None
+    count = name.removeprefix("DEPTH_")
+    return int(count) if count.isdigit() else None
 
 
 def orderbook_stream_tier(depth: int) -> int:
@@ -64,7 +92,8 @@ def orderbook_stream_tier(depth: int) -> int:
     top = ORDERBOOK_STREAM_DEPTHS[-1]
     raise PolyesterValidationError(
         f"orderbook subscription depth {depth} is above the deepest published stream tier "
-        f"({top}); use orderbook.get for a deeper snapshot, up to the max_depth it reports"
+        f"({top}); use orderbook.get for a deeper snapshot, up to "
+        f"{ORDERBOOK_SNAPSHOT_DEPTHS[-1]} levels per side"
     )
 
 

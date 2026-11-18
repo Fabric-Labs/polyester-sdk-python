@@ -4,7 +4,7 @@ from polyester.codecs.orderbook import exact_int
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import heatmap_pb2
 
-# Depths of the HeatmapDepth enum, ascending.
+# Tiers the heatmap serves, ascending: every DepthTier but DEPTH_5000.
 HEATMAP_SUPPORTED_DEPTHS = (1, 5, 10, 20, 50, 100, 200, 500, 1000)
 
 # The depth a heatmap request of 0 selects.
@@ -54,7 +54,7 @@ def resolve_heatmap_quantity_mode(quantity_mode: str) -> heatmap_pb2.HeatmapQuan
 
 
 def heatmap_depth(depth: int) -> int:
-    """Depth ``heatmap.get`` requests for ``depth``: a ``HeatmapDepth`` level count.
+    """Depth ``heatmap.get`` requests for ``depth``: a ``DepthTier`` level count.
 
     ``depth`` itself when it is a supported depth (1, 5, 10, 20, 50, 100, 200, 500 or 1000),
     else the smallest one covering it; 0 is the default 50. A depth below 0 or above 1000, or
@@ -77,5 +77,5 @@ def heatmap_depth(depth: int) -> int:
 
 
 def depth_to_proto_name(depth: int) -> str:
-    """``HeatmapDepth`` name for ``depth``, by the rule of :func:`heatmap_depth`."""
+    """``DepthTier`` name for ``depth``, by the rule of :func:`heatmap_depth`."""
     return f"DEPTH_{heatmap_depth(depth)}"

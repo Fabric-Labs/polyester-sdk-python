@@ -307,7 +307,8 @@ async def fetch_rt_token(
     )
     try:
         payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+    except ValueError as exc:
+        # Not JSON, not UTF-8, or an integer too long to convert.
         raise PolyesterRealtimeError(f"{label}: response is not valid JSON") from exc
     token = payload.get("token") if isinstance(payload, dict) else None
     if not token:

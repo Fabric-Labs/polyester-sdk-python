@@ -200,7 +200,8 @@ async def _read_limited(response: httpx.Response, max_bytes: int) -> bytes:
 def _decode_jsonrpc_envelope(raw: bytes, *, expected_id: int) -> Any:
     try:
         body = json.loads(raw)
-    except json.JSONDecodeError as exc:
+    except ValueError as exc:
+        # Not JSON, not UTF-8, or an integer too long to convert.
         raise JsonRpcError("json-rpc response is not valid JSON") from exc
     if not isinstance(body, dict):
         raise JsonRpcError("json-rpc response must be a JSON object")

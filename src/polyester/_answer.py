@@ -7,12 +7,11 @@ answer behind it carries neither.
 
 from __future__ import annotations
 
-import json
 from contextlib import suppress
 from math import isfinite
 from typing import Any
 
-from polyester._problem import HTTPProblem, decode_http_problem
+from polyester._problem import HTTPProblem, decode_http_problem, loads_bounded
 from polyester.errors import PolyesterError, PolyesterRealtimeError
 
 
@@ -64,7 +63,8 @@ def _problem_of(body: object, status: int) -> HTTPProblem | None:
     if not isinstance(body, bytes | bytearray) or not body:
         return None
     try:
-        payload = json.loads(bytes(body))
-    except (ValueError, UnicodeDecodeError):
+        # Bounded, so an integer too long to convert costs the body nothing.
+        payload = loads_bounded(bytes(body))
+    except ValueError:
         return None
     return decode_http_problem(payload, status)

@@ -1017,3 +1017,98 @@ async def test_iter_account_activity_follows_pages_with_the_same_filters() -> No
     assert [event.subaccount_id for event in events] == [format_id(1), format_id(2)]
     sent = [activity_pb2.ListAccountActivityRequest.FromString(r.body) for r in requests]
     assert [list(s.sources) for s in sent] == [[subaccounts_pb2.ACTIVITY_SOURCE_API]] * 2
+
+
+# --- refused WebSocket upgrades over a real socket -----------------------------------------------
+
+_SESSIONS_PROBLEM = (
+    b'{"type":"https://polyester.dev/problems/too-many-sessions-api-key",'
+    b'"title":"Too Many Requests","status":429,"code":"TOO_MANY_SESSIONS_API_KEY",'
+    b'"detail":"too many sessions for this API key","unrelated":' + b"9" * 5000 + b"}"
+)
+
+
+@asynccontextmanager
+async def _refusing_ws_server(body: bytes):
+    """A local WebSocket endpoint refusing every upgrade with HTTP 429."""
+    from websockets.asyncio.server import ServerConnection, serve
+    from websockets.http11 import Request
+
+    def refuse(_connection: ServerConnection, _request: Request) -> Response:
+        return Response(
+            429,
+            "Too Many Requests",
+            Headers(
+                {
+                    "Content-Type": "application/problem+json",
+                    "Retry-After": "7",
+                    "Content-Length": str(len(body)),
+                }
+            ),
+            body,
+        )
+
+    async def handler(_connection: ServerConnection) -> None:
+        return None
+
+    import logging
+
+    async with serve(
+        handler,
+        "127.0.0.1",
+        0,
+        process_request=refuse,
+        logger=logging.getLogger("tests.fake_ws_server"),
+    ) as server:
+        yield f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}/ws"
+
+
+async def _subscribe_generic(url: str) -> None:
+    from polyester.realtime.client import AsyncRealtimeClient
+
+    client = AsyncRealtimeClient(url)
+    try:
+        await client.subscribe_proto("trades:BTC-USDT", decode=lambda b: b, auto_reconnect=False)
+    finally:
+        await client.aclose()
+
+
+async def _subscribe_private_orders(url: str) -> None:
+    from polyester.realtime.private_orders import PrivateOrderStream
+
+    async def token(*_args: object) -> str:
+        return "fake-token"
+
+    stream = PrivateOrderStream(url=url, fetch_connect_token=token, fetch_subscribe_token=token)
+    try:
+        await asyncio.wait_for(stream.subscribe(42), 5)
+    finally:
+        await stream.aclose()
+
+
+@pytest.mark.parametrize(
+    "dial", [_subscribe_generic, _subscribe_private_orders], ids=["generic", "private_orders"]
+)
+async def test_refused_upgrade_keeps_its_problem_despite_an_unreadable_integer(dial) -> None:
+    # An unrelated integer too long to convert must not cost the refusal its
+    # code, problem, status or retry delay.
+    async with _refusing_ws_server(_SESSIONS_PROBLEM) as url:
+        with pytest.raises(PolyesterRealtimeError) as raised:
+            await dial(url)
+    error = raised.value
+    assert (error.code, error.status_code, error.retry_after) == (
+        "TOO_MANY_SESSIONS_API_KEY",
+        429,
+        7,
+    )
+    assert error.problem is not None
+    assert error.problem.code == "TOO_MANY_SESSIONS_API_KEY"
+    assert error.problem.detail == "too many sessions for this API key"
+
+
+def test_jsonrpc_answer_with_an_unconvertible_integer_is_a_typed_error() -> None:
+    from polyester.chain.rpc import JsonRpcError, _decode_jsonrpc_envelope
+
+    raw = b'{"jsonrpc":"2.0","id":1,"result":' + b"9" * 5000 + b"}"
+    with pytest.raises(JsonRpcError):
+        _decode_jsonrpc_envelope(raw, expected_id=1)

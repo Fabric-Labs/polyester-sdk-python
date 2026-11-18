@@ -69,8 +69,8 @@ HEARTBEAT_TIMEOUT_CLOSE_CODE = 4000
 # Closes a connection whose own handling failed.
 INTERNAL_ERROR_CLOSE_CODE = 1011
 # Unexpected failures of the stream's own handling that recovery may retry: per
-# account until its cursor moves, and per connection until any account's cursor
-# moves. The last one ends the account (or the stream).
+# account until its cursor moves, and per connection until every account it hit
+# has moved its cursor. The last one ends the account (or the stream).
 MAX_INTERNAL_FAILURES = 3
 # What decoding a malformed frame raises; anything else is an internal failure.
 DECODE_ERRORS = (PolyesterValidationError, PolyesterResponseContractError)
@@ -174,6 +174,8 @@ class _Subscription:
     confirmed: bool = False
     # Unexpected failures attributed to it since its cursor last moved.
     failures: int = 0
+    # A failure of the whole connection hit it and its cursor has not moved since.
+    unrecovered: bool = False
 
 
 @dataclass(frozen=True)
@@ -219,7 +221,8 @@ class PrivateOrderStream:
         # Work for this connection failed, for one subscription or the whole
         # connection; that connection's _run recovers from it.
         self._failure: tuple[ClientConnection, _Subscription | None, Exception] | None = None
-        # Unexpected failures not attributed to one subscription since any cursor moved.
+        # Unexpected failures not attributed to one subscription, until every
+        # subscription they hit has moved its cursor.
         self._failures = 0
         self._request_seq = 0
         self._closed = False
@@ -533,15 +536,22 @@ class PrivateOrderStream:
                 self._terminate(s, error)
             return
         self._failures += 1
+        for hit in self._subs.values():
+            hit.unrecovered = True
         if self._failures >= MAX_INTERNAL_FAILURES:
             self._terminate_all(error)
 
     def _progressed(self, s: _Subscription, cursor: str) -> None:
         """``s`` applied data and moved from ``cursor``; only a move proves that
-        what failed before is behind it."""
+        what failed before is behind it. A failure of the whole connection is
+        behind it only once every subscription it hit has moved: another
+        account's progress says nothing about the one that keeps failing."""
         s.retries = 0
-        if s.cursor != cursor:
-            s.failures = 0
+        if s.cursor == cursor:
+            return
+        s.failures = 0
+        s.unrecovered = False
+        if self._failures and not any(hit.unrecovered for hit in self._subs.values()):
             self._failures = 0
 
     def _take_failure(self, ws: ClientConnection) -> tuple[_Subscription | None, Exception] | None:

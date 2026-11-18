@@ -1544,3 +1544,104 @@ async def test_a_failure_recorded_before_the_last_consumer_left_stays_with_its_c
     assert isinstance(await next_event(again), PrivateOrdersConnected)
     assert again._queue.empty()
     assert again.error is None
+
+
+def fail_on_cursor(
+    stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch, next_cursor: str
+) -> None:
+    """Make every unit to ``next_cursor`` raise before the stream can tell whose it is."""
+    handle = stream._on_frame
+
+    def failing(ws: Any, raw: str | bytes) -> None:
+        if isinstance(raw, bytes):
+            msg = pb.ServerMessage.FromString(raw)
+            if msg.HasField("unit") and msg.unit.next_cursor == next_cursor:
+                raise RuntimeError("injected shared handler failure")
+        handle(ws, raw)
+
+    monkeypatch.setattr(stream, "_on_frame", failing)
+
+
+async def open_two_accounts(
+    server: FakePrivateWsServer, stream: PrivateOrderStream
+) -> tuple[AsyncSubscription[Any], AsyncSubscription[Any], FakeConnection]:
+    a, conn = await open_stream(server, stream, "a0")
+    opening = asyncio.create_task(stream.subscribe(format_id(ACCOUNT_B)))
+    await confirm_accounts(conn, {ACCOUNT_B: "b0"})
+    b = await asyncio.wait_for(opening, EVENT_TIMEOUT)
+    assert isinstance(await next_event(b), PrivateOrdersConnected)
+    await conn.snapshot("a0", "a1", [order(1)])
+    await conn.snapshot("b0", "b1", [])
+    assert isinstance(await next_event(a), PrivateOrdersSnapshot)
+    assert isinstance(await next_event(b), PrivateOrdersSnapshot)
+    return a, b, conn
+
+
+async def test_a_shared_failure_stays_counted_while_another_account_progresses(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    limit = private_orders.MAX_INTERNAL_FAILURES
+    monkeypatch.setattr(private_orders, "STABLE_CONNECTION", 0.0)
+    a, b, conn = await open_two_accounts(server, stream)
+    fail_on_cursor(stream, monkeypatch, "a2")
+    seq = {"a": 3, "b": 3}
+    ids = {"a": "a0", "b": "b0"}
+    for attempt in range(limit):
+        if attempt:
+            conn = await server.next_connection()
+            await conn.expect("auth")
+            ids = {"a": f"a{attempt}", "b": f"b{attempt}"}
+            requests = await confirm_accounts(conn, {ACCOUNT: ids["a"], ACCOUNT_B: ids["b"]})
+            assert requests[ACCOUNT].cursor == "a1"
+            assert requests[ACCOUNT_B].cursor == f"b{attempt + 1}"
+            assert isinstance(await next_event(a), PrivateOrdersConnected)
+            assert isinstance(await next_event(b), PrivateOrdersConnected)
+            seq = {"a": 0, "b": 0}
+        # The other account makes real progress before every replay of the fault.
+        seq["b"] += 1
+        await conn.send(
+            ids["b"],
+            seq["b"],
+            unit=pb.Unit(prev_cursor=f"b{attempt + 1}", next_cursor=f"b{attempt + 2}"),
+        )
+        assert isinstance(await next_event(b), PrivateOrdersUnit)
+        seq["a"] += 1
+        replay = pb.Unit(prev_cursor="a1", next_cursor="a2", orders=[order(1, 2)])
+        await conn.send(ids["a"], seq["a"], unit=replay)
+        if attempt < limit - 1:
+            await expect_internal_failure(a)
+            await expect_internal_failure(b)
+            assert stream._failures == attempt + 1
+
+    # Nothing reliably owns the fault, so every consumer on the connection ends.
+    for consumer in (a, b):
+        assert isinstance(await next_event(consumer), PrivateOrdersDisconnected)
+        with pytest.raises(PolyesterRealtimeError, match="private order stream failed"):
+            await next_event(consumer)
+        assert consumer.error is not None
+        assert not consumer.is_alive
+    assert stream.active_accounts == 0
+
+
+async def test_a_shared_failure_is_behind_once_every_account_it_hit_moves(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a, b, conn = await open_two_accounts(server, stream)
+    fail_on_unit(stream, monkeypatch, times=1)
+    await conn.send("a0", 4, unit=pb.Unit(prev_cursor="a1", next_cursor="a2"))
+    await expect_internal_failure(a)
+    await expect_internal_failure(b)
+    assert stream._failures == 1
+
+    conn = await server.next_connection()
+    await conn.expect("auth")
+    await confirm_accounts(conn, {ACCOUNT: "a1", ACCOUNT_B: "b1"})
+    assert isinstance(await next_event(a), PrivateOrdersConnected)
+    assert isinstance(await next_event(b), PrivateOrdersConnected)
+    await conn.send("b1", 1, unit=pb.Unit(prev_cursor="b1", next_cursor="b2"))
+    assert isinstance(await next_event(b), PrivateOrdersUnit)
+    # One account moving is not enough: the other was hit too.
+    assert stream._failures == 1
+    await conn.send("a1", 1, unit=pb.Unit(prev_cursor="a1", next_cursor="a2"))
+    assert isinstance(await next_event(a), PrivateOrdersUnit)
+    assert stream._failures == 0

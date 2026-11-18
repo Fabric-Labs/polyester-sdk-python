@@ -14,7 +14,7 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
-from polyester import PolyesterAuthError, PolyesterRealtimeError
+from polyester import PolyesterAuthError, PolyesterRealtimeError, PolyesterValidationError
 from polyester.codecs.decode.orders import order_from_proto
 from polyester.codecs.scalars import format_id
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
@@ -977,12 +977,15 @@ async def test_repeated_internal_failures_end_the_stream_truthfully(
             conn, request = await reconnect(server, f"s{attempt + 1}")
             assert request.cursor == "c1"
             assert isinstance(await next_event(sub), PrivateOrdersConnected)
+            # Ready proves the resume reached live, not that the failure is behind it.
+            await conn.send(f"s{attempt + 1}", 1, ready=pb.Ready())
+            assert isinstance(await next_event(sub), PrivateOrdersReady)
         else:
             await conn.snapshot("s1", "c1", [order(1)])
             assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
         await conn.send(
             f"s{attempt + 1}",
-            4 if attempt == 0 else 1,
+            4 if attempt == 0 else 2,
             unit=pb.Unit(prev_cursor="c1", next_cursor="c2", orders=[order(2)]),
         )
         if attempt < limit - 1:
@@ -1243,7 +1246,9 @@ async def test_an_update_that_keeps_failing_ends_its_account_only(
             await conn.send("b", 1, ready=pb.Ready())
             assert isinstance(await next_event(a), PrivateOrdersReady)
             assert isinstance(await next_event(b), PrivateOrdersReady)
-            await conn.send("a", 2, unit=poisoned)
+            # Covered at the cursor it already has moves nothing either.
+            await conn.send("a", 2, covered=pb.Covered(cursor="c1"))
+            await conn.send("a", 3, unit=poisoned)
 
     # The account whose update never applied ends truthfully.
     assert isinstance(await next_event(a), PrivateOrdersDisconnected)
@@ -1371,13 +1376,13 @@ async def test_a_joiner_waiting_through_a_failed_replay_still_gets_the_view(
     await third.send("s3", 1, ready=pb.Ready())
     assert isinstance(await next_event(sub), PrivateOrdersConnected)
     assert isinstance(await next_event(sub), PrivateOrdersReady)
-    seen: list[Any] = []
-    while not isinstance(event := await next_event(late), PrivateOrdersReady):
-        seen.append(event)
-    connected = next(i for i, e in enumerate(seen) if isinstance(e, PrivateOrdersConnected))
-    view = seen[connected + 1]
+    # Nothing reached the joiner before its join completed: Connected comes first.
+    assert isinstance(await next_event(late), PrivateOrdersConnected)
+    view = await next_event(late)
     assert isinstance(view, PrivateOrdersSnapshot)
     assert [o.order_id for o in view.orders] == [format_id(1)]
+    assert isinstance(await next_event(late), PrivateOrdersReady)
+    assert late._queue.empty()
 
 
 async def test_a_joiner_whose_replay_fails_ends_alone(
@@ -1397,3 +1402,145 @@ async def test_a_joiner_whose_replay_fails_ends_alone(
     await conn.send("s1", 4, unit=pb.Unit(prev_cursor="c1", next_cursor="c2"))
     assert isinstance(await next_event(sub), PrivateOrdersUnit)
     assert sub.is_alive
+
+
+class SecondHashFails(str):
+    """An order ID that hashes once, then fails: it would fail while committed."""
+
+    hashed = False
+
+    def __hash__(self) -> int:
+        if SecondHashFails.hashed:
+            raise RuntimeError("injected hash failure")
+        SecondHashFails.hashed = True
+        return str.__hash__(self)
+
+
+async def test_unit_whose_commit_would_fail_is_refused_before_anything_applies(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    SecondHashFails.hashed = False
+    sub, first = await open_stream(server, stream)
+    await first.snapshot("s1", "c1", [order(1), order(2)])
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+
+    decode_unit = private_orders.private_orders_unit_from_proto
+
+    def odd_ids(unit: Any, *, scales: Any = None) -> Any:
+        decoded = decode_unit(unit, scales=scales)
+        return dataclasses.replace(
+            decoded, removed_order_ids=[SecondHashFails(i) for i in decoded.removed_order_ids]
+        )
+
+    monkeypatch.setattr(private_orders, "private_orders_unit_from_proto", odd_ids)
+    unit = pb.Unit(
+        prev_cursor="c1", next_cursor="c2", orders=[order(1, version=2)], removed_order_ids=[2]
+    )
+    await first.send("s1", 4, unit=unit)
+
+    error = await expect_internal_failure(sub)
+    state = stream._subs[CHANNEL]
+    assert state.cursor == "c1"
+    assert state.orders == {format_id(1): order(1), format_id(2): order(2)}
+    assert all(type(key) is str for key in state.orders)
+    assert isinstance(error.__cause__, TypeError)
+    _, request = await reconnect(server, "s2")
+    assert request.cursor == "c1"
+
+
+async def test_decode_errors_and_internal_failures_take_different_paths(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sub, first = await open_stream(server, stream)
+    await first.snapshot("s1", "c1", [order(1)])
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+    decode_unit = private_orders.private_orders_unit_from_proto
+
+    # A malformed unit is a decode error: the same connection subscribes again.
+    def malformed(unit: Any, *, scales: Any = None) -> Any:
+        raise PolyesterValidationError("ticks must be non-negative")
+
+    monkeypatch.setattr(private_orders, "private_orders_unit_from_proto", malformed)
+    await first.send("s1", 4, unit=pb.Unit(prev_cursor="c1", next_cursor="c2"))
+    reported = await next_event(sub)
+    assert isinstance(reported, PrivateOrdersError)
+    assert reported.kind == "decode"
+    retry = await first.expect("subscribe")
+    assert retry.cursor == "c1"
+    assert isinstance(await next_event(sub), PrivateOrdersDisconnected)
+    assert len(server.all) == 1
+    monkeypatch.setattr(private_orders, "private_orders_unit_from_proto", decode_unit)
+    await first.send("s2", subscribed=pb.Subscribed(id=retry.id, account=ACCOUNT))
+    assert isinstance(await next_event(sub), PrivateOrdersConnected)
+
+    # A scales lookup that fails is the stream's own failure, not a decode error.
+    def broken_scales(symbol_id: int) -> tuple[int | None, int | None]:
+        raise RuntimeError("injected scales failure")
+
+    stream.order_scales = broken_scales
+    await first.send("s2", 1, unit=pb.Unit(prev_cursor="c1", next_cursor="c2", orders=[order(2)]))
+    error = await expect_internal_failure(sub)
+    assert isinstance(error.__cause__, RuntimeError)
+    assert stream._subs[CHANNEL].cursor == "c1"
+    assert stream._subs[CHANNEL].failures == 1
+    stream.order_scales = None
+    _, request = await reconnect(server, "s3")
+    assert request.cursor == "c1"
+
+
+async def test_snapshot_failing_internally_keeps_the_last_cursor(
+    server: FakePrivateWsServer, stream: PrivateOrderStream
+) -> None:
+    sub, first = await open_stream(server, stream)
+    await first.snapshot("s1", "c1", [order(1)])
+    assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
+
+    def broken_scales(symbol_id: int) -> tuple[int | None, int | None]:
+        raise RuntimeError("injected scales failure")
+
+    stream.order_scales = broken_scales
+    await first.send("s1", 4, snapshot_begin=pb.SnapshotBegin(epoch=2))
+    await first.send("s1", 5, snapshot_page=pb.SnapshotPage(orders=[order(2)]))
+    await first.send("s1", 6, snapshot_end=pb.SnapshotEnd(cursor="c2", count=1))
+    await expect_internal_failure(sub)
+    # Not cleared as for a malformed snapshot: the last applied cursor resumes.
+    assert stream._subs[CHANNEL].cursor == "c1"
+    stream.order_scales = None
+    _, request = await reconnect(server, "s2")
+    assert request.cursor == "c1"
+
+
+async def test_a_failure_recorded_before_the_last_consumer_left_stays_with_its_connection(
+    server: FakePrivateWsServer, stream: PrivateOrderStream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sub, first = await open_stream(server, stream)
+
+    async def broken(ws: Any) -> None:
+        raise RuntimeError("injected reauthentication failure")
+
+    # Hold the drop: the failure is recorded but its connection is not closed yet.
+    close_soon = stream._close_soon
+
+    def held(ws: Any, code: int = 1000, reason: str = "") -> None:
+        if code != private_orders.INTERNAL_ERROR_CLOSE_CODE:
+            close_soon(ws, code, reason)
+
+    monkeypatch.setattr(stream, "_reauthenticate", broken)
+    monkeypatch.setattr(stream, "_close_soon", held)
+    await first.send(token_expiring=pb.TokenExpiring(expires_ts_sec=1))
+    for _ in range(100):
+        if stream._failure is not None:
+            break
+        await asyncio.sleep(0.01)
+    assert stream._failure is not None
+    await sub.aclose()
+    assert stream._failure is None
+
+    # A new subscription on a new connection; its ordinary reconnect reports nothing.
+    again, second = await open_stream(server, stream, "t1")
+    await second.close(1001)
+    assert isinstance(await next_event(again), PrivateOrdersDisconnected)
+    await reconnect(server, "t2")
+    assert isinstance(await next_event(again), PrivateOrdersConnected)
+    assert again._queue.empty()
+    assert again.error is None

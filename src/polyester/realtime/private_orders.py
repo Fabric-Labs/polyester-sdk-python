@@ -33,6 +33,7 @@ from polyester.errors import (
     PolyesterRealtimeError,
     PolyesterRealtimeOverflowError,
     PolyesterRedirectError,
+    PolyesterResponseContractError,
     PolyesterValidationError,
 )
 from polyester.gen.orders.v1.orders_read_pb2 import Order as OrderPb
@@ -68,9 +69,11 @@ HEARTBEAT_TIMEOUT_CLOSE_CODE = 4000
 # Closes a connection whose own handling failed.
 INTERNAL_ERROR_CLOSE_CODE = 1011
 # Unexpected failures of the stream's own handling that recovery may retry: per
-# account until its cursor moves past them, and per connection until any account
-# applies data or reaches Ready. The next one ends the account (or the stream).
+# account until its cursor moves, and per connection until any account's cursor
+# moves. The last one ends the account (or the stream).
 MAX_INTERNAL_FAILURES = 3
+# What decoding a malformed frame raises; anything else is an internal failure.
+DECODE_ERRORS = (PolyesterValidationError, PolyesterResponseContractError)
 
 
 def private_ws_url(api_url: str) -> str:
@@ -113,6 +116,17 @@ class _SubscriptionFailure(Exception):
         self.error = error
 
 
+def _cache_key(order_id: object) -> str:
+    """An order ID as a key of the cached view.
+
+    Only an exact ``str``: setting and popping such keys runs no code that can
+    fail, so committing a staged change cannot stop part way.
+    """
+    if type(order_id) is not str:
+        raise TypeError(f"order ID is a {type(order_id).__name__}, not a str")
+    return order_id
+
+
 def _request_error_code(code: int) -> str:
     try:
         return pb.RequestError.Code.Name(code)
@@ -127,6 +141,8 @@ class _Consumer:
     ready: asyncio.Future[None]
     # Joined a running subscription: the cached view follows its Connected.
     catch_up: bool = False
+    # Got its Connected (and any replay): only then is it told anything else.
+    joined: bool = False
 
 
 @dataclass(eq=False)
@@ -200,10 +216,10 @@ class PrivateOrderStream:
         self._outbox: asyncio.Queue[bytes] | None = None
         self._run_task: asyncio.Task[None] | None = None
         self._tasks: set[asyncio.Task[Any]] = set()
-        # A task working for the current connection failed, for one subscription
-        # or the whole connection; _run recovers from it.
-        self._failure: tuple[_Subscription | None, Exception] | None = None
-        # Unexpected failures not attributed to one subscription since any applied data.
+        # Work for this connection failed, for one subscription or the whole
+        # connection; that connection's _run recovers from it.
+        self._failure: tuple[ClientConnection, _Subscription | None, Exception] | None = None
+        # Unexpected failures not attributed to one subscription since any cursor moved.
         self._failures = 0
         self._request_seq = 0
         self._closed = False
@@ -308,6 +324,10 @@ class PrivateOrderStream:
         if consumer not in s.consumers:
             return
         connected = isinstance(event, PrivateOrdersConnected)
+        if not connected and not consumer.joined:
+            # Its first event is Connected: until then it is told nothing; a
+            # join that fails raises from subscribe().
+            return
         # A joining consumer's replay is prepared before anything reaches it: if
         # that fails, the join stays pending and still owed its replay.
         events = [event, *self._cached_events(s)] if connected and consumer.catch_up else [event]
@@ -328,6 +348,7 @@ class PrivateOrderStream:
                 return
         if connected:
             consumer.catch_up = False
+            consumer.joined = True
             if not consumer.ready.done():
                 consumer.ready.set_result(None)
 
@@ -354,7 +375,8 @@ class PrivateOrderStream:
     def _report(self, s: _Subscription, kind: str, error: Exception) -> None:
         self._deliver(s, PrivateOrdersError(kind=kind, error=error))
         for consumer in list(s.consumers):
-            consumer.subscription._notify_error(error)
+            if consumer.joined:
+                consumer.subscription._notify_error(error)
 
     def _report_all(self, kind: str, error: Exception) -> None:
         for s in list(self._subs.values()):
@@ -380,7 +402,7 @@ class PrivateOrderStream:
         s.consumers.clear()
         self._teardown(s)
         for consumer in consumers:
-            if not told_disconnected:
+            if not told_disconnected and consumer.joined:
                 with contextlib.suppress(asyncio.QueueFull):
                     consumer.queue.put_nowait(PrivateOrdersDisconnected())
             self._end_consumer(consumer, error)
@@ -444,16 +466,17 @@ class PrivateOrderStream:
                 # from the last applied cursor.
                 try:
                     closed = await self._serve(ws, token)
-                    failed = self._failure
+                    failed = self._take_failure(ws)
                 except asyncio.CancelledError:
                     raise
                 except _SubscriptionFailure as exc:
                     closed = _Closed(INTERNAL_ERROR_CLOSE_CODE)
                     failed = (exc.subscription, exc.error)
+                    self._take_failure(ws)
                 except Exception as exc:
                     closed = _Closed(INTERNAL_ERROR_CLOSE_CODE)
                     failed = (None, exc)
-                self._failure = None
+                    self._take_failure(ws)
                 if time.monotonic() - served_at >= STABLE_CONNECTION:
                     attempt = 0
                 if not self._owns_connection():
@@ -513,11 +536,21 @@ class PrivateOrderStream:
         if self._failures >= MAX_INTERNAL_FAILURES:
             self._terminate_all(error)
 
-    def _progressed(self, s: _Subscription) -> None:
-        """``s`` applied data: what failed before is behind it."""
+    def _progressed(self, s: _Subscription, cursor: str) -> None:
+        """``s`` applied data and moved from ``cursor``; only a move proves that
+        what failed before is behind it."""
         s.retries = 0
-        s.failures = 0
-        self._failures = 0
+        if s.cursor != cursor:
+            s.failures = 0
+            self._failures = 0
+
+    def _take_failure(self, ws: ClientConnection) -> tuple[_Subscription | None, Exception] | None:
+        """The failure work for ``ws`` recorded, if any; it is cleared."""
+        failure = self._failure
+        if failure is None or failure[0] is not ws:
+            return None
+        self._failure = None
+        return failure[1], failure[2]
 
     async def _serve(self, ws: ClientConnection, token: str) -> _Closed:
         """Authenticate, subscribe every account, and read until the socket closes."""
@@ -584,6 +617,8 @@ class PrivateOrderStream:
     def _shutdown(self) -> None:
         ws = self._ws
         self._detach()
+        # A failure no loop will recover from now belongs to no later connection.
+        self._failure = None
         current = asyncio.current_task()
         # A loop that is not cancelled here (it called this) sees it no longer owns the stream.
         self._run_task = None
@@ -631,8 +666,8 @@ class PrivateOrderStream:
             # Its connection is gone: it neither drops nor charges a later one.
             self._report_all("internal", _internal_error(error))
             return
-        if self._failure is None:
-            self._failure = (s, error)
+        if self._failure is None or self._failure[0] is not ws:
+            self._failure = (ws, s, error)
         self._close_soon(ws, INTERNAL_ERROR_CLOSE_CODE, "internal error")
 
     def _close_soon(self, ws: ClientConnection, code: int = 1000, reason: str = "") -> None:
@@ -867,13 +902,13 @@ class PrivateOrderStream:
         elif kind == "unit":
             self._on_unit(ws, s, msg.unit)
         elif kind == "covered":
+            cursor = s.cursor
             s.cursor = msg.covered.cursor
-            self._progressed(s)
+            self._progressed(s, cursor)
         elif kind == "ready":
             # A resumed subscription on a quiet account delivers no data, only this.
-            # It shows the connection recovered, not that a failed update applied.
+            # It does not show that anything that failed has applied since.
             s.retries = 0
-            self._failures = 0
             if not s.ready:
                 s.ready = True
                 self._deliver(s, PrivateOrdersReady())
@@ -934,41 +969,46 @@ class PrivateOrderStream:
             return
         try:
             orders = private_orders_from_proto(staged, scales=self.order_scales)
-        except Exception as exc:
+        except DECODE_ERRORS as exc:
+            # A malformed snapshot: take a fresh one. Any other failure is the
+            # stream's own and keeps the last applied cursor.
             self._report(s, "decode", exc)
             s.cursor = ""
             self._resubscribe(ws, s)
             return
         # Build the whole next state first: a failure leaves the last applied
         # view and cursor in place.
-        view = {order.order_id: raw for order, raw in zip(orders, staged, strict=True)}
+        view = {_cache_key(order.order_id): raw for order, raw in zip(orders, staged, strict=True)}
         event = PrivateOrdersSnapshot(orders=orders)
+        cursor = s.cursor
         s.cursor = end.cursor
         s.orders = view
-        self._progressed(s)
+        self._progressed(s, cursor)
         self._deliver(s, event)
 
     def _on_unit(self, ws: ClientConnection, s: _Subscription, unit: pb.Unit) -> None:
         try:
             event = private_orders_unit_from_proto(unit, scales=self.order_scales)
-        except Exception as exc:
-            # The unit is not applied: resume from the cursor before it.
+        except DECODE_ERRORS as exc:
+            # A malformed unit is not applied: resume from the cursor before it.
             self._report(s, "decode", exc)
             self._resubscribe(ws, s)
             return
         # Stage the whole change, upserts and removals, first: a failure applies
-        # none of the unit, so the cursor before it still resumes it. Committing
-        # it below only sets and pops keys already hashed here.
+        # none of the unit, so the cursor before it still resumes it. The commit
+        # below sets and pops exact str keys only, which cannot fail.
         upserts = {
-            order.order_id: raw for order, raw in zip(event.orders, unit.orders, strict=True)
+            _cache_key(order.order_id): raw
+            for order, raw in zip(event.orders, unit.orders, strict=True)
         }
-        removals = frozenset(event.removed_order_ids)
+        removals = [_cache_key(order_id) for order_id in event.removed_order_ids]
+        cursor = s.cursor
         s.cursor = unit.next_cursor
         if s.orders is not None:
             s.orders.update(upserts)
             for order_id in removals:
                 s.orders.pop(order_id, None)
-        self._progressed(s)
+        self._progressed(s, cursor)
         self._deliver(s, event)
 
     def _on_request_error(self, ws: ClientConnection, sub: str, error: pb.RequestError) -> None:

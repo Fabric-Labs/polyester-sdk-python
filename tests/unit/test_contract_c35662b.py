@@ -168,6 +168,18 @@ async def test_get_batch_refuses_a_request_id_the_contract_refuses(request_id: A
         _batch(it_pb2.BATCH_ACCEPTED, it_pb2.LEG_CREDITED, request_id=""),
         _batch(it_pb2.BATCH_ACCEPTED, it_pb2.LEG_CREDITED, legs=0),
         _batch(it_pb2.BATCH_PROCESSING, it_pb2.LEG_CREDITED),
+        it_pb2.GetInternalTransferBatchResponse(
+            request_id="1234",
+            status=it_pb2.BATCH_ACCEPTED,
+            legs=[
+                it_pb2.InternalTransferBatchLegResult(
+                    leg_index=0,
+                    status=it_pb2.LEG_CREDITED,
+                    transfer_id="t0",
+                    credited_at_ts_ns=1,
+                )
+            ],
+        ),
     ],
 )
 async def test_get_batch_refuses_an_answer_that_breaks_the_contract(reply) -> None:
@@ -561,6 +573,32 @@ def test_asset_info_reads_its_market_datapoints() -> None:
     assert stats.max_supply_unlimited.source == "polyester"
     assert stats.rank is not None and stats.rank.value == "1"
     assert asset_info_from_proto(asset_info_pb2.AssetInfo(asset_id=3)).market_stats is None
+
+
+def test_activity_event_exposes_every_published_field() -> None:
+    created = datetime(2026, 11, 17, 6, 30, 0, 123456, tzinfo=UTC)
+    event = subaccount_activity_event_from_proto(
+        subaccounts_pb2.ActivityEvent(
+            created_at=_ts(created),
+            entity_kind=subaccounts_pb2.ACTIVITY_ENTITY_SESSION,
+            event_action=subaccounts_pb2.ACTIVITY_ACTION_FAILED,
+            source=subaccounts_pb2.ACTIVITY_SOURCE_API,
+            ip="203.0.113.7",
+            user_agent="wallet/1.0",
+            actor_account_id=56,
+            payload_json='{"method":"wallet","reason":"invalid_signature"}',
+            subaccount_id=12,
+            actor_api_key_id=34,
+        )
+    )
+    assert event.created_at == created
+    assert (event.entity_kind, event.event_action, event.source) == ("session", "failed", "api")
+    assert (event.ip, event.user_agent) == ("203.0.113.7", "wallet/1.0")
+    assert event.actor_account_id == format_id(56)
+    assert event.payload_json == '{"method":"wallet","reason":"invalid_signature"}'
+    assert (event.subaccount_id, event.actor_api_key_id) == (format_id(12), format_id(34))
+    published = set(subaccounts_pb2.ActivityEvent.DESCRIPTOR.fields_by_name)
+    assert published <= set(type(event).__struct_fields__)
 
 
 def test_activity_event_names_its_sub_account_and_acting_key() -> None:

@@ -357,7 +357,7 @@ transfer.v1.GetInternalTransferResponse.flow_id	not_required	an older server sen
 transfer.v1.GetInternalTransferResponse.request_id	required	
 transfer.v1.GetInternalTransferResponse.transfer_id	required	
 transfer.v1.InternalTransferBatchLegResult.asset_id	not_required	reference to an asset
-transfer.v1.InternalTransferBatchLegResult.flow_id	not_required	set once the leg is credited; empty otherwise
+transfer.v1.InternalTransferBatchLegResult.flow_id	not_required	set once the leg is credited; a credited leg's decoder requires it
 transfer.v1.InternalTransferBatchLegResult.transfer_id	not_required	set once the batch is processing or accepted; a processing or credited leg's decoder requires it
 transfer.v1.ListDustBalancesResponse.target_asset_id	not_required	reference to an asset
 transfer.v1.QuoteDustConversionResponse.quote_id	not_required	empty when no balance converts

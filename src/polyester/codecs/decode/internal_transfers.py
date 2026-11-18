@@ -99,6 +99,16 @@ def _batch_leg_from_proto(
         raise PolyesterResponseContractError(
             operation, f"{status} leg {msg.leg_index} is missing transfer_id"
         )
+    # The contract sets a leg's lifecycle flow and credit time once it is
+    # credited: a credited leg without them is not a receipt of a credit.
+    if status == "credited" and not msg.flow_id:
+        raise PolyesterResponseContractError(
+            operation, f"credited leg {msg.leg_index} is missing flow_id"
+        )
+    if status == "credited" and not msg.credited_at_ts_ns:
+        raise PolyesterResponseContractError(
+            operation, f"credited leg {msg.leg_index} is missing credited_at_ts_ns"
+        )
     asset_id = int(msg.asset_id)
     return InternalTransferBatchLegResult(
         leg_index=int(msg.leg_index),
@@ -141,7 +151,9 @@ def internal_transfer_batch_from_proto(
 
     It must name a known batch status and carry its ``request_id`` unless
     refused (a read must answer the batch it named), answer every requested
-    leg once in request order, and give every leg the one status its batch
+    leg once in request order, give a processing or credited leg its
+    ``transfer_id`` and a credited leg its ``flow_id`` and
+    ``credited_at_ts_ns``, and give every leg the one status its batch
     status admits: ``"credited"`` for an accepted batch, ``"processing"`` for
     a processing one and ``"not_moved"`` for a refused one.
     """

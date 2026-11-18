@@ -413,6 +413,13 @@ def _processing(index: int, **overrides) -> it_pb2.InternalTransferBatchLegResul
         it_pb2.BatchCreateInternalTransfersResponse(
             request_id="1", status=it_pb2.BATCH_PROCESSING, legs=[_processing(0, transfer_id="")]
         ),
+        # A credited leg without the flow or credit time the contract sets on it.
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0, flow_id="")]
+        ),
+        it_pb2.BatchCreateInternalTransfersResponse(
+            request_id="1", status=it_pb2.BATCH_ACCEPTED, legs=[_credited(0, credited_at_ts_ns=0)]
+        ),
         # A leg without a known status.
         it_pb2.BatchCreateInternalTransfersResponse(
             request_id="1",

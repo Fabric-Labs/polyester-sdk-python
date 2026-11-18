@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from polyester.codecs.contract_limits import contract_uint32_range
 from polyester.codecs.decode.deposit import (
     create_deposit_address_from_proto,
     deposit_addresses_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.deposit.v1.deposit_connect import DepositAddressServiceClient
 from polyester.gen.chain.deposit.v1.deposit_pb2 import (
     CreateDepositAddressRequest,
@@ -14,6 +16,13 @@ from polyester.models import DepositAddress, DepositAddressesList
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+
+# The chain a deposit address is created on, from the contract's rule on
+# ``CreateDepositAddressRequest.chain_id`` (positive; 0 is not "every chain"
+# as it is when listing).
+CREATE_CHAIN_ID_MIN, CREATE_CHAIN_ID_MAX = contract_uint32_range(
+    CreateDepositAddressRequest, "chain_id"
+)
 
 
 class AsyncDepositService(ScopedSubAccountMixin, BaseService):
@@ -50,7 +59,20 @@ class AsyncDepositService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> DepositAddress:
-        """Create a deposit address. An API key needs ``CREATE_DEPOSIT_ADDRESS``."""
+        """Create a deposit address. An API key needs ``CREATE_DEPOSIT_ADDRESS``.
+
+        ``chain_id`` must be positive, as the contract requires; 0 is refused
+        with ``PolyesterValidationError`` before sending.
+        """
+        if (
+            isinstance(chain_id, bool)
+            or not isinstance(chain_id, int)
+            or not CREATE_CHAIN_ID_MIN <= chain_id <= CREATE_CHAIN_ID_MAX
+        ):
+            raise PolyesterValidationError(
+                f"chain_id: {chain_id!r} is not an integer between "
+                f"{CREATE_CHAIN_ID_MIN} and {CREATE_CHAIN_ID_MAX}"
+            )
         request = CreateDepositAddressRequest(chain_id=chain_id)
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)

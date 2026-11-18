@@ -20,7 +20,7 @@ reason = "Wallet login is intentionally outside the API-key SDK surface."
 
 [[allowlist]]
 service = "auth.v1.PolicyService"
-reason = "Policy writes require an interactive session. List/get reads accept an API key with READ_API_POLICIES or READ_SUBACCOUNT_POLICIES but are not wrapped yet; the SDK exposes realtime subscribe."
+reason = "Not wrapped in this SDK yet. Policy writes take an interactive session, and SetApiKeyPolicy, SetSubaccountPolicy and UpdateSubaccountPolicy also an admin API key with its MANAGE_* permission. List/get reads accept an API key with READ_API_POLICIES or READ_SUBACCOUNT_POLICIES; the SDK exposes realtime subscribe."
 
 [[allowlist]]
 service = "auth.v1.ProfileService"
@@ -32,15 +32,15 @@ reason = "ResolveAccount accepts an API key with READ_ACCOUNT_DIRECTORY but is n
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/CreateApiKey"
-reason = "API key create requires interactive JWT/session."
+reason = "Not wrapped in this SDK yet. API key create takes an interactive session, or an admin API key with MANAGE_API_KEYS."
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/UpdateApiKey"
-reason = "API key update requires interactive JWT/session."
+reason = "Not wrapped in this SDK yet. API key update takes an interactive session, or an admin API key with MANAGE_API_KEYS."
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/DeleteApiKey"
-reason = "API key delete requires interactive JWT/session."
+reason = "Not wrapped in this SDK yet. API key delete takes an interactive session, or an admin API key with MANAGE_API_KEYS."
 
 [[allowlist]]
 procedure = "/auth.v1.SubaccountService/CreateSubaccount"
@@ -173,3 +173,7 @@ reason = "The notification center is not part of the trading SDK surface yet. It
 [[allowlist]]
 service = "swap.quickswap.v1.QuickSwapExplorerService"
 reason = "The public Quick Swap explorer is outside the trading SDK surface, like the rest of Quick Swap."
+
+[[allowlist]]
+service = "auth.v1.ConnectedAppService"
+reason = "Connecting outside apps with OAuth is session-only, for the website; API keys are not accepted."

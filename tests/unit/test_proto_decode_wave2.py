@@ -22,7 +22,7 @@ from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.gen.orderbook.v1 import orderbook_pb2
-from polyester.gen.polyester.type.v1 import u128_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2, u128_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2
 
 
@@ -172,6 +172,7 @@ def test_market_overview_list_from_proto() -> None:
 
 def test_orderbook_from_proto() -> None:
     msg = orderbook_pb2.GetOrderBookResponse(
+        depth=depth_tier_pb2.DEPTH_50,
         book_seq=42,
         bids=[orderbook_pb2.PriceLevel(price_ticks=100, qty_scaled=50)],
         asks=[orderbook_pb2.PriceLevel(price_ticks=101, qty_scaled=25)],
@@ -192,7 +193,8 @@ def test_orderbook_from_proto_rejects_missing_or_invalid_levels(
     price_ticks: int, qty_scaled: int
 ) -> None:
     msg = orderbook_pb2.GetOrderBookResponse(
-        bids=[orderbook_pb2.PriceLevel(price_ticks=price_ticks, qty_scaled=qty_scaled)]
+        depth=depth_tier_pb2.DEPTH_1,
+        bids=[orderbook_pb2.PriceLevel(price_ticks=price_ticks, qty_scaled=qty_scaled)],
     )
     with pytest.raises(PolyesterValidationError):
         orderbook_from_proto(msg, symbol="BTC-USD", depth=1, quantity_scale=8)

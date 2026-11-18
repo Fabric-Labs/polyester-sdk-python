@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from polyester._wire import protobuf_to_public_dict
 from polyester.codecs.decode.common import require_id
-from polyester.codecs.proto_helpers import format_uint64_id, optional_timestamp
-from polyester.gen.auth.v1 import auth_pb2, profile_pb2
+from polyester.codecs.proto_helpers import (
+    format_optional_uint64_id,
+    format_uint64_id,
+    optional_timestamp,
+    proto_enum_name,
+)
+from polyester.errors import PolyesterResponseContractError
+from polyester.gen.auth.v1 import address_book_pb2, auth_pb2, profile_pb2
 from polyester.models.auth import (
     MeResult,
     UsernameHistoryEntry,
@@ -18,12 +24,17 @@ def me_from_proto(msg: auth_pb2.MeResponse) -> MeResult:
     if msg.HasField("session"):
         require_id("Me", "session.session_id", msg.session.session_id)
         session = protobuf_to_public_dict(msg.session)
+    scope = proto_enum_name(address_book_pb2.AccountScopeType, int(msg.api_key_scope))
+    if scope == "subaccount" and not msg.subaccount_id:
+        raise PolyesterResponseContractError("Me", "sub-account key without its subaccount_id")
     return MeResult(
         account_id=format_uint64_id(msg.account_id),
         api_key_id=(msg.api_key_id or "").strip(),
         username=msg.username,
         root_smart_account_address=msg.root_smart_account_address,
         session=session,
+        api_key_scope=scope,
+        subaccount_id=format_optional_uint64_id(int(msg.subaccount_id)),
     )
 
 

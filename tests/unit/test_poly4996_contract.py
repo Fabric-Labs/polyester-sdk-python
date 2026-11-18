@@ -25,6 +25,7 @@ from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.services._symbols import resolve_cancel_all_symbol_ids
@@ -269,7 +270,9 @@ def test_currency_conversion_rates_preserve_e8_and_absent_fiat() -> None:
 
 def test_empty_orderbook_with_zero_sequence_is_success() -> None:
     result = orderbook_from_proto(
-        orderbook_pb2.GetOrderBookResponse(symbol_id=1, book_seq=0),
+        orderbook_pb2.GetOrderBookResponse(
+            symbol_id=1, book_seq=0, depth=depth_tier_pb2.DEPTH_50
+        ),
         symbol="BTC-USDT",
         depth=50,
         quantity_scale=8,

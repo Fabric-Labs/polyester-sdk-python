@@ -303,8 +303,10 @@ A request body over an endpoint's size limit is refused with HTTP 413 and the pr
 `REQUEST_TOO_LARGE` on every service, before the request is authenticated. It raises
 `PolyesterApiError` with `code` `REQUEST_TOO_LARGE` and the problem in `error.problem`;
 `is_request_too_large(err)` reports it. Nothing changed and the same body is refused again: reduce
-it to fit the limit. A ConnectRPC message over the limit once decoded keeps its Connect
-`resource_exhausted` answer and maps as before. Preview
+it to fit the limit. A ConnectRPC call over the limit answers `resource_exhausted` with a typed
+`RequestErrorDetail`: it raises the same final `PolyesterApiError` `REQUEST_TOO_LARGE`, with the
+limit it is over in `error.limit_bytes`, and is never retried. A `resource_exhausted` without that
+detail stays a retryable rate limit. Preview
 and batch rejections expose the same payload on `OrderErrorDetail.rate_limit` / batch item
 `rate_limit`. That error payload is distinct from `client.rate_limits`
 (`ratelimit.v1.RateLimitService`), which returns the public trading quota catalog and
@@ -905,9 +907,19 @@ from the order stream and reads. A dry run lists none. Retrying with the same
 `cancelled_orders` and `listing_status="not_retained_read_open_orders"`; the
 empty list does not mean nothing was cancelled, so read open orders instead.
 
-`cancel_all` and the dead-man switch (`cancel_all_after`) cancel open orders
-only, never triggers: an armed stop still fires and places its order later, a
-TWAP keeps placing slices, and the triggers keep their reserved funds. Orders
+By default `cancel_all` and the dead-man switch (`cancel_all_after`) cancel
+open orders only, never triggers: an armed stop still fires and places its
+order later, a TWAP keeps placing slices, and the triggers keep their reserved
+funds. With `include_triggers=True` one request halts all automated trading on
+the matched symbols and side: every trigger and attached leg created before the
+request was accepted (for the switch, before its expiry time) ends canceled
+with reason `cancel_all`, releases its reserved funds and places no order after
+the response, and the cancel-all result's `matched_triggers` counts them. A
+cancel-all covers the orders admitted before its `request_id` was first
+admitted, from any interface: an order whose create, modify or replace call
+answered before you sent it is covered, while one still in flight or with an
+unknown outcome may be admitted after it and stay open, so send a second
+cancel-all once those calls have answered. Without `include_triggers`: Orders
 that triggers placed (TWAP slices, ladder levels, exit orders) are canceled like
 any other; a ladder stops once its levels are canceled. An attached stop-loss,
 take-profit or trailing leg whose exit order is canceled ends, and so do the
@@ -1952,25 +1964,24 @@ if not book.available:
     ...  # unknown book: retry later instead of quoting into an empty side
 ```
 
-`orderbook.get` takes any level count per side from 1 to the `max_depth` every
-snapshot reports (5,000 by default), sent as given; 0 means the default 50, and the
-result's `depth` reads 50 then. A depth above `max_depth` is refused by the server
-with `PolyesterApiError` code `invalid_argument`, never truncated: read `max_depth`
-from any snapshot instead of assuming a limit. A negative depth, one above the uint32
-range, or one that isn't an exact integer, raises `PolyesterValidationError` before
-any request. Each snapshot also carries `book_epoch`, the epoch of its `book_seq`:
+`orderbook.get` takes a tier's level count per side: 1, 5, 10, 20, 50, 100, 200,
+500, 1000 or 5000 (`polyester.codecs.orderbook.ORDERBOOK_SNAPSHOT_DEPTHS`), sent as
+that `DepthTier`; 0 means the default 50. Any other count, a negative one, or one that
+isn't an exact integer, raises `PolyesterValidationError` before any request. The
+result's `depth` is the tier the server served; an answer that names none, or another
+tier than the one asked for, raises `PolyesterResponseContractError`. Each snapshot also carries `book_epoch`, the epoch of its `book_seq`:
 order snapshots by `(book_epoch, book_seq)` with
 `polyester.orderbook.compare_snapshots(a, b)` (-1, 0 or 1), since a higher epoch is
 newer whatever its `book_seq` and a new epoch may restart `book_seq`; keep the newest
 and drop one of an older epoch. A snapshot is a frozen view at its own position: never
-apply stream deltas to it. A managed subscription's views carry `book_epoch` `""` and
-`max_depth` `0`, as the delta stream names no epoch.
+apply stream deltas to it. A managed subscription's views carry `book_epoch` `""`,
+as the delta stream names no epoch.
 
 ```python
 from polyester.orderbook import compare_snapshots
 
-deep = await client.orderbook.get(symbol="BTC-USDT", depth=2500)
-newer = await client.orderbook.get(symbol="BTC-USDT", depth=2500)
+deep = await client.orderbook.get(symbol="BTC-USDT", depth=1000)
+newer = await client.orderbook.get(symbol="BTC-USDT", depth=1000)
 if compare_snapshots(newer, deep) > 0:
     deep = newer
 ```

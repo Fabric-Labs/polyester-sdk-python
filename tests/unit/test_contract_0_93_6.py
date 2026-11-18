@@ -88,3 +88,54 @@ def test_resource_exhausted_without_the_detail_stays_a_rate_limit() -> None:
         ConnectError(Code.RESOURCE_EXHAUSTED, "rate limited", details=[detail])
     )
     assert isinstance(with_rate_limit, PolyesterRateLimitError)
+
+
+# --- Me names an API key's scope ------------------------------------------------------------------
+
+
+def test_me_names_a_sub_account_keys_scope_and_sub_account() -> None:
+    from polyester.codecs.decode.auth import me_from_proto
+    from polyester.codecs.scalars import format_id
+    from polyester.gen.auth.v1 import address_book_pb2, auth_pb2
+
+    me = me_from_proto(
+        auth_pb2.MeResponse(
+            account_id=7, api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT, subaccount_id=12
+        )
+    )
+    assert (me.api_key_scope, me.subaccount_id) == ("subaccount", format_id(12))
+    root = me_from_proto(
+        auth_pb2.MeResponse(account_id=7, api_key_scope=address_book_pb2.SCOPE_ROOT)
+    )
+    assert (root.api_key_scope, root.subaccount_id) == ("root", "")
+    session = me_from_proto(auth_pb2.MeResponse(account_id=7))
+    assert (session.api_key_scope, session.subaccount_id) == ("", "")
+
+
+def test_me_refuses_a_sub_account_key_without_its_sub_account() -> None:
+    from polyester.codecs.decode.auth import me_from_proto
+    from polyester.errors import PolyesterResponseContractError
+    from polyester.gen.auth.v1 import address_book_pb2, auth_pb2
+
+    with pytest.raises(PolyesterResponseContractError):
+        me_from_proto(
+            auth_pb2.MeResponse(account_id=7, api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT)
+        )
+
+
+# --- policy template copies -----------------------------------------------------------------------
+
+
+def test_policy_copies_name_their_template_revision() -> None:
+    from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_policy_from_proto
+    from polyester.codecs.scalars import format_id
+    from polyester.gen.auth.v1 import policies_pb2
+
+    api = api_policy_from_proto(
+        policies_pb2.ApiPolicyView(id=1, source_template_id=9, source_template_revision=4)
+    )
+    sub = subaccount_policy_from_proto(
+        policies_pb2.SubaccountPolicyView(id=2, source_template_id=9, source_template_revision=5)
+    )
+    assert (api.source_template_id, api.source_template_revision) == (format_id(9), 4)
+    assert (sub.source_template_id, sub.source_template_revision) == (format_id(9), 5)

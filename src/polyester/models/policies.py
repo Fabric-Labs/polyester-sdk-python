@@ -18,7 +18,10 @@ class SubaccountPolicy(msgspec.Struct, kw_only=True, omit_defaults=True):
     spot_market_scope: str = ""
     actions: list[str] = []
     is_template: bool = False
+    # The template and template revision a copy was made from, set when the
+    # copy is made and never changed; "" and 0 for a policy that is no copy.
     source_template_id: str = ""
+    source_template_revision: int = 0
     max_order_notional: int = 0
     max_open_orders: int = 0
     trading_halted: bool = False
@@ -38,7 +41,10 @@ class ApiPolicy(msgspec.Struct, kw_only=True, omit_defaults=True):
     actions: list[str] = []
     spot_market_scope: str = ""
     is_template: bool = False
+    # The template and template revision a copy was made from, set when the
+    # copy is made and never changed; "" and 0 for a policy that is no copy.
     source_template_id: str = ""
+    source_template_revision: int = 0
     created_at: datetime | None = None
     updated_at: datetime | None = None
     revision: int = 0

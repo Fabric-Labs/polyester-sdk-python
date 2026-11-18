@@ -385,9 +385,12 @@ def id_to_int(value: str | int, label: str = "id") -> int:
     """Decode a public ID, refusing one that decodes to 0.
 
     A string is base58 only, read character by character as the server reads
-    it: a digit-only string is base58 too (``"123"`` is 60), and anything
+    it: a digit-only string is base58 too (``"23"`` is 60), and anything
     outside the base58 alphabet is refused, ``0``, whitespace and non-ASCII
-    characters included; nothing is trimmed. An ``int`` names the ID it is.
+    characters included; nothing is trimmed. Only the canonical spelling, as
+    :func:`format_id` writes it, is accepted: a leading ``1`` is a base58
+    zero, so ``"123"`` would name the same ID as ``"23"``, and is refused. An
+    ``int`` names the ID it is.
     On the wire 0 is unset and names nothing, so ``"1"`` (``format_id(0)``)
     or ``0`` would send a request for an ID the caller did not mean.
     """
@@ -420,6 +423,13 @@ def _parse_id(value: str | int, label: str) -> int:
         parsed = parsed * 58 + digit
         if parsed > UINT64_MAX:
             raise PolyesterValidationError(f"{label} exceeds uint64 range")
+    if _encode_id(parsed) != value:
+        if parsed == 0:
+            raise PolyesterValidationError(f"{label} must be a non-zero ID, not 0")
+        raise PolyesterValidationError(
+            f"{label} must be a public ID in canonical form, as the SDK writes it "
+            "(no leading 1); use the ID as the SDK or the app shows it, or pass the integer"
+        )
     return parsed
 
 
@@ -435,9 +445,9 @@ def parse_account_id(value: str | int, label: str) -> int:
 
 
 def format_id(value: str | int) -> str:
-    """The canonical base58 public ID of an integer ID, or of a base58 string
-    (re-encoded without leading ``1`` digits). A string that is not base58 is
-    refused, as :func:`id_to_int` refuses it."""
+    """The canonical base58 public ID of an integer ID, or of a base58 string.
+    A string that is not a canonical base58 public ID is refused, as
+    :func:`id_to_int` refuses it."""
     return _encode_id(_parse_id(value, "id"))
 
 

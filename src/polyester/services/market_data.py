@@ -7,7 +7,7 @@ from typing import Any
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.contract_limits import contract_uint32_items_range
+from polyester.codecs.contract_limits import contract_repeated_items, contract_uint32_items_range
 from polyester.codecs.decode.asset_info import asset_info_list_from_proto
 from polyester.codecs.decode.market_data import (
     candles_columns_from_proto,
@@ -34,11 +34,13 @@ from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
 
-# Each asset ID ``list_asset_info`` takes, from the contract's rule on
-# ``ListAssetInfoRequest.asset_ids`` (1 to 2147483647).
+# Each asset ID ``list_asset_info`` takes (1 to 2147483647) and how many it
+# takes (at most 1000), from the contract's rule on
+# ``ListAssetInfoRequest.asset_ids``.
 ASSET_ID_MIN, ASSET_ID_MAX = contract_uint32_items_range(
     asset_info_pb2.ListAssetInfoRequest, "asset_ids"
 )
+_, ASSET_IDS_MAX = contract_repeated_items(asset_info_pb2.ListAssetInfoRequest, "asset_ids")
 
 TIMEFRAME_ALIASES: dict[str, str] = {
     "1s": "SEC_1",
@@ -101,9 +103,9 @@ class AsyncMarketDataService(BaseService):
 
         ``asset_ids`` (the ``ledger_id`` of the spot and deposit/withdraw
         configs) keeps those assets; ``None`` or empty returns every saved
-        entry. The server accepts at most 1000 IDs and ignores duplicate and
-        unknown ones. Each ID is 1 to 2147483647, as the contract allows; any
-        other is refused with ``PolyesterValidationError`` before sending.
+        entry. The server ignores duplicate and unknown IDs. The contract
+        takes at most 1000 IDs, each from 1 to 2147483647; more IDs or any
+        other ID is refused with ``PolyesterValidationError`` before sending.
         Assets never edited are omitted. The result is complete: there is no
         paging. Public, never signed.
         """
@@ -121,6 +123,10 @@ class AsyncMarketDataService(BaseService):
                     f"{ASSET_ID_MIN} and {ASSET_ID_MAX}"
                 )
             ids.append(value)
+        if len(ids) > ASSET_IDS_MAX:
+            raise PolyesterValidationError(
+                f"asset_ids: {len(ids)} IDs is more than the {ASSET_IDS_MAX} allowed"
+            )
         return await unary_public_decoded(
             self._transport,
             MarketDataServiceClient,

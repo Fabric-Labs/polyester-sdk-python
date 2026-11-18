@@ -11,7 +11,10 @@ class AccountScope(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 class AddressBookSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     scope: AccountScope | None = None
-    caller_role: int = 0
+    # The caller's role in this book's account, as ``SubAccount.role`` has it:
+    # viewer, trader, leveraged_trader, treasury, admin or owner; empty when
+    # the server sends none.
+    caller_role: str = ""
     label: str = ""
     owner_username: str = ""
     smart_account_address: str = ""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.common import require_id
+from polyester.codecs.decode.sub_accounts import _subaccount_role_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import address_book_pb2
@@ -117,7 +118,7 @@ def address_book_summary_from_proto(msg: address_book_pb2.AddressBook) -> Addres
         scope = account_scope_from_proto(msg.scope)
     return AddressBookSummary(
         scope=scope,
-        caller_role=int(msg.caller_role),
+        caller_role=_subaccount_role_from_proto(msg.caller_role),
         label=msg.label,
         owner_username=msg.owner_username,
         smart_account_address=msg.smart_account_address,

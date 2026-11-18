@@ -88,10 +88,19 @@ class PrivateOrdersUnit:
 
 @dataclass(frozen=True, slots=True)
 class PrivateOrdersStale:
-    """The account's live view is temporarily behind (``True``) or caught up (``False``)."""
+    """The account's live view is temporarily behind (``True``) or caught up (``False``).
+
+    ``order_ids``: when only some orders are behind (the server's
+    ``ORDER_UNAVAILABLE``), the public IDs of the orders whose current state
+    is unknown, ascending. Their rows show an earlier state, or none yet; the
+    rest of the view is current and units keep arriving. Empty when the whole
+    view is behind and when ``stale`` is ``False``. A later stale event
+    replaces the earlier one's IDs.
+    """
 
     stale: bool
     type: Literal["stale"] = "stale"
+    order_ids: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)

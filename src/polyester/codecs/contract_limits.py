@@ -34,7 +34,16 @@ def contract_uint32_range(message: Any, name: str) -> tuple[int, int]:
     upper; a bound the contract leaves out is the wire type's own, 0 or
     2**32 - 1.
     """
-    rules = _rules(message, name).uint32
+    return _uint32_bounds(_rules(message, name).uint32)
+
+
+def contract_uint32_items_range(message: Any, name: str) -> tuple[int, int]:
+    """The inclusive range the contract sets on each item of a repeated
+    ``uint32`` field, read as :func:`contract_uint32_range` reads a field's."""
+    return _uint32_bounds(_rules(message, name).repeated.items.uint32)
+
+
+def _uint32_bounds(rules: Any) -> tuple[int, int]:
     low = 0
     if rules.HasField("gte"):
         low = int(rules.gte)

@@ -2123,7 +2123,9 @@ async with subscription:
   Outcomes between the two states are not replayed; fills stay readable from
   trade history.
 - `PrivateOrdersStale(stale=True)` means the account's live view is
-  temporarily behind; it recovers by itself.
+  temporarily behind; it recovers by itself. When only some orders are
+  behind, `order_ids` lists them (public IDs, ascending) and the rest of the
+  view is current; it is empty when the whole view is behind.
 - Recoverable failures arrive as `PrivateOrdersError` events and through
   `set_on_error(...)`. A failure that ends the stream (a refused token, a
   revoked permission, close code 4400 or 4403) is raised from iteration, with

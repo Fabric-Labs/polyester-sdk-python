@@ -552,19 +552,21 @@ def create_trigger_to_proto(
                 price_max_ticks = resolve_positive_price_ticks(
                     ladder_price_max, "ladder_price_max", symbol=symbol
                 )  # type: ignore[arg-type]
-        if (
-            price_min_ticks is not None
-            and price_max_ticks is not None
-            and price_min_ticks >= price_max_ticks
-        ):
+        # Both bounds are required: the contract's price_min_ticks and
+        # price_max_ticks have no presence and must be greater than 0, so a
+        # bound left out is 0 on the wire, which the contract refuses.
+        if price_min_ticks is None or price_max_ticks is None:
+            missing = "ladder_price_min" if price_min_ticks is None else "ladder_price_max"
+            raise PolyesterValidationError(
+                f"{missing} is required for a ladder", code=TRIGGER_PRICE_INVALID
+            )
+        if price_min_ticks >= price_max_ticks:
             raise PolyesterValidationError(
                 "ladder_price_min must be strictly less than ladder_price_max",
                 code=TRIGGER_PRICE_INVALID,
             )
-        if price_min_ticks is not None:
-            ladder.price_min_ticks = price_min_ticks
-        if price_max_ticks is not None:
-            ladder.price_max_ticks = price_max_ticks
+        ladder.price_min_ticks = price_min_ticks
+        ladder.price_max_ticks = price_max_ticks
         # Left out, levels is 0 on the wire, which the contract refuses.
         if ladder_levels is None:
             raise PolyesterValidationError(

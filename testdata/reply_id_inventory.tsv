@@ -32,7 +32,7 @@ ai.v1.Memory.conversation_id	not_required	reference to another object; 0 or empt
 ai.v1.Memory.memory_id	required	
 ai.v1.Message.message_id	required	
 ai.v1.Message.run_id	not_required	reference to another object; 0 or empty when none
-ai.v1.MessageImage.image_id	required	
+ai.v1.MessageImage.image_id	required	the identity of the image the reply returns
 ai.v1.OrderChange.order_id	not_required	reference to another order, trigger or batch; 0 when none
 ai.v1.OrderChangePreview.symbol_id	not_required	reference to a market
 ai.v1.OrderPreview.symbol_id	not_required	reference to a market
@@ -271,7 +271,7 @@ swap.quickswap.v1.Deposit.zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.DepositInstructions.zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.ExplorerQuickSwap.destination_zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.ExplorerQuickSwap.source_zipped_asset_id	not_required	reference to an asset
-swap.quickswap.v1.ExplorerQuickSwap.swap_id	required	
+swap.quickswap.v1.ExplorerQuickSwap.swap_id	required	the identity of the swap the reply returns
 swap.quickswap.v1.ExplorerRouteLeg.symbol_id	not_required	reference to a market
 swap.quickswap.v1.FeeSplit.asset_id	not_required	reference to an asset
 swap.quickswap.v1.FeeTotal.asset_id	not_required	reference to an asset
@@ -352,7 +352,7 @@ transfer.v1.DustConversion.conversion_id	required
 transfer.v1.DustConversion.quote_id	not_required	reference to another object; 0 or empty when none
 transfer.v1.DustConversion.target_asset_id	not_required	reference to an asset
 transfer.v1.DustSource.asset_id	not_required	reference to an asset
-transfer.v1.GetInternalTransferBatchResponse.request_id	required	
+transfer.v1.GetInternalTransferBatchResponse.request_id	required	the identity of the batch the read names
 transfer.v1.GetInternalTransferResponse.flow_id	not_required	an older server sends none, as for CreateInternalTransfer
 transfer.v1.GetInternalTransferResponse.request_id	required	
 transfer.v1.GetInternalTransferResponse.transfer_id	required	

@@ -31,7 +31,7 @@ from polyester._contract_codes import (
     is_recognised_rest_code,
     outcome_unknown_code,
 )
-from polyester._problem import decode_http_problem
+from polyester._problem import decode_http_problem, loads_bounded
 from polyester._redact import (
     redact_exception_chain,
     register,
@@ -298,6 +298,11 @@ def _classify_failed_answer(response: pyqwest.FullResponse) -> pyqwest.FullRespo
     if is_json:
         with suppress(Exception):
             body = response.json()
+        if body is None:
+            # A body the default parser refuses, such as one with an integer
+            # too long to convert, may still name its code.
+            with suppress(Exception):
+                body = loads_bounded(bytes(response.content))
     code = body.get("code") if isinstance(body, dict) else None
     retry_after = _retry_after_header(response)
     status = response.status

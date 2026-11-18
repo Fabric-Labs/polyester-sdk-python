@@ -7,6 +7,7 @@ now answers for triggers, OCOs and attached exits."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -78,11 +79,13 @@ def _ts(value: datetime) -> Timestamp:
 
 
 @asynccontextmanager
-async def _client(answer: Answer, *, signed: bool = True):
+async def _client(answer: Answer, *, signed: bool = True, delay: float = 0.0):
     requests: list[ParsedRequest] = []
 
     async def handler(req: ParsedRequest) -> HttpScript:
         requests.append(req)
+        if delay:
+            await asyncio.sleep(delay)
         return answer(req)
 
     http = await MockHttpServer.spawn(handler)
@@ -207,6 +210,27 @@ async def test_wait_batch_gives_up_after_its_timeout() -> None:
     async with _client(answer) as (client, requests):
         with pytest.raises(PolyesterTimeoutError):
             await client.internal_transfers.wait_batch(request_id="1234", timeout=0)
+    assert requests == []
+
+
+async def test_wait_batch_never_returns_a_read_that_ends_after_its_deadline() -> None:
+    # The batch is accepted, but the read only answers after the deadline.
+    answer = _ok(_batch(it_pb2.BATCH_ACCEPTED, it_pb2.LEG_CREDITED))
+    async with _client(answer, delay=0.3) as (client, _requests):
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(PolyesterTimeoutError):
+            await client.internal_transfers.wait_batch(request_id="1234", timeout=0.05)
+        assert asyncio.get_running_loop().time() - started < 0.25
+
+
+async def test_wait_batch_bounds_its_wait_between_reads(monkeypatch) -> None:
+    monkeypatch.setattr("polyester.services.internal_transfers._BATCH_POLL_INITIAL", 5.0)
+    answer = _ok(_batch(it_pb2.BATCH_PROCESSING, it_pb2.LEG_PROCESSING))
+    async with _client(answer) as (client, requests):
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(PolyesterTimeoutError):
+            await client.internal_transfers.wait_batch(request_id="1234", timeout=0.2)
+        assert asyncio.get_running_loop().time() - started < 1.0
     assert len(requests) == 1
 
 
@@ -248,8 +272,21 @@ async def test_download_url_is_a_secret_that_never_prints() -> None:
     assert (link.expires_at, link.filename) == (_OBSERVED, "statement-AAo.csv")
 
 
-async def test_download_url_answer_without_a_url_is_refused() -> None:
-    reply = export_pb2.GetStatementExportDownloadUrlResponse(filename="statement-AAo.csv")
+@pytest.mark.parametrize(
+    "reply",
+    [
+        export_pb2.GetStatementExportDownloadUrlResponse(
+            expires_at=_ts(_OBSERVED), filename="statement-AAo.csv"
+        ),
+        export_pb2.GetStatementExportDownloadUrlResponse(
+            url="https://files.example.test/s.csv", filename="statement-AAo.csv"
+        ),
+        export_pb2.GetStatementExportDownloadUrlResponse(
+            url="https://files.example.test/s.csv", expires_at=_ts(_OBSERVED)
+        ),
+    ],
+)
+async def test_download_url_answer_missing_a_guaranteed_field_is_refused(reply) -> None:
     async with _client(_ok(reply)) as (client, _):
         with pytest.raises(PolyesterResponseContractError):
             await client.statements.get_export_download_url(export_id=format_id(77))
@@ -296,9 +333,21 @@ async def test_wait_export_gives_up_after_its_timeout() -> None:
     reply = export_pb2.GetStatementExportResponse(
         export=_export(export_pb2.STATEMENT_EXPORT_STATUS_PROCESSING)
     )
-    async with _client(_ok(reply)) as (client, _):
+    async with _client(_ok(reply)) as (client, requests):
         with pytest.raises(PolyesterTimeoutError):
             await client.statements.wait_export(export_id=format_id(77), timeout=0)
+    assert requests == []
+
+
+async def test_wait_export_never_returns_a_read_that_ends_after_its_deadline() -> None:
+    reply = export_pb2.GetStatementExportResponse(
+        export=_export(export_pb2.STATEMENT_EXPORT_STATUS_READY)
+    )
+    async with _client(_ok(reply), delay=0.3) as (client, _requests):
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(PolyesterTimeoutError):
+            await client.statements.wait_export(export_id=format_id(77), timeout=0.05)
+        assert asyncio.get_running_loop().time() - started < 0.25
 
 
 def test_statements_no_longer_offer_the_removed_paged_export() -> None:
@@ -364,6 +413,15 @@ def test_skew_refusal_carries_the_servers_timestamp_window() -> None:
         ({"serverTimeMs": "abc"}, None),
         ({"serverTimeMs": "١٢"}, None),
         ({"serverTimeMs": True}, None),
+        ({"serverTimeMs": "9" * 5000}, None),
+        ({"serverTimeMs": str(2**63)}, None),
+        ({"serverTimeMs": 2**63}, None),
+        ({"serverTimeMs": -5}, None),
+        ({"serverTimeMs": 1.5}, None),
+        (
+            {"serverTimeMs": "1763361000123", "recvWindowMs": 2**32, "maxFutureMs": -1},
+            ServerTime(server_time_ms=1_763_361_000_123),
+        ),
         ("not an object", None),
     ],
 )
@@ -380,6 +438,54 @@ async def test_rest_skew_problem_carries_its_timestamp_window(window, expected) 
         with pytest.raises(PolyesterTimestampSkewError) as raised:
             await client.statements.get_export(export_id=format_id(77))
     assert raised.value.timestamp_window == expected
+    assert raised.value.status_code == 401
+
+
+_HUGE_WINDOW = (
+    b'{"code":"TIMESTAMP_SKEW","status":401,"detail":"d",'
+    b'"timestampWindow":{"serverTimeMs":' + b"9" * 5000 + b',"recvWindowMs":5000}}'
+)
+
+
+async def test_unreadable_timestamp_window_keeps_the_skew_refusal_and_its_answer() -> None:
+    # A number too long for Python to convert must not cost the refusal its
+    # code, status or retry delay.
+    answer = lambda _req: HttpScript.raw(  # noqa: E731
+        401,
+        headers=[("Content-Type", "application/problem+json"), ("Retry-After", "7")],
+        body=_HUGE_WINDOW,
+    )
+    async with _client(answer) as (client, _):
+        with pytest.raises(PolyesterTimestampSkewError) as raised:
+            await client.statements.get_export(export_id=format_id(77))
+    assert raised.value.timestamp_window is None
+    assert (raised.value.status_code, raised.value.retry_after) == (401, 7)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        _HUGE_WINDOW,
+        b'{"code":"TIMESTAMP_SKEW","timestampWindow":{"serverTimeMs":"' + b"9" * 5000 + b'"}}',
+    ],
+)
+def test_realtime_login_skew_refusal_survives_unreadable_metadata(body: bytes) -> None:
+    from polyester.realtime.auth import _auth_http_error
+
+    error = _auth_http_error(status_code=401, label="realtime token", endpoint="/x", body=body)
+    assert isinstance(error, PolyesterTimestampSkewError)
+    assert (error.status_code, error.timestamp_window) == (401, None)
+
+
+def test_realtime_login_skew_refusal_reads_its_window() -> None:
+    from polyester.realtime.auth import _auth_http_error
+
+    body = json.dumps(
+        {"code": "TIMESTAMP_SKEW", "timestampWindow": {"serverTimeMs": "1763361000123"}}
+    ).encode()
+    error = _auth_http_error(status_code=401, label="realtime token", endpoint="/x", body=body)
+    assert isinstance(error, PolyesterTimestampSkewError)
+    assert error.timestamp_window == ServerTime(server_time_ms=1_763_361_000_123)
 
 
 # --- route supply status -------------------------------------------------------------------------
@@ -433,6 +539,19 @@ def test_route_supply_is_set_only_while_known(variant, supply, status, observed)
     assert route.known_supply() == supply
 
 
+@pytest.mark.parametrize("status", [zipper_pb2.AVAILABLE, zipper_pb2.STALE])
+def test_known_supply_without_its_observation_time_is_refused(status) -> None:
+    with pytest.raises(PolyesterResponseContractError):
+        deposit_withdraw_config_from_proto(_config(supply_q=1_500_000, supply_status=status))
+    batch = zipper_pb2.ZippedAssetSupplyBatch(
+        updates=[zipper_pb2.ZippedAssetSupplyUpdate(zipped_asset_id=7, supply_q=1, status=status)]
+    )
+    with pytest.raises(PolyesterResponseContractError):
+        zipped_asset_supply_batch_from_proto(
+            batch, quantity_scale_for_zipped_asset_id=lambda _zid: 6
+        )
+
+
 def test_supply_stream_update_carries_its_status_and_patches_the_catalog() -> None:
     batch = zipper_pb2.ZippedAssetSupplyBatch(
         updates=[
@@ -451,7 +570,9 @@ def test_supply_stream_update_carries_its_status_and_patches_the_catalog() -> No
         zipped_asset_id=7, supply="1.5", status="stale", observed_at=_OBSERVED
     )
 
-    config = _config(supply_q=1_000_000, supply_status=zipper_pb2.AVAILABLE)
+    config = _config(
+        supply_q=1_000_000, supply_status=zipper_pb2.AVAILABLE, supply_observed_at=_ts(_OBSERVED)
+    )
     config.chains.add(chain_id=1, code="ETH")
     catalog = build_zipper_catalog_data(deposit_withdraw_config_from_proto(config))
     assert catalog.assets[0].chains[0].supply_status == "available"
@@ -555,8 +676,10 @@ def test_asset_info_reads_its_market_datapoints() -> None:
                 source=asset_info_pb2.COINMARKETCAP,
                 as_of=_ts(_OBSERVED),
             ),
-            max_supply_unlimited=asset_info_pb2.AssetMarketFlag(source=asset_info_pb2.POLYESTER),
-            rank=value(value="1", source=asset_info_pb2.COINMARKETCAP),
+            max_supply_unlimited=asset_info_pb2.AssetMarketFlag(
+                source=asset_info_pb2.POLYESTER, as_of=_ts(_OBSERVED)
+            ),
+            rank=value(value="1", source=asset_info_pb2.COINMARKETCAP, as_of=_ts(_OBSERVED)),
         ),
     )
     info = asset_info_from_proto(msg)
@@ -573,6 +696,26 @@ def test_asset_info_reads_its_market_datapoints() -> None:
     assert stats.max_supply_unlimited.source == "polyester"
     assert stats.rank is not None and stats.rank.value == "1"
     assert asset_info_from_proto(asset_info_pb2.AssetInfo(asset_id=3)).market_stats is None
+
+
+_VALUE = dict(value="1", source=asset_info_pb2.COINMARKETCAP, as_of=_ts(_OBSERVED))
+
+
+@pytest.mark.parametrize(
+    "stats",
+    [
+        {"rank": asset_info_pb2.AssetMarketValue(**{**_VALUE, "value": ""})},
+        {"rank": asset_info_pb2.AssetMarketValue(**{**_VALUE, "source": 0})},
+        {"total_supply": asset_info_pb2.AssetMarketValue(value="1", source=1)},
+        {"max_supply_unlimited": asset_info_pb2.AssetMarketFlag(as_of=_ts(_OBSERVED))},
+        {"max_supply_unlimited": asset_info_pb2.AssetMarketFlag(source=1)},
+    ],
+)
+def test_present_market_datapoint_without_its_provenance_is_refused(stats) -> None:
+    market_stats = asset_info_pb2.AssetMarketStats(**stats)
+    msg = asset_info_pb2.AssetInfo(asset_id=3, market_stats=market_stats)
+    with pytest.raises(PolyesterResponseContractError):
+        asset_info_from_proto(msg)
 
 
 def test_activity_event_exposes_every_published_field() -> None:

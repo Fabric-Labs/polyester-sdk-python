@@ -206,5 +206,5 @@ class StatementExportDownloadUrl(msgspec.Struct, kw_only=True):
     """
 
     url: Secret[str]
-    expires_at: datetime | None = None
-    filename: str = ""
+    expires_at: datetime
+    filename: str

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import re
-import time
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
@@ -20,7 +18,7 @@ from polyester.codecs.decode.internal_transfers import (
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
-from polyester.errors import PolyesterTimeoutError, PolyesterValidationError
+from polyester.errors import PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
     BatchCreateInternalTransfersRequest,
@@ -35,6 +33,7 @@ from polyester.models import (
 )
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._poll import poll_until_final
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.types.money import AssetAmount
 
@@ -205,22 +204,22 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         they come. After ``timeout`` seconds (``None`` waits for as long as
         the batch processes), :class:`~polyester.errors.PolyesterTimeoutError`
         is raised: the batch still completes on its own, so read it again
-        later. Cancelling the call cancels the wait.
+        later. The timeout bounds each read and wait: a read still in flight
+        at the deadline is cancelled, and none is returned after it.
+        Cancelling the call cancels the wait.
         """
         checked = _batch_request_id(request_id)
-        deadline = None if timeout is None else time.monotonic() + max(timeout, 0.0)
-        delay = _BATCH_POLL_INITIAL
-        while True:
-            batch = await self.get_batch(request_id=checked)
-            if batch.status != "processing":
-                return batch
-            if deadline is not None and time.monotonic() + delay > deadline:
-                raise PolyesterTimeoutError(
-                    f"internal transfer batch {checked} is still processing; "
-                    "it completes on its own, so read it again later"
-                )
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, _BATCH_POLL_MAX)
+        return await poll_until_final(
+            lambda: self.get_batch(request_id=checked),
+            lambda batch: batch.status != "processing",
+            timeout=timeout,
+            initial=_BATCH_POLL_INITIAL,
+            maximum=_BATCH_POLL_MAX,
+            expired=lambda _last: (
+                f"internal transfer batch {checked} is still processing; "
+                "it completes on its own, so read it again later"
+            ),
+        )
 
     def _fill_transfer(
         self,

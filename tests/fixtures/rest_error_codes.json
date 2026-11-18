@@ -1,5 +1,5 @@
 {
-  "source": "Fabric-Labs/polyester-proto develop c35662bc4ab9b444974b71703015e68801c40a01 docs/errors.json, every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
+  "source": "Fabric-Labs/polyester-proto develop c35662bc4ab9b444974b71703015e68801c40a01 docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
   "codes": [
     {"code": "ACCOUNT_ORDERS_SUSPENDED", "status": 400, "connect": "failed_precondition"},
     {"code": "ACCOUNT_REPAIRING", "status": 400, "connect": "failed_precondition"},
@@ -282,6 +282,7 @@
     {"code": "TWAP_INTERVAL_INVALID", "status": 400, "connect": "invalid_argument"},
     {"code": "UNAUTHENTICATED", "status": 401, "connect": "unauthenticated"},
     {"code": "UNAVAILABLE", "status": 503, "connect": "unavailable"},
+    {"code": "UNKNOWN_SYMBOL", "status": 400, "connect": "invalid_argument"},
     {"code": "UNKNOWN_SYMBOL", "status": 404, "connect": "not_found"},
     {"code": "UNSUPPORTED_ASSET", "status": 400, "connect": "invalid_argument"},
     {"code": "UNSUPPORTED_FIELD_SET", "status": 400, "connect": "invalid_argument"},

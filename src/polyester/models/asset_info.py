@@ -41,19 +41,21 @@ class AssetMarketValue(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``"polyester"`` (the Polyester team), "" when not named, and a source this
     SDK does not know reads as its decimal string. ``as_of`` is when the source
     last observed or set the value: older values stay until a newer
-    observation replaces them, so show it with the value."""
+    observation replaces them, so show it with the value. A datapoint the
+    server sends without its value, source or time raises
+    :class:`~polyester.errors.PolyesterResponseContractError`."""
 
-    value: str = ""
-    source: str = ""
-    as_of: datetime | None = None
+    value: str
+    source: str
+    as_of: datetime
 
 
 class AssetMarketFlag(msgspec.Struct, kw_only=True, omit_defaults=True):
     """A market fact that holds because it is present, with its ``source``
-    and ``as_of`` as on :class:`AssetMarketValue`."""
+    and ``as_of`` as on :class:`AssetMarketValue`, both always set."""
 
-    source: str = ""
-    as_of: datetime | None = None
+    source: str
+    as_of: datetime
 
 
 class AssetMarketStats(msgspec.Struct, kw_only=True, omit_defaults=True):

@@ -627,6 +627,16 @@ async def test_compression_neither_hides_a_code_nor_invents_one(
     assert calls == 1
 
 
+def test_catalog_keeps_every_code_status_and_connect_variant() -> None:
+    # One entry per (code, HTTP status, ConnectRPC code), never one per code:
+    # a code the catalogs answer two ways is tested both ways.
+    variants = [(entry["code"], entry["status"], entry["connect"]) for entry in CATALOG]
+    assert len(variants) == len(set(variants))
+    assert {("UNKNOWN_SYMBOL", 400, "invalid_argument"), ("UNKNOWN_SYMBOL", 404, "not_found")} <= (
+        set(variants)
+    )
+
+
 @pytest.mark.parametrize(
     "entry", CATALOG, ids=lambda entry: f"{entry['status']}-{entry['code']}-{entry['connect']}"
 )

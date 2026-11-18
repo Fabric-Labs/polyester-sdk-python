@@ -2,8 +2,24 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
+
+# The most digits an integer in an answer's body may have: an unsigned 128-bit
+# value has 39. A longer one names nothing this SDK reads, and converting it
+# could fail (Python refuses integer strings over 4300 digits).
+MAX_INTEGER_DIGITS = 39
+
+
+def _bounded_int(text: str) -> int | None:
+    return int(text) if len(text.lstrip("-")) <= MAX_INTEGER_DIGITS else None
+
+
+def loads_bounded(raw: bytes | str) -> Any:
+    """Parse an answer's JSON body, reading an integer longer than
+    ``MAX_INTEGER_DIGITS`` as ``None`` so the rest of the body still reads."""
+    return json.loads(raw, parse_int=_bounded_int)
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from polyester.codecs.ledger_amounts import format_ledger_u128
 from polyester.codecs.proto_helpers import optional_timestamp, proto_enum_name
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.chain.zipper.v1 import zipper_pb2
 from polyester.models.zipper import (
     DepositWithdrawConfig,
@@ -21,19 +21,35 @@ from polyester.models.zipper import (
 _KNOWN_SUPPLY_STATUSES = (zipper_pb2.AVAILABLE, zipper_pb2.STALE)
 
 
-def _supply(supply_q: int, status: int, msg, observed_field: str, scale: int) -> dict:
+def _supply(
+    supply_q: int, status: int, msg, observed_field: str, scale: int, *, operation: str
+) -> dict:
     """A route's supply, its status label and observation time: the supply
-    and time only while the status says the supply is known."""
+    and time only while the status says the supply is known. A known supply
+    comes with the time it was read; one without it breaks the contract."""
     known = status in _KNOWN_SUPPLY_STATUSES
+    observed_at = optional_timestamp(msg, observed_field) if known else None
+    if known and observed_at is None:
+        raise PolyesterResponseContractError(
+            operation,
+            f"zipped asset {int(msg.zipped_asset_id)} has a known supply without {observed_field}",
+        )
     return {
         "supply": format_ledger_u128(supply_q, scale=scale) if known else None,
         "supply_status": proto_enum_name(zipper_pb2.SupplyStatus, status),
-        "supply_observed_at": optional_timestamp(msg, observed_field) if known else None,
+        "supply_observed_at": observed_at,
     }
 
 
 def _update_supply(item: zipper_pb2.ZippedAssetSupplyUpdate, scale: int) -> dict:
-    fields = _supply(item.supply_q, int(item.status), item, "observed_at", scale)
+    fields = _supply(
+        item.supply_q,
+        int(item.status),
+        item,
+        "observed_at",
+        scale,
+        operation="ZippedAssetSupplyBatch",
+    )
     return {
         "supply": fields["supply"],
         "status": fields["supply_status"],
@@ -61,7 +77,14 @@ def _variant_from_proto(
         network_fee_ts_sec=0,
         deposit_min_amount=msg.deposit_min_amount or "",
         withdraw_min_amount=msg.withdraw_min_amount or "",
-        **_supply(msg.supply_q, int(msg.supply_status), msg, "supply_observed_at", quantity_scale),
+        **_supply(
+            msg.supply_q,
+            int(msg.supply_status),
+            msg,
+            "supply_observed_at",
+            quantity_scale,
+            operation="GetDepositWithdrawConfig",
+        ),
         source_token=_token_config(msg.source_address, msg.source_decimals),
         z_token=_token_config(msg.ztoken_address, msg.ztoken_decimals),
         deposit_status=proto_enum_name(zipper_pb2.RouteStatus, int(msg.deposit_status)),

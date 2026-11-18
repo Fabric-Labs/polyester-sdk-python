@@ -94,10 +94,14 @@ def canceled_statement_export_from_proto(
 def statement_export_download_url_from_proto(
     msg: export_pb2.GetStatementExportDownloadUrlResponse,
 ) -> StatementExportDownloadUrl:
+    operation = "GetStatementExportDownloadUrl"
+    expires_at = optional_timestamp(msg, "expires_at")
     if not msg.url:
-        raise PolyesterResponseContractError("GetStatementExportDownloadUrl", "missing url")
+        raise PolyesterResponseContractError(operation, "missing url")
+    if expires_at is None:
+        raise PolyesterResponseContractError(operation, "missing expires_at")
+    if not msg.filename:
+        raise PolyesterResponseContractError(operation, "missing filename")
     return StatementExportDownloadUrl(
-        url=Secret(msg.url),
-        expires_at=optional_timestamp(msg, "expires_at"),
-        filename=msg.filename,
+        url=Secret(msg.url), expires_at=expires_at, filename=msg.filename
     )

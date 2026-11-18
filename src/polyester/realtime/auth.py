@@ -8,7 +8,7 @@ from urllib.parse import quote
 import httpx
 
 from polyester._answer import attach_answer
-from polyester._problem import decode_http_problem
+from polyester._problem import decode_http_problem, loads_bounded
 from polyester._redact import url_for_error, url_without_userinfo
 from polyester._redirects import redirect_refusal
 from polyester.auth import ApiKeyCredentials, sign_request_async
@@ -94,7 +94,7 @@ def _auth_http_error(
     problem = None
     payload: object = None
     try:
-        payload = json.loads(body)
+        payload = loads_bounded(body)
         problem = decode_http_problem(payload, status_code)
         if isinstance(payload, dict):
             raw_code = payload.get("code")
@@ -103,7 +103,8 @@ def _auth_http_error(
                 code = raw_code.strip()
             if isinstance(raw_message, str) and raw_message.strip():
                 server_message = raw_message.strip()
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except ValueError:
+        # Not JSON, not UTF-8 or unreadable: the refusal reads by its status.
         pass
     if code == TIMESTAMP_SKEW:
         skew_error = PolyesterTimestampSkewError(

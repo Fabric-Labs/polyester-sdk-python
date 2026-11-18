@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import re
-import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 
@@ -22,7 +20,6 @@ from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, id_to_int
 from polyester.errors import (
     PolyesterResponseContractError,
-    PolyesterTimeoutError,
     PolyesterValidationError,
 )
 from polyester.gen.ledger.read.v1 import statement_export_pb2 as export_pb2
@@ -34,6 +31,7 @@ from polyester.models.statements import (
 )
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
+from polyester.services._poll import poll_until_final
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services.changelog import _timestamp
 
@@ -212,21 +210,22 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         Reads start 1 s apart and back off to 15 s. Errors are raised as they
         come. After ``timeout`` seconds (``None`` waits for as long as the
         export runs), :class:`~polyester.errors.PolyesterTimeoutError` is
-        raised; the export keeps running. Cancelling the call cancels the
+        raised; the export keeps running. The timeout bounds each read and
+        wait: a read still in flight at the deadline is cancelled, and none
+        is returned after it. Cancelling the call cancels the
         wait, not the export: use :meth:`cancel_export` for that.
         """
-        deadline = None if timeout is None else time.monotonic() + max(timeout, 0.0)
-        delay = _EXPORT_POLL_INITIAL
-        while True:
-            export = await self.get_export(export_id=export_id)
-            if export.status in EXPORT_FINAL_STATUSES:
-                return export
-            if deadline is not None and time.monotonic() + delay > deadline:
-                raise PolyesterTimeoutError(
-                    f"statement export {export_id} is still {export.status or 'in progress'}"
-                )
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, _EXPORT_POLL_MAX)
+        return await poll_until_final(
+            lambda: self.get_export(export_id=export_id),
+            lambda export: export.status in EXPORT_FINAL_STATUSES,
+            timeout=timeout,
+            initial=_EXPORT_POLL_INITIAL,
+            maximum=_EXPORT_POLL_MAX,
+            expired=lambda last: (
+                f"statement export {export_id} is still "
+                f"{(last.status if last else '') or 'in progress'}"
+            ),
+        )
 
     async def list_exports(
         self,

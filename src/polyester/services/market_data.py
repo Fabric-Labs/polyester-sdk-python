@@ -7,6 +7,7 @@ from typing import Any
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
+from polyester.codecs.contract_limits import contract_uint32_items_range
 from polyester.codecs.decode.asset_info import asset_info_list_from_proto
 from polyester.codecs.decode.market_data import (
     candles_columns_from_proto,
@@ -32,6 +33,12 @@ from polyester.services._generated import unary_public, unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
+
+# Each asset ID ``list_asset_info`` takes, from the contract's rule on
+# ``ListAssetInfoRequest.asset_ids`` (1 to 2147483647).
+ASSET_ID_MIN, ASSET_ID_MAX = contract_uint32_items_range(
+    asset_info_pb2.ListAssetInfoRequest, "asset_ids"
+)
 
 TIMEFRAME_ALIASES: dict[str, str] = {
     "1s": "SEC_1",
@@ -94,17 +101,24 @@ class AsyncMarketDataService(BaseService):
 
         ``asset_ids`` (the ``ledger_id`` of the spot and deposit/withdraw
         configs) keeps those assets; ``None`` or empty returns every saved
-        entry. The server accepts at most 1000 positive IDs and ignores
-        duplicate and unknown ones. Assets never edited are omitted. The
-        result is complete: there is no paging. Public, never signed.
+        entry. The server accepts at most 1000 IDs and ignores duplicate and
+        unknown ones. Each ID is 1 to 2147483647, as the contract allows; any
+        other is refused with ``PolyesterValidationError`` before sending.
+        Assets never edited are omitted. The result is complete: there is no
+        paging. Public, never signed.
         """
         if isinstance(asset_ids, (str, bytes)):
             raise PolyesterValidationError("asset_ids must be a sequence of integers")
         ids: list[int] = []
         for value in asset_ids or ():
-            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < 2**32:
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not ASSET_ID_MIN <= value <= ASSET_ID_MAX
+            ):
                 raise PolyesterValidationError(
-                    f"asset_ids: {value!r} is not an integer between 0 and 2**32 - 1"
+                    f"asset_ids: {value!r} is not an integer between "
+                    f"{ASSET_ID_MIN} and {ASSET_ID_MAX}"
                 )
             ids.append(value)
         return await unary_public_decoded(

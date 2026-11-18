@@ -25,6 +25,7 @@ from polyester.codecs.decode.orders import OrderScales
 from polyester.codecs.decode.private_orders import (
     private_orders_from_proto,
     private_orders_unit_from_proto,
+    stale_order_ids_from_proto,
 )
 from polyester.codecs.scalars import format_id, parse_account_id
 from polyester.errors import (
@@ -124,6 +125,8 @@ class _Subscription:
     # The last connection state consumers were told about.
     state: Literal["pending", "connected", "disconnected"] = "pending"
     stale: bool = False
+    # The orders the last stale report named; empty when it covered the whole view.
+    stale_order_ids: tuple[str, ...] = ()
     # The current server subscription reported Ready; reset on every new server subscription.
     ready: bool = False
     # Subscribe attempts since the subscription last delivered data; drives retry backoff.
@@ -256,7 +259,9 @@ class PrivateOrderStream:
         if s.ready:
             self._deliver_to(s, consumer, PrivateOrdersReady())
         if s.stale:
-            self._deliver_to(s, consumer, PrivateOrdersStale(stale=True))
+            self._deliver_to(
+                s, consumer, PrivateOrdersStale(stale=True, order_ids=list(s.stale_order_ids))
+            )
 
     def _deliver(self, s: _Subscription, event: PrivateOrdersEvent) -> None:
         for consumer in list(s.consumers):
@@ -729,9 +734,14 @@ class PrivateOrderStream:
             if not s.ready:
                 s.ready = True
                 self._deliver(s, PrivateOrdersReady())
-        elif kind in ("unavailable", "available"):
-            s.stale = kind == "unavailable"
-            self._deliver(s, PrivateOrdersStale(stale=s.stale))
+        elif kind == "unavailable":
+            s.stale = True
+            s.stale_order_ids = tuple(stale_order_ids_from_proto(msg.unavailable))
+            self._deliver(s, PrivateOrdersStale(stale=True, order_ids=list(s.stale_order_ids)))
+        elif kind == "available":
+            s.stale = False
+            s.stale_order_ids = ()
+            self._deliver(s, PrivateOrdersStale(stale=False))
         elif kind == "subscribe_expiring":
             self._spawn(self._refresh(ws, s))
         elif kind == "unsubscribed":
@@ -762,6 +772,7 @@ class PrivateOrderStream:
         # A new subscription reports Unavailable itself if its view is still behind.
         if s.stale:
             s.stale = False
+            s.stale_order_ids = ()
             self._deliver(s, PrivateOrdersStale(stale=False))
 
     def _on_snapshot_end(self, ws: ClientConnection, s: _Subscription, end: pb.SnapshotEnd) -> None:

@@ -31,6 +31,12 @@ def private_orders_from_proto(
     return [scaled_order_from_proto(item, scales) for item in orders]
 
 
+def stale_order_ids_from_proto(msg: private_ws_pb2.Unavailable) -> list[str]:
+    """Public IDs of the orders an ``ORDER_UNAVAILABLE`` report names, in the
+    server's (ascending) order; empty for every other reason."""
+    return [format_uint64_id(order_id) for order_id in msg.order_ids]
+
+
 def _fill_from_proto(
     msg: private_ws_pb2.Fill, *, quantity_scale: int | None = None
 ) -> PrivateOrderFill:

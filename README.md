@@ -1690,8 +1690,9 @@ SDK notes:
   `client.lifecycle.get_account_flow(flow_id=...)`; the flow may become readable
   after the receipt.
 - **Several Trading → Trading transfers at once:**
-  `client.internal_transfers.batch_create(legs=[...], idempotency_key=...)` sends up
-  to 10 legs under one idempotency key and one MFA check (see below).
+  `client.internal_transfers.batch_create(legs=[...], idempotency_key=...)` moves
+  legs together under one idempotency key and one MFA check: every leg is credited,
+  or none moves (see below).
 - **Dust:** `client.dust_conversions` converts Trading balances too small to trade into one
   target asset (see below).
 - **Balance history:** `client.balances.get_balance_history(range="7d")` returns one
@@ -1700,33 +1701,52 @@ SDK notes:
 
 ### Batch internal transfers
 
-`internal_transfers.batch_create` takes up to 10 `InternalTransferLeg`s, each
-with the arguments of `create` except the idempotency key: `asset_id`, an exact
+`internal_transfers.batch_create` moves Trading to Trading transfers together:
+every leg is credited, or none moves. It takes `InternalTransferLeg`s, each with
+the arguments of `create` except the idempotency key: `asset_id`, an exact
 `quantity` (a decimal string, `Decimal` or `AssetAmount`; never a float), one
 destination, and the source account by `account` or `sub_account_id` (legs may
-debit different accounts). Every leg is checked before any runs: if one fails,
-the batch is `"refused"` and nothing moves. Otherwise the batch is
-`"submitted"` and legs run in order, independently and not atomically, so read
-each leg's `status`: `"accepted"`, `"pending"` (outcome not known yet),
-`"refused"` (with `error_code` such as `"insufficient_funds"`) or
-`"not_submitted"`. Retry with the same key and the same legs to read pending
-legs and run the ones not yet accepted; accepted legs answer the same transfers.
-Each leg's `destination` is the destination the server resolved for it.
+debit different accounts). The server takes up to 500 legs from at most 10 source
+accounts. The result's `status` is `"accepted"` (every leg `"credited"`),
+`"processing"` (the outcome is not known yet; follow it with
+`internal_transfers.wait_batch(request_id=...)`) or `"refused"` (every leg
+`"not_moved"`, the ones that caused it with an `error_code` such as
+`"insufficient_funds"`). A refused batch is final for its idempotency key: try
+again under a new key.
+
+A batch that fails with a server error (HTTP 5xx) may or may not have been
+admitted: the error's outcome is unknown (`mutation_outcome_unknown(err)` is
+true) and it is not retried for you, whatever its status, `retry_after` or code.
+The contract's safe path is to send the batch again with the same
+`idempotency_key` and the same legs, which is safe whether or not it was
+admitted: the server returns the batch's state, or admits it once. Different legs
+under the same key are refused with `ERROR_CODE_IDEMPOTENCY_CONFLICT`.
 
 ```python
+import asyncio
+
+from polyester.errors import PolyesterError, mutation_outcome_unknown
 from polyester.models import InternalTransferLeg
 
-batch = await client.internal_transfers.batch_create(
-    idempotency_key="rebalance-2026-11-13-1",
-    legs=[
-        InternalTransferLeg(asset_id=1, quantity="0.5", destination_smart_account_address="0x…"),
-        InternalTransferLeg(
-            asset_id=3, quantity="0.001", destination_account_id="AAo8yKqygTg", account="main"
-        ),
-    ],
-)
-for leg in batch.legs:
-    print(leg.leg_index, leg.status, leg.transfer_id, leg.error_code)
+legs = [
+    InternalTransferLeg(asset_id=1, quantity="0.5", destination_smart_account_address="0x…"),
+    InternalTransferLeg(
+        asset_id=3, quantity="0.001", destination_account_id="AAo8yKqygTg", account="main"
+    ),
+]
+key = "rebalance-2026-11-19-1"
+for attempt in range(5):
+    try:
+        batch = await client.internal_transfers.batch_create(legs=legs, idempotency_key=key)
+        break
+    except PolyesterError as err:
+        if not mutation_outcome_unknown(err) or attempt == 4:
+            raise  # a refusal (nothing moved), or out of attempts
+        # Same key, same legs: safe whether or not the batch was admitted.
+        await asyncio.sleep(err.retry_after or 2**attempt)
+if batch.status == "processing":
+    batch = await client.internal_transfers.wait_batch(request_id=batch.request_id)
+print(batch.status, [(leg.leg_index, leg.status, leg.transfer_id) for leg in batch.legs])
 ```
 
 ### Dust conversion

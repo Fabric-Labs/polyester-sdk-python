@@ -16,15 +16,9 @@ from polyester.codecs.decode.internal_transfers import (
     internal_transfer_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.proto_helpers import error_code_name
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
-from polyester.errors import (
-    PolyesterError,
-    PolyesterServerError,
-    PolyesterValidationError,
-)
-from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
+from polyester.errors import PolyesterError, PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
     BatchCreateInternalTransfersRequest,
@@ -57,52 +51,6 @@ BATCH_REQUEST_ID_MIN_LEN, BATCH_REQUEST_ID_MAX_LEN = contract_string_length(
 _BATCH_REQUEST_ID_PATTERN = re.compile(
     contract_string_pattern(GetInternalTransferBatchRequest, "request_id")
 )
-# Codes a batch answers, with unavailable (HTTP 503), when a service its
-# checks depend on is briefly unavailable; nothing was recorded.
-_BATCH_PRE_ADMISSION_CODES = frozenset({"SERVICE_UNAVAILABLE", "ACCOUNT_SHARD_UNAVAILABLE"})
-
-
-def _is_pre_admission_refusal(err: PolyesterError) -> bool:
-    """Whether a batch failure is a documented pre-admission refusal: a
-    :class:`PolyesterServerError` from an actual HTTP 503 that is either a
-    ConnectRPC error whose body names ``unavailable`` itself and carries
-    exactly one detail, a ``transfer.v1.ErrorDetail`` with one of its codes,
-    or the contract's REST problem for one, served under one
-    ``application/problem+json`` field and declaring that code's ``type``.
-    A body naming a member twice, a code read from the status, another or an
-    extra detail entry (one that cannot be decoded included), a 502 or 504,
-    another media type, generic JSON or a code only in a diagnostic field
-    is not."""
-    if not isinstance(err, PolyesterServerError):
-        return False
-    if err.status_code != 503 or err._evidence_ambiguous:
-        return False
-    details = err._connect_details
-    if details:
-        # The typed proof: the body itself names unavailable (never read from
-        # the status), and its one detail is a transfer refusal of an
-        # admission code. Any other or extra detail proves nothing.
-        # Exactly one entry as sent, not one that survived decoding.
-        if (
-            err._wire_connect_code != "unavailable"
-            or err._raw_detail_count != 1
-            or len(details) != 1
-        ):
-            return False
-        detail = details[0]
-        detail_type = getattr(getattr(detail, "DESCRIPTOR", None), "full_name", None)
-        if detail_type != "transfer.v1.ErrorDetail":
-            return False
-        code = int(getattr(detail, "code", 0))
-        name = error_code_name(transfer_pb2.ErrorCode, code).removeprefix("ERROR_CODE_")
-        return name in _BATCH_PRE_ADMISSION_CODES
-    problem = err.problem
-    return (
-        problem is not None
-        and problem.media_type == "application/problem+json"
-        and problem.code in _BATCH_PRE_ADMISSION_CODES
-        and problem.declared_type == problem.type
-    )
 _BATCH_POLL_INITIAL = 0.25
 _BATCH_POLL_MAX = 2.0
 
@@ -184,14 +132,14 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         the whole batch. A retry with the same key and the same legs in the
         same order returns the batch's current state; different legs under the
         key are refused with ``ERROR_CODE_IDEMPOTENCY_CONFLICT``. A refused
-        batch is final for its key: submit a new batch under a new key. When a
-        service the checks depend on is briefly unavailable, the request
-        raises a retryable :class:`~polyester.errors.PolyesterServerError`
-        (``ERROR_CODE_SERVICE_UNAVAILABLE`` or
-        ``ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE``, HTTP 503) and records
-        nothing: send the same key and legs again after its ``retry_after``. A
-        ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the batch
-        outweighs the account's burst: split it instead of retrying.
+        batch is final for its key: submit a new batch under a new key. A
+        server failure (HTTP 5xx) raises an error whose outcome is unknown
+        (:func:`~polyester.errors.mutation_outcome_unknown`), with its status,
+        ``retry_after`` and code: the batch may or may not have been admitted.
+        Send it again with the same ``idempotency_key`` and the same legs,
+        which is safe either way: it returns the batch's state, or admits it
+        once. A ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the
+        batch outweighs the account's burst: split it instead of retrying.
         """
         if not isinstance(idempotency_key, str) or not (
             BATCH_IDEMPOTENCY_KEY_MIN_LEN <= len(idempotency_key) <= BATCH_IDEMPOTENCY_KEY_MAX_LEN
@@ -231,14 +179,13 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
                 lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
             )
         except PolyesterError as exc:
-            # Only the refusals the contract documents as the batch's checks
-            # being briefly undecidable are safe to send again under the same
-            # key: nothing was recorded. Any other 5xx of the batch may have
-            # moved funds, whatever error it maps to (a rate limit or a
-            # retryable refusal included). A 4xx keeps its own meaning: a
-            # genuine 429 throttle stays retryable.
+            # A server failure of a batch may or may not have been admitted, and
+            # no answer proves which. Whatever error it maps to, it is an unknown
+            # outcome: send the batch again with the same idempotency key and
+            # legs, which the contract makes safe either way. A 4xx keeps its
+            # own meaning: a genuine 429 throttle stays retryable.
             if exc.status_code is not None and exc.status_code >= 500:
-                exc._outcome_known = _is_pre_admission_refusal(exc)
+                exc._outcome_known = False
             raise
 
     async def get_batch(self, *, request_id: str) -> InternalTransferBatchResult:

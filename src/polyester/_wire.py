@@ -358,12 +358,6 @@ def map_connect_error(exc: ConnectError):
         if http_status is not None:
             mapped._admission_status = mapped.status_code
             mapped.status_code = http_status
-    if isinstance(mapped, PolyesterError):
-        mapped._evidence_ambiguous = bool(getattr(exc, "ambiguous_body", False))
-    if isinstance(mapped, PolyesterError) and not isinstance(exc, GatewayProblemError):
-        mapped._wire_connect_code = getattr(exc, "wire_code", "")
-        mapped._connect_details = tuple(_unpack_error_detail(d) for d in exc.details)
-        mapped._raw_detail_count = getattr(exc, "raw_detail_count", None)
     if isinstance(exc, GatewayProblemError):
         mapped.problem = exc.problem
     # The mapped error holds what it decoded from the answer too, such as a

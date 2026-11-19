@@ -173,21 +173,11 @@ class PolyesterError(Exception):
     problem: HTTPProblem | None = None
     retry_after: float | None = None
     status_code: int | None = None
-    # Set where a call's contract decides the outcome itself: True for a
-    # refusal documented as made before anything was recorded (its outcome is
-    # known), False for any other failure of such a call (unknown), None to
-    # apply the general rules.
+    # Set where a call decides the outcome itself: False for a failure whose
+    # outcome is unknown whatever it maps to (a batch transfer's server
+    # failure), None to apply the general rules.
     _outcome_known: bool | None = None
-    # What a ConnectRPC answer named itself: the code its body stated ("" when
-    # read from the HTTP status) and every error detail it carried, decoded
-    # (``None`` for one this SDK cannot read). ``None`` when no ConnectRPC
-    # error stood behind this one.
-    _wire_connect_code: str | None = None
-    _connect_details: tuple[object | None, ...] | None = None
-    # Whether the answer's body named a member twice, and how many detail
-    # entries it held as sent, decodable or not.
-    _evidence_ambiguous: bool = False
-    _raw_detail_count: int | None = None
+
     # The status the error mapping read a code as, kept for classification
     # only; ``status_code`` reports the answer's own.
     _admission_status: int | None = None

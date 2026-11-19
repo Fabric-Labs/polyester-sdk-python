@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
-from dataclasses import dataclass, field
-from email import policy as email_policy
-from email.message import EmailMessage
+from dataclasses import dataclass
 from typing import Any
 
 # The most digits an integer in an answer's body may have: an unsigned 128-bit
@@ -17,35 +14,6 @@ MAX_INTEGER_DIGITS = 39
 
 def _bounded_int(text: str) -> int | None:
     return int(text) if len(text.lstrip("-")) <= MAX_INTEGER_DIGITS else None
-
-
-class _DuplicateMember(ValueError):
-    pass
-
-
-def _reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    seen: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in seen:
-            raise _DuplicateMember(key)
-        seen[key] = value
-    return seen
-
-
-def body_evidence(raw: bytes | str) -> tuple[bool, int | None]:
-    """How an answer's JSON error body reads when every member counts:
-    whether it is ambiguous (it does not parse, or an object names one member
-    twice, which a plain parse would collapse to its last value), and how
-    many entries its top-level ``details`` array holds as sent, readable or
-    not (``None`` when it has no such array, or is ambiguous)."""
-    try:
-        data = json.loads(raw, parse_int=_bounded_int, object_pairs_hook=_reject_duplicates)
-    except (ValueError, UnicodeDecodeError, RecursionError):
-        return True, None
-    if not isinstance(data, dict):
-        return False, None
-    details = data.get("details")
-    return False, (len(details) if isinstance(details, list) else None)
 
 
 def loads_bounded(raw: bytes | str) -> Any:
@@ -62,34 +30,6 @@ class HTTPProblem:
     status: int
     detail: str
     type: str
-    # The ``type`` URI the body itself declared, "" when it named none: a
-    # contract problem declares its code's canonical ``type``.
-    declared_type: str = field(default="", compare=False)
-    # The answer's media type, lowercased without parameters (such as
-    # ``application/problem+json``); "" when the answer named none.
-    media_type: str = field(default="", compare=False)
-
-
-def media_type_of(values: Sequence[str]) -> str:
-    """The media type of an answer's ``Content-Type`` fields, lowercased and
-    without parameters, read by the standard library's header parser.
-
-    "" unless there is exactly one field and it parses cleanly: two fields,
-    an unquoted comma listing another media type, or any other defect name
-    no single media type. Quoted parameters, a comma inside them included,
-    are valid.
-    """
-    if len(values) != 1:
-        return ""
-    message = EmailMessage(policy=email_policy.default)
-    try:
-        message["Content-Type"] = values[0]
-        header = message["Content-Type"]
-    except (ValueError, TypeError):
-        return ""
-    if header is None or header.defects:
-        return ""
-    return str(header.content_type)
 
 
 def decode_http_problem(data: Any, status: int) -> HTTPProblem | None:
@@ -97,11 +37,9 @@ def decode_http_problem(data: Any, status: int) -> HTTPProblem | None:
         return None
     code = data["code"]
     detail = data.get("detail", data.get("message", ""))
-    declared = data.get("type")
     return HTTPProblem(
         code=code,
         status=status,
         detail=detail if isinstance(detail, str) else "",
         type="https://polyester.dev/problems/" + code.lower().replace("_", "-"),
-        declared_type=declared if isinstance(declared, str) else "",
     )

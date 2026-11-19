@@ -68,6 +68,15 @@ class QuickSwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     INTERMEDIATE_BELOW_MINIMUM: _ClassVar[QuickSwapReason]
     MARKET_CLOSED: _ClassVar[QuickSwapReason]
     SOURCE_WALLET_SCREENING_FAILED: _ClassVar[QuickSwapReason]
+    INSUFFICIENT_LIQUIDITY: _ClassVar[QuickSwapReason]
+    ORDER_REJECTED: _ClassVar[QuickSwapReason]
+
+class DepositReturnState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RETURN_UNSPECIFIED: _ClassVar[DepositReturnState]
+    RETURN_PENDING: _ClassVar[DepositReturnState]
+    RETURN_COMPLETED: _ClassVar[DepositReturnState]
+    RETURN_HELD: _ClassVar[DepositReturnState]
 
 class WithdrawalRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -204,6 +213,12 @@ DEPOSIT_ADDRESS_NOT_ISSUED: QuickSwapReason
 INTERMEDIATE_BELOW_MINIMUM: QuickSwapReason
 MARKET_CLOSED: QuickSwapReason
 SOURCE_WALLET_SCREENING_FAILED: QuickSwapReason
+INSUFFICIENT_LIQUIDITY: QuickSwapReason
+ORDER_REJECTED: QuickSwapReason
+RETURN_UNSPECIFIED: DepositReturnState
+RETURN_PENDING: DepositReturnState
+RETURN_COMPLETED: DepositReturnState
+RETURN_HELD: DepositReturnState
 ROLE_UNSPECIFIED: WithdrawalRole
 DESTINATION: WithdrawalRole
 REFUND: WithdrawalRole
@@ -417,7 +432,7 @@ class DepositInstructions(_message.Message):
     def __init__(self, address: _Optional[str] = ..., memo: _Optional[str] = ..., zipped_asset_id: _Optional[int] = ..., issued_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., funding_expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., address_retires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., address_state: _Optional[_Union[DepositAddressState, str]] = ..., min_native_gas_limit: _Optional[int] = ...) -> None: ...
 
 class Deposit(_message.Message):
-    __slots__ = ("index", "tx_hash", "tx_occurrence_index", "zipped_asset_id", "amount", "disposition", "reason", "confirmations", "required_confirmations", "detected_at", "credited_at", "flow_id")
+    __slots__ = ("index", "tx_hash", "tx_occurrence_index", "zipped_asset_id", "amount", "disposition", "reason", "confirmations", "required_confirmations", "detected_at", "credited_at", "flow_id", "direct_return")
     INDEX_FIELD_NUMBER: _ClassVar[int]
     TX_HASH_FIELD_NUMBER: _ClassVar[int]
     TX_OCCURRENCE_INDEX_FIELD_NUMBER: _ClassVar[int]
@@ -430,6 +445,7 @@ class Deposit(_message.Message):
     DETECTED_AT_FIELD_NUMBER: _ClassVar[int]
     CREDITED_AT_FIELD_NUMBER: _ClassVar[int]
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
+    DIRECT_RETURN_FIELD_NUMBER: _ClassVar[int]
     index: int
     tx_hash: str
     tx_occurrence_index: int
@@ -442,7 +458,18 @@ class Deposit(_message.Message):
     detected_at: _timestamp_pb2.Timestamp
     credited_at: _timestamp_pb2.Timestamp
     flow_id: str
-    def __init__(self, index: _Optional[int] = ..., tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., disposition: _Optional[_Union[DepositDisposition, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., credited_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow_id: _Optional[str] = ...) -> None: ...
+    direct_return: DepositReturn
+    def __init__(self, index: _Optional[int] = ..., tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., disposition: _Optional[_Union[DepositDisposition, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., credited_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow_id: _Optional[str] = ..., direct_return: _Optional[_Union[DepositReturn, _Mapping]] = ...) -> None: ...
+
+class DepositReturn(_message.Message):
+    __slots__ = ("state", "tx_hash", "updated_at")
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    TX_HASH_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    state: DepositReturnState
+    tx_hash: str
+    updated_at: _timestamp_pb2.Timestamp
+    def __init__(self, state: _Optional[_Union[DepositReturnState, str]] = ..., tx_hash: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ExecutionProgress(_message.Message):
     __slots__ = ("input_amount", "executed_input", "output_amount", "intermediate_remainder", "completed_slices", "total_slices", "started_at", "deadline", "finished_at", "slices", "slices_truncated", "slices_unavailable_reason")

@@ -9,6 +9,7 @@ import websockets
 from polyester import AsyncPolyester
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1 import heatmap_pb2 as heatmap
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services.heatmap import AsyncHeatmapService
 from tests.hardening_support import (
@@ -169,7 +170,7 @@ async def test_get_requests_the_smallest_supported_depth_covering_the_request(de
         assert result.raw["depth"] == want
 
     requests = await _with_client(run)
-    assert [heatmap.HeatmapDepth.Name(r.depth) for r in requests] == [want]
+    assert [depth_tier_pb2.DepthTier.Name(r.depth) for r in requests] == [want]
 
 
 @pytest.mark.parametrize("depth", [-1, 1001, 5000, True, 1.5])

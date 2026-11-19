@@ -9,11 +9,22 @@ from polyester.models.secret import Secret, as_secret
 
 
 class MeResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Who the caller is (``auth.me``).
+
+    For an API key, ``api_key_scope`` is ``"root"`` for a key of the main
+    account and ``"subaccount"`` for a key bound to one sub-account, whose
+    public ID is then ``subaccount_id``; a sub-account key's private realtime
+    channels and account reads name that sub-account. Both are "" for a
+    session.
+    """
+
     account_id: str = ""
     api_key_id: str = ""
     username: str = ""
     root_smart_account_address: str = ""
     session: dict[str, Any] | None = None
+    api_key_scope: str = ""
+    subaccount_id: str = ""
 
 
 class UserProfile(msgspec.Struct, kw_only=True, omit_defaults=True):

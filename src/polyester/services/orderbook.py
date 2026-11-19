@@ -9,10 +9,12 @@ from collections.abc import Callable
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.orderbook import (
+    depth_tier_value,
     orderbook_snapshot_depth,
-    orderbook_snapshot_wire_depth,
+    orderbook_snapshot_tier,
     orderbook_stream_tier,
     require_published_stream_depth,
+    require_served_tier,
 )
 from polyester.codecs.realtime_decode import decode_orderbook_delta_bytes
 from polyester.errors import PolyesterValidationError
@@ -66,22 +68,23 @@ class AsyncOrderbookService(BaseService):
     async def get(self, *, symbol: str, depth: int = 50) -> OrderbookData:
         """Snapshot of ``symbol`` with up to ``depth`` levels per side.
 
-        ``depth`` is any level count from 1 to the ``max_depth`` every snapshot reports
-        (5,000 by default), sent as given; 0 selects the default of 50, and the result's
-        ``depth`` reads 50. A depth above ``max_depth`` is refused by the server with
-        ``invalid_argument`` (:class:`PolyesterApiError`), never truncated. A
-        negative depth, one above the uint32 range, or a value that is not an integer, is
-        refused before any request.
+        ``depth`` is a tier's level count: 1, 5, 10, 20, 50, 100, 200, 500,
+        1000 or 5000 (``ORDERBOOK_SNAPSHOT_DEPTHS``), sent as that
+        ``DepthTier``; 0 selects the default of 50. Any other count, a negative
+        one, or a value that is not an integer, is refused before any request.
+        The result's ``depth`` is the tier the server served; an answer that
+        names none, or another tier, raises
+        :class:`~polyester.errors.PolyesterResponseContractError`.
         """
-        wire_depth = orderbook_snapshot_wire_depth(depth)
-        depth = orderbook_snapshot_depth(wire_depth)
+        tier = orderbook_snapshot_tier(depth)
+        depth = orderbook_snapshot_depth(depth)
         # Levels are decoded with the pair's catalog quantity scale.
         await self._ensure_catalogs()
         request = GetOrderBookRequest(
             symbol_id=resolve_symbol_id(
                 self._catalogs, symbol=symbol, symbol_id=None, label="orderbook.get"
             ),
-            depth=wire_depth,
+            depth=tier,
         )
         return await unary_public_decoded(
             self._transport,
@@ -235,13 +238,20 @@ class AsyncOrderbookService(BaseService):
         async def fetch_snapshot():
             # At the tier, not the requested depth: deltas diff the tier's whole view, and a
             # level promoted into a trimmed view must already be known.
-            request = GetOrderBookRequest(symbol_id=resolved_symbol_id, depth=stream_depth)
+            request = GetOrderBookRequest(
+                symbol_id=resolved_symbol_id, depth=depth_tier_value(stream_depth)
+            )
+            def checked(msg):
+                # The snapshot must be of the tier the deltas diff.
+                require_served_tier("GetOrderBook", int(msg.depth), stream_depth)
+                return msg
+
             return await unary_public_decoded(
                 self._transport,
                 OrderbookServiceClient,
                 lambda client, req: client.get_order_book(req),
                 request,
-                lambda msg: msg,
+                checked,
             )
 
         def apply_snapshot(snapshot, buffered_deltas: list[OrderBookDeltaUpdate]) -> None:

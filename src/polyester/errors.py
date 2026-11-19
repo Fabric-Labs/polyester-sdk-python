@@ -173,6 +173,11 @@ class PolyesterError(Exception):
     problem: HTTPProblem | None = None
     retry_after: float | None = None
     status_code: int | None = None
+    # Set where a call decides the outcome itself: False for a failure whose
+    # outcome is unknown whatever it maps to (a batch transfer's server
+    # failure), None to apply the general rules.
+    _outcome_known: bool | None = None
+
     # The status the error mapping read a code as, kept for classification
     # only; ``status_code`` reports the answer's own.
     _admission_status: int | None = None
@@ -472,6 +477,11 @@ class PolyesterApiError(PolyesterError):
     (``order.baseQty``). Branch on ``code``, then on each ``rule_id``.
     """
 
+    # The size limit in bytes a ConnectRPC request refused with
+    # ``REQUEST_TOO_LARGE`` was over, from its ``RequestErrorDetail``; ``None``
+    # for every other error and for a REST refusal, which names no limit.
+    limit_bytes: int | None = None
+
     def __init__(
         self,
         message: str,
@@ -680,8 +690,11 @@ def is_route_suspended(err: BaseException) -> bool:
 
 
 def is_request_too_large(err: BaseException) -> bool:
-    """True when a request body over the endpoint's size limit was refused
-    (``REQUEST_TOO_LARGE``, HTTP 413). Nothing changed; reduce the body."""
+    """True when a request over the endpoint's size limit was refused
+    (``REQUEST_TOO_LARGE``: REST HTTP 413, or a ConnectRPC
+    ``resource_exhausted`` carrying a ``RequestErrorDetail``, whose limit is
+    ``err.limit_bytes``). Nothing changed and it is never retried: reduce the
+    request."""
     return isinstance(err, PolyesterApiError) and err.code == REQUEST_TOO_LARGE
 
 
@@ -884,6 +897,9 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
     confirmed in time (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or
     trigger back before retrying.
     """
+    known = getattr(err, "_outcome_known", None)
+    if known is not None:
+        return not known
     return (
         isinstance(
             err,

@@ -1,5 +1,5 @@
 # Every field of the request and reply messages public contracts 1945423c,
-# 5c2119f and c35662b added or changed, and of the messages nested in their new replies. A guard
+# 5c2119f, c35662b and 6c18dd0 added or changed, and of the messages nested in their new replies. A guard
 # test walks these messages and fails when a field is missing here or listed
 # but gone, or when a covered name is not an attribute of the named model, so
 # no field of them is dropped by accident.
@@ -113,14 +113,14 @@ marketdata.v1.AssetMarketStats.total_supply	covered	AssetMarketStats.total_suppl
 marketdata.v1.AssetMarketValue.as_of	covered	AssetMarketValue.as_of
 marketdata.v1.AssetMarketValue.source	covered	AssetMarketValue.source
 marketdata.v1.AssetMarketValue.value	covered	AssetMarketValue.value
-orderbook.v1.GetOrderBookRequest.depth	covered	orderbook.get depth (sent as given; 0 is the default 50)
+orderbook.v1.GetOrderBookRequest.depth	covered	orderbook.get depth (a tier's level count, sent as that DepthTier; 0 is the default 50)
 orderbook.v1.GetOrderBookRequest.symbol_id	covered	orderbook.get symbol (resolved to its ID from the spot catalog)
 orderbook.v1.GetOrderBookResponse.asks	covered	OrderbookData.asks
 orderbook.v1.GetOrderBookResponse.available	covered	OrderbookData.available
 orderbook.v1.GetOrderBookResponse.bids	covered	OrderbookData.bids
 orderbook.v1.GetOrderBookResponse.book_epoch	covered	OrderbookData.book_epoch
 orderbook.v1.GetOrderBookResponse.book_seq	covered	OrderbookData.book_seq
-orderbook.v1.GetOrderBookResponse.max_depth	covered	OrderbookData.max_depth
+orderbook.v1.GetOrderBookResponse.depth	covered	OrderbookData.depth (the tier served)
 orderbook.v1.GetOrderBookResponse.symbol_id	covered	OrderbookData.symbol (the symbol the caller passed)
 orderbook.v1.GetOrderBookResponse.ts	omitted	a best-effort snapshot time this contract did not change; order snapshots by (book_epoch, book_seq)
 orders.v1.ErrorDetail.cause_code	covered	PolyesterApiError.cause_code, PolyesterRateLimitError.cause_code

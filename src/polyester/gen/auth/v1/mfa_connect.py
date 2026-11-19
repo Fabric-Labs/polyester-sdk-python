@@ -63,12 +63,6 @@ class MFAService(Protocol):
     async def release_fresh_step_up(self, request: auth_dot_v1_dot_mfa__pb2.ReleaseFreshStepUpRequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.ReleaseFreshStepUpResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def get_recent_m_f_a(self, request: auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-
-    async def end_recent_m_f_a(self, request: auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-
 
 class MFAServiceASGIApplication(ConnectASGIApplication[MFAService]):
     def __init__(self, service: MFAService | AsyncGenerator[MFAService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -224,26 +218,6 @@ class MFAServiceASGIApplication(ConnectASGIApplication[MFAService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.release_fresh_step_up,
-                ),
-                "/auth.v1.MFAService/GetRecentMFA": Endpoint.unary(
-                    method=MethodInfo(
-                        name="GetRecentMFA",
-                        service_name="auth.v1.MFAService",
-                        input=auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest,
-                        output=auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse,
-                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
-                    ),
-                    function=svc.get_recent_m_f_a,
-                ),
-                "/auth.v1.MFAService/EndRecentMFA": Endpoint.unary(
-                    method=MethodInfo(
-                        name="EndRecentMFA",
-                        service_name="auth.v1.MFAService",
-                        input=auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest,
-                        output=auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse,
-                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
-                    ),
-                    function=svc.end_recent_m_f_a,
                 ),
             },
             interceptors=interceptors,
@@ -559,48 +533,6 @@ class MFAServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
-    async def get_recent_m_f_a(
-        self,
-        request: auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-        use_get: bool = False,
-    ) -> auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse:
-        return await self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="GetRecentMFA",
-                service_name="auth.v1.MFAService",
-                input=auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest,
-                output=auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse,
-                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-            use_get=use_get,
-        )
-
-    async def end_recent_m_f_a(
-        self,
-        request: auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse:
-        return await self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="EndRecentMFA",
-                service_name="auth.v1.MFAService",
-                input=auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest,
-                output=auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse,
-                idempotency_level=IdempotencyLevel.IDEMPOTENT,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
 
 
 
@@ -635,10 +567,6 @@ class MFAServiceSync(Protocol):
     def consume_fresh_step_up(self, request: auth_dot_v1_dot_mfa__pb2.ConsumeFreshStepUpRequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.ConsumeFreshStepUpResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def release_fresh_step_up(self, request: auth_dot_v1_dot_mfa__pb2.ReleaseFreshStepUpRequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.ReleaseFreshStepUpResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def get_recent_m_f_a(self, request: auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse:
-        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def end_recent_m_f_a(self, request: auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest, ctx: RequestContext) -> auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -795,26 +723,6 @@ class MFAServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.release_fresh_step_up,
-                ),
-                "/auth.v1.MFAService/GetRecentMFA": EndpointSync.unary(
-                    method=MethodInfo(
-                        name="GetRecentMFA",
-                        service_name="auth.v1.MFAService",
-                        input=auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest,
-                        output=auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse,
-                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
-                    ),
-                    function=service.get_recent_m_f_a,
-                ),
-                "/auth.v1.MFAService/EndRecentMFA": EndpointSync.unary(
-                    method=MethodInfo(
-                        name="EndRecentMFA",
-                        service_name="auth.v1.MFAService",
-                        input=auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest,
-                        output=auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse,
-                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
-                    ),
-                    function=service.end_recent_m_f_a,
                 ),
             },
             interceptors=interceptors,
@@ -1125,48 +1033,6 @@ class MFAServiceClientSync(ConnectClientSync):
                 input=auth_dot_v1_dot_mfa__pb2.ReleaseFreshStepUpRequest,
                 output=auth_dot_v1_dot_mfa__pb2.ReleaseFreshStepUpResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-        )
-
-    def get_recent_m_f_a(
-        self,
-        request: auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-        use_get: bool = False,
-    ) -> auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse:
-        return self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="GetRecentMFA",
-                service_name="auth.v1.MFAService",
-                input=auth_dot_v1_dot_mfa__pb2.GetRecentMFARequest,
-                output=auth_dot_v1_dot_mfa__pb2.GetRecentMFAResponse,
-                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
-            ),
-            headers=headers,
-            timeout_ms=timeout_ms,
-            use_get=use_get,
-        )
-
-    def end_recent_m_f_a(
-        self,
-        request: auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest,
-        *,
-        headers: Headers | Mapping[str, str] | None = None,
-        timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse:
-        return self.execute_unary(
-            request=request,
-            method=MethodInfo(
-                name="EndRecentMFA",
-                service_name="auth.v1.MFAService",
-                input=auth_dot_v1_dot_mfa__pb2.EndRecentMFARequest,
-                output=auth_dot_v1_dot_mfa__pb2.EndRecentMFAResponse,
-                idempotency_level=IdempotencyLevel.IDEMPOTENT,
             ),
             headers=headers,
             timeout_ms=timeout_ms,

@@ -1,5 +1,6 @@
 import datetime
 
+from polyester.gen.auth.v1 import address_book_pb2 as _address_book_pb2
 from polyester.gen.auth.v1 import mfa_pb2 as _mfa_pb2
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
@@ -87,7 +88,13 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_REPLAY_DETECTED: _ClassVar[AuthErrorCode]
     AUTH_SOCIAL_ACCOUNT_COOLDOWN: _ClassVar[AuthErrorCode]
     AUTH_SOCIAL_CHANGE_LIMIT_REACHED: _ClassVar[AuthErrorCode]
-    AUTH_RECENT_MFA_EXPIRED: _ClassVar[AuthErrorCode]
+    AUTH_ADMIN_KEY_REQUIRED: _ClassVar[AuthErrorCode]
+    AUTH_ADMIN_KEY_ESCALATION_DENIED: _ClassVar[AuthErrorCode]
+    AUTH_ADMIN_KEY_SCOPE_EXCEEDED: _ClassVar[AuthErrorCode]
+    AUTH_ADMIN_KEY_FORBIDDEN_TARGET: _ClassVar[AuthErrorCode]
+    AUTH_ADMIN_KEY_ALLOWLIST_INVALID: _ClassVar[AuthErrorCode]
+    AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED: _ClassVar[AuthErrorCode]
+    AUTH_CONNECTED_APP_LIMIT_REACHED: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -155,7 +162,13 @@ AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR: AuthErrorCode
 AUTH_REPLAY_DETECTED: AuthErrorCode
 AUTH_SOCIAL_ACCOUNT_COOLDOWN: AuthErrorCode
 AUTH_SOCIAL_CHANGE_LIMIT_REACHED: AuthErrorCode
-AUTH_RECENT_MFA_EXPIRED: AuthErrorCode
+AUTH_ADMIN_KEY_REQUIRED: AuthErrorCode
+AUTH_ADMIN_KEY_ESCALATION_DENIED: AuthErrorCode
+AUTH_ADMIN_KEY_SCOPE_EXCEEDED: AuthErrorCode
+AUTH_ADMIN_KEY_FORBIDDEN_TARGET: AuthErrorCode
+AUTH_ADMIN_KEY_ALLOWLIST_INVALID: AuthErrorCode
+AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED: AuthErrorCode
+AUTH_CONNECTED_APP_LIMIT_REACHED: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")
@@ -212,18 +225,22 @@ class MeRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class MeResponse(_message.Message):
-    __slots__ = ("account_id", "api_key_id", "username", "root_smart_account_address", "session")
+    __slots__ = ("account_id", "api_key_id", "username", "root_smart_account_address", "api_key_scope", "subaccount_id", "session")
     ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     API_KEY_ID_FIELD_NUMBER: _ClassVar[int]
     USERNAME_FIELD_NUMBER: _ClassVar[int]
     ROOT_SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    API_KEY_SCOPE_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SESSION_FIELD_NUMBER: _ClassVar[int]
     account_id: int
     api_key_id: str
     username: str
     root_smart_account_address: str
+    api_key_scope: _address_book_pb2.AccountScopeType
+    subaccount_id: int
     session: _mfa_pb2.SessionInfo
-    def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
+    def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., api_key_scope: _Optional[_Union[_address_book_pb2.AccountScopeType, str]] = ..., subaccount_id: _Optional[int] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
 
 class AuthErrorDetail(_message.Message):
     __slots__ = ("code", "message", "retry_after", "timestamp_window")

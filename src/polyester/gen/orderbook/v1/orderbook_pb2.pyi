@@ -4,6 +4,7 @@ from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2 as _depth_tier_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -17,8 +18,8 @@ class GetOrderBookRequest(_message.Message):
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
-    depth: int
-    def __init__(self, symbol_id: _Optional[int] = ..., depth: _Optional[int] = ...) -> None: ...
+    depth: _depth_tier_pb2.DepthTier
+    def __init__(self, symbol_id: _Optional[int] = ..., depth: _Optional[_Union[_depth_tier_pb2.DepthTier, str]] = ...) -> None: ...
 
 class PriceLevel(_message.Message):
     __slots__ = ("price_ticks", "qty_scaled")
@@ -29,7 +30,7 @@ class PriceLevel(_message.Message):
     def __init__(self, price_ticks: _Optional[int] = ..., qty_scaled: _Optional[int] = ...) -> None: ...
 
 class GetOrderBookResponse(_message.Message):
-    __slots__ = ("symbol_id", "book_seq", "bids", "asks", "ts", "available", "book_epoch", "max_depth")
+    __slots__ = ("symbol_id", "book_seq", "bids", "asks", "ts", "available", "book_epoch", "depth")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     BOOK_SEQ_FIELD_NUMBER: _ClassVar[int]
     BIDS_FIELD_NUMBER: _ClassVar[int]
@@ -37,7 +38,7 @@ class GetOrderBookResponse(_message.Message):
     TS_FIELD_NUMBER: _ClassVar[int]
     AVAILABLE_FIELD_NUMBER: _ClassVar[int]
     BOOK_EPOCH_FIELD_NUMBER: _ClassVar[int]
-    MAX_DEPTH_FIELD_NUMBER: _ClassVar[int]
+    DEPTH_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     book_seq: int
     bids: _containers.RepeatedCompositeFieldContainer[PriceLevel]
@@ -45,8 +46,8 @@ class GetOrderBookResponse(_message.Message):
     ts: _timestamp_pb2.Timestamp
     available: bool
     book_epoch: int
-    max_depth: int
-    def __init__(self, symbol_id: _Optional[int] = ..., book_seq: _Optional[int] = ..., bids: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., asks: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., available: _Optional[bool] = ..., book_epoch: _Optional[int] = ..., max_depth: _Optional[int] = ...) -> None: ...
+    depth: _depth_tier_pb2.DepthTier
+    def __init__(self, symbol_id: _Optional[int] = ..., book_seq: _Optional[int] = ..., bids: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., asks: _Optional[_Iterable[_Union[PriceLevel, _Mapping]]] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., available: _Optional[bool] = ..., book_epoch: _Optional[int] = ..., depth: _Optional[_Union[_depth_tier_pb2.DepthTier, str]] = ...) -> None: ...
 
 class OrderBookDelta(_message.Message):
     __slots__ = ("symbol_id", "book_seq_start", "book_seq_end", "bids", "asks", "reset", "ts")

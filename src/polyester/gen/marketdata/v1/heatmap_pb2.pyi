@@ -3,6 +3,7 @@ import datetime
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2 as _depth_tier_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -20,19 +21,6 @@ class HeatmapInterval(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     INTERVAL_5M: _ClassVar[HeatmapInterval]
     INTERVAL_1H: _ClassVar[HeatmapInterval]
 
-class HeatmapDepth(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
-    DEPTH_UNSPECIFIED: _ClassVar[HeatmapDepth]
-    DEPTH_1: _ClassVar[HeatmapDepth]
-    DEPTH_5: _ClassVar[HeatmapDepth]
-    DEPTH_10: _ClassVar[HeatmapDepth]
-    DEPTH_20: _ClassVar[HeatmapDepth]
-    DEPTH_50: _ClassVar[HeatmapDepth]
-    DEPTH_100: _ClassVar[HeatmapDepth]
-    DEPTH_200: _ClassVar[HeatmapDepth]
-    DEPTH_500: _ClassVar[HeatmapDepth]
-    DEPTH_1000: _ClassVar[HeatmapDepth]
-
 class HeatmapQuantityMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     QTY_MODE_UNSPECIFIED: _ClassVar[HeatmapQuantityMode]
@@ -43,16 +31,6 @@ INTERVAL_1S: HeatmapInterval
 INTERVAL_1M: HeatmapInterval
 INTERVAL_5M: HeatmapInterval
 INTERVAL_1H: HeatmapInterval
-DEPTH_UNSPECIFIED: HeatmapDepth
-DEPTH_1: HeatmapDepth
-DEPTH_5: HeatmapDepth
-DEPTH_10: HeatmapDepth
-DEPTH_20: HeatmapDepth
-DEPTH_50: HeatmapDepth
-DEPTH_100: HeatmapDepth
-DEPTH_200: HeatmapDepth
-DEPTH_500: HeatmapDepth
-DEPTH_1000: HeatmapDepth
 QTY_MODE_UNSPECIFIED: HeatmapQuantityMode
 CLOSE: HeatmapQuantityMode
 PEAK: HeatmapQuantityMode
@@ -76,12 +54,12 @@ class GetOrderbookHeatmapRequest(_message.Message):
     QUANTITY_MODE_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     interval: HeatmapInterval
-    depth: HeatmapDepth
+    depth: _depth_tier_pb2.DepthTier
     time_range: HeatmapTimeRange
     page_token: str
     limit: int
     quantity_mode: HeatmapQuantityMode
-    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[HeatmapDepth, str]] = ..., time_range: _Optional[_Union[HeatmapTimeRange, _Mapping]] = ..., page_token: _Optional[str] = ..., limit: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[_depth_tier_pb2.DepthTier, str]] = ..., time_range: _Optional[_Union[HeatmapTimeRange, _Mapping]] = ..., page_token: _Optional[str] = ..., limit: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ...) -> None: ...
 
 class HeatmapLevels(_message.Message):
     __slots__ = ("price_ticks", "qty_scaled")
@@ -182,7 +160,7 @@ class GetOrderbookHeatmapResponse(_message.Message):
     LIVE_BUCKET_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     interval: HeatmapInterval
-    depth: HeatmapDepth
+    depth: _depth_tier_pb2.DepthTier
     chain: HeatmapDeltaChain
     last_persisted_ts_sec: int
     live_from_book_seq_end: int
@@ -191,4 +169,4 @@ class GetOrderbookHeatmapResponse(_message.Message):
     server_time_sec: int
     quantity_mode: HeatmapQuantityMode
     live_bucket: HeatmapLiveBucket
-    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[HeatmapDepth, str]] = ..., chain: _Optional[_Union[HeatmapDeltaChain, _Mapping]] = ..., last_persisted_ts_sec: _Optional[int] = ..., live_from_book_seq_end: _Optional[int] = ..., has_live_anchor: _Optional[bool] = ..., next_page_token: _Optional[str] = ..., server_time_sec: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ..., live_bucket: _Optional[_Union[HeatmapLiveBucket, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., interval: _Optional[_Union[HeatmapInterval, str]] = ..., depth: _Optional[_Union[_depth_tier_pb2.DepthTier, str]] = ..., chain: _Optional[_Union[HeatmapDeltaChain, _Mapping]] = ..., last_persisted_ts_sec: _Optional[int] = ..., live_from_book_seq_end: _Optional[int] = ..., has_live_anchor: _Optional[bool] = ..., next_page_token: _Optional[str] = ..., server_time_sec: _Optional[int] = ..., quantity_mode: _Optional[_Union[HeatmapQuantityMode, str]] = ..., live_bucket: _Optional[_Union[HeatmapLiveBucket, _Mapping]] = ...) -> None: ...

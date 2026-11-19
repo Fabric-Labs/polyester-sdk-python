@@ -9,7 +9,8 @@ import pytest
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
-from polyester.errors import PolyesterValidationError
+from polyester.codecs.orderbook import depth_tier_value
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.models.realtime import OrderBookDeltaUpdate
 from polyester.orderbook.local_book import apply_delta, build_orderbook_data
@@ -111,8 +112,9 @@ def _snapshot_service(monkeypatch, *, levels: int = 1):
                 symbol_id=request.symbol_id,
                 book_seq=7,
                 book_epoch=3,
-                max_depth=5000,
                 available=True,
+                # The tier served: the request's, or 50 for none.
+                depth=request.depth or depth_tier_value(50),
                 bids=[
                     orderbook_pb2.PriceLevel(price_ticks=52_320_000_000 - i, qty_scaled=5)
                     for i in range(levels)
@@ -128,56 +130,56 @@ def _snapshot_service(monkeypatch, *, levels: int = 1):
     return AsyncOrderbookService(MagicMock(), catalogs=_catalogs()), requests
 
 
-# The depth is a level count sent as given: no rounding to the old fixed depths and no
-# local maximum, since the server reports its own (max_depth). 0 is sent as 0, the
-# server's default of 50, which the result reports. Only what the uint32 field cannot
-# carry, or a value that is not an integer, is refused before any request.
+# The depth is a tier's level count, sent as that DepthTier; 0 sends no tier,
+# which the server serves at 50 and the result reports. A count that is no tier
+# is refused before any request.
 @pytest.mark.parametrize(
-    ("depth", "wire", "reported"),
+    ("depth", "reported"),
     [
-        (0, 0, 50),
-        (1, 1, 1),
-        (2, 2, 2),
-        (11, 11, 11),
-        (50, 50, 50),
-        (1001, 1001, 1001),
-        (2500, 2500, 2500),
-        (5000, 5000, 5000),
-        (6000, 6000, 6000),
-        (2**32 - 1, 2**32 - 1, 2**32 - 1),
+        (0, 50),
+        (1, 1),
+        (5, 5),
+        (10, 10),
+        (20, 20),
+        (50, 50),
+        (100, 100),
+        (200, 200),
+        (500, 500),
+        (1000, 1000),
+        (5000, 5000),
     ],
 )
-async def test_snapshot_sends_depth_as_given(
-    monkeypatch, depth: int, wire: int, reported: int
-) -> None:
+async def test_snapshot_sends_the_tier_of_the_depth(monkeypatch, depth: int, reported: int) -> None:
     service, requests = _snapshot_service(monkeypatch)
     book = await service.get(symbol="BTC-USDT", depth=depth)
-    assert [r.depth for r in requests] == [wire]
+    expected = 0 if depth == 0 else depth_tier_value(depth)
+    assert [r.depth for r in requests] == [expected]
     assert book.depth == reported
 
 
-@pytest.mark.parametrize("depth", [-1, -2, 2**32, True, 2.5, "20", None])
-async def test_snapshot_refuses_unsupported_depth_before_request(monkeypatch, depth) -> None:
+@pytest.mark.parametrize("depth", [-1, -2, 2, 11, 1001, 2500, 6000, 2**32, True, 2.5, "20", None])
+async def test_snapshot_refuses_a_depth_that_is_no_tier_before_request(monkeypatch, depth) -> None:
     service, requests = _snapshot_service(monkeypatch)
     with pytest.raises(PolyesterValidationError, match="depth"):
         await service.get(symbol="BTC-USDT", depth=depth)
     assert requests == []
 
 
-async def test_snapshot_carries_epoch_and_max_depth(monkeypatch) -> None:
+async def test_snapshot_carries_its_epoch_and_served_tier(monkeypatch) -> None:
     service, _ = _snapshot_service(monkeypatch)
     book = await service.get(symbol="BTC-USDT", depth=20)
-    assert (book.book_seq, book.book_epoch, book.max_depth) == ("7", "3", 5000)
+    assert (book.book_seq, book.book_epoch, book.depth) == ("7", "3", 20)
 
 
-def test_snapshot_without_max_depth_decodes_zero() -> None:
-    book = orderbook_from_proto(
-        orderbook_pb2.GetOrderBookResponse(symbol_id=1, available=False),
-        symbol="BTC-USDT",
-        depth=50,
-        quantity_scale=8,
-    )
-    assert (book.book_epoch, book.max_depth, book.available) == ("0", 0, False)
+@pytest.mark.parametrize("served", [0, depth_tier_value(20), 42])
+def test_snapshot_without_its_requested_tier_is_refused(served: int) -> None:
+    with pytest.raises(PolyesterResponseContractError):
+        orderbook_from_proto(
+            orderbook_pb2.GetOrderBookResponse(symbol_id=1, depth=served),
+            symbol="BTC-USDT",
+            depth=50,
+            quantity_scale=8,
+        )
 
 
 def _assert_bound(levels, symbol: str) -> None:
@@ -206,6 +208,7 @@ def test_decoded_and_rendered_levels_are_bound_to_their_market() -> None:
         book_seq=1,
         bids=[orderbook_pb2.PriceLevel(price_ticks=52_320_000_000, qty_scaled=5)],
         asks=[orderbook_pb2.PriceLevel(price_ticks=52_330_000_000, qty_scaled=6)],
+        depth=depth_tier_value(5),
     )
     decoded = orderbook_from_proto(msg, symbol="LTC-USDT", depth=5, quantity_scale=8)
     _assert_bound(decoded.bids + decoded.asks, "LTC-USDT")

@@ -10,13 +10,14 @@ from __future__ import annotations
 import pytest
 
 from polyester.codecs.orderbook import (
+    depth_tier_value,
     orderbook_snapshot_depth,
     orderbook_stream_tier,
     require_published_stream_depth,
 )
 from polyester.errors import PolyesterValidationError
-from polyester.gen.marketdata.v1 import heatmap_pb2 as heatmap
 from polyester.gen.marketdata.v1 import marketdata_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 from polyester.services._validation import validate_limit as _validate_limit
 from tests.unit.test_heatmap_requests import _with_client
 from tests.unit.test_orderbook_depth_delta_binding import _snapshot_service
@@ -48,7 +49,7 @@ class Index:
 
 def test_helpers_accept_index_integers_and_return_plain_ints() -> None:
     for value, helper, want in [
-        (Index(11), orderbook_snapshot_depth, 11),
+        (Index(10), orderbook_snapshot_depth, 10),
         (Index(0), orderbook_snapshot_depth, 50),
         (Index(10), orderbook_stream_tier, 20),
         (Index(20), require_published_stream_depth, 20),
@@ -84,9 +85,9 @@ def test_depth_helpers_judge_the_index_value(helper, value) -> None:
 
 async def test_snapshot_accepts_an_index_integer_depth(monkeypatch) -> None:
     service, requests = _snapshot_service(monkeypatch)
-    book = await service.get(symbol="BTC-USDT", depth=Index(11))
-    assert [(r.depth, type(r.depth)) for r in requests] == [(11, int)]
-    assert (book.depth, type(book.depth)) == (11, int)
+    book = await service.get(symbol="BTC-USDT", depth=Index(10))
+    assert [r.depth for r in requests] == [depth_tier_value(10)]
+    assert (book.depth, type(book.depth)) == (10, int)
 
 
 async def test_managed_book_accepts_an_index_integer_depth() -> None:
@@ -111,4 +112,5 @@ async def test_heatmap_accepts_index_integer_depth_and_limit() -> None:
         await client.heatmap.get(symbol_id=1, interval="1m", depth=Index(11), limit=Index(3))
 
     requests = await _with_client(run)
-    assert [(heatmap.HeatmapDepth.Name(r.depth), r.limit) for r in requests] == [("DEPTH_20", 3)]
+    got = [(depth_tier_pb2.DepthTier.Name(r.depth), r.limit) for r in requests]
+    assert got == [("DEPTH_20", 3)]

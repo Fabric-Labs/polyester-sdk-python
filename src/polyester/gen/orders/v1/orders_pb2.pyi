@@ -821,18 +821,20 @@ class RiskPolicy(_message.Message):
     def __init__(self, take_profit: _Optional[_Union[TakeProfitPolicy, _Mapping]] = ..., stop_loss: _Optional[_Union[StopLossPolicy, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopPolicy, _Mapping]] = ..., oco: _Optional[bool] = ...) -> None: ...
 
 class CancelAllOrdersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_ids", "side", "dry_run", "request_id")
+    __slots__ = ("subaccount_id", "symbol_ids", "side", "dry_run", "request_id", "include_triggers")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_IDS_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     DRY_RUN_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_TRIGGERS_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     symbol_ids: _containers.RepeatedScalarFieldContainer[int]
     side: Side
     dry_run: bool
     request_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_ids: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ...) -> None: ...
+    include_triggers: bool
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_ids: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ..., include_triggers: _Optional[bool] = ...) -> None: ...
 
 class CancelledOrder(_message.Message):
     __slots__ = ("order_id", "client_order_id")
@@ -843,7 +845,7 @@ class CancelledOrder(_message.Message):
     def __init__(self, order_id: _Optional[int] = ..., client_order_id: _Optional[str] = ...) -> None: ...
 
 class CancelAllOrdersResponse(_message.Message):
-    __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns", "cancelled_orders", "total_cancelled", "truncated", "listing_status")
+    __slots__ = ("status", "matched_orders", "submitted_cancels", "failed_cancels", "ts", "ts_ns", "cancelled_orders", "total_cancelled", "truncated", "listing_status", "matched_triggers")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[CancelAllOrdersResponse.Status]
@@ -870,6 +872,7 @@ class CancelAllOrdersResponse(_message.Message):
     TOTAL_CANCELLED_FIELD_NUMBER: _ClassVar[int]
     TRUNCATED_FIELD_NUMBER: _ClassVar[int]
     LISTING_STATUS_FIELD_NUMBER: _ClassVar[int]
+    MATCHED_TRIGGERS_FIELD_NUMBER: _ClassVar[int]
     status: CancelAllOrdersResponse.Status
     matched_orders: int
     submitted_cancels: int
@@ -880,21 +883,24 @@ class CancelAllOrdersResponse(_message.Message):
     total_cancelled: int
     truncated: bool
     listing_status: CancelAllOrdersResponse.ListingStatus
-    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., cancelled_orders: _Optional[_Iterable[_Union[CancelledOrder, _Mapping]]] = ..., total_cancelled: _Optional[int] = ..., truncated: _Optional[bool] = ..., listing_status: _Optional[_Union[CancelAllOrdersResponse.ListingStatus, str]] = ...) -> None: ...
+    matched_triggers: int
+    def __init__(self, status: _Optional[_Union[CancelAllOrdersResponse.Status, str]] = ..., matched_orders: _Optional[int] = ..., submitted_cancels: _Optional[int] = ..., failed_cancels: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ..., cancelled_orders: _Optional[_Iterable[_Union[CancelledOrder, _Mapping]]] = ..., total_cancelled: _Optional[int] = ..., truncated: _Optional[bool] = ..., listing_status: _Optional[_Union[CancelAllOrdersResponse.ListingStatus, str]] = ..., matched_triggers: _Optional[int] = ...) -> None: ...
 
 class CancelAllAfterRequest(_message.Message):
-    __slots__ = ("subaccount_id", "timeout_sec", "symbol_id", "side", "request_id")
+    __slots__ = ("subaccount_id", "timeout_sec", "symbol_id", "side", "request_id", "include_triggers")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEOUT_SEC_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_TRIGGERS_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     timeout_sec: int
     symbol_id: int
     side: Side
     request_id: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., timeout_sec: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., request_id: _Optional[str] = ...) -> None: ...
+    include_triggers: bool
+    def __init__(self, subaccount_id: _Optional[int] = ..., timeout_sec: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., request_id: _Optional[str] = ..., include_triggers: _Optional[bool] = ...) -> None: ...
 
 class DeadManSwitchScope(_message.Message):
     __slots__ = ("account_id", "symbol_id", "side")

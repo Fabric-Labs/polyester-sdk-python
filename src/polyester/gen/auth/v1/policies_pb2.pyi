@@ -57,6 +57,9 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     READ_FUNDING_FLOWS: _ClassVar[PolicyAction]
     READ_NOTIFICATIONS: _ClassVar[PolicyAction]
     READ_ACCOUNT_ACTIVITY: _ClassVar[PolicyAction]
+    MANAGE_API_KEYS: _ClassVar[PolicyAction]
+    MANAGE_API_KEY_POLICIES: _ClassVar[PolicyAction]
+    MANAGE_SUBACCOUNT_POLICIES: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -96,6 +99,9 @@ CONVERT_DUST: PolicyAction
 READ_FUNDING_FLOWS: PolicyAction
 READ_NOTIFICATIONS: PolicyAction
 READ_ACCOUNT_ACTIVITY: PolicyAction
+MANAGE_API_KEYS: PolicyAction
+MANAGE_API_KEY_POLICIES: PolicyAction
+MANAGE_SUBACCOUNT_POLICIES: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()
@@ -122,7 +128,7 @@ class SpotMarketRule(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ...) -> None: ...
 
 class SubaccountPolicyView(_message.Message):
-    __slots__ = ("id", "name", "description", "spot_markets", "spot_market_scope", "actions", "is_template", "source_template_id", "max_order_notional", "max_open_orders", "trading_halted", "locked", "review_at", "expires_at", "created_at", "updated_at", "revision")
+    __slots__ = ("id", "name", "description", "spot_markets", "spot_market_scope", "actions", "is_template", "source_template_id", "source_template_revision", "max_order_notional", "max_open_orders", "trading_halted", "locked", "review_at", "expires_at", "created_at", "updated_at", "revision")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -131,6 +137,7 @@ class SubaccountPolicyView(_message.Message):
     ACTIONS_FIELD_NUMBER: _ClassVar[int]
     IS_TEMPLATE_FIELD_NUMBER: _ClassVar[int]
     SOURCE_TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TEMPLATE_REVISION_FIELD_NUMBER: _ClassVar[int]
     MAX_ORDER_NOTIONAL_FIELD_NUMBER: _ClassVar[int]
     MAX_OPEN_ORDERS_FIELD_NUMBER: _ClassVar[int]
     TRADING_HALTED_FIELD_NUMBER: _ClassVar[int]
@@ -148,6 +155,7 @@ class SubaccountPolicyView(_message.Message):
     actions: _containers.RepeatedScalarFieldContainer[PolicyAction]
     is_template: bool
     source_template_id: int
+    source_template_revision: int
     max_order_notional: int
     max_open_orders: int
     trading_halted: bool
@@ -157,7 +165,7 @@ class SubaccountPolicyView(_message.Message):
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     revision: int
-    def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketRule, _Mapping]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., is_template: _Optional[bool] = ..., source_template_id: _Optional[int] = ..., max_order_notional: _Optional[int] = ..., max_open_orders: _Optional[int] = ..., trading_halted: _Optional[bool] = ..., locked: _Optional[bool] = ..., review_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketRule, _Mapping]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., is_template: _Optional[bool] = ..., source_template_id: _Optional[int] = ..., source_template_revision: _Optional[int] = ..., max_order_notional: _Optional[int] = ..., max_open_orders: _Optional[int] = ..., trading_halted: _Optional[bool] = ..., locked: _Optional[bool] = ..., review_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ListSubaccountPoliciesRequest(_message.Message):
     __slots__ = ("subaccount_id",)
@@ -186,7 +194,7 @@ class GetSubaccountPolicyResponse(_message.Message):
     def __init__(self, policy: _Optional[_Union[SubaccountPolicyView, _Mapping]] = ...) -> None: ...
 
 class SubaccountPolicySpec(_message.Message):
-    __slots__ = ("name", "description", "spot_markets", "spot_market_scope", "actions", "max_order_notional", "max_open_orders", "trading_halted", "locked", "review_at", "expires_at")
+    __slots__ = ("name", "description", "spot_markets", "spot_market_scope", "actions", "max_order_notional", "max_open_orders", "trading_halted", "locked", "review_at", "expires_at", "is_template")
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     SPOT_MARKETS_FIELD_NUMBER: _ClassVar[int]
@@ -198,6 +206,7 @@ class SubaccountPolicySpec(_message.Message):
     LOCKED_FIELD_NUMBER: _ClassVar[int]
     REVIEW_AT_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    IS_TEMPLATE_FIELD_NUMBER: _ClassVar[int]
     name: str
     description: str
     spot_markets: _containers.RepeatedCompositeFieldContainer[SpotMarketSelector]
@@ -209,7 +218,8 @@ class SubaccountPolicySpec(_message.Message):
     locked: bool
     review_at: _timestamp_pb2.Timestamp
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketSelector, _Mapping]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., max_order_notional: _Optional[int] = ..., max_open_orders: _Optional[int] = ..., trading_halted: _Optional[bool] = ..., locked: _Optional[bool] = ..., review_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    is_template: bool
+    def __init__(self, name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketSelector, _Mapping]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., max_order_notional: _Optional[int] = ..., max_open_orders: _Optional[int] = ..., trading_halted: _Optional[bool] = ..., locked: _Optional[bool] = ..., review_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., is_template: _Optional[bool] = ...) -> None: ...
 
 class CreateSubaccountPolicyRequest(_message.Message):
     __slots__ = ("policy", "subaccount_id")
@@ -262,11 +272,13 @@ class SetSubaccountPolicyRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ...) -> None: ...
 
 class SetSubaccountPolicyResponse(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("policy_id",)
+    POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    policy_id: int
+    def __init__(self, policy_id: _Optional[int] = ...) -> None: ...
 
 class ApiPolicyView(_message.Message):
-    __slots__ = ("id", "name", "description", "spot_markets", "actions", "spot_market_scope", "is_template", "source_template_id", "created_at", "updated_at", "revision")
+    __slots__ = ("id", "name", "description", "spot_markets", "actions", "spot_market_scope", "is_template", "source_template_id", "source_template_revision", "created_at", "updated_at", "revision")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -275,6 +287,7 @@ class ApiPolicyView(_message.Message):
     SPOT_MARKET_SCOPE_FIELD_NUMBER: _ClassVar[int]
     IS_TEMPLATE_FIELD_NUMBER: _ClassVar[int]
     SOURCE_TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TEMPLATE_REVISION_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
@@ -286,10 +299,11 @@ class ApiPolicyView(_message.Message):
     spot_market_scope: MarketScope.Value
     is_template: bool
     source_template_id: int
+    source_template_revision: int
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     revision: int
-    def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketRule, _Mapping]]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., is_template: _Optional[bool] = ..., source_template_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., spot_markets: _Optional[_Iterable[_Union[SpotMarketRule, _Mapping]]] = ..., actions: _Optional[_Iterable[_Union[PolicyAction, str]]] = ..., spot_market_scope: _Optional[_Union[MarketScope.Value, str]] = ..., is_template: _Optional[bool] = ..., source_template_id: _Optional[int] = ..., source_template_revision: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ListApiPoliciesRequest(_message.Message):
     __slots__ = ("key_id",)
@@ -384,5 +398,7 @@ class SetApiKeyPolicyRequest(_message.Message):
     def __init__(self, key_id: _Optional[str] = ..., policy_id: _Optional[int] = ...) -> None: ...
 
 class SetApiKeyPolicyResponse(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("policy_id",)
+    POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    policy_id: int
+    def __init__(self, policy_id: _Optional[int] = ...) -> None: ...

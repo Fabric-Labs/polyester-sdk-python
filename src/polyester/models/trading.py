@@ -584,6 +584,10 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``not_retained_read_open_orders``: the empty list does not mean nothing
     was cancelled, so read open orders instead. An unknown value keeps its
     number.
+
+    ``matched_triggers`` counts, with ``include_triggers=True``, the triggers
+    that matched, each stopped (canceled with reason ``cancel_all``) unless
+    it is a dry run; 0 without it.
     """
 
     status: str = ""
@@ -594,6 +598,7 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     total_cancelled: int = 0
     truncated: bool = False
     listing_status: str = ""
+    matched_triggers: int = 0
 
 
 @dataclass(frozen=True, slots=True)

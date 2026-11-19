@@ -2,8 +2,8 @@
 
 The server here behaves like the public stream contract: it accepts a subscribe on
 any depth, but publishes only on the tiers 1, 20, 50, 200 and 500, each as a SET
-diff of that tier's own top-N view. Snapshots answer at any level count up to the
-max_depth they report, and refuse a deeper one with INVALID_ARGUMENT.
+diff of that tier's own top-N view. Snapshots answer at every DepthTier and name
+the tier they served.
 """
 
 from __future__ import annotations
@@ -16,7 +16,8 @@ import pytest
 import websockets
 
 from polyester import AsyncPolyester
-from polyester.errors import PolyesterApiError, PolyesterValidationError
+from polyester.codecs.orderbook import depth_tier_levels, depth_tier_value
+from polyester.errors import PolyesterValidationError
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.realtime.client import AsyncRealtimeClient
 from tests.hardening_support import (
@@ -28,7 +29,6 @@ from tests.hardening_support import (
 from tests.unit.test_server_unsubscribe import CentrifugoServer, publication
 
 TIERS = (1, 20, 50, 200, 500)
-MAX_DEPTH = 5000
 UNIT = 1_000_000_000  # One quote unit, in price ticks.
 BEST_BID = 2000 * UNIT
 BEST_ASK = 2001 * UNIT
@@ -77,21 +77,19 @@ class TierMarket:
     async def snapshot(self, request: ParsedRequest) -> HttpScript:
         assert request.path.endswith("/GetOrderBook")
         message = orderbook_pb2.GetOrderBookRequest.FromString(request.body)
-        self.snapshot_requests.append(message.depth)
-        if message.depth > MAX_DEPTH:
-            return HttpScript.json(
-                400,
-                {"code": "invalid_argument", "message": f"depth must be at most {MAX_DEPTH}"},
-            )
+        # The levels of the requested tier; no tier is served at 50.
+        levels = depth_tier_levels(message.depth) if message.depth else 50
+        assert levels is not None, f"no tier {message.depth}"
+        self.snapshot_requests.append(levels)
         response = orderbook_pb2.GetOrderBookResponse(
             symbol_id=1,
             book_seq=self.seq,
             book_epoch=2 if self.available else 0,
-            max_depth=MAX_DEPTH,
             available=self.available,
+            depth=depth_tier_value(levels),
         )
         if self.available:
-            bids, asks = self._view(message.depth or 50)
+            bids, asks = self._view(levels)
             for price, qty in sorted(bids.items(), reverse=True):
                 response.bids.add(price_ticks=price, qty_scaled=qty)
             for price, qty in sorted(asks.items()):
@@ -615,37 +613,36 @@ async def test_raw_deltas_at_an_unpublished_depth_are_refused(depth) -> None:
         assert h.server.connections == 0
 
 
-@pytest.mark.parametrize("depth", [1, 2, 7, 50, 1000, 1001, 2500, MAX_DEPTH])
-async def test_raw_snapshot_serves_any_depth_up_to_max_depth(depth: int) -> None:
+@pytest.mark.parametrize("depth", [1, 5, 10, 20, 50, 100, 200, 500, 1000, 5000])
+async def test_raw_snapshot_serves_every_tier(depth: int) -> None:
     # The book holds 1500 levels a side: a deeper snapshot holds all of them.
     async with harness(levels=1500) as h:
         book = await h.client.orderbook.get(symbol="BTC-USDT", depth=depth)
         assert h.market.snapshot_requests == [depth]
         held = min(depth, 1500)
         assert (book.depth, len(book.bids), len(book.asks)) == (depth, held, held)
-        assert (book.book_epoch, book.max_depth) == ("2", MAX_DEPTH)
+        assert book.book_epoch == "2"
         assert h.server.connections == 0
 
 
 async def test_raw_snapshot_depth_zero_is_the_default_50() -> None:
     async with harness() as h:
         book = await h.client.orderbook.get(symbol="BTC-USDT", depth=0)
-        assert h.market.snapshot_requests == [0]
+        assert h.market.snapshot_requests == [50]
         assert (book.depth, len(book.bids), len(book.asks)) == (50, 50, 50)
 
 
-async def test_raw_snapshot_above_max_depth_is_the_servers_refusal() -> None:
+@pytest.mark.parametrize("depth", [2, 7, 37, 1001, 2500, 5001, -1, True, 20.0, "20"])
+async def test_raw_snapshot_at_no_tier_is_refused_before_sending(depth) -> None:
     async with harness() as h:
-        with pytest.raises(PolyesterApiError, match="at most 5000") as refused:
-            await h.client.orderbook.get(symbol="BTC-USDT", depth=MAX_DEPTH + 1)
-        assert refused.value.code == "invalid_argument"
-        # Sent as given: the maximum is the server's, not the SDK's.
-        assert h.market.snapshot_requests == [MAX_DEPTH + 1]
+        with pytest.raises(PolyesterValidationError, match="1, 5, 10, 20, 50"):
+            await h.client.orderbook.get(symbol="BTC-USDT", depth=depth)
+        assert h.market.snapshot_requests == []
 
 
-async def test_managed_views_carry_no_epoch_or_max_depth() -> None:
+async def test_managed_views_carry_no_epoch() -> None:
     async with harness() as h:
         sub = await h.client.orderbook.create_subscription(symbol="BTC-USDT", depth=20)
         view = await next_view(sub, what="first view")
-        assert (view.book_epoch, view.max_depth) == ("", 0)
+        assert view.book_epoch == ""
         await sub.aclose()

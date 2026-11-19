@@ -27,6 +27,7 @@ class NotificationType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TELEGRAM_APPROVAL: _ClassVar[NotificationType]
     BROKER_ALLOWLIST_CHANGE: _ClassVar[NotificationType]
     TELEGRAM_LINKED: _ClassVar[NotificationType]
+    ADMIN_KEY_ACTION: _ClassVar[NotificationType]
 
 class NotificationCategory(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -52,6 +53,7 @@ class TelegramApprovalAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PAUSE_TRIGGER: _ClassVar[TelegramApprovalAction]
     RESUME_TRIGGER: _ClassVar[TelegramApprovalAction]
     SWAP: _ClassVar[TelegramApprovalAction]
+    CONVERT_DUST: _ClassVar[TelegramApprovalAction]
 
 class BrokerAllowlistEvent(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -65,6 +67,16 @@ class BrokerAllowlistAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     BROKER_ALLOWLIST_ACTION_UNSPECIFIED: _ClassVar[BrokerAllowlistAction]
     ADD_DESTINATION: _ClassVar[BrokerAllowlistAction]
     REMOVE_DESTINATION: _ClassVar[BrokerAllowlistAction]
+
+class AdminKeyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ADMIN_KEY_ACTION_UNSPECIFIED: _ClassVar[AdminKeyAction]
+    CREATE_API_KEY: _ClassVar[AdminKeyAction]
+    UPDATE_API_KEY: _ClassVar[AdminKeyAction]
+    DELETE_API_KEY: _ClassVar[AdminKeyAction]
+    SET_API_KEY_POLICY: _ClassVar[AdminKeyAction]
+    SET_SUBACCOUNT_POLICY: _ClassVar[AdminKeyAction]
+    UPDATE_SUBACCOUNT_POLICY: _ClassVar[AdminKeyAction]
 ERROR_UNSPECIFIED: ErrorCode
 NOTIFICATION_NOT_FOUND: ErrorCode
 SERVICE_UNAVAILABLE: ErrorCode
@@ -73,6 +85,7 @@ PRICE_ALERT: NotificationType
 TELEGRAM_APPROVAL: NotificationType
 BROKER_ALLOWLIST_CHANGE: NotificationType
 TELEGRAM_LINKED: NotificationType
+ADMIN_KEY_ACTION: NotificationType
 CATEGORY_UNSPECIFIED: NotificationCategory
 ALERTS: NotificationCategory
 SECURITY: NotificationCategory
@@ -89,6 +102,7 @@ MODIFY_TRIGGER: TelegramApprovalAction
 PAUSE_TRIGGER: TelegramApprovalAction
 RESUME_TRIGGER: TelegramApprovalAction
 SWAP: TelegramApprovalAction
+CONVERT_DUST: TelegramApprovalAction
 BROKER_ALLOWLIST_EVENT_UNSPECIFIED: BrokerAllowlistEvent
 CHANGE_REQUESTED: BrokerAllowlistEvent
 CHANGE_APPLIED: BrokerAllowlistEvent
@@ -96,6 +110,13 @@ CHANGE_NOT_APPLIED: BrokerAllowlistEvent
 BROKER_ALLOWLIST_ACTION_UNSPECIFIED: BrokerAllowlistAction
 ADD_DESTINATION: BrokerAllowlistAction
 REMOVE_DESTINATION: BrokerAllowlistAction
+ADMIN_KEY_ACTION_UNSPECIFIED: AdminKeyAction
+CREATE_API_KEY: AdminKeyAction
+UPDATE_API_KEY: AdminKeyAction
+DELETE_API_KEY: AdminKeyAction
+SET_API_KEY_POLICY: AdminKeyAction
+SET_SUBACCOUNT_POLICY: AdminKeyAction
+UPDATE_SUBACCOUNT_POLICY: AdminKeyAction
 
 class ErrorDetail(_message.Message):
     __slots__ = ("code",)
@@ -104,7 +125,7 @@ class ErrorDetail(_message.Message):
     def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class Notification(_message.Message):
-    __slots__ = ("notification_id", "type", "category", "title", "text", "created_at", "read_at", "price_alert", "telegram_approval", "broker_allowlist", "telegram_link")
+    __slots__ = ("notification_id", "type", "category", "title", "text", "created_at", "read_at", "price_alert", "telegram_approval", "broker_allowlist", "telegram_link", "admin_key_action")
     NOTIFICATION_ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
@@ -116,6 +137,7 @@ class Notification(_message.Message):
     TELEGRAM_APPROVAL_FIELD_NUMBER: _ClassVar[int]
     BROKER_ALLOWLIST_FIELD_NUMBER: _ClassVar[int]
     TELEGRAM_LINK_FIELD_NUMBER: _ClassVar[int]
+    ADMIN_KEY_ACTION_FIELD_NUMBER: _ClassVar[int]
     notification_id: int
     type: NotificationType
     category: NotificationCategory
@@ -127,7 +149,8 @@ class Notification(_message.Message):
     telegram_approval: TelegramApprovalNotice
     broker_allowlist: BrokerAllowlistNotice
     telegram_link: TelegramLinkNotice
-    def __init__(self, notification_id: _Optional[int] = ..., type: _Optional[_Union[NotificationType, str]] = ..., category: _Optional[_Union[NotificationCategory, str]] = ..., title: _Optional[str] = ..., text: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., read_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., price_alert: _Optional[_Union[PriceAlertNotice, _Mapping]] = ..., telegram_approval: _Optional[_Union[TelegramApprovalNotice, _Mapping]] = ..., broker_allowlist: _Optional[_Union[BrokerAllowlistNotice, _Mapping]] = ..., telegram_link: _Optional[_Union[TelegramLinkNotice, _Mapping]] = ...) -> None: ...
+    admin_key_action: AdminKeyActionNotice
+    def __init__(self, notification_id: _Optional[int] = ..., type: _Optional[_Union[NotificationType, str]] = ..., category: _Optional[_Union[NotificationCategory, str]] = ..., title: _Optional[str] = ..., text: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., read_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., price_alert: _Optional[_Union[PriceAlertNotice, _Mapping]] = ..., telegram_approval: _Optional[_Union[TelegramApprovalNotice, _Mapping]] = ..., broker_allowlist: _Optional[_Union[BrokerAllowlistNotice, _Mapping]] = ..., telegram_link: _Optional[_Union[TelegramLinkNotice, _Mapping]] = ..., admin_key_action: _Optional[_Union[AdminKeyActionNotice, _Mapping]] = ...) -> None: ...
 
 class PriceAlertNotice(_message.Message):
     __slots__ = ("alert_id", "symbol_id", "direction", "price_source", "price_ticks", "triggered_price_ticks", "triggered_at")
@@ -192,6 +215,24 @@ class BrokerAllowlistNotice(_message.Message):
     label: str
     requested_by_account_id: int
     def __init__(self, broker: _Optional[str] = ..., vault_account_id: _Optional[int] = ..., change_id: _Optional[int] = ..., event: _Optional[_Union[BrokerAllowlistEvent, str]] = ..., action: _Optional[_Union[BrokerAllowlistAction, str]] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., label: _Optional[str] = ..., requested_by_account_id: _Optional[int] = ...) -> None: ...
+
+class AdminKeyActionNotice(_message.Message):
+    __slots__ = ("admin_key_id", "action", "key_id", "subaccount_id", "policy_id", "source_ip", "changed_at")
+    ADMIN_KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_IP_FIELD_NUMBER: _ClassVar[int]
+    CHANGED_AT_FIELD_NUMBER: _ClassVar[int]
+    admin_key_id: str
+    action: AdminKeyAction
+    key_id: str
+    subaccount_id: int
+    policy_id: int
+    source_ip: str
+    changed_at: _timestamp_pb2.Timestamp
+    def __init__(self, admin_key_id: _Optional[str] = ..., action: _Optional[_Union[AdminKeyAction, str]] = ..., key_id: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ..., source_ip: _Optional[str] = ..., changed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ListNotificationsRequest(_message.Message):
     __slots__ = ("categories", "read_state", "start_time", "end_time", "limit", "page_token")

@@ -12,11 +12,11 @@ from polyester.codecs.heatmap import (
     resolve_heatmap_interval,
     resolve_heatmap_quantity_mode,
 )
+from polyester.codecs.orderbook import depth_tier_value
 from polyester.codecs.realtime_decode import decode_heatmap_live_bucket_bytes
 from polyester.gen.marketdata.v1.heatmap_connect import HeatmapServiceClient
 from polyester.gen.marketdata.v1.heatmap_pb2 import (
     GetOrderbookHeatmapRequest,
-    HeatmapDepth,
     HeatmapTimeRange,
 )
 from polyester.models import ApiData
@@ -67,7 +67,9 @@ class AsyncHeatmapService(BaseService):
         ``quantity_mode`` is ``"close"`` or ``"peak"``. ``depth`` is requested as itself
         when it is a supported depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else as the
         smallest supported depth covering it, and 0 as 50; the response's ``depth`` names
-        the depth requested. A depth below 0 or above 1000 is refused.
+        the tier served, and a reply naming none, or another tier, raises
+        :class:`~polyester.errors.PolyesterResponseContractError`. A depth below 0 or above
+        1000 is refused.
         """
         validated_limit = validate_limit(limit, GetOrderbookHeatmapRequest)
         if symbol:
@@ -79,7 +81,8 @@ class AsyncHeatmapService(BaseService):
             label="heatmap.get",
         )
         interval_enum = resolve_heatmap_interval(interval)
-        depth_enum = HeatmapDepth.Value(f"DEPTH_{heatmap_depth(depth)}")
+        depth_levels = heatmap_depth(depth)
+        depth_enum = depth_tier_value(depth_levels)
         qty_enum = resolve_heatmap_quantity_mode(quantity_mode)
 
         request = GetOrderbookHeatmapRequest(
@@ -118,7 +121,7 @@ class AsyncHeatmapService(BaseService):
             HeatmapServiceClient,
             lambda client, req: client.get_orderbook_heatmap(req),
             request,
-            heatmap_from_proto,
+            lambda msg: heatmap_from_proto(msg, depth=depth_levels),
         )
 
     async def subscribe_live(

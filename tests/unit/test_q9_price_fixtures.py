@@ -27,6 +27,7 @@ from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import OrderId
 from polyester.services.market_data import AsyncMarketDataService
@@ -355,6 +356,7 @@ async def test_orderbook_level_price_decodes_from_q9() -> None:
     capture = CaptureUnary(
         orderbook_pb2.GetOrderBookResponse(
             book_seq=1,
+            depth=depth_tier_pb2.DEPTH_50,
             bids=[orderbook_pb2.PriceLevel(price_ticks=185_250_000_000, qty_scaled=1_000_000)],
             asks=[orderbook_pb2.PriceLevel(price_ticks=185_260_000_000, qty_scaled=2_000_000)],
         )

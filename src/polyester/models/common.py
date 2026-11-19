@@ -31,16 +31,15 @@ class OrderbookData(msgspec.Struct, kw_only=True, omit_defaults=True):
     snapshot carries it: a subscription's book reports the value of the last
     snapshot it applied, and deltas, resets included, do not change it.
 
-    ``book_epoch`` and ``max_depth`` are set only on a snapshot from
-    ``orderbook.get``; a managed subscription's views carry ``""`` and ``0``, since
-    the delta stream names no epoch. ``book_epoch`` is the epoch of ``book_seq``
-    (a decimal string, like ``book_seq``; ``"0"`` while ``available`` is
-    ``False``): order snapshots by ``(book_epoch, book_seq)`` with
-    :func:`polyester.orderbook.compare_snapshots`, since a higher epoch is newer
-    whatever its ``book_seq`` and a new epoch may restart ``book_seq``.
-    ``max_depth`` is the largest depth per side the service accepts: ask
-    ``orderbook.get`` for at most that many levels. A snapshot is a frozen view at
-    its own ``(book_epoch, book_seq)``: never apply stream deltas to it.
+    ``book_epoch`` is set only on a snapshot from ``orderbook.get``; a managed
+    subscription's views carry ``""``, since the delta stream names no epoch.
+    It is the epoch of ``book_seq`` (a decimal string, like ``book_seq``;
+    ``"0"`` while ``available`` is ``False``): order snapshots by
+    ``(book_epoch, book_seq)`` with :func:`polyester.orderbook.compare_snapshots`,
+    since a higher epoch is newer whatever its ``book_seq`` and a new epoch may
+    restart ``book_seq``. ``depth`` is the levels per side of the tier a
+    snapshot was served at, or of a view. A snapshot is a frozen view at its
+    own ``(book_epoch, book_seq)``: never apply stream deltas to it.
     """
 
     symbol: str
@@ -50,7 +49,6 @@ class OrderbookData(msgspec.Struct, kw_only=True, omit_defaults=True):
     asks: list[OrderbookLevel]
     available: bool = True
     book_epoch: str = ""
-    max_depth: int = 0
 
 
 class ApiData(msgspec.Struct, kw_only=True, omit_defaults=True):

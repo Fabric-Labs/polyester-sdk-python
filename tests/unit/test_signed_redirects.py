@@ -25,6 +25,7 @@ from polyester import AsyncPolyester, PolyesterError, PolyesterRedirectError
 from polyester.auth import ApiKeyCredentials
 from polyester.codecs.scalars import format_id
 from polyester.errors import is_retryable_error, mutation_outcome_unknown
+from polyester.gen.auth.v1.address_book_pb2 import SCOPE_ROOT
 from polyester.gen.auth.v1.auth_connect import AuthServiceClient
 from polyester.gen.auth.v1.auth_pb2 import MeRequest, MeResponse
 from polyester.models.order_key import OrderId
@@ -41,10 +42,12 @@ def _disposable_key_hex() -> str:
 
 
 def _me_answer(request: Request) -> Response:
-    message = MeResponse(account_id=7, api_key_id=_KEY_ID)
+    message = MeResponse(account_id=7, api_key_id=_KEY_ID, api_key_scope=SCOPE_ROOT)
     if request.headers.get("Content-Type", "").startswith("application/json"):
         return Response(
-            '{"accountId":"7","apiKeyId":"ak_redirect_test"}', 200, content_type="application/json"
+            '{"accountId":"7","apiKeyId":"ak_redirect_test","apiKeyScope":"SCOPE_ROOT"}',
+            200,
+            content_type="application/json",
         )
     return Response(message.SerializeToString(), 200, content_type="application/proto")
 

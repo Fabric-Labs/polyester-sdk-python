@@ -12,7 +12,7 @@ from polyester.codecs.decode.sub_accounts import (
     subaccount_from_proto,
 )
 from polyester.codecs.scalars import format_id
-from polyester.gen.auth.v1 import auth_pb2, profile_pb2, subaccounts_pb2
+from polyester.gen.auth.v1 import address_book_pb2, auth_pb2, profile_pb2, subaccounts_pb2
 
 
 def test_me_from_proto_formats_ids_and_session() -> None:
@@ -21,6 +21,7 @@ def test_me_from_proto_formats_ids_and_session() -> None:
         api_key_id="ak_0123456789abcdef0123456789abcdef",
         username="alice",
         root_smart_account_address="0xabc",
+        api_key_scope=address_book_pb2.SCOPE_ROOT,
     )
     result = me_from_proto(msg)
     assert result.account_id == format_id(123456)

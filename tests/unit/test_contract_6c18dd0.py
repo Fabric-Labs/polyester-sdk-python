@@ -1,4 +1,4 @@
-"""Public contract 0.93.6: cancel-all that stops triggers, the typed answer to
+"""Public contract 6c18dd0 (0.93.6): cancel-all that stops triggers, the typed answer to
 an oversized ConnectRPC request, and the other handwritten follow-ups."""
 
 from __future__ import annotations

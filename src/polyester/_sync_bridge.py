@@ -42,6 +42,8 @@ def run_on_loop(
     call: Callable[[], Awaitable[T]],
     *,
     what: str = "a sync client method",
+    closed_error: type[PolyesterError] = PolyesterError,
+    closed_during: str = "the client closed during the call",
 ) -> T:
     """Run ``call()`` on ``loop`` and return its result once it has ended.
 
@@ -51,15 +53,18 @@ def run_on_loop(
     interrupted while it waits (for example by ``KeyboardInterrupt``), the
     call is cancelled and the interruption is raised only once the call has
     stopped, so nothing is sent on the caller's behalf afterwards. A call
-    on a closed client, or whose client closes while it waits, raises
-    :class:`~polyester.errors.PolyesterError`, and so does a call made from a
-    client callback, which runs on the loop and can't wait for it.
+    on a closed client, or whose client closes while it waits (its call
+    cancelled as the client loop finishes included), raises ``closed_error``
+    (:class:`~polyester.errors.PolyesterError` by default, with
+    ``closed_during`` once the call had been scheduled). A call made from a
+    client callback, which runs on the loop and can't wait for it, raises
+    :class:`~polyester.errors.PolyesterError`.
 
-    ``call`` runs on the loop, so a caller interrupted before the call was
-    scheduled leaves nothing behind.
+    ``call`` is called on the loop, so a caller interrupted before the call was
+    scheduled, or a call the loop stops before reaching, leaves nothing behind.
     """
     if not loop.is_running():
-        raise PolyesterError("the client is closed")
+        raise closed_error("the client is closed")
     refuse_on_client_loop(loop, what)
     finished = threading.Event()
     holder: dict[str, asyncio.Task[T]] = {}
@@ -92,10 +97,10 @@ def run_on_loop(
             loop.call_soon_threadsafe(start)
         except RuntimeError:
             # The loop closed since the check above: ``start`` never runs.
-            raise PolyesterError("the client is closed") from None
+            raise closed_error("the client is closed") from None
         while not finished.wait(_POLL_SECONDS):
             if not loop.is_running():
-                raise PolyesterError("the client closed during the call")
+                raise closed_error(closed_during)
     except BaseException:
         if not finished.is_set() and loop.is_running():
             # A loop closed since the check stopped the call with it.
@@ -104,4 +109,8 @@ def run_on_loop(
             while not finished.wait(_POLL_SECONDS) and loop.is_running():
                 pass
         raise
-    return holder["task"].result()
+    task = holder["task"]
+    if task.cancelled():
+        # Only the closing client loop cancels a call its caller still waits for.
+        raise closed_error(closed_during)
+    return task.result()

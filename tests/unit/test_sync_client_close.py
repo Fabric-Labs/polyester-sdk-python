@@ -179,3 +179,115 @@ def test_failed_start_up_closes_the_loop(monkeypatch: pytest.MonkeyPatch) -> Non
         Polyester(hydrate_catalogs=False)
     assert len(loops) == 1
     assert loops[0].is_closed()
+
+
+def _asyncio_errors(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name == "asyncio" and r.levelno >= 40]
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="counts /proc/self/fd")
+def test_loop_closes_when_its_thread_outlives_the_close_wait(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Short waits, so the close gives up on a loop a callback is blocking.
+    monkeypatch.setattr("polyester.client._SHUTDOWN_WAIT_SECONDS", 0.2, raising=False)
+    monkeypatch.setattr("polyester.client._LOOP_JOIN_SECONDS", 0.2, raising=False)
+    Polyester(hydrate_catalogs=False).close()
+    gc.collect()
+    before = _open_fds()
+    client = Polyester(hydrate_catalogs=False)
+    shut_down = threading.Event()
+    aclose = client._client.aclose
+
+    async def recording_aclose() -> None:
+        await aclose()
+        shut_down.set()
+
+    client._client.aclose = recording_aclose  # type: ignore[method-assign]
+    blocking = threading.Event()
+    release = threading.Event()
+
+    def block() -> None:
+        blocking.set()
+        release.wait(60)
+
+    client._loop.call_soon_threadsafe(block)
+    assert blocking.wait(5), "the blocking callback never ran"
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        client.close()
+        # The close gave up waiting: the callback still holds the loop.
+        assert client._loop_thread.is_alive()
+        started = time.monotonic()
+        client.close()
+        assert time.monotonic() - started < PROMPT_SECONDS
+        release.set()
+        client._loop_thread.join(5)
+        assert not client._loop_thread.is_alive()
+        gc.collect()
+    # The loop thread finished the shutdown the close started, then closed the loop.
+    assert shut_down.is_set(), "the client was never shut down"
+    assert client._loop.is_closed()
+    assert _open_fds() <= before
+    assert [str(w.message) for w in caught] == []
+    assert _asyncio_errors(caplog) == []
+
+
+def test_subscribe_queued_while_the_loop_stops_leaves_nothing_behind(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def subscribe(self, **kwargs):
+        raise AssertionError("setup must not start on a closing client")
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+    loop = client._loop
+    stopping = threading.Event()
+    queued = threading.Event()
+    proceed = threading.Event()
+    stop = loop.stop
+    call_soon_threadsafe = loop.call_soon_threadsafe
+
+    def stop_then_hold() -> None:
+        # The loop is in its final iteration from here: still running, stopping.
+        stop()
+        stopping.set()
+        proceed.wait(5)
+
+    def recording_call_soon_threadsafe(callback, *args, **kwargs):
+        handle = call_soon_threadsafe(callback, *args, **kwargs)
+        if stopping.is_set():
+            queued.set()
+        return handle
+
+    loop.stop = stop_then_hold  # type: ignore[method-assign]
+    loop.call_soon_threadsafe = recording_call_soon_threadsafe  # type: ignore[method-assign]
+    # Keep no exception object: its traceback would keep an abandoned coroutine alive.
+    outcome: list[tuple[type[BaseException], str]] = []
+
+    def subscribe_sync() -> None:
+        try:
+            client.orders.subscribe_sync(on_event=lambda _: None)
+        except BaseException as error:
+            outcome.append((type(error), str(error)))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        closer = threading.Thread(target=client.close, daemon=True)
+        closer.start()
+        assert stopping.wait(5), "the loop never stopped"
+        subscriber = threading.Thread(target=subscribe_sync, daemon=True)
+        subscriber.start()
+        assert queued.wait(5), "subscribe_sync never queued its setup"
+        proceed.set()
+        closer.join(10)
+        subscriber.join(10)
+        assert not closer.is_alive()
+        assert not subscriber.is_alive()
+        gc.collect()
+    assert len(outcome) == 1
+    assert issubclass(outcome[0][0], PolyesterRealtimeError), outcome
+    assert "closed" in outcome[0][1]
+    assert loop.is_closed()
+    assert [str(w.message) for w in caught] == []
+    assert _asyncio_errors(caplog) == []

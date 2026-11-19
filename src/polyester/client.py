@@ -113,6 +113,13 @@ from polyester.services.system import AsyncSystemService
 from polyester.sync_subscribe import SyncSubscription
 from polyester.transport import TransportConfig, TransportFactory
 
+# How long the sync client's close waits for the async client to shut down, and
+# then for its loop thread to stop. The loop thread itself gives a shutdown it
+# finds unfinished the same time, and its other tasks _LOOP_FINISH_SECONDS.
+_SHUTDOWN_WAIT_SECONDS = 10.0
+_LOOP_JOIN_SECONDS = 5.0
+_LOOP_FINISH_SECONDS = 5.0
+
 SPOT_CONFIG = CatalogSource(
     catalog="spot",
     name="spot config",
@@ -624,8 +631,9 @@ class Polyester:
         catalog_timeout: float | None = None,
     ) -> None:
         self._loop = asyncio.new_event_loop()
+        self._shutdown_task: asyncio.Task[None] | None = None
         self._loop_thread = threading.Thread(
-            target=self._loop.run_forever,
+            target=self._run_loop,
             name="polyester-sync-loop",
             daemon=True,
         )
@@ -794,32 +802,88 @@ class Polyester:
                 except Exception as exc:
                     first_failure = first_failure or exc
             self._active_sync_subscriptions.clear()
-
-            async def _shutdown() -> None:
-                await self._client.aclose()
-
             # A close interrupted after the loop stopped has nothing left to shut down.
             if self._loop.is_running():
-                future = asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
-                with contextlib.suppress(Exception):
-                    future.result(timeout=10)
+                self._shut_down_client()
             self._stop_loop()
             self._closed = True
         if first_failure is not None:
             raise first_failure
 
-    def _stop_loop(self) -> None:
-        """Stop the client loop, wait for its thread, then close the loop.
+    def _shut_down_client(self) -> None:
+        """Start the async client's shutdown on the loop and wait for it, up to
+        ``_SHUTDOWN_WAIT_SECONDS``.
 
-        Closing it releases its selector and wake-up descriptors. A thread still
-        running after the wait leaves the loop open: a running loop can't be closed.
+        The shutdown is created on the loop, so one the loop never reaches
+        leaves nothing behind. One the wait gives up on, because a callback
+        holds the loop, is finished by the loop thread before the loop closes.
         """
-        if self._loop.is_closed():
+        finished = threading.Event()
+
+        def settled(task: asyncio.Task[None]) -> None:
+            # A failed shutdown still closes the client: mark it retrieved.
+            if not task.cancelled():
+                task.exception()
+            finished.set()
+
+        def start() -> None:
+            task = self._loop.create_task(self._client.aclose())
+            task.add_done_callback(settled)
+            self._shutdown_task = task
+
+        try:
+            self._loop.call_soon_threadsafe(start)
+        except RuntimeError:
             return
-        self._loop.call_soon_threadsafe(self._loop.stop)
-        self._loop_thread.join(timeout=5)
-        if not self._loop_thread.is_alive():
-            self._loop.close()
+        finished.wait(_SHUTDOWN_WAIT_SECONDS)
+
+    def _stop_loop(self) -> None:
+        """Stop the client loop and wait up to ``_LOOP_JOIN_SECONDS`` for its thread.
+
+        The thread closes the loop as it ends, so a thread the wait gives up on
+        still releases the loop's selector and wake-up descriptors once the
+        callback holding it returns.
+        """
+        with contextlib.suppress(RuntimeError):  # closed already
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        self._loop_thread.join(timeout=_LOOP_JOIN_SECONDS)
+
+    def _run_loop(self) -> None:
+        """The loop thread: run the loop until it stops, finish, then close it."""
+        loop = self._loop
+        try:
+            loop.run_forever()
+        finally:
+            try:
+                self._finish_loop()
+            finally:
+                loop.close()
+
+    def _finish_loop(self) -> None:
+        """Finish what the stopped loop holds, as :func:`asyncio.run` does.
+
+        A client shutdown a close stopped waiting for runs to its end, up to
+        ``_SHUTDOWN_WAIT_SECONDS``. Every other task left is cancelled and given
+        up to ``_LOOP_FINISH_SECONDS`` to end, so none is dropped unstarted or
+        mid-call: a sync caller waiting on one gets the closed client's error.
+        """
+        loop = self._loop
+        shutdown = self._shutdown_task
+        if shutdown is not None and not shutdown.done():
+            loop.run_until_complete(asyncio.wait([shutdown], timeout=_SHUTDOWN_WAIT_SECONDS))
+        deadline = time.monotonic() + _LOOP_FINISH_SECONDS
+        while True:
+            pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+            remaining = deadline - time.monotonic()
+            if not pending or remaining <= 0:
+                return
+            for task in pending:
+                task.cancel()
+            loop.run_until_complete(asyncio.wait(pending, timeout=remaining))
+            for task in pending:
+                # Their failures were reported to their callers, if anywhere.
+                if task.done() and not task.cancelled():
+                    task.exception()
 
     def __enter__(self) -> Polyester:
         return self

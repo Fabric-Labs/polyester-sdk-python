@@ -29,6 +29,7 @@ class ApiKeyPurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PURPOSE_UNSPECIFIED: _ClassVar[ApiKeyPurpose]
     STANDARD: _ClassVar[ApiKeyPurpose]
     ASSISTANT: _ClassVar[ApiKeyPurpose]
+    ADMIN_KEY: _ClassVar[ApiKeyPurpose]
 
 class AssistantKeyPreset(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -42,6 +43,7 @@ DISABLED: ApiKeyStatus
 PURPOSE_UNSPECIFIED: ApiKeyPurpose
 STANDARD: ApiKeyPurpose
 ASSISTANT: ApiKeyPurpose
+ADMIN_KEY: ApiKeyPurpose
 PRESET_UNSPECIFIED: AssistantKeyPreset
 READ_ONLY: AssistantKeyPreset
 TRADE_WITH_APPROVAL: AssistantKeyPreset
@@ -83,20 +85,22 @@ class ApiKey(_message.Message):
     def __init__(self, key_id: _Optional[str] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_used_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., public_key_ed25519: _Optional[bytes] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_by_actor: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., purpose: _Optional[_Union[ApiKeyPurpose, str]] = ...) -> None: ...
 
 class CreateApiKeyRequest(_message.Message):
-    __slots__ = ("label", "subaccount_id", "icon", "color", "ip_whitelist", "public_key_ed25519")
+    __slots__ = ("label", "subaccount_id", "icon", "color", "ip_whitelist", "public_key_ed25519", "purpose")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
     COLOR_FIELD_NUMBER: _ClassVar[int]
     IP_WHITELIST_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_ED25519_FIELD_NUMBER: _ClassVar[int]
+    PURPOSE_FIELD_NUMBER: _ClassVar[int]
     label: str
     subaccount_id: int
     icon: str
     color: str
     ip_whitelist: _containers.RepeatedScalarFieldContainer[str]
     public_key_ed25519: bytes
-    def __init__(self, label: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., public_key_ed25519: _Optional[bytes] = ...) -> None: ...
+    purpose: ApiKeyPurpose
+    def __init__(self, label: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., public_key_ed25519: _Optional[bytes] = ..., purpose: _Optional[_Union[ApiKeyPurpose, str]] = ...) -> None: ...
 
 class CreateApiKeyResponse(_message.Message):
     __slots__ = ("api_key",)
@@ -139,20 +143,22 @@ class GetApiKeyResponse(_message.Message):
     def __init__(self, api_key: _Optional[_Union[ApiKey, _Mapping]] = ...) -> None: ...
 
 class ApiKeyUpdateSpec(_message.Message):
-    __slots__ = ("label", "icon", "color", "status", "ip_whitelist", "expires_at")
+    __slots__ = ("label", "icon", "color", "status", "ip_whitelist", "expires_at", "purpose")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
     COLOR_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     IP_WHITELIST_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    PURPOSE_FIELD_NUMBER: _ClassVar[int]
     label: str
     icon: str
     color: str
     status: ApiKeyStatus
     ip_whitelist: _containers.RepeatedScalarFieldContainer[str]
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    purpose: ApiKeyPurpose
+    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., purpose: _Optional[_Union[ApiKeyPurpose, str]] = ...) -> None: ...
 
 class UpdateApiKeyRequest(_message.Message):
     __slots__ = ("key_id", "api_key", "update_mask", "expected_revision")

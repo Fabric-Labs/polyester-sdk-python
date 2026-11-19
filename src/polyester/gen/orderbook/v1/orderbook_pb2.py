@@ -26,9 +26,10 @@ from polyester.gen.buf.validate import validate_pb2 as buf_dot_validate_dot_vali
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as gnostic_dot_openapi_dot_v3_dot_annotations__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from polyester.gen.polyester.api import options_pb2 as polyester_dot_api_dot_options__pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2 as polyester_dot_type_dot_v1_dot_depth__tier__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1corderbook/v1/orderbook.proto\x12\x0corderbook.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\"Q\n\x13GetOrderBookRequest\x12$\n\tsymbol_id\x18\x01 \x01(\rB\x07\xbaH\x04*\x02 \x00R\x08symbolId\x12\x14\n\x05\x64\x65pth\x18\x03 \x01(\rR\x05\x64\x65pth\"L\n\nPriceLevel\x12\x1f\n\x0bprice_ticks\x18\x01 \x01(\x03R\npriceTicks\x12\x1d\n\nqty_scaled\x18\x02 \x01(\x03R\tqtyScaled\"\xb0\x02\n\x14GetOrderBookResponse\x12\x1b\n\tsymbol_id\x18\x01 \x01(\rR\x08symbolId\x12\x19\n\x08\x62ook_seq\x18\x02 \x01(\x04R\x07\x62ookSeq\x12,\n\x04\x62ids\x18\x03 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x62ids\x12,\n\x04\x61sks\x18\x04 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x61sks\x12*\n\x02ts\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x02ts\x12\x1c\n\tavailable\x18\x06 \x01(\x08R\tavailable\x12\x1d\n\nbook_epoch\x18\x07 \x01(\x04R\tbookEpoch\x12\x1b\n\tmax_depth\x18\x08 \x01(\rR\x08maxDepth\"\x93\x02\n\x0eOrderBookDelta\x12\x1b\n\tsymbol_id\x18\x01 \x01(\rR\x08symbolId\x12$\n\x0e\x62ook_seq_start\x18\x02 \x01(\x04R\x0c\x62ookSeqStart\x12 \n\x0c\x62ook_seq_end\x18\x03 \x01(\x04R\nbookSeqEnd\x12,\n\x04\x62ids\x18\x04 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x62ids\x12,\n\x04\x61sks\x18\x05 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x61sks\x12\x14\n\x05reset\x18\x06 \x01(\x08R\x05reset\x12*\n\x02ts\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x02ts2\xd4\x02\n\x10OrderbookService\x12\xaf\x02\n\x0cGetOrderBook\x12!.orderbook.v1.GetOrderBookRequest\x1a\".orderbook.v1.GetOrderBookResponse\"\xd7\x01\xbaG\xcf\x01\n\x11Orderbook Service\x12\x0eGet Order Book\x1a\xa9\x01Retrieve a spot order book depth snapshot for a symbol. Supports a selectable depth per side, up to the max_depth each response reports, and returns best bid/ask levels.\x88\xb5\x18\x01\x1a\x0e\x8a\xb5\x18\nmarketdataB\x97\x01ZDgithub.com/Fabric-Labs/polyester-sdk-go/gen/orderbook/v1;orderbookv1\xbaGN:L\n\x11Orderbook Service\x12\x37Public read surface for spot orderbook depth snapshots.b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1corderbook/v1/orderbook.proto\x12\x0corderbook.v1\x1a\x1b\x62uf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\x1a\"polyester/type/v1/depth_tier.proto\"y\n\x13GetOrderBookRequest\x12$\n\tsymbol_id\x18\x01 \x01(\rB\x07\xbaH\x04*\x02 \x00R\x08symbolId\x12<\n\x05\x64\x65pth\x18\x02 \x01(\x0e\x32\x1c.polyester.type.v1.DepthTierB\x08\xbaH\x05\x82\x01\x02\x10\x01R\x05\x64\x65pth\"L\n\nPriceLevel\x12\x1f\n\x0bprice_ticks\x18\x01 \x01(\x03R\npriceTicks\x12\x1d\n\nqty_scaled\x18\x02 \x01(\x03R\tqtyScaled\"\xc7\x02\n\x14GetOrderBookResponse\x12\x1b\n\tsymbol_id\x18\x01 \x01(\rR\x08symbolId\x12\x19\n\x08\x62ook_seq\x18\x02 \x01(\x04R\x07\x62ookSeq\x12,\n\x04\x62ids\x18\x03 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x62ids\x12,\n\x04\x61sks\x18\x04 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x61sks\x12*\n\x02ts\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x02ts\x12\x1c\n\tavailable\x18\x06 \x01(\x08R\tavailable\x12\x1d\n\nbook_epoch\x18\x07 \x01(\x04R\tbookEpoch\x12\x32\n\x05\x64\x65pth\x18\t \x01(\x0e\x32\x1c.polyester.type.v1.DepthTierR\x05\x64\x65pth\"\x93\x02\n\x0eOrderBookDelta\x12\x1b\n\tsymbol_id\x18\x01 \x01(\rR\x08symbolId\x12$\n\x0e\x62ook_seq_start\x18\x02 \x01(\x04R\x0c\x62ookSeqStart\x12 \n\x0c\x62ook_seq_end\x18\x03 \x01(\x04R\nbookSeqEnd\x12,\n\x04\x62ids\x18\x04 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x62ids\x12,\n\x04\x61sks\x18\x05 \x03(\x0b\x32\x18.orderbook.v1.PriceLevelR\x04\x61sks\x12\x14\n\x05reset\x18\x06 \x01(\x08R\x05reset\x12*\n\x02ts\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x02ts2\xc1\x02\n\x10OrderbookService\x12\x9c\x02\n\x0cGetOrderBook\x12!.orderbook.v1.GetOrderBookRequest\x1a\".orderbook.v1.GetOrderBookResponse\"\xc4\x01\xbaG\xbc\x01\n\x11Orderbook Service\x12\x0eGet Order Book\x1a\x96\x01Retrieve a spot order book depth snapshot for a symbol. Supports a selectable depth tier per side, up to 5000 levels, and returns best bid/ask levels.\x88\xb5\x18\x01\x1a\x0e\x8a\xb5\x18\nmarketdataB\x97\x01ZDgithub.com/Fabric-Labs/polyester-sdk-go/gen/orderbook/v1;orderbookv1\xbaGN:L\n\x11Orderbook Service\x12\x37Public read surface for spot orderbook depth snapshots.b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -38,18 +39,20 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'ZDgithub.com/Fabric-Labs/polyester-sdk-go/gen/orderbook/v1;orderbookv1\272GN:L\n\021Orderbook Service\0227Public read surface for spot orderbook depth snapshots.'
   _globals['_GETORDERBOOKREQUEST'].fields_by_name['symbol_id']._loaded_options = None
   _globals['_GETORDERBOOKREQUEST'].fields_by_name['symbol_id']._serialized_options = b'\272H\004*\002 \000'
+  _globals['_GETORDERBOOKREQUEST'].fields_by_name['depth']._loaded_options = None
+  _globals['_GETORDERBOOKREQUEST'].fields_by_name['depth']._serialized_options = b'\272H\005\202\001\002\020\001'
   _globals['_ORDERBOOKSERVICE']._loaded_options = None
   _globals['_ORDERBOOKSERVICE']._serialized_options = b'\212\265\030\nmarketdata'
   _globals['_ORDERBOOKSERVICE'].methods_by_name['GetOrderBook']._loaded_options = None
-  _globals['_ORDERBOOKSERVICE'].methods_by_name['GetOrderBook']._serialized_options = b'\272G\317\001\n\021Orderbook Service\022\016Get Order Book\032\251\001Retrieve a spot order book depth snapshot for a symbol. Supports a selectable depth per side, up to the max_depth each response reports, and returns best bid/ask levels.\210\265\030\001'
-  _globals['_GETORDERBOOKREQUEST']._serialized_start=175
-  _globals['_GETORDERBOOKREQUEST']._serialized_end=256
-  _globals['_PRICELEVEL']._serialized_start=258
-  _globals['_PRICELEVEL']._serialized_end=334
-  _globals['_GETORDERBOOKRESPONSE']._serialized_start=337
-  _globals['_GETORDERBOOKRESPONSE']._serialized_end=641
-  _globals['_ORDERBOOKDELTA']._serialized_start=644
-  _globals['_ORDERBOOKDELTA']._serialized_end=919
-  _globals['_ORDERBOOKSERVICE']._serialized_start=922
-  _globals['_ORDERBOOKSERVICE']._serialized_end=1262
+  _globals['_ORDERBOOKSERVICE'].methods_by_name['GetOrderBook']._serialized_options = b'\272G\274\001\n\021Orderbook Service\022\016Get Order Book\032\226\001Retrieve a spot order book depth snapshot for a symbol. Supports a selectable depth tier per side, up to 5000 levels, and returns best bid/ask levels.\210\265\030\001'
+  _globals['_GETORDERBOOKREQUEST']._serialized_start=211
+  _globals['_GETORDERBOOKREQUEST']._serialized_end=332
+  _globals['_PRICELEVEL']._serialized_start=334
+  _globals['_PRICELEVEL']._serialized_end=410
+  _globals['_GETORDERBOOKRESPONSE']._serialized_start=413
+  _globals['_GETORDERBOOKRESPONSE']._serialized_end=740
+  _globals['_ORDERBOOKDELTA']._serialized_start=743
+  _globals['_ORDERBOOKDELTA']._serialized_end=1018
+  _globals['_ORDERBOOKSERVICE']._serialized_start=1021
+  _globals['_ORDERBOOKSERVICE']._serialized_end=1342
 # @@protoc_insertion_point(module_scope)

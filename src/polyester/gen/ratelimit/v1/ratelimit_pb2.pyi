@@ -19,9 +19,11 @@ class TradingRateLimitClass(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRADING_RATE_LIMIT_CLASS_UNSPECIFIED: _ClassVar[TradingRateLimitClass]
     TRADING_RATE_LIMIT_CLASS_PLACE: _ClassVar[TradingRateLimitClass]
     TRADING_RATE_LIMIT_CLASS_CANCEL: _ClassVar[TradingRateLimitClass]
+    TRADING_RATE_LIMIT_CLASS_READ: _ClassVar[TradingRateLimitClass]
 TRADING_RATE_LIMIT_CLASS_UNSPECIFIED: TradingRateLimitClass
 TRADING_RATE_LIMIT_CLASS_PLACE: TradingRateLimitClass
 TRADING_RATE_LIMIT_CLASS_CANCEL: TradingRateLimitClass
+TRADING_RATE_LIMIT_CLASS_READ: TradingRateLimitClass
 
 class TradingRateLimitRule(_message.Message):
     __slots__ = ("policy_class", "vip_tier", "quota_weight", "period_ms", "burst_weight")

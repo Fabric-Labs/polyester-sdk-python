@@ -589,3 +589,87 @@ def test_media_type_of_reads_exactly_one_well_formed_field(values, expected) -> 
     from polyester._problem import media_type_of
 
     assert media_type_of(values) == expected
+
+
+# --- review round 4: the typed proof needs the explicit wire code and only that detail ---------
+
+
+def _connect_body(status: int, code, details: list[tuple[str, bytes]]):
+    import base64
+    import json
+
+    from tests.hardening_support import HttpScript
+
+    body: dict = {
+        "message": "transfer checks unavailable",
+        "details": [
+            {"type": name, "value": base64.b64encode(value).decode()} for name, value in details
+        ],
+    }
+    if code is not ...:
+        body["code"] = code
+    return HttpScript.raw(
+        status,
+        headers=[("Content-Type", "application/json"), ("Retry-After", "7")],
+        body=json.dumps(body).encode(),
+    )
+
+
+_SERVICE = "ERROR_CODE_SERVICE_UNAVAILABLE"
+_CAPITAL_VIEW = "ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE"
+
+
+def _transfer(code_name: str) -> tuple[str, bytes]:
+    return ("transfer.v1.ErrorDetail", _transfer_detail(code_name).SerializeToString())
+
+
+@pytest.mark.parametrize(
+    "code", [..., "", None, "unspecified"], ids=["missing", "empty", "null", "unspecified"]
+)
+async def test_an_inferred_connect_code_proves_nothing(code) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(
+        _connect_body(503, code, [_transfer("ERROR_CODE_SERVICE_UNAVAILABLE")])
+    )
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        [
+            _transfer("ERROR_CODE_SERVICE_UNAVAILABLE"),
+            _transfer("ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE"),
+        ],
+        [
+            _transfer("ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE"),
+            _transfer("ERROR_CODE_SERVICE_UNAVAILABLE"),
+        ],
+        [_transfer("ERROR_CODE_SERVICE_UNAVAILABLE"), _transfer("ERROR_CODE_SERVICE_UNAVAILABLE")],
+        [
+            _transfer("ERROR_CODE_SERVICE_UNAVAILABLE"),
+            ("orders.v1.ErrorDetail", _orders_unavailable().SerializeToString()),
+        ],
+        [_transfer("ERROR_CODE_SERVICE_UNAVAILABLE"), ("x.y.Unknown", b"\x08\x01")],
+        [_transfer("ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE")],
+    ],
+    ids=["then-other", "other-then", "repeated", "plus-foreign", "plus-unknown", "other-code"],
+)
+async def test_only_a_single_admission_detail_proves_the_refusal(details) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(_connect_body(503, "unavailable", details))
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+@pytest.mark.parametrize("code", _PRE_ADMISSION)
+async def test_the_explicit_wire_code_with_its_single_detail_is_the_refusal(code) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(_connect_body(503, "unavailable", [_transfer(code)]))
+    assert (error.status_code, error.retry_after) == (503, 7)
+    assert not mutation_outcome_unknown(error)
+    assert is_retryable_error(error)

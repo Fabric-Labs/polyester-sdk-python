@@ -64,22 +64,30 @@ _BATCH_PRE_ADMISSION_CODES = frozenset({"SERVICE_UNAVAILABLE", "ACCOUNT_SHARD_UN
 
 def _is_pre_admission_refusal(err: PolyesterError) -> bool:
     """Whether a batch failure is a documented pre-admission refusal: a
-    :class:`PolyesterServerError` from an actual HTTP 503 carrying either a
-    typed ``transfer.v1.ErrorDetail`` with one of its codes (ConnectRPC
-    ``unavailable``) or the contract's REST problem for one, served as
-    ``application/problem+json`` and declaring that code's ``type``. A 502 or
-    504, another detail type or media type, generic JSON or a code only in a
-    diagnostic field is not."""
+    :class:`PolyesterServerError` from an actual HTTP 503 that is either a
+    ConnectRPC error whose body names ``unavailable`` itself and carries
+    exactly one detail, a ``transfer.v1.ErrorDetail`` with one of its codes,
+    or the contract's REST problem for one, served under one
+    ``application/problem+json`` field and declaring that code's ``type``.
+    A code read from the status, another or an extra detail, a 502 or 504,
+    another media type, generic JSON or a code only in a diagnostic field
+    is not."""
     if not isinstance(err, PolyesterServerError):
         return False
     if err.status_code != 503:
         return False
-    raw = err.raw
-    if raw is not None:
-        detail_type = getattr(getattr(raw, "DESCRIPTOR", None), "full_name", None)
+    details = err._connect_details
+    if details:
+        # The typed proof: the body itself names unavailable (never read from
+        # the status), and its one detail is a transfer refusal of an
+        # admission code. Any other or extra detail proves nothing.
+        if err._wire_connect_code != "unavailable" or len(details) != 1:
+            return False
+        detail = details[0]
+        detail_type = getattr(getattr(detail, "DESCRIPTOR", None), "full_name", None)
         if detail_type != "transfer.v1.ErrorDetail":
             return False
-        code = int(getattr(raw, "code", 0))
+        code = int(getattr(detail, "code", 0))
         name = error_code_name(transfer_pb2.ErrorCode, code).removeprefix("ERROR_CODE_")
         return name in _BATCH_PRE_ADMISSION_CODES
     problem = err.problem

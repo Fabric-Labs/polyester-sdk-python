@@ -178,6 +178,12 @@ class PolyesterError(Exception):
     # known), False for any other failure of such a call (unknown), None to
     # apply the general rules.
     _outcome_known: bool | None = None
+    # What a ConnectRPC answer named itself: the code its body stated ("" when
+    # read from the HTTP status) and every error detail it carried, decoded
+    # (``None`` for one this SDK cannot read). ``None`` when no ConnectRPC
+    # error stood behind this one.
+    _wire_connect_code: str | None = None
+    _connect_details: tuple[object | None, ...] | None = None
     # The status the error mapping read a code as, kept for classification
     # only; ``status_code`` reports the answer's own.
     _admission_status: int | None = None

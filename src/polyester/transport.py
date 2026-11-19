@@ -114,6 +114,9 @@ class _AnswerError(ConnectError):
 
     http_status: int | None = None
     retry_after: float | None = None
+    # The ConnectRPC code the answer's body named itself; "" when the code was
+    # read from the HTTP status because the body named none.
+    wire_code: str = ""
 
 
 def _retry_after_header(response: pyqwest.FullResponse) -> float | None:
@@ -349,11 +352,13 @@ def _classify_failed_answer(response: pyqwest.FullResponse) -> pyqwest.FullRespo
         ):
             raise _no_recognised_code_error(response, body)
         # Decoded here, as Connect would, so the answer's metadata rides along.
-        raise _AnswerError(
+        answer = _AnswerError(
             Code(code),
             str((body.get("message") if isinstance(body, dict) else None) or ""),
             details,
         )
+        answer.wire_code = str(code)
+        raise answer
     if has_no_code:
         return _answer_without_a_code(response, body, is_json, code, details)
     assert isinstance(code, str)

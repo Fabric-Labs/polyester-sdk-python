@@ -33,6 +33,7 @@ from polyester.errors import (
     PolyesterRealtimeError,
     PolyesterRealtimeOverflowError,
     PolyesterRedirectError,
+    PolyesterResponseContractError,
     PolyesterValidationError,
 )
 from polyester.gen.orders.v1.orders_read_pb2 import Order as OrderPb
@@ -65,6 +66,14 @@ SUBSCRIBE_ACK_TIMEOUT = 30.0
 # A malformed frame (4400) and a rejected connect token (4403) recur on every reconnect.
 TERMINAL_CLOSE_CODES = frozenset({4400, 4403})
 HEARTBEAT_TIMEOUT_CLOSE_CODE = 4000
+# Closes a connection whose own handling failed.
+INTERNAL_ERROR_CLOSE_CODE = 1011
+# Unexpected failures of the stream's own handling that recovery may retry: per
+# account until its cursor moves, and per connection until every account it hit
+# has moved its cursor. The last one ends the account (or the stream).
+MAX_INTERNAL_FAILURES = 3
+# What decoding a malformed frame raises; anything else is an internal failure.
+DECODE_ERRORS = (PolyesterValidationError, PolyesterResponseContractError)
 
 
 def private_ws_url(api_url: str) -> str:
@@ -91,6 +100,33 @@ def _is_terminal_token_error(exc: BaseException) -> bool:
     return isinstance(exc, (PolyesterAuthError, PolyesterRedirectError, PolyesterValidationError))
 
 
+def _internal_error(exc: Exception) -> PolyesterRealtimeError:
+    """An unexpected failure of the stream's own handling; ``exc`` is its cause."""
+    error = PolyesterRealtimeError(f"private order stream failed: {type(exc).__name__}: {exc}")
+    error.__cause__ = exc
+    return error
+
+
+class _SubscriptionFailure(Exception):
+    """Applying a frame or running a task for one subscription failed unexpectedly."""
+
+    def __init__(self, subscription: _Subscription, error: Exception) -> None:
+        super().__init__(str(error))
+        self.subscription = subscription
+        self.error = error
+
+
+def _cache_key(order_id: object) -> str:
+    """An order ID as a key of the cached view.
+
+    Only an exact ``str``: setting and popping such keys runs no code that can
+    fail, so committing a staged change cannot stop part way.
+    """
+    if type(order_id) is not str:
+        raise TypeError(f"order ID is a {type(order_id).__name__}, not a str")
+    return order_id
+
+
 def _request_error_code(code: int) -> str:
     try:
         return pb.RequestError.Code.Name(code)
@@ -105,6 +141,8 @@ class _Consumer:
     ready: asyncio.Future[None]
     # Joined a running subscription: the cached view follows its Connected.
     catch_up: bool = False
+    # Got its Connected (and any replay): only then is it told anything else.
+    joined: bool = False
 
 
 @dataclass(eq=False)
@@ -134,6 +172,10 @@ class _Subscription:
     retry_handle: asyncio.TimerHandle | None = None
     # The server confirmed this subscription at least once.
     confirmed: bool = False
+    # Unexpected failures attributed to it since its cursor last moved.
+    failures: int = 0
+    # A failure of the whole connection hit it and its cursor has not moved since.
+    unrecovered: bool = False
 
 
 @dataclass(frozen=True)
@@ -176,6 +218,12 @@ class PrivateOrderStream:
         self._outbox: asyncio.Queue[bytes] | None = None
         self._run_task: asyncio.Task[None] | None = None
         self._tasks: set[asyncio.Task[Any]] = set()
+        # Work for this connection failed, for one subscription or the whole
+        # connection; that connection's _run recovers from it.
+        self._failure: tuple[ClientConnection, _Subscription | None, Exception] | None = None
+        # Unexpected failures not attributed to one subscription, until every
+        # subscription they hit has moved its cursor.
+        self._failures = 0
         self._request_seq = 0
         self._closed = False
 
@@ -200,14 +248,21 @@ class PrivateOrderStream:
         s = self._subs.get(channel)
         if s is not None:
             s.consumers.append(consumer)
-            self._catch_up(s, consumer)
+            try:
+                self._catch_up(s, consumer)
+            except Exception as exc:
+                # Only this consumer's replay failed: it ends; the others keep going.
+                s.consumers.remove(consumer)
+                self._end_consumer(consumer, _internal_error(exc))
         else:
             s = _Subscription(channel=channel, account=account, consumers=[consumer])
             self._subs[channel] = s
             if self._ws is not None and self._authenticated:
-                self._spawn(self._subscribe(self._ws, s))
+                self._spawn(self._subscribe(self._ws, s), self._ws, s)
             elif self._run_task is None:
-                self._run_task = self._spawn(self._run())
+                self._run_task = asyncio.create_task(self._run())
+                self._tasks.add(self._run_task)
+                self._run_task.add_done_callback(self._tasks.discard)
         sub = s
         consumer.subscription._on_closed = lambda _closed: self._remove(sub, consumer)
         try:
@@ -251,17 +306,18 @@ class PrivateOrderStream:
         if s.state == "connected":
             self._deliver_to(s, consumer, PrivateOrdersConnected())
 
-    def _deliver_cached(self, s: _Subscription, consumer: _Consumer) -> None:
+    def _cached_events(self, s: _Subscription) -> list[PrivateOrdersEvent]:
+        """What a joining consumer is owed after its ``Connected``."""
+        events: list[PrivateOrdersEvent] = []
         if s.orders is not None:
             # Each order decoded when it arrived, so this decode cannot fail.
             orders = private_orders_from_proto(s.orders.values(), scales=self.order_scales)
-            self._deliver_to(s, consumer, PrivateOrdersSnapshot(orders=orders))
+            events.append(PrivateOrdersSnapshot(orders=orders))
         if s.ready:
-            self._deliver_to(s, consumer, PrivateOrdersReady())
+            events.append(PrivateOrdersReady())
         if s.stale:
-            self._deliver_to(
-                s, consumer, PrivateOrdersStale(stale=True, order_ids=list(s.stale_order_ids))
-            )
+            events.append(PrivateOrdersStale(stale=True, order_ids=list(s.stale_order_ids)))
+        return events
 
     def _deliver(self, s: _Subscription, event: PrivateOrdersEvent) -> None:
         for consumer in list(s.consumers):
@@ -270,26 +326,34 @@ class PrivateOrderStream:
     def _deliver_to(self, s: _Subscription, consumer: _Consumer, event: PrivateOrdersEvent) -> None:
         if consumer not in s.consumers:
             return
-        try:
-            consumer.queue.put_nowait(event)
-        except asyncio.QueueFull:
-            # Never drop an update silently: fail this consumer only.
-            s.consumers.remove(consumer)
-            self._end_consumer(
-                consumer,
-                PolyesterRealtimeOverflowError(
-                    "private order stream queue full; consumer too slow"
-                ),
-            )
-            if not s.consumers:
-                self._teardown(s)
+        connected = isinstance(event, PrivateOrdersConnected)
+        if not connected and not consumer.joined:
+            # Its first event is Connected: until then it is told nothing; a
+            # join that fails raises from subscribe().
             return
-        if isinstance(event, PrivateOrdersConnected):
+        # A joining consumer's replay is prepared before anything reaches it: if
+        # that fails, the join stays pending and still owed its replay.
+        events = [event, *self._cached_events(s)] if connected and consumer.catch_up else [event]
+        for item in events:
+            try:
+                consumer.queue.put_nowait(item)
+            except asyncio.QueueFull:
+                # Never drop an update silently: fail this consumer only.
+                s.consumers.remove(consumer)
+                self._end_consumer(
+                    consumer,
+                    PolyesterRealtimeOverflowError(
+                        "private order stream queue full; consumer too slow"
+                    ),
+                )
+                if not s.consumers:
+                    self._teardown(s)
+                return
+        if connected:
+            consumer.catch_up = False
+            consumer.joined = True
             if not consumer.ready.done():
                 consumer.ready.set_result(None)
-            if consumer.catch_up:
-                consumer.catch_up = False
-                self._deliver_cached(s, consumer)
 
     def _end_consumer(self, consumer: _Consumer, error: BaseException | None) -> None:
         subscription = consumer.subscription
@@ -314,7 +378,8 @@ class PrivateOrderStream:
     def _report(self, s: _Subscription, kind: str, error: Exception) -> None:
         self._deliver(s, PrivateOrdersError(kind=kind, error=error))
         for consumer in list(s.consumers):
-            consumer.subscription._notify_error(error)
+            if consumer.joined:
+                consumer.subscription._notify_error(error)
 
     def _report_all(self, kind: str, error: Exception) -> None:
         for s in list(self._subs.values()):
@@ -340,7 +405,7 @@ class PrivateOrderStream:
         s.consumers.clear()
         self._teardown(s)
         for consumer in consumers:
-            if not told_disconnected:
+            if not told_disconnected and consumer.joined:
                 with contextlib.suppress(asyncio.QueueFull):
                     consumer.queue.put_nowait(PrivateOrdersDisconnected())
             self._end_consumer(consumer, error)
@@ -357,6 +422,7 @@ class PrivateOrderStream:
 
     async def _run(self) -> None:
         attempt = 0
+        self._failures = 0
         try:
             while self._owns_connection():
                 try:
@@ -398,12 +464,33 @@ class PrivateOrderStream:
                     await asyncio.sleep(_backoff_delay(attempt))
                     attempt += 1
                     continue
-                closed, stable = await self._serve(ws, token)
-                if stable:
+                served_at = time.monotonic()
+                # Nothing of a frame that failed was applied: recovery resumes it
+                # from the last applied cursor.
+                try:
+                    closed = await self._serve(ws, token)
+                    failed = self._take_failure(ws)
+                except asyncio.CancelledError:
+                    raise
+                except _SubscriptionFailure as exc:
+                    closed = _Closed(INTERNAL_ERROR_CLOSE_CODE)
+                    failed = (exc.subscription, exc.error)
+                    self._take_failure(ws)
+                except Exception as exc:
+                    closed = _Closed(INTERNAL_ERROR_CLOSE_CODE)
+                    failed = (None, exc)
+                    self._take_failure(ws)
+                if time.monotonic() - served_at >= STABLE_CONNECTION:
                     attempt = 0
                 if not self._owns_connection():
                     return
-                if closed.code in TERMINAL_CLOSE_CODES:
+                failure: PolyesterRealtimeError | None = None
+                if failed is not None:
+                    failure = _internal_error(failed[1])
+                    self._charge(failed[0], failure)
+                    if not self._owns_connection():
+                        return
+                elif closed.code in TERMINAL_CLOSE_CODES:
                     self._terminate_all(
                         PolyesterRealtimeError(
                             closed.reason or f"private WebSocket closed with code {closed.code}",
@@ -411,12 +498,14 @@ class PrivateOrderStream:
                         )
                     )
                     return
-                # A close that reconnects is not an error.
+                # A close that reconnects is not an error; a failure of this
+                # stream's own handling is, though it reconnects too.
                 for s in list(self._subs.values()):
                     if not s.confirmed:
                         self._terminate(
                             s,
-                            PolyesterRealtimeError(
+                            failure
+                            or PolyesterRealtimeError(
                                 f"private WebSocket closed with code {closed.code} "
                                 "before the subscription was confirmed",
                                 close_code=closed.code,
@@ -425,27 +514,69 @@ class PrivateOrderStream:
                     elif s.state == "connected":
                         s.state = "disconnected"
                         self._deliver(s, PrivateOrdersDisconnected())
+                if failure is not None:
+                    self._report_all("internal", failure)
                 if not self._owns_connection():
                     return
                 await asyncio.sleep(_backoff_delay(attempt))
                 attempt += 1
+        except Exception as exc:
+            # A failure outside a connection's handling leaves nothing to recover with.
+            if self._owns_connection():
+                self._terminate_all(_internal_error(exc))
         finally:
             if self._run_task is asyncio.current_task():
                 self._run_task = None
 
-    async def _serve(self, ws: ClientConnection, token: str) -> tuple[_Closed, bool]:
+    def _charge(self, s: _Subscription | None, error: PolyesterRealtimeError) -> None:
+        """Count an unexpected failure; past the limit, end what keeps failing."""
+        if s is not None and self._is_current(s):
+            s.failures += 1
+            if s.failures >= MAX_INTERNAL_FAILURES:
+                self._terminate(s, error)
+            return
+        self._failures += 1
+        for hit in self._subs.values():
+            hit.unrecovered = True
+        if self._failures >= MAX_INTERNAL_FAILURES:
+            self._terminate_all(error)
+
+    def _progressed(self, s: _Subscription, cursor: str) -> None:
+        """``s`` applied data and moved from ``cursor``; only a move proves that
+        what failed before is behind it. A failure of the whole connection is
+        behind it only once every subscription it hit has moved: another
+        account's progress says nothing about the one that keeps failing."""
+        s.retries = 0
+        if s.cursor == cursor:
+            return
+        s.failures = 0
+        s.unrecovered = False
+        if self._failures and not any(hit.unrecovered for hit in self._subs.values()):
+            self._failures = 0
+
+    def _take_failure(self, ws: ClientConnection) -> tuple[_Subscription | None, Exception] | None:
+        """The failure work for ``ws`` recorded, if any; it is cleared."""
+        failure = self._failure
+        if failure is None or failure[0] is not ws:
+            return None
+        self._failure = None
+        return failure[1], failure[2]
+
+    async def _serve(self, ws: ClientConnection, token: str) -> _Closed:
         """Authenticate, subscribe every account, and read until the socket closes."""
         outbox: asyncio.Queue[bytes] = asyncio.Queue()
         self._ws = ws
         self._outbox = outbox
+        # Outside _tasks, so a shutdown lets it flush the last unsubscribe; the
+        # finally below ends it.
         writer = asyncio.create_task(self._write(ws, outbox))
+        self._supervise(writer, ws)
         closed = _Closed(code=1000)
-        auth_at = time.monotonic()
         try:
             self._send(ws, pb.ClientMessage(auth=pb.Auth(token=token)))
             self._authenticated = True
             for s in list(self._subs.values()):
-                self._spawn(self._subscribe(ws, s))
+                self._spawn(self._subscribe(ws, s), ws, s)
             while self._ws is ws:
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=HEARTBEAT_TIMEOUT)
@@ -457,15 +588,18 @@ class PrivateOrderStream:
                     closed = _Closed(frame.code, frame.reason) if frame else _Closed(1006)
                     break
                 self._on_frame(ws, raw)
+        except Exception:
+            closed = _Closed(INTERNAL_ERROR_CLOSE_CODE, "internal error")
+            raise
         finally:
             writer.cancel()
             if self._ws is ws:
                 self._detach()
-            if closed.code == HEARTBEAT_TIMEOUT_CLOSE_CODE:
-                self._spawn(ws.close(closed.code, closed.reason))
+            if closed.code in (HEARTBEAT_TIMEOUT_CLOSE_CODE, INTERNAL_ERROR_CLOSE_CODE):
+                self._close_soon(ws, closed.code, closed.reason)
             else:
-                self._spawn(ws.close(1000))
-        return closed, time.monotonic() - auth_at >= STABLE_CONNECTION
+                self._close_soon(ws)
+        return closed
 
     async def _write(self, ws: ClientConnection, outbox: asyncio.Queue[bytes]) -> None:
         with contextlib.suppress(ConnectionClosed):
@@ -493,6 +627,8 @@ class PrivateOrderStream:
     def _shutdown(self) -> None:
         ws = self._ws
         self._detach()
+        # A failure no loop will recover from now belongs to no later connection.
+        self._failure = None
         current = asyncio.current_task()
         # A loop that is not cancelled here (it called this) sees it no longer owns the stream.
         self._run_task = None
@@ -500,13 +636,55 @@ class PrivateOrderStream:
             if task is not current:
                 task.cancel()
         if ws is not None:
-            self._spawn(ws.close(1000))
+            self._close_soon(ws)
 
-    def _spawn(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
+    def _spawn(
+        self,
+        coro: Coroutine[Any, Any, Any],
+        ws: ClientConnection,
+        s: _Subscription | None = None,
+    ) -> asyncio.Task[Any]:
+        """Run work for connection ``ws`` (and subscription ``s``), supervised."""
         task = asyncio.create_task(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+        self._supervise(task, ws, s)
         return task
+
+    def _supervise(
+        self, task: asyncio.Task[Any], ws: ClientConnection, s: _Subscription | None = None
+    ) -> None:
+        """Make an unexpected failure of ``task`` a failure of its connection."""
+
+        def done(task: asyncio.Task[Any]) -> None:
+            if task.cancelled():
+                return
+            error = task.exception()
+            if isinstance(error, Exception):
+                self._fail_connection(ws, s, error)
+
+        task.add_done_callback(done)
+
+    def _fail_connection(
+        self, ws: ClientConnection, s: _Subscription | None, error: Exception
+    ) -> None:
+        """Work for connection ``ws`` failed: drop it, and ``_run`` reports the
+        failure and recovers as when a frame's handling fails."""
+        if self._closed or not self._subs:
+            return
+        if self._ws is not ws:
+            # Its connection is gone: it neither drops nor charges a later one.
+            self._report_all("internal", _internal_error(error))
+            return
+        if self._failure is None or self._failure[0] is not ws:
+            self._failure = (ws, s, error)
+        self._close_soon(ws, INTERNAL_ERROR_CLOSE_CODE, "internal error")
+
+    def _close_soon(self, ws: ClientConnection, code: int = 1000, reason: str = "") -> None:
+        """Close a socket in the background; it no longer carries the stream."""
+        task = asyncio.create_task(ws.close(code, reason))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     def _next_request_id(self) -> str:
         self._request_seq += 1
@@ -584,7 +762,7 @@ class PrivateOrderStream:
         def retry() -> None:
             s.retry_handle = None
             if self._ws is ws and self._is_current(s) and not s.sub:
-                self._spawn(self._subscribe(ws, s))
+                self._spawn(self._subscribe(ws, s), ws, s)
 
         s.retry_handle = asyncio.get_running_loop().call_later(_backoff_delay(s.retries), retry)
         s.retries += 1
@@ -645,7 +823,7 @@ class PrivateOrderStream:
             self._retry_subscribe(ws, s)
         else:
             s.retries = 1
-            self._spawn(self._subscribe(ws, s))
+            self._spawn(self._subscribe(ws, s), ws, s)
         # Consumers see the gap as a disconnect and the replacement's Subscribed as a reconnect.
         if s.state == "connected":
             s.state = "disconnected"
@@ -704,12 +882,20 @@ class PrivateOrderStream:
             self._on_request_error(ws, msg.sub, msg.error)
             return
         if kind == "token_expiring":
-            self._spawn(self._reauthenticate(ws))
+            self._spawn(self._reauthenticate(ws), ws)
             return
 
         s = self._by_sub.get(msg.sub)
         if s is None:
             return
+        try:
+            self._on_subscription_frame(ws, s, msg, kind)
+        except Exception as exc:
+            raise _SubscriptionFailure(s, exc) from exc
+
+    def _on_subscription_frame(
+        self, ws: ClientConnection, s: _Subscription, msg: pb.ServerMessage, kind: str | None
+    ) -> None:
         if msg.seq > 0:
             if msg.seq != s.seq + 1:
                 self._resubscribe(ws, s)
@@ -726,24 +912,27 @@ class PrivateOrderStream:
         elif kind == "unit":
             self._on_unit(ws, s, msg.unit)
         elif kind == "covered":
+            cursor = s.cursor
             s.cursor = msg.covered.cursor
-            s.retries = 0
+            self._progressed(s, cursor)
         elif kind == "ready":
             # A resumed subscription on a quiet account delivers no data, only this.
+            # It does not show that anything that failed has applied since.
             s.retries = 0
             if not s.ready:
                 s.ready = True
                 self._deliver(s, PrivateOrdersReady())
         elif kind == "unavailable":
+            stale_order_ids = tuple(stale_order_ids_from_proto(msg.unavailable))
             s.stale = True
-            s.stale_order_ids = tuple(stale_order_ids_from_proto(msg.unavailable))
+            s.stale_order_ids = stale_order_ids
             self._deliver(s, PrivateOrdersStale(stale=True, order_ids=list(s.stale_order_ids)))
         elif kind == "available":
             s.stale = False
             s.stale_order_ids = ()
             self._deliver(s, PrivateOrdersStale(stale=False))
         elif kind == "subscribe_expiring":
-            self._spawn(self._refresh(ws, s))
+            self._spawn(self._refresh(ws, s), ws, s)
         elif kind == "unsubscribed":
             # The server ended it: its token expired, or for a reason this client does not know.
             self._by_sub.pop(s.sub, None)
@@ -761,11 +950,17 @@ class PrivateOrderStream:
             return
         del self._pending[msg.subscribed.id]
         s = request.subscription
-        s.sub = msg.sub
+        try:
+            self._confirm(s, msg.sub)
+        except Exception as exc:
+            raise _SubscriptionFailure(s, exc) from exc
+
+    def _confirm(self, s: _Subscription, sub: str) -> None:
+        s.sub = sub
         s.seq = 0
         s.ready = False
         s.confirmed = True
-        self._by_sub[msg.sub] = s
+        self._by_sub[sub] = s
         if s.state != "connected":
             s.state = "connected"
             self._deliver(s, PrivateOrdersConnected())
@@ -784,31 +979,46 @@ class PrivateOrderStream:
             return
         try:
             orders = private_orders_from_proto(staged, scales=self.order_scales)
-        except Exception as exc:
+        except DECODE_ERRORS as exc:
+            # A malformed snapshot: take a fresh one. Any other failure is the
+            # stream's own and keeps the last applied cursor.
             self._report(s, "decode", exc)
             s.cursor = ""
             self._resubscribe(ws, s)
             return
+        # Build the whole next state first: a failure leaves the last applied
+        # view and cursor in place.
+        view = {_cache_key(order.order_id): raw for order, raw in zip(orders, staged, strict=True)}
+        event = PrivateOrdersSnapshot(orders=orders)
+        cursor = s.cursor
         s.cursor = end.cursor
-        s.retries = 0
-        s.orders = {order.order_id: raw for order, raw in zip(orders, staged, strict=True)}
-        self._deliver(s, PrivateOrdersSnapshot(orders=orders))
+        s.orders = view
+        self._progressed(s, cursor)
+        self._deliver(s, event)
 
     def _on_unit(self, ws: ClientConnection, s: _Subscription, unit: pb.Unit) -> None:
         try:
             event = private_orders_unit_from_proto(unit, scales=self.order_scales)
-        except Exception as exc:
-            # The unit is not applied: resume from the cursor before it.
+        except DECODE_ERRORS as exc:
+            # A malformed unit is not applied: resume from the cursor before it.
             self._report(s, "decode", exc)
             self._resubscribe(ws, s)
             return
+        # Stage the whole change, upserts and removals, first: a failure applies
+        # none of the unit, so the cursor before it still resumes it. The commit
+        # below sets and pops exact str keys only, which cannot fail.
+        upserts = {
+            _cache_key(order.order_id): raw
+            for order, raw in zip(event.orders, unit.orders, strict=True)
+        }
+        removals = [_cache_key(order_id) for order_id in event.removed_order_ids]
+        cursor = s.cursor
         s.cursor = unit.next_cursor
-        s.retries = 0
         if s.orders is not None:
-            for order, raw in zip(event.orders, unit.orders, strict=True):
-                s.orders[order.order_id] = raw
-            for order_id in event.removed_order_ids:
+            s.orders.update(upserts)
+            for order_id in removals:
                 s.orders.pop(order_id, None)
+        self._progressed(s, cursor)
         self._deliver(s, event)
 
     def _on_request_error(self, ws: ClientConnection, sub: str, error: pb.RequestError) -> None:
@@ -833,7 +1043,7 @@ class PrivateOrderStream:
         if request is not None and request.kind == "subscribe":
             if error.code == pb.RequestError.CURSOR_INVALID:
                 s.cursor = ""
-                self._spawn(self._subscribe(ws, s))
+                self._spawn(self._subscribe(ws, s), ws, s)
                 return
             self._terminate(s, realtime_error)
             return

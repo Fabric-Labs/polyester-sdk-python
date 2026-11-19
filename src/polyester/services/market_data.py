@@ -282,6 +282,15 @@ class AsyncMarketDataService(BaseService):
         include_reference: bool = False,
         page_token: str = "",
     ) -> CandlesResult:
+        """One page of candles from the columnar call, oldest-first.
+
+        The columnar response carries no closed flag, so each candle's
+        ``is_closed`` follows ``include_incomplete``. Without it, every row is a
+        closed candle and reads ``True``. With it, the newest row, and the newest
+        reference row, reads ``False``, meaning not known to be closed: it is the
+        open candle when one was available. Every earlier row reads ``True``. Use
+        :meth:`get_candles` for the server's own flag on each row.
+        """
         # Candles are decoded with the pair's catalog volume scale.
         await self._ensure_catalogs()
         request = _build_candles_request(
@@ -309,6 +318,7 @@ class AsyncMarketDataService(BaseService):
                 msg,
                 volume_scale=volume_scale,
                 reference_price_scale=reference_price_scale,
+                include_incomplete=request.include_incomplete,
             ),
         )
 

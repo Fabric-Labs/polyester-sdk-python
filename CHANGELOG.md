@@ -58,6 +58,7 @@
 
 ### Fixed
 - `Polyester.close()` closes the client's private event loop once its thread has stopped, releasing the loop's file descriptors: each client created and closed used to leave them open, so a process making a sync client per job ran out of descriptors. `close()` is idempotent: once a close has run, another one (for example an explicit `close()` inside a `with` block, followed by its exit) returns at once and does nothing, where it waited 10 seconds and warned that a coroutine was never awaited; a call made while a close is running waits for it. A client whose start-up fails closes its loop too. A call, `subscribe_sync` included, on a closed client still raises `PolyesterError` (`PolyesterRealtimeError` for `subscribe_sync`) saying the client is closed.
+- `market_data.get_candles_columns` reports `is_closed` on its candles; every row read `False`, so finished candles looked open. The contract's columnar response has no closed column, so the flag follows the request's `include_incomplete`. Without it, every row is a closed candle and reads `True`. With it, the newest row, and the newest reference row, reads `False`, meaning not known to be closed: it is the open candle when one was available. Every earlier row reads `True`. `polyester.codecs.decode.market_data.candles_columns_from_proto` and `polyester.codecs.wire_decode.decode_candles_list` take `include_incomplete` (default `False`) to apply the same rule. Use `get_candles` for the server's own flag on every row.
 
 ## 0.33.0
 

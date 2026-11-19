@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
 from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.codecs.scalars import format_price_ticks, format_qty_scaled
@@ -143,12 +145,33 @@ def candles_from_proto(
     )
 
 
+def _newest_row_open(ts_secs: Sequence[int], *, include_incomplete: bool) -> int | None:
+    """The row whose ``is_closed`` reads ``False`` in a columnar series, if any.
+
+    The columns carry no closed flag. Without ``include_incomplete`` every row is
+    a closed candle; with it, the newest row may be the open candle, so it is
+    not known to be closed.
+    """
+    if not include_incomplete or not ts_secs:
+        return None
+    return max(range(len(ts_secs)), key=lambda index: int(ts_secs[index]))
+
+
 def candles_columns_from_proto(
     msg: marketdata_pb2.GetCandlesColumnsResponse,
     *,
     volume_scale: int,
     reference_price_scale: int | None = None,
+    include_incomplete: bool = False,
 ) -> CandlesResult:
+    """Decode a ``GetCandlesColumns`` page into rows, oldest-first.
+
+    The response has no closed column, so ``is_closed`` follows the request's
+    ``include_incomplete``: without it every row is closed (``True``); with it the
+    newest row, primary and reference alike, reads ``False`` (not known to be
+    closed: it is the open candle when one was available) and every earlier row
+    ``True``.
+    """
     row_count = len(msg.ts_sec)
     lengths = {
         "open": len(msg.open),
@@ -166,6 +189,7 @@ def candles_columns_from_proto(
         )
         raise PolyesterTransportError(f"invalid GetCandlesColumns response lengths: {rendered}")
 
+    open_index = _newest_row_open(msg.ts_sec, include_incomplete=include_incomplete)
     candles: list[Candle] = []
     for index, ts in enumerate(msg.ts_sec):
         candles.append(
@@ -180,10 +204,14 @@ def candles_columns_from_proto(
                     scale=volume_scale,
                 ),
                 quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
+                is_closed=index != open_index,
             )
         )
     reference = _reference_candles_from_columns(
-        msg, volume_scale=volume_scale, reference_price_scale=reference_price_scale
+        msg,
+        volume_scale=volume_scale,
+        reference_price_scale=reference_price_scale,
+        include_incomplete=include_incomplete,
     )
     return CandlesResult(
         next_page_token=msg.next_page_token,
@@ -199,6 +227,7 @@ def _reference_candles_from_columns(
     *,
     volume_scale: int,
     reference_price_scale: int | None,
+    include_incomplete: bool,
 ) -> list[Candle]:
     row_count = len(msg.reference_ts_sec)
     lengths = {
@@ -222,6 +251,7 @@ def _reference_candles_from_columns(
         raise PolyesterValidationError(
             "candle reference prices require reference_price_scale from GetSpotConfig"
         )
+    open_index = _newest_row_open(msg.reference_ts_sec, include_incomplete=include_incomplete)
     candles: list[Candle] = []
     for index, ts in enumerate(msg.reference_ts_sec):
         candles.append(
@@ -232,6 +262,7 @@ def _reference_candles_from_columns(
                 low=_decode_price_field(msg.reference_low[index], scale=reference_price_scale),
                 close=_decode_price_field(msg.reference_close[index], scale=reference_price_scale),
                 volume=_decode_volume_field(msg.reference_volume[index], scale=volume_scale),
+                is_closed=index != open_index,
             )
         )
     return candles

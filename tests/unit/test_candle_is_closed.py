@@ -1,9 +1,11 @@
-"""Every candle path keeps the contract's ``is_closed`` flag.
+"""Every candle path reports ``is_closed``.
 
 ``CandlePoint.is_closed`` is true for a closed bucket (historical rows and a
 live terminal update) and false only while the bucket is still open. Each path
 that builds a :class:`~polyester.models.Candle` from a ``CandlePoint`` must
-carry it through, both ways.
+carry it through, both ways. The columnar response has no closed column: its
+rows are all closed without ``include_incomplete``, and with it the newest row
+is not known to be closed.
 """
 
 from __future__ import annotations
@@ -126,7 +128,91 @@ def test_json_candle_rows_keep_is_closed(is_closed: bool) -> None:
 
 def test_columnar_candles_have_no_closed_flag_in_the_contract() -> None:
     # GetCandlesColumnsResponse carries no closed column, so columnar candles
-    # can't report it. When the contract adds one, decode it in
-    # candles_columns_from_proto and replace this check with a decode test.
+    # derive is_closed from include_incomplete (tests below). When the contract
+    # adds one, decode it in candles_columns_from_proto and replace this check.
     fields = marketdata_pb2.GetCandlesColumnsResponse.DESCRIPTOR.fields_by_name
     assert not [name for name in fields if "closed" in name]
+
+
+def _columns() -> marketdata_pb2.GetCandlesColumnsResponse:
+    # Oldest-first, as the contract orders both series.
+    return marketdata_pb2.GetCandlesColumnsResponse(
+        symbol_id=SYMBOL_ID,
+        timeframe=marketdata_pb2.MIN_1,
+        ts_sec=[60, 120, 180],
+        open=[2_000_000_000] * 3,
+        high=[2_000_000_000] * 3,
+        low=[2_000_000_000] * 3,
+        close=[2_000_000_000] * 3,
+        volume=[10_000_000] * 3,
+        reference_ts_sec=[60, 120, 180],
+        reference_open=[200_000_000] * 3,
+        reference_high=[200_000_000] * 3,
+        reference_low=[200_000_000] * 3,
+        reference_close=[200_000_000] * 3,
+        reference_volume=[10_000_000] * 3,
+    )
+
+
+@pytest.mark.parametrize(
+    ("include_incomplete", "expected"),
+    [(False, [True, True, True]), (True, [True, True, False])],
+)
+@pytest.mark.asyncio
+async def test_get_candles_columns_is_closed_follows_include_incomplete(
+    include_incomplete: bool, expected: list[bool]
+) -> None:
+    capture = CaptureUnary(_columns())
+    service = AsyncMarketDataService(MagicMock(), _catalogs())
+    with patch("polyester.services.market_data.unary_public_decoded", capture):
+        result = await service.get_candles_columns(
+            symbol="BTC-USDT", include_incomplete=include_incomplete, include_reference=True
+        )
+
+    assert capture.request is not None
+    assert capture.request.include_incomplete is include_incomplete
+    rows = list(zip([60, 120, 180], expected, strict=True))
+    assert [(c.ts_sec, c.is_closed) for c in result.candles] == rows
+    assert [(c.ts_sec, c.is_closed) for c in result.reference_candles] == rows
+
+
+def test_columnar_decoder_marks_the_newest_row_not_known_closed() -> None:
+    from polyester.codecs.decode.market_data import candles_columns_from_proto
+
+    closed = candles_columns_from_proto(_columns(), volume_scale=8, reference_price_scale=8)
+    assert [c.is_closed for c in closed.candles] == [True, True, True]
+    assert [c.is_closed for c in closed.reference_candles] == [True, True, True]
+
+    # A single row is the newest one; an empty page has no rows to mark.
+    single = marketdata_pb2.GetCandlesColumnsResponse(
+        ts_sec=[180], open=[1], high=[1], low=[1], close=[1], volume=[1]
+    )
+    only = candles_columns_from_proto(single, volume_scale=8, include_incomplete=True)
+    assert [c.is_closed for c in only.candles] == [False]
+    empty = candles_columns_from_proto(
+        marketdata_pb2.GetCandlesColumnsResponse(), volume_scale=8, include_incomplete=True
+    )
+    assert empty.candles == []
+
+
+@pytest.mark.parametrize(
+    ("include_incomplete", "expected"),
+    [(False, [True, True]), (True, [True, False])],
+)
+def test_json_columnar_candles_is_closed_follows_include_incomplete(
+    include_incomplete: bool, expected: list[bool]
+) -> None:
+    data = {
+        "symbolId": SYMBOL_ID,
+        "timeframe": "MIN_1",
+        "tsSec": ["120", "180"],
+        "open": ["2000000000"] * 2,
+        "high": ["2000000000"] * 2,
+        "low": ["2000000000"] * 2,
+        "close": ["2000000000"] * 2,
+        "volume": ["10000000"] * 2,
+    }
+
+    result = decode_candles_list(data, volume_scale=8, include_incomplete=include_incomplete)
+
+    assert [c.is_closed for c in result.candles] == expected

@@ -247,44 +247,64 @@ def test_me_refuses_an_inconsistent_scope(key, scope, subaccount) -> None:
         me_from_proto(msg)
 
 
-def _transfer_unavailable(code_name: str):
+def _connect_unavailable(status: int, detail_type: str, detail):
     import base64
     import json
 
-    from polyester.gen.transfer.v1 import internal_transfer_pb2 as it_pb2
     from tests.hardening_support import HttpScript
 
-    detail = it_pb2.ErrorDetail(code=it_pb2.ErrorCode.Value(code_name))
     body = {
         "code": "unavailable",
         "message": "transfer checks unavailable",
         "details": [
-            {
-                "type": "transfer.v1.ErrorDetail",
-                "value": base64.b64encode(detail.SerializeToString()).decode(),
-            }
+            {"type": detail_type, "value": base64.b64encode(detail.SerializeToString()).decode()}
         ],
     }
     return HttpScript.raw(
-        503,
+        status,
         headers=[("Content-Type", "application/json"), ("Retry-After", "7")],
         body=json.dumps(body).encode(),
     )
 
 
-@pytest.mark.parametrize(
-    "code", ["ERROR_CODE_SERVICE_UNAVAILABLE", "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE"]
-)
-async def test_batch_refused_before_admission_is_a_retryable_known_outcome(code: str) -> None:
+def _transfer_detail(code_name: str):
+    from polyester.gen.transfer.v1 import internal_transfer_pb2 as it_pb2
+
+    return it_pb2.ErrorDetail(code=it_pb2.ErrorCode.Value(code_name))
+
+
+def _problem_answer(status: int, body: dict, content_type: str = "application/problem+json"):
+    import json
+
+    from tests.hardening_support import HttpScript
+
+    return HttpScript.raw(
+        status,
+        headers=[("Content-Type", content_type), ("Retry-After", "7")],
+        body=json.dumps(body).encode(),
+    )
+
+
+def _catalog_problem(code: str, status: int = 503) -> dict:
+    return {
+        "code": code,
+        "status": status,
+        "title": "Service Unavailable",
+        "detail": "A required service is temporarily unavailable.",
+        "type": "https://polyester.dev/problems/" + code.lower().replace("_", "-"),
+    }
+
+
+async def _batch_error(script):
     from polyester import AsyncPolyester
-    from polyester.errors import PolyesterError, mutation_outcome_unknown
+    from polyester.errors import PolyesterError
     from polyester.models import InternalTransferLeg
     from tests.hardening_support import MockHttpServer, make_test_credentials
 
     creds = make_test_credentials()
 
     async def handler(_req):
-        return _transfer_unavailable(code)
+        return script
 
     http = await MockHttpServer.spawn(handler)
     client = AsyncPolyester(
@@ -302,11 +322,79 @@ async def test_batch_refused_before_admission_is_a_retryable_known_outcome(code:
     finally:
         await client.aclose()
         await http.aclose()
-    error = raised.value
-    assert (error.status_code, error.retry_after) == (503, 7)
-    assert getattr(error, "code", None) == code
-    assert not mutation_outcome_unknown(error)
-    assert is_retryable_error(error)
+    return raised.value
+
+
+_PRE_ADMISSION = ["ERROR_CODE_SERVICE_UNAVAILABLE", "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE"]
+
+
+@pytest.mark.parametrize("code", _PRE_ADMISSION)
+async def test_batch_refused_before_admission_is_a_retryable_known_outcome(code: str) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    for script in (
+        _connect_unavailable(503, "transfer.v1.ErrorDetail", _transfer_detail(code)),
+        _problem_answer(503, _catalog_problem(code.removeprefix("ERROR_CODE_"))),
+    ):
+        error = await _batch_error(script)
+        assert (error.status_code, error.retry_after) == (503, 7)
+        assert getattr(error, "code", None) == code
+        assert not mutation_outcome_unknown(error)
+        assert is_retryable_error(error)
+
+
+def _orders_unavailable():
+    return orders_pb2.ErrorDetail(code=orders_pb2.ERROR_CODE_UNAVAILABLE)
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        # A 504 or 502 is an unknown outcome, whatever detail it carries.
+        _connect_unavailable(
+            504, "transfer.v1.ErrorDetail", _transfer_detail("ERROR_CODE_SERVICE_UNAVAILABLE")
+        ),
+        _connect_unavailable(
+            502, "transfer.v1.ErrorDetail", _transfer_detail("ERROR_CODE_SERVICE_UNAVAILABLE")
+        ),
+        _problem_answer(504, _catalog_problem("SERVICE_UNAVAILABLE", 504)),
+        _problem_answer(502, _catalog_problem("SERVICE_UNAVAILABLE", 502)),
+        # A detail type foreign to the transfer service.
+        _connect_unavailable(503, "orders.v1.ErrorDetail", _orders_unavailable()),
+        # Generic JSON: a prefixed code, or a bare code with no problem type.
+        _problem_answer(
+            503, {"code": "ERROR_CODE_SERVICE_UNAVAILABLE", "message": "x"}, "application/json"
+        ),
+        _problem_answer(503, {"code": "SERVICE_UNAVAILABLE", "message": "x"}, "application/json"),
+        _problem_answer(503, {**_catalog_problem("SERVICE_UNAVAILABLE"), "type": "about:blank"}),
+        # The code only in a diagnostic field.
+        _problem_answer(
+            503, {"message": "x", "diagnostic": "SERVICE_UNAVAILABLE"}, "application/json"
+        ),
+        _problem_answer(
+            503,
+            {**_catalog_problem("UNAVAILABLE"), "detail": "SERVICE_UNAVAILABLE"},
+        ),
+    ],
+    ids=[
+        "connect-504",
+        "connect-502",
+        "problem-504",
+        "problem-502",
+        "foreign-detail",
+        "generic-prefixed",
+        "generic-bare",
+        "problem-wrong-type",
+        "diagnostic-field",
+        "detail-text",
+    ],
+)
+async def test_other_batch_failures_stay_unknown_and_unretried(script) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(script)
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
 
 
 async def test_an_opaque_503_on_a_batch_stays_an_unknown_outcome() -> None:

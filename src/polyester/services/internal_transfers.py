@@ -16,9 +16,11 @@ from polyester.codecs.decode.internal_transfers import (
     internal_transfer_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.proto_helpers import error_code_name
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
 from polyester.errors import PolyesterServerError, PolyesterValidationError
+from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
     BatchCreateInternalTransfersRequest,
@@ -53,9 +55,31 @@ _BATCH_REQUEST_ID_PATTERN = re.compile(
 )
 # Codes a batch answers, with unavailable (HTTP 503), when a service its
 # checks depend on is briefly unavailable; nothing was recorded.
-_BATCH_PRE_ADMISSION_CODES = frozenset(
-    {"ERROR_CODE_SERVICE_UNAVAILABLE", "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE"}
-)
+_BATCH_PRE_ADMISSION_CODES = frozenset({"SERVICE_UNAVAILABLE", "ACCOUNT_SHARD_UNAVAILABLE"})
+
+
+def _is_pre_admission_refusal(err: PolyesterServerError) -> bool:
+    """Whether a batch failure is a documented pre-admission refusal: an
+    actual HTTP 503 carrying either a typed ``transfer.v1.ErrorDetail`` with
+    one of its codes (ConnectRPC ``unavailable``) or the contract's REST
+    problem for one, declaring that code's ``type``. A 502 or 504, another
+    detail type, generic JSON or a code only in a diagnostic field is not."""
+    if err.status_code != 503:
+        return False
+    raw = err.raw
+    if raw is not None:
+        detail_type = getattr(getattr(raw, "DESCRIPTOR", None), "full_name", None)
+        if detail_type != "transfer.v1.ErrorDetail":
+            return False
+        code = int(getattr(raw, "code", 0))
+        name = error_code_name(transfer_pb2.ErrorCode, code).removeprefix("ERROR_CODE_")
+        return name in _BATCH_PRE_ADMISSION_CODES
+    problem = err.problem
+    return (
+        problem is not None
+        and problem.code in _BATCH_PRE_ADMISSION_CODES
+        and problem.declared_type == problem.type
+    )
 _BATCH_POLL_INITIAL = 0.25
 _BATCH_POLL_MAX = 2.0
 
@@ -184,11 +208,11 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
                 lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
             )
         except PolyesterServerError as exc:
-            # The contract documents these as the batch's checks being briefly
-            # undecidable: nothing is recorded under the key, so the same key
-            # and legs may be sent again.
-            if exc.status_code == 503 and exc.code in _BATCH_PRE_ADMISSION_CODES:
-                exc._known_refusal = True
+            # Only the refusals the contract documents as the batch's checks
+            # being briefly undecidable are safe to send again under the same
+            # key: nothing was recorded. Any other server failure of the batch
+            # may have moved funds.
+            exc._outcome_known = _is_pre_admission_refusal(exc)
             raise
 
     async def get_batch(self, *, request_id: str) -> InternalTransferBatchResult:

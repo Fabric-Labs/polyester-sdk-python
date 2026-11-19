@@ -426,3 +426,102 @@ async def test_an_opaque_503_on_a_batch_stays_an_unknown_outcome() -> None:
         await http.aclose()
     assert mutation_outcome_unknown(raised.value)
     assert not is_retryable_error(raised.value)
+
+
+# --- review round 2: the REST proof needs its media type; no 5xx class escapes -----------------
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    ["application/problem+json-gateway", "application/json", "application/vnd.gateway+json"],
+)
+async def test_a_canonical_problem_under_another_media_type_proves_nothing(content_type) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(
+        _problem_answer(503, _catalog_problem("SERVICE_UNAVAILABLE"), content_type)
+    )
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    "content_type", ["Application/Problem+JSON", "application/problem+json; charset=utf-8"]
+)
+async def test_the_problem_media_type_matches_in_any_case_with_parameters(content_type) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(
+        _problem_answer(503, _catalog_problem("SERVICE_UNAVAILABLE"), content_type)
+    )
+    assert (error.status_code, error.retry_after) == (503, 7)
+    assert not mutation_outcome_unknown(error)
+    assert is_retryable_error(error)
+
+
+def _connect_answer(status: int, connect_code: str, detail_type: str, detail):
+    import base64
+    import json
+
+    from tests.hardening_support import HttpScript
+
+    body = {
+        "code": connect_code,
+        "message": "m",
+        "details": [
+            {"type": detail_type, "value": base64.b64encode(detail.SerializeToString()).decode()}
+        ],
+    }
+    return HttpScript.raw(
+        status,
+        headers=[("Content-Type", "application/json"), ("Retry-After", "7")],
+        body=json.dumps(body).encode(),
+    )
+
+
+def _auth_unavailable():
+    from polyester.gen.auth.v1 import auth_pb2
+
+    return auth_pb2.AuthErrorDetail(code=auth_pb2.AUTH_TEMPORARILY_UNAVAILABLE)
+
+
+@pytest.mark.parametrize("status", [502, 503])
+@pytest.mark.parametrize(
+    "answer",
+    [
+        lambda status: _connect_answer(
+            status,
+            "resource_exhausted",
+            "polyester.ratelimit.v1.RateLimitDetail",
+            ratelimit_pb2.RateLimitDetail(retry_after_ms=1500),
+        ),
+        lambda status: _connect_answer(
+            status, "unavailable", "auth.v1.AuthErrorDetail", _auth_unavailable()
+        ),
+    ],
+    ids=["rate-limit-detail", "auth-unavailable"],
+)
+async def test_no_5xx_escapes_the_batch_guard_whatever_it_maps_to(answer, status) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(answer(status))
+    assert error.status_code == status
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+async def test_a_genuine_429_on_a_batch_stays_a_retryable_throttle() -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(
+        _connect_answer(
+            429,
+            "resource_exhausted",
+            "polyester.ratelimit.v1.RateLimitDetail",
+            ratelimit_pb2.RateLimitDetail(retry_after_ms=1500),
+        )
+    )
+    assert isinstance(error, PolyesterRateLimitError)
+    assert error.status_code == 429
+    assert not mutation_outcome_unknown(error)
+    assert is_retryable_error(error)

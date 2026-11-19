@@ -19,7 +19,11 @@ from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.proto_helpers import error_code_name
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
-from polyester.errors import PolyesterServerError, PolyesterValidationError
+from polyester.errors import (
+    PolyesterError,
+    PolyesterServerError,
+    PolyesterValidationError,
+)
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
@@ -58,12 +62,16 @@ _BATCH_REQUEST_ID_PATTERN = re.compile(
 _BATCH_PRE_ADMISSION_CODES = frozenset({"SERVICE_UNAVAILABLE", "ACCOUNT_SHARD_UNAVAILABLE"})
 
 
-def _is_pre_admission_refusal(err: PolyesterServerError) -> bool:
-    """Whether a batch failure is a documented pre-admission refusal: an
-    actual HTTP 503 carrying either a typed ``transfer.v1.ErrorDetail`` with
-    one of its codes (ConnectRPC ``unavailable``) or the contract's REST
-    problem for one, declaring that code's ``type``. A 502 or 504, another
-    detail type, generic JSON or a code only in a diagnostic field is not."""
+def _is_pre_admission_refusal(err: PolyesterError) -> bool:
+    """Whether a batch failure is a documented pre-admission refusal: a
+    :class:`PolyesterServerError` from an actual HTTP 503 carrying either a
+    typed ``transfer.v1.ErrorDetail`` with one of its codes (ConnectRPC
+    ``unavailable``) or the contract's REST problem for one, served as
+    ``application/problem+json`` and declaring that code's ``type``. A 502 or
+    504, another detail type or media type, generic JSON or a code only in a
+    diagnostic field is not."""
+    if not isinstance(err, PolyesterServerError):
+        return False
     if err.status_code != 503:
         return False
     raw = err.raw
@@ -77,6 +85,7 @@ def _is_pre_admission_refusal(err: PolyesterServerError) -> bool:
     problem = err.problem
     return (
         problem is not None
+        and problem.media_type == "application/problem+json"
         and problem.code in _BATCH_PRE_ADMISSION_CODES
         and problem.declared_type == problem.type
     )
@@ -207,12 +216,15 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
                 request,
                 lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
             )
-        except PolyesterServerError as exc:
+        except PolyesterError as exc:
             # Only the refusals the contract documents as the batch's checks
             # being briefly undecidable are safe to send again under the same
-            # key: nothing was recorded. Any other server failure of the batch
-            # may have moved funds.
-            exc._outcome_known = _is_pre_admission_refusal(exc)
+            # key: nothing was recorded. Any other 5xx of the batch may have
+            # moved funds, whatever error it maps to (a rate limit or a
+            # retryable refusal included). A 4xx keeps its own meaning: a
+            # genuine 429 throttle stays retryable.
+            if exc.status_code is not None and exc.status_code >= 500:
+                exc._outcome_known = _is_pre_admission_refusal(exc)
             raise
 
     async def get_batch(self, *, request_id: str) -> InternalTransferBatchResult:

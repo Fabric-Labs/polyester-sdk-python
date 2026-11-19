@@ -33,6 +33,19 @@ class HTTPProblem:
     # The ``type`` URI the body itself declared, "" when it named none: a
     # contract problem declares its code's canonical ``type``.
     declared_type: str = field(default="", compare=False)
+    # The answer's media type, lowercased without parameters (such as
+    # ``application/problem+json``); "" when the answer named none.
+    media_type: str = field(default="", compare=False)
+
+
+def media_type_of(content_type: str | None) -> str:
+    """A ``Content-Type`` header's media type, lowercased, its parameters
+    dropped; "" when absent or not of the ``type/subtype`` form."""
+    value = (content_type or "").split(";", 1)[0].strip().lower()
+    kind, slash, subtype = value.partition("/")
+    if not slash or not kind or not subtype or any(c.isspace() for c in value):
+        return ""
+    return value
 
 
 def decode_http_problem(data: Any, status: int) -> HTTPProblem | None:

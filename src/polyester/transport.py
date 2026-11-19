@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import re
 from base64 import b64decode
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
@@ -31,7 +32,7 @@ from polyester._contract_codes import (
     is_recognised_rest_code,
     outcome_unknown_code,
 )
-from polyester._problem import decode_http_problem, loads_bounded
+from polyester._problem import decode_http_problem, loads_bounded, media_type_of
 from polyester._redact import (
     redact_exception_chain,
     register,
@@ -427,6 +428,12 @@ def _future_code(details: list[AnyMessage]) -> str:
     return ""
 
 
+def _problem_with_media_type(problem, content_type: str | None):
+    if problem is None:
+        return None
+    return dataclasses.replace(problem, media_type=media_type_of(content_type))
+
+
 def _raise_problem(
     response: pyqwest.FullResponse,
     body: object,
@@ -444,7 +451,9 @@ def _raise_problem(
         connect_code,
         code,
         http_status=response.status,
-        problem=decode_http_problem(body, response.status),
+        problem=_problem_with_media_type(
+            decode_http_problem(body, response.status), response.headers.get("content-type")
+        ),
         retry_after=retry_after,
         rate_limit=body.get("rateLimit"),
         timestamp_window=body.get("timestampWindow"),

@@ -638,6 +638,8 @@ class Polyester:
                 self._loop.close()
                 raise PolyesterError("the client's event loop did not start")
         self._active_sync_subscriptions: list[SyncSubscription] = []
+        self._close_lock = threading.Lock()
+        self._closed = False
 
         async def _bootstrap() -> AsyncPolyester:
             client = AsyncPolyester(
@@ -661,8 +663,7 @@ class Polyester:
         try:
             self._client = run_on_loop(self._loop, _bootstrap)
         except BaseException:
-            self._loop.call_soon_threadsafe(self._loop.stop)
-            self._loop_thread.join(timeout=5)
+            self._stop_loop()
             raise
         loop = self._loop
         client = self._client
@@ -767,10 +768,12 @@ class Polyester:
         )
 
     def close(self) -> None:
-        """Close every sync subscription and the client.
+        """Close every sync subscription and the client, and release its event loop.
 
         A subscription that failed with no ``on_error`` raises its failure here, once
         everything has shut down, as does a close a callback scheduled that failed.
+        Once a close has run, further calls, from any thread, return at once and
+        do nothing; one made while a close is running waits for it to finish.
 
         Calling it from a client callback raises
         :class:`~polyester.errors.PolyesterError` at once and leaves the client
@@ -778,25 +781,45 @@ class Polyester:
         inside. Close a subscription from its callback instead, or close the
         client from another thread.
         """
+        if self._closed:
+            return
         refuse_on_client_loop(self._loop, "Polyester.close()")
-        first_failure: Exception | None = None
-        for subscription in list(self._active_sync_subscriptions):
-            try:
-                subscription.close()
-            except Exception as exc:
-                first_failure = first_failure or exc
-        self._active_sync_subscriptions.clear()
+        with self._close_lock:
+            if self._closed:
+                return
+            first_failure: Exception | None = None
+            for subscription in list(self._active_sync_subscriptions):
+                try:
+                    subscription.close()
+                except Exception as exc:
+                    first_failure = first_failure or exc
+            self._active_sync_subscriptions.clear()
 
-        async def _shutdown() -> None:
-            await self._client.aclose()
+            async def _shutdown() -> None:
+                await self._client.aclose()
 
-        future = asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
-        with contextlib.suppress(Exception):
-            future.result(timeout=10)
-        self._loop.call_soon_threadsafe(self._loop.stop)
-        self._loop_thread.join(timeout=5)
+            # A close interrupted after the loop stopped has nothing left to shut down.
+            if self._loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
+                with contextlib.suppress(Exception):
+                    future.result(timeout=10)
+            self._stop_loop()
+            self._closed = True
         if first_failure is not None:
             raise first_failure
+
+    def _stop_loop(self) -> None:
+        """Stop the client loop, wait for its thread, then close the loop.
+
+        Closing it releases its selector and wake-up descriptors. A thread still
+        running after the wait leaves the loop open: a running loop can't be closed.
+        """
+        if self._loop.is_closed():
+            return
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._loop_thread.join(timeout=5)
+        if not self._loop_thread.is_alive():
+            self._loop.close()
 
     def __enter__(self) -> Polyester:
         return self

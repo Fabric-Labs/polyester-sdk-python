@@ -51,7 +51,9 @@ class SyncSubscription:
         sub = self._holder.get("sub")
         if sub is not None and hasattr(sub, "set_bucket"):
             parse_bucket_ticks(bucket)
-            self._loop.call_soon_threadsafe(sub.set_bucket, bucket)
+            # Once the client has closed there is no stream left to change.
+            with contextlib.suppress(RuntimeError):
+                self._loop.call_soon_threadsafe(sub.set_bucket, bucket)
 
     def since_last_publication(self) -> float | None:
         """An order book's ``since_last_publication``; ``None`` for other streams."""
@@ -81,6 +83,10 @@ class SyncSubscription:
                 if self._holder is not None:
                     # Read by the delivery loop on the client loop before each event.
                     self._holder["closed"] = True
+                if self._loop.is_closed():
+                    # The client closed, and its loop with it: nothing is left to stop.
+                    self._finished = True
+                    return
                 closing = self._closing = asyncio.run_coroutine_threadsafe(
                     self._close_coro(), self._loop
                 )
@@ -105,7 +111,9 @@ def _wait_for_setup(future: Future[None], loop: asyncio.AbstractEventLoop) -> No
             if not loop.is_running():
                 raise PolyesterRealtimeError("client closed during subscription setup")
     except BaseException:
-        future.cancel()
+        # Cancelling reaches the loop through it: a closed loop has stopped setup already.
+        if not loop.is_closed():
+            future.cancel()
         raise
     future.result()
 
@@ -165,5 +173,14 @@ def subscribe_sync(
             holder["sub"] = sub
         holder["task"] = asyncio.create_task(_consume(sub))
 
-    _wait_for_setup(asyncio.run_coroutine_threadsafe(_start(), loop), loop)
+    if not loop.is_running():
+        raise PolyesterRealtimeError("the client is closed")
+    start = _start()
+    try:
+        setup = asyncio.run_coroutine_threadsafe(start, loop)
+    except RuntimeError:
+        # The loop closed since the check above.
+        start.close()
+        raise PolyesterRealtimeError("the client is closed") from None
+    _wait_for_setup(setup, loop)
     return SyncSubscription(loop, close_coro=_close, holder=holder)

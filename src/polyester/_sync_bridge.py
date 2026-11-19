@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -87,13 +88,19 @@ def run_on_loop(
             task.cancel()
 
     try:
-        loop.call_soon_threadsafe(start)
+        try:
+            loop.call_soon_threadsafe(start)
+        except RuntimeError:
+            # The loop closed since the check above: ``start`` never runs.
+            raise PolyesterError("the client is closed") from None
         while not finished.wait(_POLL_SECONDS):
             if not loop.is_running():
                 raise PolyesterError("the client closed during the call")
     except BaseException:
         if not finished.is_set() and loop.is_running():
-            loop.call_soon_threadsafe(cancel)
+            # A loop closed since the check stopped the call with it.
+            with contextlib.suppress(RuntimeError):
+                loop.call_soon_threadsafe(cancel)
             while not finished.wait(_POLL_SECONDS) and loop.is_running():
                 pass
         raise

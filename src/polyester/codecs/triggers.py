@@ -403,11 +403,15 @@ def create_trigger_to_proto(
         conditional = triggers_pb2.ConditionalTrigger(
             side=side_proto, trigger_price_source=price_source
         )
-        if trigger_price is not None:
-            with refusal_code(TRIGGER_PRICE_INVALID):
-                conditional.trigger_price_ticks = resolve_positive_price_ticks(
-                    trigger_price, "trigger_price", symbol=symbol
-                )  # type: ignore[arg-type]
+        # Left out, it is 0 on the wire, which the contract refuses.
+        if trigger_price is None:
+            raise PolyesterValidationError(
+                f"trigger_price is required for a {type_key}", code=TRIGGER_PRICE_INVALID
+            )
+        with refusal_code(TRIGGER_PRICE_INVALID):
+            conditional.trigger_price_ticks = resolve_positive_price_ticks(
+                trigger_price, "trigger_price", symbol=symbol
+            )  # type: ignore[arg-type]
         conditional.child.CopyFrom(
             _conditional_child(
                 side=side_key,

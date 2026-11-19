@@ -682,8 +682,22 @@ async def test_the_explicit_wire_code_with_its_single_detail_is_the_refusal(code
         [("X-Connect-Code", "unavailable")],
         [("Grpc-Status", "14"), ("Grpc-Message", "unavailable")],
         [("Code", "unavailable")],
+        # ConnectRPC merges Trailer-prefixed headers into error metadata.
+        [("Trailer-Connect-Error-Code", "unavailable")],
+        [("Trailer-Code", "unavailable")],
+        [("Trailer-Grpc-Status", "14"), ("Trailer-Grpc-Message", "unavailable")],
+        [("Trailer-Http-Status", "503"), ("Trailer-Wire-Code", "unavailable")],
     ],
-    ids=["connect-header", "x-header", "grpc-status", "bare-header"],
+    ids=[
+        "connect-header",
+        "x-header",
+        "grpc-status",
+        "bare-header",
+        "trailer-connect-code",
+        "trailer-code",
+        "trailer-grpc-status",
+        "trailer-status",
+    ],
 )
 async def test_a_header_cannot_forge_the_wire_code(spoof) -> None:
     import base64

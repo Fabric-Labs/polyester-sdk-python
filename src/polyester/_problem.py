@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from email import policy as email_policy
+from email.message import EmailMessage
 from typing import Any
 
 # The most digits an integer in an answer's body may have: an unsigned 128-bit
@@ -38,14 +41,26 @@ class HTTPProblem:
     media_type: str = field(default="", compare=False)
 
 
-def media_type_of(content_type: str | None) -> str:
-    """A ``Content-Type`` header's media type, lowercased, its parameters
-    dropped; "" when absent or not of the ``type/subtype`` form."""
-    value = (content_type or "").split(";", 1)[0].strip().lower()
-    kind, slash, subtype = value.partition("/")
-    if not slash or not kind or not subtype or any(c.isspace() for c in value):
+def media_type_of(values: Sequence[str]) -> str:
+    """The media type of an answer's ``Content-Type`` fields, lowercased and
+    without parameters, read by the standard library's header parser.
+
+    "" unless there is exactly one field and it parses cleanly: two fields,
+    an unquoted comma listing another media type, or any other defect name
+    no single media type. Quoted parameters, a comma inside them included,
+    are valid.
+    """
+    if len(values) != 1:
         return ""
-    return value
+    message = EmailMessage(policy=email_policy.default)
+    try:
+        message["Content-Type"] = values[0]
+        header = message["Content-Type"]
+    except (ValueError, TypeError):
+        return ""
+    if header is None or header.defects:
+        return ""
+    return str(header.content_type)
 
 
 def decode_http_problem(data: Any, status: int) -> HTTPProblem | None:

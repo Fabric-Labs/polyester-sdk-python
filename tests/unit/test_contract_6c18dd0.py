@@ -525,3 +525,67 @@ async def test_a_genuine_429_on_a_batch_stays_a_retryable_throttle() -> None:
     assert error.status_code == 429
     assert not mutation_outcome_unknown(error)
     assert is_retryable_error(error)
+
+
+# --- review round 3: exactly one Content-Type field, parsed by the standard library -----------
+
+
+def _problem_with_headers(headers: list[tuple[str, str]]):
+    import json
+
+    from tests.hardening_support import HttpScript
+
+    return HttpScript.raw(
+        503,
+        headers=[*headers, ("Retry-After", "7")],
+        body=json.dumps(_catalog_problem("SERVICE_UNAVAILABLE")).encode(),
+    )
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        # Two Content-Type fields: the first alone looks like a problem.
+        [("Content-Type", "application/problem+json"), ("Content-Type", "application/json")],
+        # One field listing two media types behind an unquoted comma.
+        [("Content-Type", "application/problem+json; charset=utf-8, application/json")],
+        [("Content-Type", "application/problem+json, application/json")],
+    ],
+    ids=["duplicate-field", "comma-after-parameter", "comma-list"],
+)
+async def test_an_ambiguous_content_type_proves_nothing(headers) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(_problem_with_headers(headers))
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+async def test_a_quoted_parameter_keeps_the_problem_media_type() -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(
+        _problem_with_headers([("Content-Type", 'application/problem+json; profile="a, b"')])
+    )
+    assert (error.status_code, error.retry_after) == (503, 7)
+    assert not mutation_outcome_unknown(error)
+    assert is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        (["application/problem+json"], "application/problem+json"),
+        (["Application/Problem+JSON; charset=utf-8"], "application/problem+json"),
+        (['application/problem+json; profile="a, b"'], "application/problem+json"),
+        (["application/problem+json; charset=utf-8, application/json"], ""),
+        (["application/problem+json garbage"], ""),
+        (["application/problem+json", "application/json"], ""),
+        ([], ""),
+        ([""], ""),
+    ],
+)
+def test_media_type_of_reads_exactly_one_well_formed_field(values, expected) -> None:
+    from polyester._problem import media_type_of
+
+    assert media_type_of(values) == expected

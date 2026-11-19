@@ -4,7 +4,7 @@ import asyncio
 import dataclasses
 import re
 from base64 import b64decode
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -428,10 +428,10 @@ def _future_code(details: list[AnyMessage]) -> str:
     return ""
 
 
-def _problem_with_media_type(problem, content_type: str | None):
+def _problem_with_media_type(problem, content_types: Sequence[str]):
     if problem is None:
         return None
-    return dataclasses.replace(problem, media_type=media_type_of(content_type))
+    return dataclasses.replace(problem, media_type=media_type_of(list(content_types)))
 
 
 def _raise_problem(
@@ -452,7 +452,7 @@ def _raise_problem(
         code,
         http_status=response.status,
         problem=_problem_with_media_type(
-            decode_http_problem(body, response.status), response.headers.get("content-type")
+            decode_http_problem(body, response.status), response.headers.getall("content-type")
         ),
         retry_after=retry_after,
         rate_limit=body.get("rateLimit"),

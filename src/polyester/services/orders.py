@@ -593,15 +593,19 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         the matched symbols and side: every trigger and attached leg created
         before the request was accepted ends canceled (reason
         ``cancel_all``), releases its reserved funds and places no order
-        after the response; ``matched_triggers`` counts them.
+        after the response; ``matched_triggers`` counts the triggers that
+        matched. A ``dry_run`` counts them and stops none.
 
         What a cancel-all covers is fixed when its ``request_id`` is first
         admitted: every matching order admitted before it, from any interface,
         and none admitted after. An order whose create, modify or replace
         answered before the cancel-all was sent is covered; one still in flight
         or with an unknown outcome may be admitted after it and stay open, so
-        send a second cancel-all once those calls have answered. The result
-        confirms admission, not completion.
+        send a second cancel-all, with a fresh ``request_id``, once those
+        calls have answered. A retry with the same ``request_id`` returns the
+        original outcome and covers nothing admitted since; send it with the
+        same ``include_triggers``. The result confirms admission, not
+        completion.
         """
         if symbol or symbols:
             await self._ensure_catalogs()

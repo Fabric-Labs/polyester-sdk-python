@@ -14,6 +14,7 @@ import pytest
 
 from polyester import AsyncPolyester
 from polyester.gen.orderbook.v1 import orderbook_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 from tests.hardening_support import (
     HttpScript,
     MockHttpServer,
@@ -42,7 +43,10 @@ def _delta(seq: int, qty: int) -> bytes:
 async def test_snapshot_with_buffered_deltas_adds_one_view(buffered) -> None:
     async def snapshot(request: ParsedRequest) -> HttpScript:
         await asyncio.sleep(0.3)
-        response = orderbook_pb2.GetOrderBookResponse(symbol_id=1, book_seq=1, available=True)
+        # The managed book snapshots at its stream tier, 50 here.
+        response = orderbook_pb2.GetOrderBookResponse(
+            symbol_id=1, book_seq=1, available=True, depth=depth_tier_pb2.DEPTH_50
+        )
         response.bids.add(price_ticks=BID, qty_scaled=1)
         response.asks.add(price_ticks=71_700_000, qty_scaled=4)
         return connect_proto_response(response.SerializeToString())

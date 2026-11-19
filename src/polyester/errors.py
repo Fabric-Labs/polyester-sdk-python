@@ -173,6 +173,9 @@ class PolyesterError(Exception):
     problem: HTTPProblem | None = None
     retry_after: float | None = None
     status_code: int | None = None
+    # Set where a call's contract documents the answer as a refusal made
+    # before anything was recorded: its outcome is known whatever its status.
+    _known_refusal: bool = False
     # The status the error mapping read a code as, kept for classification
     # only; ``status_code`` reports the answer's own.
     _admission_status: int | None = None
@@ -892,6 +895,8 @@ def mutation_outcome_unknown(err: BaseException) -> bool:
     confirmed in time (``ERROR_CODE_*_OUTCOME_UNKNOWN``). Read the order or
     trigger back before retrying.
     """
+    if getattr(err, "_known_refusal", False):
+        return False
     return (
         isinstance(
             err,

@@ -914,12 +914,15 @@ funds. With `include_triggers=True` one request halts all automated trading on
 the matched symbols and side: every trigger and attached leg created before the
 request was accepted (for the switch, before its expiry time) ends canceled
 with reason `cancel_all`, releases its reserved funds and places no order after
-the response, and the cancel-all result's `matched_triggers` counts them. A
-cancel-all covers the orders admitted before its `request_id` was first
-admitted, from any interface: an order whose create, modify or replace call
-answered before you sent it is covered, while one still in flight or with an
-unknown outcome may be admitted after it and stay open, so send a second
-cancel-all once those calls have answered. Without `include_triggers`: Orders
+the response, and the cancel-all result's `matched_triggers` counts the
+triggers that matched; a `dry_run` counts them and stops none. A cancel-all
+covers the orders admitted before its `request_id` was first admitted, from any
+interface: an order whose create, modify or replace call answered before you
+sent it is covered, while one still in flight or with an unknown outcome may be
+admitted after it and stay open, so send a second cancel-all, with a fresh
+`request_id`, once those calls have answered. A retry with the same
+`request_id` returns the original outcome and covers nothing admitted since;
+keep its `include_triggers` unchanged. Without `include_triggers`: Orders
 that triggers placed (TWAP slices, ladder levels, exit orders) are canceled like
 any other; a ladder stops once its levels are canceled. An attached stop-loss,
 take-profit or trailing leg whose exit order is canceled ends, and so do the

@@ -67,7 +67,9 @@ class AsyncHeatmapService(BaseService):
         ``quantity_mode`` is ``"close"`` or ``"peak"``. ``depth`` is requested as itself
         when it is a supported depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else as the
         smallest supported depth covering it, and 0 as 50; the response's ``depth`` names
-        the depth requested. A depth below 0 or above 1000 is refused.
+        the tier served, and a reply naming none, or another tier, raises
+        :class:`~polyester.errors.PolyesterResponseContractError`. A depth below 0 or above
+        1000 is refused.
         """
         validated_limit = validate_limit(limit, GetOrderbookHeatmapRequest)
         if symbol:
@@ -79,7 +81,8 @@ class AsyncHeatmapService(BaseService):
             label="heatmap.get",
         )
         interval_enum = resolve_heatmap_interval(interval)
-        depth_enum = depth_tier_value(heatmap_depth(depth))
+        depth_levels = heatmap_depth(depth)
+        depth_enum = depth_tier_value(depth_levels)
         qty_enum = resolve_heatmap_quantity_mode(quantity_mode)
 
         request = GetOrderbookHeatmapRequest(
@@ -118,7 +121,7 @@ class AsyncHeatmapService(BaseService):
             HeatmapServiceClient,
             lambda client, req: client.get_orderbook_heatmap(req),
             request,
-            heatmap_from_proto,
+            lambda msg: heatmap_from_proto(msg, depth=depth_levels),
         )
 
     async def subscribe_live(

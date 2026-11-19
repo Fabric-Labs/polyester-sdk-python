@@ -1,7 +1,7 @@
 import operator
 from typing import SupportsIndex
 
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.polyester.type.v1 import depth_tier_pb2
 
 # Depths the server publishes on the delta stream, a subset of the snapshot
@@ -65,6 +65,21 @@ def orderbook_snapshot_depth(depth: int) -> int:
 def depth_tier_value(levels: int) -> depth_tier_pb2.DepthTier:
     """The ``DepthTier`` of ``levels`` per side, which must be a tier."""
     return depth_tier_pb2.DepthTier.Value(f"DEPTH_{levels}")
+
+
+def require_served_tier(operation: str, served: int, levels: int) -> int:
+    """The levels per side of the tier a reply says it served, which must be
+    the ``levels`` requested: a reply naming no tier, one this SDK does not
+    know, or another tier breaks the contract. The requested tier is never
+    filled in for a missing one."""
+    count = depth_tier_levels(int(served))
+    if count is None:
+        raise PolyesterResponseContractError(operation, "missing the depth it served")
+    if count != levels:
+        raise PolyesterResponseContractError(
+            operation, f"served {count} levels per side for {levels} requested"
+        )
+    return count
 
 
 def depth_tier_levels(tier: int) -> int | None:

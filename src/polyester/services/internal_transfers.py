@@ -18,7 +18,7 @@ from polyester.codecs.decode.internal_transfers import (
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterServerError, PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
     BatchCreateInternalTransfersRequest,
@@ -50,6 +50,11 @@ BATCH_REQUEST_ID_MIN_LEN, BATCH_REQUEST_ID_MAX_LEN = contract_string_length(
 )
 _BATCH_REQUEST_ID_PATTERN = re.compile(
     contract_string_pattern(GetInternalTransferBatchRequest, "request_id")
+)
+# Codes a batch answers, with unavailable (HTTP 503), when a service its
+# checks depend on is briefly unavailable; nothing was recorded.
+_BATCH_PRE_ADMISSION_CODES = frozenset(
+    {"ERROR_CODE_SERVICE_UNAVAILABLE", "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE"}
 )
 _BATCH_POLL_INITIAL = 0.25
 _BATCH_POLL_MAX = 2.0
@@ -132,7 +137,12 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         the whole batch. A retry with the same key and the same legs in the
         same order returns the batch's current state; different legs under the
         key are refused with ``ERROR_CODE_IDEMPOTENCY_CONFLICT``. A refused
-        batch is final for its key: submit a new batch under a new key. A
+        batch is final for its key: submit a new batch under a new key. When a
+        service the checks depend on is briefly unavailable, the request
+        raises a retryable :class:`~polyester.errors.PolyesterServerError`
+        (``ERROR_CODE_SERVICE_UNAVAILABLE`` or
+        ``ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE``, HTTP 503) and records
+        nothing: send the same key and legs again after its ``retry_after``. A
         ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the batch
         outweighs the account's burst: split it instead of retrying.
         """
@@ -165,13 +175,21 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
                 label=f"legs[{index}]",
             )
         leg_count = len(request.legs)
-        return await unary_auth_decoded(
-            self._transport,
-            InternalTransferServiceClient,
-            lambda client, req: client.batch_create_internal_transfers(req),
-            request,
-            lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
-        )
+        try:
+            return await unary_auth_decoded(
+                self._transport,
+                InternalTransferServiceClient,
+                lambda client, req: client.batch_create_internal_transfers(req),
+                request,
+                lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
+            )
+        except PolyesterServerError as exc:
+            # The contract documents these as the batch's checks being briefly
+            # undecidable: nothing is recorded under the key, so the same key
+            # and legs may be sent again.
+            if exc.status_code == 503 and exc.code in _BATCH_PRE_ADMISSION_CODES:
+                exc._known_refusal = True
+            raise
 
     async def get_batch(self, *, request_id: str) -> InternalTransferBatchResult:
         """A batch's current outcome and the state of every leg, by the

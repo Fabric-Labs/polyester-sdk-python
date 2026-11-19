@@ -18,6 +18,7 @@ from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterAuthError, PolyesterRealtimeError
 from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.gen.orderbook.v1 import orderbook_pb2
+from polyester.gen.polyester.type.v1 import depth_tier_pb2
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.realtime.resubscribe import (
     ResubscribeTiming,
@@ -154,7 +155,10 @@ async def test_unsubscribe_of_another_channel_is_ignored() -> None:
 
 
 def _book(seq: int, *, available: bool) -> orderbook_pb2.GetOrderBookResponse:
-    response = orderbook_pb2.GetOrderBookResponse(symbol_id=1, book_seq=seq, available=available)
+    # Subscriptions here ask for 10 levels, which ride the 20-level tier.
+    response = orderbook_pb2.GetOrderBookResponse(
+        symbol_id=1, book_seq=seq, available=available, depth=depth_tier_pb2.DEPTH_20
+    )
     if available:
         response.bids.add(price_ticks=100, qty_scaled=5)
         response.asks.add(price_ticks=101, qty_scaled=5)

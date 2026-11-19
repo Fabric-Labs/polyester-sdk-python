@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from polyester.codecs.orderbook import depth_tier_levels
-from polyester.errors import PolyesterResponseContractError
+from polyester.codecs.orderbook import require_served_tier
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.models import OrderbookData, OrderbookLevel
 from polyester.orderbook.local_book import format_orderbook_level
@@ -31,13 +30,7 @@ def orderbook_from_proto(
     """Decode a snapshot requested at ``depth`` levels per side. The response
     names the tier it served in every answer: one without it, or with another
     tier than the one requested, breaks the contract."""
-    served = depth_tier_levels(int(msg.depth))
-    if served is None:
-        raise PolyesterResponseContractError("GetOrderBook", "missing the depth it served")
-    if served != depth:
-        raise PolyesterResponseContractError(
-            "GetOrderBook", f"served {served} levels per side for {depth} requested"
-        )
+    served = require_served_tier("GetOrderBook", int(msg.depth), depth)
     return OrderbookData(
         symbol=symbol,
         depth=served,

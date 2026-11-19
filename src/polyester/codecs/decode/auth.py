@@ -25,8 +25,7 @@ def me_from_proto(msg: auth_pb2.MeResponse) -> MeResult:
         require_id("Me", "session.session_id", msg.session.session_id)
         session = protobuf_to_public_dict(msg.session)
     scope = proto_enum_name(address_book_pb2.AccountScopeType, int(msg.api_key_scope))
-    if scope == "subaccount" and not msg.subaccount_id:
-        raise PolyesterResponseContractError("Me", "sub-account key without its subaccount_id")
+    _check_key_scope(bool((msg.api_key_id or "").strip()), scope, int(msg.subaccount_id))
     return MeResult(
         account_id=format_uint64_id(msg.account_id),
         api_key_id=(msg.api_key_id or "").strip(),
@@ -36,6 +35,24 @@ def me_from_proto(msg: auth_pb2.MeResponse) -> MeResult:
         api_key_scope=scope,
         subaccount_id=format_optional_uint64_id(int(msg.subaccount_id)),
     )
+
+
+def _check_key_scope(is_key: bool, scope: str, subaccount_id: int) -> None:
+    """An API key names its scope, ``root`` or ``subaccount``, and only a
+    sub-account key names its sub-account; a session names neither."""
+    if not is_key:
+        if scope or subaccount_id:
+            raise PolyesterResponseContractError("Me", "a session names an API key scope")
+        return
+    if scope not in ("root", "subaccount"):
+        raise PolyesterResponseContractError("Me", f"API key with no known scope ({scope!r})")
+    if (scope == "subaccount") != bool(subaccount_id):
+        raise PolyesterResponseContractError(
+            "Me",
+            "sub-account key without its subaccount_id"
+            if scope == "subaccount"
+            else "root key naming a subaccount_id",
+        )
 
 
 def profile_from_proto(msg: profile_pb2.UserProfile) -> UserProfile:

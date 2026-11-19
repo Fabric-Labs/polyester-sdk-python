@@ -41,6 +41,7 @@ from polyester.errors import (
     PolyesterError,
     PolyesterNotImplementedError,
     PolyesterRateLimitError,
+    PolyesterResponseContractError,
     PolyesterRouteNotFoundError,
     PolyesterServerError,
     PolyesterSessionRequiredError,
@@ -451,8 +452,13 @@ def _map_connect_error(exc: ConnectError):
                 # this SDK does not know leaves the error as it reads without
                 # the detail.
                 if unpacked.code == request_error_pb2.REQUEST_TOO_LARGE:
+                    if not unpacked.limit_bytes:
+                        # The contract sets the limit for this code.
+                        return PolyesterResponseContractError(
+                            "RequestErrorDetail", "REQUEST_TOO_LARGE without limit_bytes"
+                        )
                     too_large = PolyesterApiError(error_message, code=REQUEST_TOO_LARGE)
-                    too_large.limit_bytes = int(unpacked.limit_bytes) or None
+                    too_large.limit_bytes = int(unpacked.limit_bytes)
                     return too_large
                 continue
             if full_name == "alerts.v1.ErrorDetail":
@@ -639,8 +645,11 @@ def _map_connect_error(exc: ConnectError):
             return PolyesterRateLimitError(
                 error_message, code=order_code, retry_after=getattr(exc, "retry_after", None)
             )
-        if order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name or re.fullmatch(
-            r"[A-Z][A-Z0-9_]*", message_code
+        # Only a typed RequestErrorDetail (or a REST problem) marks a request
+        # too large: a message naming it stays a rate limit.
+        if order_code != REQUEST_TOO_LARGE and (
+            order_code in orders_pb2.ErrorCode.DESCRIPTOR.values_by_name
+            or re.fullmatch(r"[A-Z][A-Z0-9_]*", message_code)
         ):
             return PolyesterApiError(error_message, code=order_code)
     if is_cloudflare_browser_ban(error_message):

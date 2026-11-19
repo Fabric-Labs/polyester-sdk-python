@@ -100,12 +100,17 @@ def test_me_names_a_sub_account_keys_scope_and_sub_account() -> None:
 
     me = me_from_proto(
         auth_pb2.MeResponse(
-            account_id=7, api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT, subaccount_id=12
+            account_id=7,
+            api_key_id="key-1",
+            api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT,
+            subaccount_id=12,
         )
     )
     assert (me.api_key_scope, me.subaccount_id) == ("subaccount", format_id(12))
     root = me_from_proto(
-        auth_pb2.MeResponse(account_id=7, api_key_scope=address_book_pb2.SCOPE_ROOT)
+        auth_pb2.MeResponse(
+            account_id=7, api_key_id="key-1", api_key_scope=address_book_pb2.SCOPE_ROOT
+        )
     )
     assert (root.api_key_scope, root.subaccount_id) == ("root", "")
     session = me_from_proto(auth_pb2.MeResponse(account_id=7))
@@ -119,7 +124,9 @@ def test_me_refuses_a_sub_account_key_without_its_sub_account() -> None:
 
     with pytest.raises(PolyesterResponseContractError):
         me_from_proto(
-            auth_pb2.MeResponse(account_id=7, api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT)
+            auth_pb2.MeResponse(
+                account_id=7, api_key_id="key-1", api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT
+            )
         )
 
 
@@ -139,3 +146,195 @@ def test_policy_copies_name_their_template_revision() -> None:
     )
     assert (api.source_template_id, api.source_template_revision) == (format_id(9), 4)
     assert (sub.source_template_id, sub.source_template_revision) == (format_id(9), 5)
+
+
+# --- review round 1: every reply names what the contract guarantees ------------------------------
+
+
+def test_request_error_detail_without_its_limit_is_refused() -> None:
+    from polyester.errors import PolyesterResponseContractError
+
+    error = map_connect_error(_too_large(code=request_error_pb2.REQUEST_TOO_LARGE))
+    assert isinstance(error, PolyesterResponseContractError)
+    assert not is_retryable_error(error)
+
+
+@pytest.mark.parametrize(("template_id", "revision"), [(9, 0), (0, 3)])
+def test_policy_lineage_must_name_both_template_and_revision(template_id, revision) -> None:
+    from polyester.codecs.decode.policies import api_policy_from_proto, subaccount_policy_from_proto
+    from polyester.errors import PolyesterResponseContractError
+    from polyester.gen.auth.v1 import policies_pb2
+
+    lineage = dict(source_template_id=template_id, source_template_revision=revision)
+    with pytest.raises(PolyesterResponseContractError):
+        api_policy_from_proto(policies_pb2.ApiPolicyView(id=1, **lineage))
+    with pytest.raises(PolyesterResponseContractError):
+        subaccount_policy_from_proto(policies_pb2.SubaccountPolicyView(id=2, **lineage))
+
+
+def test_a_policy_that_is_no_copy_has_no_lineage() -> None:
+    from polyester.codecs.decode.policies import api_policy_from_proto
+    from polyester.gen.auth.v1 import policies_pb2
+
+    policy = api_policy_from_proto(policies_pb2.ApiPolicyView(id=1))
+    assert (policy.source_template_id, policy.source_template_revision) == ("", 0)
+
+
+@pytest.mark.parametrize("served", [0, 42, "DEPTH_20"])
+def test_heatmap_reply_without_the_requested_tier_is_refused(served) -> None:
+    from polyester.codecs.decode.heatmap import heatmap_from_proto
+    from polyester.errors import PolyesterResponseContractError
+    from polyester.gen.marketdata.v1 import heatmap_pb2
+    from polyester.gen.polyester.type.v1 import depth_tier_pb2
+
+    value = depth_tier_pb2.DepthTier.Value(served) if isinstance(served, str) else served
+    msg = heatmap_pb2.GetOrderbookHeatmapResponse(symbol_id=1, depth=value)
+    with pytest.raises(PolyesterResponseContractError):
+        heatmap_from_proto(msg, depth=50)
+
+
+def test_heatmap_reply_with_the_requested_tier_reads() -> None:
+    from polyester.codecs.decode.heatmap import heatmap_from_proto
+    from polyester.gen.marketdata.v1 import heatmap_pb2
+    from polyester.gen.polyester.type.v1 import depth_tier_pb2
+
+    msg = heatmap_pb2.GetOrderbookHeatmapResponse(symbol_id=1, depth=depth_tier_pb2.DEPTH_50)
+    assert heatmap_from_proto(msg, depth=50) is not None
+
+
+@pytest.mark.parametrize("served", [0, 42, 4])
+async def test_managed_book_snapshot_without_its_tier_fails_closed(served) -> None:
+    from polyester.codecs.orderbook import require_served_tier
+    from polyester.errors import PolyesterResponseContractError
+
+    with pytest.raises(PolyesterResponseContractError):
+        require_served_tier("GetOrderBook", served, 50)
+
+
+# --- review round 1: message text, Me scope pairs and batch pre-admission refusals ---------------
+
+
+@pytest.mark.parametrize("message", ["REQUEST_TOO_LARGE", "request too large"])
+def test_message_text_never_makes_a_request_too_large(message: str) -> None:
+    for details in ([], [request_error_pb2.RequestErrorDetail(code=99, limit_bytes=1)]):
+        error = map_connect_error(ConnectError(Code.RESOURCE_EXHAUSTED, message, details=details))
+        assert isinstance(error, PolyesterRateLimitError), (message, details)
+        assert error.code != REQUEST_TOO_LARGE
+        assert is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    ("key", "scope", "subaccount"),
+    [
+        ("key-1", 0, 0),  # an API key must name its scope
+        ("key-1", 99, 0),  # a scope this SDK does not know
+        ("key-1", "SCOPE_ROOT", 12),  # a root key has no bound sub-account
+        ("key-1", "SCOPE_SUBACCOUNT", 0),
+        ("", "SCOPE_ROOT", 0),  # a session has no key scope
+        ("", 0, 12),
+    ],
+)
+def test_me_refuses_an_inconsistent_scope(key, scope, subaccount) -> None:
+    from polyester.codecs.decode.auth import me_from_proto
+    from polyester.errors import PolyesterResponseContractError
+    from polyester.gen.auth.v1 import address_book_pb2, auth_pb2
+
+    value = address_book_pb2.AccountScopeType.Value(scope) if isinstance(scope, str) else scope
+    msg = auth_pb2.MeResponse(
+        account_id=7, api_key_id=key, api_key_scope=value, subaccount_id=subaccount
+    )
+    with pytest.raises(PolyesterResponseContractError):
+        me_from_proto(msg)
+
+
+def _transfer_unavailable(code_name: str):
+    import base64
+    import json
+
+    from polyester.gen.transfer.v1 import internal_transfer_pb2 as it_pb2
+    from tests.hardening_support import HttpScript
+
+    detail = it_pb2.ErrorDetail(code=it_pb2.ErrorCode.Value(code_name))
+    body = {
+        "code": "unavailable",
+        "message": "transfer checks unavailable",
+        "details": [
+            {
+                "type": "transfer.v1.ErrorDetail",
+                "value": base64.b64encode(detail.SerializeToString()).decode(),
+            }
+        ],
+    }
+    return HttpScript.raw(
+        503,
+        headers=[("Content-Type", "application/json"), ("Retry-After", "7")],
+        body=json.dumps(body).encode(),
+    )
+
+
+@pytest.mark.parametrize(
+    "code", ["ERROR_CODE_SERVICE_UNAVAILABLE", "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE"]
+)
+async def test_batch_refused_before_admission_is_a_retryable_known_outcome(code: str) -> None:
+    from polyester import AsyncPolyester
+    from polyester.errors import PolyesterError, mutation_outcome_unknown
+    from polyester.models import InternalTransferLeg
+    from tests.hardening_support import MockHttpServer, make_test_credentials
+
+    creds = make_test_credentials()
+
+    async def handler(_req):
+        return _transfer_unavailable(code)
+
+    http = await MockHttpServer.spawn(handler)
+    client = AsyncPolyester(
+        api_url=http.base_url,
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    leg = InternalTransferLeg(
+        asset_id=1, quantity="1", destination_smart_account_address="0x" + "2" * 40
+    )
+    try:
+        with pytest.raises(PolyesterError) as raised:
+            await client.internal_transfers.batch_create(legs=[leg], idempotency_key="k")
+    finally:
+        await client.aclose()
+        await http.aclose()
+    error = raised.value
+    assert (error.status_code, error.retry_after) == (503, 7)
+    assert getattr(error, "code", None) == code
+    assert not mutation_outcome_unknown(error)
+    assert is_retryable_error(error)
+
+
+async def test_an_opaque_503_on_a_batch_stays_an_unknown_outcome() -> None:
+    from polyester import AsyncPolyester
+    from polyester.errors import PolyesterError, mutation_outcome_unknown
+    from polyester.models import InternalTransferLeg
+    from tests.hardening_support import HttpScript, MockHttpServer, make_test_credentials
+
+    creds = make_test_credentials()
+
+    async def handler(_req):
+        return HttpScript.json(503, {"code": "unavailable", "message": "busy"})
+
+    http = await MockHttpServer.spawn(handler)
+    client = AsyncPolyester(
+        api_url=http.base_url,
+        api_key_id=creds.key_id,
+        api_private_key=creds.private_key,
+        hydrate_catalogs=False,
+    )
+    leg = InternalTransferLeg(
+        asset_id=1, quantity="1", destination_smart_account_address="0x" + "2" * 40
+    )
+    try:
+        with pytest.raises(PolyesterError) as raised:
+            await client.internal_transfers.batch_create(legs=[leg], idempotency_key="k")
+    finally:
+        await client.aclose()
+        await http.aclose()
+    assert mutation_outcome_unknown(raised.value)
+    assert not is_retryable_error(raised.value)

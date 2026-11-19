@@ -32,6 +32,7 @@ async def test_heatmap_continuation_retains_filters_without_inventing_window(
         seen.append(message)
         response = heatmap.GetOrderbookHeatmapResponse(
             symbol_id=1,
+            depth=message.depth,
             next_page_token=token if len(seen) == 1 else "",
             last_persisted_ts_sec=100,
         )
@@ -77,8 +78,10 @@ async def test_heatmap_token_with_partial_range_does_not_add_current_time(bound)
     seen = []
 
     async def handler(req: ParsedRequest) -> HttpScript:
-        seen.append(heatmap.GetOrderbookHeatmapRequest.FromString(req.body))
-        return connect_proto_response(heatmap.GetOrderbookHeatmapResponse().SerializeToString())
+        message = heatmap.GetOrderbookHeatmapRequest.FromString(req.body)
+        seen.append(message)
+        response = heatmap.GetOrderbookHeatmapResponse(depth=message.depth)
+        return connect_proto_response(response.SerializeToString())
 
     http = await MockHttpServer.spawn(handler)
     client = AsyncPolyester(api_url=http.base_url, hydrate_catalogs=False)

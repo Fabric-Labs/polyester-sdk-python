@@ -14,6 +14,7 @@ from polyester.codecs.orderbook import (
     orderbook_snapshot_tier,
     orderbook_stream_tier,
     require_published_stream_depth,
+    require_served_tier,
 )
 from polyester.codecs.realtime_decode import decode_orderbook_delta_bytes
 from polyester.errors import PolyesterValidationError
@@ -240,12 +241,17 @@ class AsyncOrderbookService(BaseService):
             request = GetOrderBookRequest(
                 symbol_id=resolved_symbol_id, depth=depth_tier_value(stream_depth)
             )
+            def checked(msg):
+                # The snapshot must be of the tier the deltas diff.
+                require_served_tier("GetOrderBook", int(msg.depth), stream_depth)
+                return msg
+
             return await unary_public_decoded(
                 self._transport,
                 OrderbookServiceClient,
                 lambda client, req: client.get_order_book(req),
                 request,
-                lambda msg: msg,
+                checked,
             )
 
         def apply_snapshot(snapshot, buffered_deltas: list[OrderBookDeltaUpdate]) -> None:

@@ -673,3 +673,35 @@ async def test_the_explicit_wire_code_with_its_single_detail_is_the_refusal(code
     assert (error.status_code, error.retry_after) == (503, 7)
     assert not mutation_outcome_unknown(error)
     assert is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    "spoof",
+    [
+        [("Connect-Error-Code", "unavailable")],
+        [("X-Connect-Code", "unavailable")],
+        [("Grpc-Status", "14"), ("Grpc-Message", "unavailable")],
+        [("Code", "unavailable")],
+    ],
+    ids=["connect-header", "x-header", "grpc-status", "bare-header"],
+)
+async def test_a_header_cannot_forge_the_wire_code(spoof) -> None:
+    import base64
+    import json
+
+    from polyester.errors import mutation_outcome_unknown
+    from tests.hardening_support import HttpScript
+
+    name, value = _transfer(_SERVICE)
+    body = {
+        "message": "transfer checks unavailable",
+        "details": [{"type": name, "value": base64.b64encode(value).decode()}],
+    }
+    script = HttpScript.raw(
+        503,
+        headers=[("Content-Type", "application/json"), ("Retry-After", "7"), *spoof],
+        body=json.dumps(body).encode(),
+    )
+    error = await _batch_error(script)
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)

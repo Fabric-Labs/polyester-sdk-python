@@ -714,6 +714,7 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
         total_cancelled=int(msg.total_cancelled),
         truncated=bool(msg.truncated),
         listing_status=_cancel_all_listing_status(msg.listing_status),
+        matched_triggers=int(msg.matched_triggers),
     )
 
 

@@ -9,6 +9,7 @@ from polyester.gen.auth.v1 import auth_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.orders.v1 import orders_pb2
+from polyester.gen.polyester.api.v1 import request_error_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as transfer_pb2
 
@@ -60,6 +61,7 @@ _CODED_DETAILS: dict[str, type[Message]] = {
     "ledger.read.v1.ErrorDetail": ledger_read_pb2.ErrorDetail,
     "alerts.v1.ErrorDetail": alerts_pb2.ErrorDetail,
     "polyester.ratelimit.v1.RateLimitDetail": ratelimit_pb2.RateLimitDetail,
+    "polyester.api.v1.RequestErrorDetail": request_error_pb2.RequestErrorDetail,
 }
 
 

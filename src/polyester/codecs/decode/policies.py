@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.proto_helpers import format_uint64_id, optional_timestamp, proto_enum_name
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import policies_pb2
 from polyester.models.policies import (
     ApiPolicy,
@@ -36,6 +37,23 @@ def _policy_actions_from_proto(actions: list[int]) -> list[str]:
     ]
 
 
+def _lineage(msg) -> dict:
+    """A policy's template lineage: a copy names both the template and the
+    template revision it was copied from, a policy that is no copy neither."""
+    template_id = int(msg.source_template_id)
+    revision = int(msg.source_template_revision)
+    if bool(template_id) != bool(revision):
+        raise PolyesterResponseContractError(
+            msg.DESCRIPTOR.name,
+            f"policy {format_uint64_id(int(msg.id))} names a template lineage without "
+            + ("its revision" if template_id else "its template"),
+        )
+    return {
+        "source_template_id": _optional_uint64_id(template_id),
+        "source_template_revision": revision,
+    }
+
+
 def subaccount_policy_from_proto(
     msg: policies_pb2.SubaccountPolicyView,
     catalogs: CatalogManager | None = None,
@@ -48,7 +66,7 @@ def subaccount_policy_from_proto(
         spot_market_scope=proto_enum_name(policies_pb2.MarketScope.Value, msg.spot_market_scope),
         actions=_policy_actions_from_proto(list(msg.actions)),
         is_template=bool(msg.is_template),
-        source_template_id=_optional_uint64_id(msg.source_template_id),
+        **_lineage(msg),
         max_order_notional=int(msg.max_order_notional),
         max_open_orders=int(msg.max_open_orders),
         trading_halted=bool(msg.trading_halted),
@@ -73,7 +91,7 @@ def api_policy_from_proto(
         actions=_policy_actions_from_proto(list(msg.actions)),
         spot_market_scope=proto_enum_name(policies_pb2.MarketScope.Value, msg.spot_market_scope),
         is_template=bool(msg.is_template),
-        source_template_id=_optional_uint64_id(msg.source_template_id),
+        **_lineage(msg),
         created_at=optional_timestamp(msg, "created_at"),
         updated_at=optional_timestamp(msg, "updated_at"),
         revision=int(msg.revision),

@@ -18,7 +18,7 @@ from polyester.codecs.decode.internal_transfers import (
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, parse_account_id
 from polyester.codecs.withdraw import str_to_u128_proto
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterError, PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
     BatchCreateInternalTransfersRequest,
@@ -133,8 +133,13 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         same order returns the batch's current state; different legs under the
         key are refused with ``ERROR_CODE_IDEMPOTENCY_CONFLICT``. A refused
         batch is final for its key: submit a new batch under a new key. A
-        ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the batch
-        outweighs the account's burst: split it instead of retrying.
+        server failure (HTTP 5xx) raises an error whose outcome is unknown
+        (:func:`~polyester.errors.mutation_outcome_unknown`), with its status,
+        ``retry_after`` and code: the batch may or may not have been admitted.
+        Send it again with the same ``idempotency_key`` and the same legs,
+        which is safe either way: it returns the batch's state, or admits it
+        once. A ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the
+        batch outweighs the account's burst: split it instead of retrying.
         """
         if not isinstance(idempotency_key, str) or not (
             BATCH_IDEMPOTENCY_KEY_MIN_LEN <= len(idempotency_key) <= BATCH_IDEMPOTENCY_KEY_MAX_LEN
@@ -165,13 +170,23 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
                 label=f"legs[{index}]",
             )
         leg_count = len(request.legs)
-        return await unary_auth_decoded(
-            self._transport,
-            InternalTransferServiceClient,
-            lambda client, req: client.batch_create_internal_transfers(req),
-            request,
-            lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
-        )
+        try:
+            return await unary_auth_decoded(
+                self._transport,
+                InternalTransferServiceClient,
+                lambda client, req: client.batch_create_internal_transfers(req),
+                request,
+                lambda msg: internal_transfer_batch_from_proto(msg, leg_count=leg_count),
+            )
+        except PolyesterError as exc:
+            # A server failure of a batch may or may not have been admitted, and
+            # no answer proves which. Whatever error it maps to, it is an unknown
+            # outcome: send the batch again with the same idempotency key and
+            # legs, which the contract makes safe either way. A 4xx keeps its
+            # own meaning: a genuine 429 throttle stays retryable.
+            if exc.status_code is not None and exc.status_code >= 500:
+                exc._outcome_known = False
+            raise
 
     async def get_batch(self, *, request_id: str) -> InternalTransferBatchResult:
         """A batch's current outcome and the state of every leg, by the

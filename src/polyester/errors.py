@@ -184,6 +184,10 @@ class PolyesterError(Exception):
     # error stood behind this one.
     _wire_connect_code: str | None = None
     _connect_details: tuple[object | None, ...] | None = None
+    # Whether the answer's body named a member twice, and how many detail
+    # entries it held as sent, decodable or not.
+    _evidence_ambiguous: bool = False
+    _raw_detail_count: int | None = None
     # The status the error mapping read a code as, kept for classification
     # only; ``status_code`` reports the answer's own.
     _admission_status: int | None = None

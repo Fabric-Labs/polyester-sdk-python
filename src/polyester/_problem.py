@@ -19,6 +19,35 @@ def _bounded_int(text: str) -> int | None:
     return int(text) if len(text.lstrip("-")) <= MAX_INTEGER_DIGITS else None
 
 
+class _DuplicateMember(ValueError):
+    pass
+
+
+def _reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    seen: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise _DuplicateMember(key)
+        seen[key] = value
+    return seen
+
+
+def body_evidence(raw: bytes | str) -> tuple[bool, int | None]:
+    """How an answer's JSON error body reads when every member counts:
+    whether it is ambiguous (it does not parse, or an object names one member
+    twice, which a plain parse would collapse to its last value), and how
+    many entries its top-level ``details`` array holds as sent, readable or
+    not (``None`` when it has no such array, or is ambiguous)."""
+    try:
+        data = json.loads(raw, parse_int=_bounded_int, object_pairs_hook=_reject_duplicates)
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        return True, None
+    if not isinstance(data, dict):
+        return False, None
+    details = data.get("details")
+    return False, (len(details) if isinstance(details, list) else None)
+
+
 def loads_bounded(raw: bytes | str) -> Any:
     """Parse an answer's JSON body, reading an integer longer than
     ``MAX_INTEGER_DIGITS`` as ``None`` so the rest of the body still reads."""

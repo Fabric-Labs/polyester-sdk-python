@@ -719,3 +719,83 @@ async def test_a_header_cannot_forge_the_wire_code(spoof) -> None:
     error = await _batch_error(script)
     assert mutation_outcome_unknown(error), repr(error)
     assert not is_retryable_error(error)
+
+
+# --- review round 5: count the raw detail entries; duplicate members make the body ambiguous ---
+
+
+def _raw_body_answer(text: str, content_type: str = "application/json"):
+    from tests.hardening_support import HttpScript
+
+    return HttpScript.raw(
+        503,
+        headers=[("Content-Type", content_type), ("Retry-After", "7")],
+        body=text.encode(),
+    )
+
+
+def _detail_entry() -> str:
+    import base64
+    import json
+
+    name, value = _transfer(_SERVICE)
+    return json.dumps({"type": name, "value": base64.b64encode(value).decode()})
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        '{"type": "transfer.v1.ErrorDetail"}',
+        '{"type": "transfer.v1.ErrorDetail", "value": null}',
+        '{"value": "CAE="}',
+        "{}",
+        "null",
+    ],
+    ids=["type-only", "null-value", "no-type", "empty-object", "null-entry"],
+)
+async def test_an_undecodable_second_detail_entry_proves_nothing(extra: str) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    body = f'{{"code": "unavailable", "message": "m", "details": [{_detail_entry()}, {extra}]}}'
+    error = await _batch_error(_raw_body_answer(body))
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        '{{"code": "internal", "code": "unavailable", "message": "m", "details": [{d}]}}',
+        '{{"code": "unavailable", "message": "m", "details": [], "details": [{d}]}}',
+        '{{"code": "unavailable", "message": "m", "details": [{d}], "details": [{d}]}}',
+    ],
+    ids=["duplicate-code", "duplicate-details", "repeated-details"],
+)
+async def test_a_duplicate_member_makes_the_connect_evidence_ambiguous(body: str) -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    error = await _batch_error(_raw_body_answer(body.format(d=_detail_entry())))
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+async def test_a_duplicate_member_makes_the_problem_evidence_ambiguous() -> None:
+    import json
+
+    from polyester.errors import mutation_outcome_unknown
+
+    problem = _catalog_problem("SERVICE_UNAVAILABLE")
+    text = '{"code": "INTERNAL_ERROR", ' + json.dumps(problem)[1:]
+    error = await _batch_error(_raw_body_answer(text, "application/problem+json"))
+    assert mutation_outcome_unknown(error), repr(error)
+    assert not is_retryable_error(error)
+
+
+async def test_a_clean_single_entry_body_is_still_the_refusal() -> None:
+    from polyester.errors import mutation_outcome_unknown
+
+    body = f'{{"code": "unavailable", "message": "m", "details": [{_detail_entry()}]}}'
+    error = await _batch_error(_raw_body_answer(body))
+    assert (error.status_code, error.retry_after) == (503, 7)
+    assert not mutation_outcome_unknown(error)
+    assert is_retryable_error(error)

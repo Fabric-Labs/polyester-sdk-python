@@ -69,19 +69,25 @@ def _is_pre_admission_refusal(err: PolyesterError) -> bool:
     exactly one detail, a ``transfer.v1.ErrorDetail`` with one of its codes,
     or the contract's REST problem for one, served under one
     ``application/problem+json`` field and declaring that code's ``type``.
-    A code read from the status, another or an extra detail, a 502 or 504,
+    A body naming a member twice, a code read from the status, another or an
+    extra detail entry (one that cannot be decoded included), a 502 or 504,
     another media type, generic JSON or a code only in a diagnostic field
     is not."""
     if not isinstance(err, PolyesterServerError):
         return False
-    if err.status_code != 503:
+    if err.status_code != 503 or err._evidence_ambiguous:
         return False
     details = err._connect_details
     if details:
         # The typed proof: the body itself names unavailable (never read from
         # the status), and its one detail is a transfer refusal of an
         # admission code. Any other or extra detail proves nothing.
-        if err._wire_connect_code != "unavailable" or len(details) != 1:
+        # Exactly one entry as sent, not one that survived decoding.
+        if (
+            err._wire_connect_code != "unavailable"
+            or err._raw_detail_count != 1
+            or len(details) != 1
+        ):
             return False
         detail = details[0]
         detail_type = getattr(getattr(detail, "DESCRIPTOR", None), "full_name", None)

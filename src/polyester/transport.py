@@ -32,7 +32,7 @@ from polyester._contract_codes import (
     is_recognised_rest_code,
     outcome_unknown_code,
 )
-from polyester._problem import decode_http_problem, loads_bounded, media_type_of
+from polyester._problem import body_evidence, decode_http_problem, loads_bounded, media_type_of
 from polyester._redact import (
     redact_exception_chain,
     register,
@@ -105,6 +105,8 @@ class GatewayProblemError(ConnectError):
         self.http_status = http_status
         self.detail = detail
         self.violations = list(violations or [])
+        # Whether the problem body names a member twice.
+        self.ambiguous_body = False
 
 
 class _AnswerError(ConnectError):
@@ -117,6 +119,10 @@ class _AnswerError(ConnectError):
     # The ConnectRPC code the answer's body named itself; "" when the code was
     # read from the HTTP status because the body named none.
     wire_code: str = ""
+    # Whether the body names a member twice (its evidence then reads two
+    # ways), and how many ``details`` entries it holds as sent.
+    ambiguous_body: bool = False
+    raw_detail_count: int | None = None
 
 
 def _retry_after_header(response: pyqwest.FullResponse) -> float | None:
@@ -358,6 +364,7 @@ def _classify_failed_answer(response: pyqwest.FullResponse) -> pyqwest.FullRespo
             details,
         )
         answer.wire_code = str(code)
+        answer.ambiguous_body, answer.raw_detail_count = body_evidence(bytes(response.content))
         raise answer
     if has_no_code:
         return _answer_without_a_code(response, body, is_json, code, details)
@@ -452,7 +459,7 @@ def _raise_problem(
     violations = body.get("violations")
     cause_code = body.get("causeCode")
     level_index = body.get("levelIndex")
-    raise GatewayProblemError(
+    problem_error = GatewayProblemError(
         connect_code,
         code,
         http_status=response.status,
@@ -477,6 +484,8 @@ def _raise_problem(
             else None
         ),
     )
+    problem_error.ambiguous_body = body_evidence(bytes(response.content))[0]
+    raise problem_error
 
 
 class SignedRedirectRefused(ConnectError):

@@ -531,3 +531,82 @@ def test_json_flow_refuses_an_enum_number_out_of_range_with_a_typed_error(value)
 def test_json_flow_refuses_a_fallback_label_of_another_field() -> None:
     with pytest.raises(PolyesterResponseContractError):
         decode_lifecycle_flow({"flowId": "flow_x", "lifecycleReason": "unknown_domain_3"})
+
+
+def _decode_both_ways(summary: dict) -> list[LifecycleFlowSummary]:
+    """``summary`` through both JSON helpers: as a detail view and as a list row."""
+    item = {"flowId": "flow_typed", **summary}
+    return [
+        decode_lifecycle_flow({"summary": item, "steps": []}),
+        decode_lifecycle_flows_list({"flows": [item]}).flows[0],
+    ]
+
+
+_BAD_ENUM_VALUES = [
+    True,
+    False,
+    2.9,
+    1.5,
+    float("inf"),
+    float("-inf"),
+    float("nan"),
+    2**31,
+    -(2**31) - 1,
+    [],
+    {},
+]
+
+
+@pytest.mark.parametrize("value", _BAD_ENUM_VALUES, ids=repr)
+@pytest.mark.parametrize(
+    "where",
+    [
+        lambda v: {"requestFee": {"status": v}},
+        lambda v: {"progressTimeline": [{"sequence": 1, "status": v}]},
+        lambda v: {"progressTimeline": [{"sequence": 1, "step": v}]},
+        lambda v: {"sourceDomain": v},
+        lambda v: {"flowKind": v},
+        lambda v: {"participation": v},
+        lambda v: {"lifecycleReason": v},
+        lambda v: {"zipperReason": {"code": v}},
+    ],
+    ids=[
+        "fee-status",
+        "timeline-status",
+        "timeline-step",
+        "domain",
+        "kind",
+        "participation",
+        "reason",
+        "zipper-code",
+    ],
+)
+def test_json_flow_refuses_an_enum_value_that_is_not_an_int32(where, value) -> None:
+    item = {"flowId": "flow_typed", **where(value)}
+    with pytest.raises(PolyesterResponseContractError):
+        decode_lifecycle_flow({"summary": item, "steps": []})
+    with pytest.raises(PolyesterResponseContractError):
+        decode_lifecycle_flows_list({"flows": [item]})
+
+
+def test_json_flow_reads_null_and_int32_enum_numbers() -> None:
+    summary = {
+        "requestFee": {"status": 2},
+        "progressTimeline": [
+            {"sequence": 1, "step": 1, "status": 1},
+            {"sequence": 2, "step": None, "status": -1},
+        ],
+        "sourceDomain": None,
+        "destinationDomain": 2.0,
+        "lifecycleReason": -(2**31),
+        "zipperReason": {"code": 1003},
+    }
+    for flow in _decode_both_ways(summary):
+        assert flow.request_fee is not None and flow.request_fee.status == "settled"
+        assert [(i.step, i.status) for i in flow.progress_timeline] == [
+            ("source", "completed"),
+            ("unspecified", "unknown_timeline_status_-1"),
+        ]
+        assert (flow.source_domain, flow.destination_domain) == ("unspecified", "zipper")
+        assert flow.lifecycle_reason == lifecycle_reason_from_code(-(2**31))
+        assert flow.zipper_reason is not None and flow.zipper_reason.code == 1003

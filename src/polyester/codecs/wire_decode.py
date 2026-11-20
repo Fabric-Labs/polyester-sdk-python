@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -471,20 +472,26 @@ def _flow_enum_json(
     as ``"withdraw"``, ``"-1"`` or ``"unknown_reason_-1"``) or prefixed name it
     is. A name newer than this SDK parses as 0 and records its label, the name
     without the enum's prefix, lowercased; any other text is refused."""
+    if value is None:
+        return None
     if not isinstance(value, str):
-        return value
+        return _enum_number_json(field, value)
     text = value.strip()
     enum_type = field.enum_type
     if text in enum_type.values_by_name:
         return text
     if not text:
         return 0
-    label_of = FLOW_ENUM_LABELS[enum_type.full_name]
     if _ENUM_NUMBER.fullmatch(text):
         number = int(text)
         if _INT32_MIN <= number <= _INT32_MAX:
             return number
         raise _not_an_enum_value(field, value)
+    label_of = FLOW_ENUM_LABELS.get(enum_type.full_name)
+    if label_of is None:
+        # An enum without a summary label (the Zipper reason code): read by
+        # its name only, as the contract parser reads it.
+        return value
     unknown = _UNKNOWN_LABEL.fullmatch(text)
     if unknown:
         number = int(unknown.group(1))
@@ -502,10 +509,26 @@ def _flow_enum_json(
     raise _not_an_enum_value(field, value)
 
 
-def _not_an_enum_value(field: Any, value: str) -> PolyesterResponseContractError:
-    shown = value if len(value) <= 64 else f"{value[:64]}..."
+def _enum_number_json(field: Any, value: Any) -> int:
+    """A non-text enum value as an int32. The contract parser would read
+    ``true`` as 1 and ``2.9`` as 2, so a boolean, a fractional or non-finite
+    number, a number out of range or any other type is refused."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise _not_an_enum_value(field, value)
+    if isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise _not_an_enum_value(field, value)
+        value = int(value)
+    if not _INT32_MIN <= value <= _INT32_MAX:
+        raise _not_an_enum_value(field, value)
+    return value
+
+
+def _not_an_enum_value(field: Any, value: Any) -> PolyesterResponseContractError:
+    text = repr(value)
+    shown = text if len(text) <= 64 else f"{text[:64]}..."
     return PolyesterResponseContractError(
-        "FlowSummaryView", f"{field.name} is not a {field.enum_type.name}: {shown!r}"
+        "FlowSummaryView", f"{field.name} is not a {field.enum_type.name}: {shown}"
     )
 
 
@@ -530,7 +553,7 @@ def _flow_json_enums(
                 f"{field.name} is sent twice, as {field.name} and {field.json_name}",
             )
         here = (*path, field.name)
-        if field.enum_type is not None and field.enum_type.full_name in FLOW_ENUM_LABELS:
+        if field.enum_type is not None:
             value = _flow_enum_json(field, value, here, newer)
         elif field.message_type is not None and isinstance(value, dict):
             value = _flow_json_enums(field.message_type, value, here, newer)

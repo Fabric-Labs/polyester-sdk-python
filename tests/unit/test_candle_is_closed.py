@@ -3,9 +3,9 @@
 ``CandlePoint.is_closed`` is true for a closed bucket (historical rows and a
 live terminal update) and false only while the bucket is still open. Each path
 that builds a :class:`~polyester.models.Candle` from a ``CandlePoint`` must
-carry it through, both ways. The columnar response has no closed column: its
-rows are all closed without ``include_incomplete``, and with it the newest row
-is not known to be closed.
+carry it through, both ways. The columnar response has no closed column: only
+the newest primary row of a first page asked with ``include_incomplete`` is not
+known to be closed; continuation pages and reference rows are closed.
 """
 
 from __future__ import annotations
@@ -155,28 +155,45 @@ def _columns() -> marketdata_pb2.GetCandlesColumnsResponse:
 
 
 @pytest.mark.parametrize(
-    ("include_incomplete", "expected"),
-    [(False, [True, True, True]), (True, [True, True, False])],
+    ("include_incomplete", "page_token", "expected"),
+    [
+        # Without include_incomplete every row is a closed candle.
+        (False, "", [True, True, True]),
+        (False, "eyJ2IjoxfQ==", [True, True, True]),
+        # A first page with include_incomplete may end with the open candle.
+        (True, "", [True, True, False]),
+        # A continuation page holds only older closed candles.
+        (True, "eyJ2IjoxfQ==", [True, True, True]),
+    ],
 )
 @pytest.mark.asyncio
-async def test_get_candles_columns_is_closed_follows_include_incomplete(
-    include_incomplete: bool, expected: list[bool]
+async def test_get_candles_columns_is_closed_follows_the_request(
+    include_incomplete: bool, page_token: str, expected: list[bool]
 ) -> None:
     capture = CaptureUnary(_columns())
     service = AsyncMarketDataService(MagicMock(), _catalogs())
     with patch("polyester.services.market_data.unary_public_decoded", capture):
         result = await service.get_candles_columns(
-            symbol="BTC-USDT", include_incomplete=include_incomplete, include_reference=True
+            symbol="BTC-USDT",
+            include_incomplete=include_incomplete,
+            include_reference=True,
+            page_token=page_token,
         )
 
     assert capture.request is not None
     assert capture.request.include_incomplete is include_incomplete
+    assert capture.request.page_token == page_token
     rows = list(zip([60, 120, 180], expected, strict=True))
     assert [(c.ts_sec, c.is_closed) for c in result.candles] == rows
-    assert [(c.ts_sec, c.is_closed) for c in result.reference_candles] == rows
+    # Reference rows are always closed buckets, the newest included.
+    assert [(c.ts_sec, c.is_closed) for c in result.reference_candles] == [
+        (60, True),
+        (120, True),
+        (180, True),
+    ]
 
 
-def test_columnar_decoder_marks_the_newest_row_not_known_closed() -> None:
+def test_columnar_decoder_marks_only_a_first_pages_newest_primary_row() -> None:
     from polyester.codecs.decode.market_data import candles_columns_from_proto
 
     closed = candles_columns_from_proto(_columns(), volume_scale=8, reference_price_scale=8)
@@ -189,6 +206,15 @@ def test_columnar_decoder_marks_the_newest_row_not_known_closed() -> None:
     )
     only = candles_columns_from_proto(single, volume_scale=8, include_incomplete=True)
     assert [c.is_closed for c in only.candles] == [False]
+    continued = candles_columns_from_proto(
+        single, volume_scale=8, include_incomplete=True, page_token="eyJ2IjoxfQ=="
+    )
+    assert [c.is_closed for c in continued.candles] == [True]
+    tip = candles_columns_from_proto(
+        _columns(), volume_scale=8, reference_price_scale=8, include_incomplete=True
+    )
+    assert [c.is_closed for c in tip.candles] == [True, True, False]
+    assert [c.is_closed for c in tip.reference_candles] == [True, True, True]
     empty = candles_columns_from_proto(
         marketdata_pb2.GetCandlesColumnsResponse(), volume_scale=8, include_incomplete=True
     )
@@ -196,11 +222,15 @@ def test_columnar_decoder_marks_the_newest_row_not_known_closed() -> None:
 
 
 @pytest.mark.parametrize(
-    ("include_incomplete", "expected"),
-    [(False, [True, True]), (True, [True, False])],
+    ("include_incomplete", "page_token", "expected"),
+    [
+        (False, "", [True, True]),
+        (True, "", [True, False]),
+        (True, "eyJ2IjoxfQ==", [True, True]),
+    ],
 )
-def test_json_columnar_candles_is_closed_follows_include_incomplete(
-    include_incomplete: bool, expected: list[bool]
+def test_json_columnar_candles_is_closed_follows_the_request(
+    include_incomplete: bool, page_token: str, expected: list[bool]
 ) -> None:
     data = {
         "symbolId": SYMBOL_ID,
@@ -213,6 +243,8 @@ def test_json_columnar_candles_is_closed_follows_include_incomplete(
         "volume": ["10000000"] * 2,
     }
 
-    result = decode_candles_list(data, volume_scale=8, include_incomplete=include_incomplete)
+    result = decode_candles_list(
+        data, volume_scale=8, include_incomplete=include_incomplete, page_token=page_token
+    )
 
     assert [c.is_closed for c in result.candles] == expected

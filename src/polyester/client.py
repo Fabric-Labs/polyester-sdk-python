@@ -13,7 +13,7 @@ from google.protobuf.message import Message
 
 from polyester._catalog_startup import CatalogSource, load_catalog
 from polyester._redact import register, url_secrets
-from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
+from polyester._sync_bridge import close_admission, refuse_on_client_loop, run_on_loop
 from polyester._sync_services import (
     SyncAddressBookService,
     SyncAlertsService,
@@ -782,6 +782,10 @@ class Polyester:
         everything has shut down, as does a close a callback scheduled that failed.
         Once a close has run, further calls, from any thread, return at once and
         do nothing; one made while a close is running waits for it to finish.
+        From the moment a close begins, every other call on the client, a
+        subscription setup included, raises
+        :class:`~polyester.errors.PolyesterError` saying the client is closed,
+        even while the client loop finishes its shutdown.
 
         Calling it from a client callback raises
         :class:`~polyester.errors.PolyesterError` at once and leaves the client
@@ -795,6 +799,9 @@ class Polyester:
         with self._close_lock:
             if self._closed:
                 return
+            # Before anything can yield the loop: no call or subscription setup
+            # starts once the close has begun, even while the loop finishes.
+            close_admission(self._loop)
             first_failure: Exception | None = None
             for subscription in list(self._active_sync_subscriptions):
                 try:
@@ -853,11 +860,10 @@ class Polyester:
         loop = self._loop
         try:
             loop.run_forever()
+            # A loop that failed to run has nothing to finish.
+            self._finish_loop()
         finally:
-            try:
-                self._finish_loop()
-            finally:
-                loop.close()
+            loop.close()
 
     def _finish_loop(self) -> None:
         """Finish what the stopped loop holds, as :func:`asyncio.run` does.
@@ -866,6 +872,8 @@ class Polyester:
         ``_SHUTDOWN_WAIT_SECONDS``. Every other task left is cancelled and given
         up to ``_LOOP_FINISH_SECONDS`` to end, so none is dropped unstarted or
         mid-call: a sync caller waiting on one gets the closed client's error.
+        Async generators left open are closed within the same time. The close
+        has already shut admission, so nothing new starts meanwhile.
         """
         loop = self._loop
         shutdown = self._shutdown_task
@@ -876,7 +884,7 @@ class Polyester:
             pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
             remaining = deadline - time.monotonic()
             if not pending or remaining <= 0:
-                return
+                break
             for task in pending:
                 task.cancel()
             loop.run_until_complete(asyncio.wait(pending, timeout=remaining))
@@ -884,6 +892,11 @@ class Polyester:
                 # Their failures were reported to their callers, if anywhere.
                 if task.done() and not task.cancelled():
                     task.exception()
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            # Async generators a sync iterator left open, closed as asyncio.run does.
+            with contextlib.suppress(Exception):
+                loop.run_until_complete(asyncio.wait_for(loop.shutdown_asyncgens(), remaining))
 
     def __enter__(self) -> Polyester:
         return self

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import threading
+import weakref
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
@@ -13,6 +14,28 @@ from polyester.errors import PolyesterError
 T = TypeVar("T")
 
 _POLL_SECONDS = 0.25
+
+# Admission to a client loop: a loop in ``_closed_loops`` takes no new call or
+# subscription setup. The lock makes closing it and admitting a call (check and
+# schedule) exclusive, so every call admitted was queued before the close went on.
+_admission = threading.Lock()
+_closed_loops: weakref.WeakSet[asyncio.AbstractEventLoop] = weakref.WeakSet()
+
+
+def close_admission(loop: asyncio.AbstractEventLoop) -> None:
+    """Admit no new call or subscription setup to ``loop`` from here on.
+
+    The sync client's close calls it before its shutdown can yield the loop or
+    run it again, so a call made once the close has begun, or after a close that
+    stopped waiting for a held loop, raises the closed client's error at once.
+    """
+    with _admission:
+        _closed_loops.add(loop)
+
+
+def admits_calls(loop: asyncio.AbstractEventLoop) -> bool:
+    """Whether ``loop`` still takes new calls: it runs and its client is not closing."""
+    return loop.is_running() and loop not in _closed_loops
 
 
 def on_client_loop(loop: asyncio.AbstractEventLoop) -> bool:
@@ -63,7 +86,7 @@ def run_on_loop(
     ``call`` is called on the loop, so a caller interrupted before the call was
     scheduled, or a call the loop stops before reaching, leaves nothing behind.
     """
-    if not loop.is_running():
+    if not admits_calls(loop):
         raise closed_error("the client is closed")
     refuse_on_client_loop(loop, what)
     finished = threading.Event()
@@ -93,11 +116,16 @@ def run_on_loop(
             task.cancel()
 
     try:
-        try:
-            loop.call_soon_threadsafe(start)
-        except RuntimeError:
-            # The loop closed since the check above: ``start`` never runs.
-            raise closed_error("the client is closed") from None
+        with _admission:
+            # Checked again with the close excluded: ``start`` is queued before
+            # a close that begins later, or not at all.
+            if not admits_calls(loop):
+                raise closed_error("the client is closed")
+            try:
+                loop.call_soon_threadsafe(start)
+            except RuntimeError:
+                # The loop closed since the check: ``start`` never runs.
+                raise closed_error("the client is closed") from None
         while not finished.wait(_POLL_SECONDS):
             if not loop.is_running():
                 raise closed_error(closed_during)

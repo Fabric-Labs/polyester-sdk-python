@@ -233,7 +233,7 @@ def test_loop_closes_when_its_thread_outlives_the_close_wait(
     assert _asyncio_errors(caplog) == []
 
 
-def test_subscribe_queued_while_the_loop_stops_leaves_nothing_behind(
+def test_subscribe_while_the_loop_stops_is_refused_and_queues_nothing(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     async def subscribe(self, **kwargs):
@@ -256,7 +256,9 @@ def test_subscribe_queued_while_the_loop_stops_leaves_nothing_behind(
 
     def recording_call_soon_threadsafe(callback, *args, **kwargs):
         handle = call_soon_threadsafe(callback, *args, **kwargs)
-        if stopping.is_set():
+        # Only the subscriber's own scheduling counts: the client's other threads
+        # may still hand the loop a result while it stops.
+        if threading.current_thread().name == "subscriber":
             queued.set()
         return handle
 
@@ -276,14 +278,15 @@ def test_subscribe_queued_while_the_loop_stops_leaves_nothing_behind(
         closer = threading.Thread(target=client.close, daemon=True)
         closer.start()
         assert stopping.wait(5), "the loop never stopped"
-        subscriber = threading.Thread(target=subscribe_sync, daemon=True)
+        subscriber = threading.Thread(target=subscribe_sync, name="subscriber", daemon=True)
         subscriber.start()
-        assert queued.wait(5), "subscribe_sync never queued its setup"
+        # Refused at once, with the loop still held in its final iteration.
+        subscriber.join(5)
+        assert not subscriber.is_alive(), "subscribe_sync waited on a closing client"
+        assert not queued.is_set(), "subscribe_sync queued work on a closing client"
         proceed.set()
         closer.join(10)
-        subscriber.join(10)
         assert not closer.is_alive()
-        assert not subscriber.is_alive()
         gc.collect()
     assert len(outcome) == 1
     assert issubclass(outcome[0][0], PolyesterRealtimeError), outcome
@@ -291,3 +294,149 @@ def test_subscribe_queued_while_the_loop_stops_leaves_nothing_behind(
     assert loop.is_closed()
     assert [str(w.message) for w in caught] == []
     assert _asyncio_errors(caplog) == []
+
+
+def _outcome_within(call, seconds: float) -> str:
+    """Run ``call`` on another thread: its error type and message, "ok", or "waiting"."""
+    outcome: list[str] = []
+
+    def run() -> None:
+        try:
+            call()
+            outcome.append("ok")
+        except BaseException as error:
+            outcome.append(f"{type(error).__name__}: {error}")
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(seconds)
+    return outcome[0] if outcome else "waiting"
+
+
+def test_calls_after_a_timed_out_close_are_refused(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr("polyester.client._SHUTDOWN_WAIT_SECONDS", 0.2)
+    monkeypatch.setattr("polyester.client._LOOP_JOIN_SECONDS", 0.2)
+    reached: list[str] = []
+
+    async def subscribe(self, **kwargs):
+        reached.append("subscribe")
+        raise AssertionError("setup must not start on a closed client")
+
+    monkeypatch.setattr(AsyncOrdersService, "subscribe", subscribe)
+    client = Polyester(hydrate_catalogs=False)
+
+    async def get_time():
+        reached.append("get_time")
+
+    client._client.get_time = get_time  # type: ignore[method-assign]
+    aclose = client._client.aclose
+    shutting_down = threading.Event()
+    finish_shutdown = threading.Event()
+
+    async def held_aclose() -> None:
+        # The loop runs again from here: the loop thread is finishing the shutdown.
+        shutting_down.set()
+        while not finish_shutdown.is_set():
+            await asyncio.sleep(0.01)
+        await aclose()
+
+    client._client.aclose = held_aclose  # type: ignore[method-assign]
+    blocking = threading.Event()
+    release = threading.Event()
+
+    def block() -> None:
+        blocking.set()
+        release.wait(60)
+
+    client._loop.call_soon_threadsafe(block)
+    assert blocking.wait(5), "the blocking callback never ran"
+    client.close()
+    assert client._loop_thread.is_alive(), "the close did not time out"
+    try:
+        # The loop is still held by the callback.
+        assert _outcome_within(client.get_time, 2) == "PolyesterError: the client is closed"
+        release.set()
+        assert shutting_down.wait(5), "the loop thread never resumed the shutdown"
+        assert client._loop.is_running()
+        # The loop runs again, finishing the shutdown: still nothing is admitted.
+        assert _outcome_within(client.get_time, 2) == "PolyesterError: the client is closed"
+        assert (
+            _outcome_within(lambda: client.orders.subscribe_sync(on_event=lambda _: None), 2)
+            == "PolyesterRealtimeError: the client is closed"
+        )
+        assert reached == []
+    finally:
+        release.set()
+        finish_shutdown.set()
+        client._loop_thread.join(5)
+    assert not client._loop_thread.is_alive()
+    assert client._loop.is_closed()
+    assert _asyncio_errors(caplog) == []
+
+
+def test_a_call_queued_in_the_loops_final_iteration_leaves_no_coroutine() -> None:
+    # Below the client's admission: a call already admitted when the loop stops
+    # is created on the loop, so the start the loop never runs leaves nothing.
+    from polyester._sync_bridge import run_on_loop
+
+    loop = asyncio.new_event_loop()
+    stopping = threading.Event()
+    queued = threading.Event()
+    proceed = threading.Event()
+    stop = loop.stop
+    call_soon_threadsafe = loop.call_soon_threadsafe
+
+    def stop_then_hold() -> None:
+        stop()
+        stopping.set()
+        proceed.wait(5)
+
+    def recording_call_soon_threadsafe(callback, *args, **kwargs):
+        handle = call_soon_threadsafe(callback, *args, **kwargs)
+        if stopping.is_set():
+            queued.set()
+        return handle
+
+    def run() -> None:
+        try:
+            loop.run_forever()
+        finally:
+            loop.close()
+
+    thread = threading.Thread(target=run, daemon=True)
+    started = threading.Event()
+    loop.call_soon(started.set)
+    thread.start()
+    assert started.wait(5)
+    reached: list[str] = []
+
+    async def call() -> None:
+        reached.append("call")
+
+    outcome: list[str] = []
+
+    def caller() -> None:
+        try:
+            run_on_loop(loop, call)
+        except BaseException as error:
+            outcome.append(f"{type(error).__name__}: {error}")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        loop.call_soon_threadsafe(stop_then_hold)
+        assert stopping.wait(5)
+        loop.call_soon_threadsafe = recording_call_soon_threadsafe  # type: ignore[method-assign]
+        waiter = threading.Thread(target=caller, daemon=True)
+        waiter.start()
+        assert queued.wait(5), "the call was never queued"
+        proceed.set()
+        thread.join(5)
+        waiter.join(5)
+        gc.collect()
+    assert not waiter.is_alive()
+    assert outcome == ["PolyesterError: the client closed during the call"]
+    assert reached == []
+    assert loop.is_closed()
+    assert [str(w.message) for w in caught] == []

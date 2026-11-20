@@ -2058,8 +2058,10 @@ column response oldest-first within each page; continuation pages go toward
 older candles. Sort explicitly by `ts_sec` before feeding a chronological
 indicator, rather than appending continuation pages as newer candles.
 The columnar response has no closed flag: its candles read `is_closed=True`,
-except that with `include_incomplete=True` the newest one reads `False` (not
-known to be closed). `get_candles()` carries the server's flag on every row.
+except the newest primary candle of a first page (no `page_token`) asked with
+`include_incomplete=True`, which reads `False` (not known to be closed).
+Continuation pages and reference candles are always closed. `get_candles()`
+carries the server's flag on every row.
 
 Merged market overview stream (snapshot + live updates). The create call waits
 for the WebSocket handshake and initial snapshot. With `symbols=[...]`, the

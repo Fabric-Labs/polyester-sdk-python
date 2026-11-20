@@ -30,6 +30,9 @@ class WithdrawService(Protocol):
     async def create_wallet_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def create_wallet_trading_to_funding_batch(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class WithdrawServiceASGIApplication(ConnectASGIApplication[WithdrawService]):
     def __init__(self, service: WithdrawService | AsyncGenerator[WithdrawService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -75,6 +78,16 @@ class WithdrawServiceASGIApplication(ConnectASGIApplication[WithdrawService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.create_wallet_trading_withdraw,
+                ),
+                "/chain.withdraw.v1.WithdrawService/CreateWalletTradingToFundingBatch": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CreateWalletTradingToFundingBatch",
+                        service_name="chain.withdraw.v1.WithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.create_wallet_trading_to_funding_batch,
                 ),
             },
             interceptors=interceptors,
@@ -170,6 +183,26 @@ class WithdrawServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def create_wallet_trading_to_funding_batch(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CreateWalletTradingToFundingBatch",
+                service_name="chain.withdraw.v1.WithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest,
+                output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -182,6 +215,8 @@ class WithdrawServiceSync(Protocol):
     def create_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateTradingWithdrawResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def create_wallet_trading_withdraw(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def create_wallet_trading_to_funding_batch(self, request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest, ctx: RequestContext) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -228,6 +263,16 @@ class WithdrawServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.create_wallet_trading_withdraw,
+                ),
+                "/chain.withdraw.v1.WithdrawService/CreateWalletTradingToFundingBatch": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CreateWalletTradingToFundingBatch",
+                        service_name="chain.withdraw.v1.WithdrawService",
+                        input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest,
+                        output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.create_wallet_trading_to_funding_batch,
                 ),
             },
             interceptors=interceptors,
@@ -317,6 +362,26 @@ class WithdrawServiceClientSync(ConnectClientSync):
                 service_name="chain.withdraw.v1.WithdrawService",
                 input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawRequest,
                 output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingWithdrawResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def create_wallet_trading_to_funding_batch(
+        self,
+        request: chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CreateWalletTradingToFundingBatch",
+                service_name="chain.withdraw.v1.WithdrawService",
+                input=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchRequest,
+                output=chain_dot_withdraw_dot_v1_dot_withdraw__pb2.CreateWalletTradingToFundingBatchResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

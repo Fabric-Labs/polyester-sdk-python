@@ -36,6 +36,9 @@ class QuickSwapReferralService(Protocol):
     async def get_referred_quick_swap(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.GetReferredQuickSwapRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.GetReferredQuickSwapResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_referral_ledger(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class QuickSwapReferralServiceASGIApplication(ConnectASGIApplication[QuickSwapReferralService]):
     def __init__(self, service: QuickSwapReferralService | AsyncGenerator[QuickSwapReferralService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -101,6 +104,16 @@ class QuickSwapReferralServiceASGIApplication(ConnectASGIApplication[QuickSwapRe
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_referred_quick_swap,
+                ),
+                "/swap.quickswap.v1.QuickSwapReferralService/ListReferralLedger": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListReferralLedger",
+                        service_name="swap.quickswap.v1.QuickSwapReferralService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_referral_ledger,
                 ),
             },
             interceptors=interceptors,
@@ -236,6 +249,26 @@ class QuickSwapReferralServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def list_referral_ledger(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListReferralLedger",
+                service_name="swap.quickswap.v1.QuickSwapReferralService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -252,6 +285,8 @@ class QuickSwapReferralServiceSync(Protocol):
     def list_referred_quick_swaps(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferredQuickSwapsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferredQuickSwapsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_referred_quick_swap(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.GetReferredQuickSwapRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.GetReferredQuickSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_referral_ledger(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -318,6 +353,16 @@ class QuickSwapReferralServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_referred_quick_swap,
+                ),
+                "/swap.quickswap.v1.QuickSwapReferralService/ListReferralLedger": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListReferralLedger",
+                        service_name="swap.quickswap.v1.QuickSwapReferralService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_referral_ledger,
                 ),
             },
             interceptors=interceptors,
@@ -447,6 +492,26 @@ class QuickSwapReferralServiceClientSync(ConnectClientSync):
                 service_name="swap.quickswap.v1.QuickSwapReferralService",
                 input=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.GetReferredQuickSwapRequest,
                 output=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.GetReferredQuickSwapResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_referral_ledger(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListReferralLedger",
+                service_name="swap.quickswap.v1.QuickSwapReferralService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__referral__pb2.ListReferralLedgerResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

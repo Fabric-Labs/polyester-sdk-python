@@ -37,11 +37,18 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
         limit: int = 50,
         reversed: bool = False,
         since: int | None = None,
+        transfer_code: int | None = None,
         page_token: str = "",
     ) -> TransfersList:
         """Read a page; reuse its token with the same scope, filters and direction.
 
+        ``reversed=True`` lists newest first; the default lists oldest first.
         ``since`` is an inclusive lower timestamp bound in microseconds.
+        ``transfer_code`` lists only transfers with that reason: a
+        ``ledger.v1.TransferCode`` value, the number a row carries in
+        ``LedgerTransfer.transfer_type`` (for example 1000 for ``DEPOSIT``).
+        ``None`` or 0 lists every reason. A page token is bound to its filters,
+        so continue a filtered listing with the same ``transfer_code``.
         An empty ``next_page_token`` marks the terminal page.
         """
         request = ListTransfersRequest(
@@ -49,6 +56,16 @@ class AsyncTransfersService(ScopedSubAccountMixin, BaseService):
             reversed=reversed,
             page_token=page_token,
         )
+        if transfer_code is not None:
+            if (
+                isinstance(transfer_code, bool)
+                or not isinstance(transfer_code, int)
+                or not 0 <= transfer_code < 2**31
+            ):
+                raise PolyesterValidationError(
+                    "transfer_code must be a ledger.v1.TransferCode value, or 0 for every reason"
+                )
+            request.transfer_code = transfer_code  # type: ignore[assignment]
         parsed_sub = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )

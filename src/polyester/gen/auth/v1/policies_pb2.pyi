@@ -60,6 +60,9 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MANAGE_API_KEYS: _ClassVar[PolicyAction]
     MANAGE_API_KEY_POLICIES: _ClassVar[PolicyAction]
     MANAGE_SUBACCOUNT_POLICIES: _ClassVar[PolicyAction]
+    READ_STRATEGIES: _ClassVar[PolicyAction]
+    DRAFT_STRATEGIES: _ClassVar[PolicyAction]
+    PROPOSE_STRATEGY_DEPLOY: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -102,6 +105,9 @@ READ_ACCOUNT_ACTIVITY: PolicyAction
 MANAGE_API_KEYS: PolicyAction
 MANAGE_API_KEY_POLICIES: PolicyAction
 MANAGE_SUBACCOUNT_POLICIES: PolicyAction
+READ_STRATEGIES: PolicyAction
+DRAFT_STRATEGIES: PolicyAction
+PROPOSE_STRATEGY_DEPLOY: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()

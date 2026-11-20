@@ -1,5 +1,6 @@
 import datetime
 
+from polyester.gen.auth.v1 import account_scope_pb2 as _account_scope_pb2
 from polyester.gen.auth.v1 import subaccounts_pb2 as _subaccounts_pb2
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
@@ -17,12 +18,6 @@ from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
-
-class AccountScopeType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
-    SCOPE_UNSPECIFIED: _ClassVar[AccountScopeType]
-    SCOPE_ROOT: _ClassVar[AccountScopeType]
-    SCOPE_SUBACCOUNT: _ClassVar[AccountScopeType]
 
 class AddressBookEntryKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -50,9 +45,6 @@ class TransferCounterpartyDirection(int, metaclass=_enum_type_wrapper.EnumTypeWr
     WITHDRAW_TO: _ClassVar[TransferCounterpartyDirection]
     INTERNAL_TRANSFER_FROM: _ClassVar[TransferCounterpartyDirection]
     INTERNAL_TRANSFER_TO: _ClassVar[TransferCounterpartyDirection]
-SCOPE_UNSPECIFIED: AccountScopeType
-SCOPE_ROOT: AccountScopeType
-SCOPE_SUBACCOUNT: AccountScopeType
 ENTRY_KIND_UNSPECIFIED: AddressBookEntryKind
 EXTERNAL_CHAIN: AddressBookEntryKind
 INTERNAL_ACCOUNT: AddressBookEntryKind
@@ -74,10 +66,10 @@ class AccountScopeRef(_message.Message):
     SCOPE_TYPE_FIELD_NUMBER: _ClassVar[int]
     ROOT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    scope_type: AccountScopeType
+    scope_type: _account_scope_pb2.AccountScopeType
     root_account_id: int
     subaccount_id: int
-    def __init__(self, scope_type: _Optional[_Union[AccountScopeType, str]] = ..., root_account_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, scope_type: _Optional[_Union[_account_scope_pb2.AccountScopeType, str]] = ..., root_account_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ...) -> None: ...
 
 class AddressBook(_message.Message):
     __slots__ = ("scope", "caller_role", "label", "owner_username", "smart_account_address")
@@ -111,11 +103,11 @@ class InternalTransferAccount(_message.Message):
     SUBACCOUNT_LABEL_FIELD_NUMBER: _ClassVar[int]
     root_account_id: int
     target_account_id: int
-    target_scope_type: AccountScopeType
+    target_scope_type: _account_scope_pb2.AccountScopeType
     smart_account_address: str
     root_username: str
     subaccount_label: str
-    def __init__(self, root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ...) -> None: ...
+    def __init__(self, root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[_account_scope_pb2.AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ...) -> None: ...
 
 class AddressBookTag(_message.Message):
     __slots__ = ("tag_id", "scope", "name", "color", "created_at", "updated_at")
@@ -228,14 +220,14 @@ class InternalAddressBookEntry(_message.Message):
     whitelist_status: DestinationWhitelistStatus
     root_account_id: int
     target_account_id: int
-    target_scope_type: AccountScopeType
+    target_scope_type: _account_scope_pb2.AccountScopeType
     smart_account_address: str
     root_username: str
     subaccount_label: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     revision: int
-    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., whitelist_status: _Optional[_Union[DestinationWhitelistStatus, str]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
+    def __init__(self, address_book_entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., label: _Optional[str] = ..., note: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., whitelist_status: _Optional[_Union[DestinationWhitelistStatus, str]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[_account_scope_pb2.AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class TransferCounterparty(_message.Message):
     __slots__ = ("counterparty_id", "scope", "direction", "kind", "saved", "address_book_entry_id", "use_count", "first_seen_at", "last_seen_at", "external", "internal")
@@ -313,11 +305,11 @@ class InternalRecentDestination(_message.Message):
     last_seen_at: _timestamp_pb2.Timestamp
     root_account_id: int
     target_account_id: int
-    target_scope_type: AccountScopeType
+    target_scope_type: _account_scope_pb2.AccountScopeType
     smart_account_address: str
     root_username: str
     subaccount_label: str
-    def __init__(self, scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., last_direction: _Optional[_Union[TransferCounterpartyDirection, str]] = ..., saved: _Optional[bool] = ..., address_book_entry_id: _Optional[int] = ..., use_count: _Optional[int] = ..., last_seen_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ...) -> None: ...
+    def __init__(self, scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., last_direction: _Optional[_Union[TransferCounterpartyDirection, str]] = ..., saved: _Optional[bool] = ..., address_book_entry_id: _Optional[int] = ..., use_count: _Optional[int] = ..., last_seen_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[_account_scope_pb2.AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ...) -> None: ...
 
 class InternalTransferWhitelistEntry(_message.Message):
     __slots__ = ("entry_id", "scope", "root_account_id", "target_account_id", "target_scope_type", "smart_account_address", "root_username", "subaccount_label", "created_at", "updated_at", "resolution_status")
@@ -336,14 +328,14 @@ class InternalTransferWhitelistEntry(_message.Message):
     scope: AccountScopeRef
     root_account_id: int
     target_account_id: int
-    target_scope_type: AccountScopeType
+    target_scope_type: _account_scope_pb2.AccountScopeType
     smart_account_address: str
     root_username: str
     subaccount_label: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     resolution_status: InternalWhitelistResolutionStatus
-    def __init__(self, entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., resolution_status: _Optional[_Union[InternalWhitelistResolutionStatus, str]] = ...) -> None: ...
+    def __init__(self, entry_id: _Optional[int] = ..., scope: _Optional[_Union[AccountScopeRef, _Mapping]] = ..., root_account_id: _Optional[int] = ..., target_account_id: _Optional[int] = ..., target_scope_type: _Optional[_Union[_account_scope_pb2.AccountScopeType, str]] = ..., smart_account_address: _Optional[str] = ..., root_username: _Optional[str] = ..., subaccount_label: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., resolution_status: _Optional[_Union[InternalWhitelistResolutionStatus, str]] = ...) -> None: ...
 
 class MirroredWithdrawWhitelistEntry(_message.Message):
     __slots__ = ("canonical_address", "raw_address_hex", "updated_at", "polychain_chain_id")

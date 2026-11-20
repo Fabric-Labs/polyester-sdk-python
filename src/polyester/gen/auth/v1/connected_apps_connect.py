@@ -18,13 +18,13 @@ import polyester.gen.auth.v1.connected_apps_pb2 as auth_dot_v1_dot_connected__ap
 
 
 class ConnectedAppService(Protocol):
-    async def get_app_authorization(self, request: auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse:
+    async def get_app_connection_request(self, request: auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def approve_app_authorization(self, request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse:
+    async def approve_app_connection_request(self, request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
-    async def deny_app_authorization(self, request: auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse:
+    async def deny_app_connection_request(self, request: auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def list_connected_apps(self, request: auth_dot_v1_dot_connected__apps__pb2.ListConnectedAppsRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.ListConnectedAppsResponse:
@@ -39,35 +39,35 @@ class ConnectedAppServiceASGIApplication(ConnectASGIApplication[ConnectedAppServ
         super().__init__(
             service=service,
             endpoints=lambda svc: {
-                "/auth.v1.ConnectedAppService/GetAppAuthorization": Endpoint.unary(
+                "/auth.v1.ConnectedAppService/GetAppConnectionRequest": Endpoint.unary(
                     method=MethodInfo(
-                        name="GetAppAuthorization",
+                        name="GetAppConnectionRequest",
                         service_name="auth.v1.ConnectedAppService",
-                        input=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest,
-                        output=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse,
+                        input=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest,
+                        output=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse,
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
-                    function=svc.get_app_authorization,
+                    function=svc.get_app_connection_request,
                 ),
-                "/auth.v1.ConnectedAppService/ApproveAppAuthorization": Endpoint.unary(
+                "/auth.v1.ConnectedAppService/ApproveAppConnectionRequest": Endpoint.unary(
                     method=MethodInfo(
-                        name="ApproveAppAuthorization",
+                        name="ApproveAppConnectionRequest",
                         service_name="auth.v1.ConnectedAppService",
-                        input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest,
-                        output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse,
+                        input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest,
+                        output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=svc.approve_app_authorization,
+                    function=svc.approve_app_connection_request,
                 ),
-                "/auth.v1.ConnectedAppService/DenyAppAuthorization": Endpoint.unary(
+                "/auth.v1.ConnectedAppService/DenyAppConnectionRequest": Endpoint.unary(
                     method=MethodInfo(
-                        name="DenyAppAuthorization",
+                        name="DenyAppConnectionRequest",
                         service_name="auth.v1.ConnectedAppService",
-                        input=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest,
-                        output=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse,
+                        input=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest,
+                        output=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=svc.deny_app_authorization,
+                    function=svc.deny_app_connection_request,
                 ),
                 "/auth.v1.ConnectedAppService/ListConnectedApps": Endpoint.unary(
                     method=MethodInfo(
@@ -103,21 +103,21 @@ class ConnectedAppServiceASGIApplication(ConnectASGIApplication[ConnectedAppServ
 
 
 class ConnectedAppServiceClient(ConnectClient):
-    async def get_app_authorization(
+    async def get_app_connection_request(
         self,
-        request: auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest,
+        request: auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
         use_get: bool = False,
-    ) -> auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse:
+    ) -> auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse:
         return await self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="GetAppAuthorization",
+                name="GetAppConnectionRequest",
                 service_name="auth.v1.ConnectedAppService",
-                input=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest,
-                output=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse,
+                input=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest,
+                output=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse,
                 idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
@@ -125,40 +125,40 @@ class ConnectedAppServiceClient(ConnectClient):
             use_get=use_get,
         )
 
-    async def approve_app_authorization(
+    async def approve_app_connection_request(
         self,
-        request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest,
+        request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse:
+    ) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse:
         return await self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="ApproveAppAuthorization",
+                name="ApproveAppConnectionRequest",
                 service_name="auth.v1.ConnectedAppService",
-                input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest,
-                output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse,
+                input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest,
+                output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
             timeout_ms=timeout_ms,
         )
 
-    async def deny_app_authorization(
+    async def deny_app_connection_request(
         self,
-        request: auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest,
+        request: auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse:
+    ) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse:
         return await self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="DenyAppAuthorization",
+                name="DenyAppConnectionRequest",
                 service_name="auth.v1.ConnectedAppService",
-                input=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest,
-                output=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse,
+                input=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest,
+                output=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
@@ -212,11 +212,11 @@ class ConnectedAppServiceClient(ConnectClient):
 
 
 class ConnectedAppServiceSync(Protocol):
-    def get_app_authorization(self, request: auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse:
+    def get_app_connection_request(self, request: auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def approve_app_authorization(self, request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse:
+    def approve_app_connection_request(self, request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
-    def deny_app_authorization(self, request: auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse:
+    def deny_app_connection_request(self, request: auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_connected_apps(self, request: auth_dot_v1_dot_connected__apps__pb2.ListConnectedAppsRequest, ctx: RequestContext) -> auth_dot_v1_dot_connected__apps__pb2.ListConnectedAppsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -228,35 +228,35 @@ class ConnectedAppServiceWSGIApplication(ConnectWSGIApplication):
     def __init__(self, service: ConnectedAppServiceSync, interceptors: Iterable[InterceptorSync]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
         super().__init__(
             endpoints={
-                "/auth.v1.ConnectedAppService/GetAppAuthorization": EndpointSync.unary(
+                "/auth.v1.ConnectedAppService/GetAppConnectionRequest": EndpointSync.unary(
                     method=MethodInfo(
-                        name="GetAppAuthorization",
+                        name="GetAppConnectionRequest",
                         service_name="auth.v1.ConnectedAppService",
-                        input=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest,
-                        output=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse,
+                        input=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest,
+                        output=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse,
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
-                    function=service.get_app_authorization,
+                    function=service.get_app_connection_request,
                 ),
-                "/auth.v1.ConnectedAppService/ApproveAppAuthorization": EndpointSync.unary(
+                "/auth.v1.ConnectedAppService/ApproveAppConnectionRequest": EndpointSync.unary(
                     method=MethodInfo(
-                        name="ApproveAppAuthorization",
+                        name="ApproveAppConnectionRequest",
                         service_name="auth.v1.ConnectedAppService",
-                        input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest,
-                        output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse,
+                        input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest,
+                        output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=service.approve_app_authorization,
+                    function=service.approve_app_connection_request,
                 ),
-                "/auth.v1.ConnectedAppService/DenyAppAuthorization": EndpointSync.unary(
+                "/auth.v1.ConnectedAppService/DenyAppConnectionRequest": EndpointSync.unary(
                     method=MethodInfo(
-                        name="DenyAppAuthorization",
+                        name="DenyAppConnectionRequest",
                         service_name="auth.v1.ConnectedAppService",
-                        input=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest,
-                        output=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse,
+                        input=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest,
+                        output=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse,
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
-                    function=service.deny_app_authorization,
+                    function=service.deny_app_connection_request,
                 ),
                 "/auth.v1.ConnectedAppService/ListConnectedApps": EndpointSync.unary(
                     method=MethodInfo(
@@ -292,21 +292,21 @@ class ConnectedAppServiceWSGIApplication(ConnectWSGIApplication):
 
 
 class ConnectedAppServiceClientSync(ConnectClientSync):
-    def get_app_authorization(
+    def get_app_connection_request(
         self,
-        request: auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest,
+        request: auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
         use_get: bool = False,
-    ) -> auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse:
+    ) -> auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse:
         return self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="GetAppAuthorization",
+                name="GetAppConnectionRequest",
                 service_name="auth.v1.ConnectedAppService",
-                input=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationRequest,
-                output=auth_dot_v1_dot_connected__apps__pb2.GetAppAuthorizationResponse,
+                input=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestRequest,
+                output=auth_dot_v1_dot_connected__apps__pb2.GetAppConnectionRequestResponse,
                 idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
             ),
             headers=headers,
@@ -314,40 +314,40 @@ class ConnectedAppServiceClientSync(ConnectClientSync):
             use_get=use_get,
         )
 
-    def approve_app_authorization(
+    def approve_app_connection_request(
         self,
-        request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest,
+        request: auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse:
+    ) -> auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse:
         return self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="ApproveAppAuthorization",
+                name="ApproveAppConnectionRequest",
                 service_name="auth.v1.ConnectedAppService",
-                input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationRequest,
-                output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppAuthorizationResponse,
+                input=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestRequest,
+                output=auth_dot_v1_dot_connected__apps__pb2.ApproveAppConnectionRequestResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,
             timeout_ms=timeout_ms,
         )
 
-    def deny_app_authorization(
+    def deny_app_connection_request(
         self,
-        request: auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest,
+        request: auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest,
         *,
         headers: Headers | Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
-    ) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse:
+    ) -> auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse:
         return self.execute_unary(
             request=request,
             method=MethodInfo(
-                name="DenyAppAuthorization",
+                name="DenyAppConnectionRequest",
                 service_name="auth.v1.ConnectedAppService",
-                input=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationRequest,
-                output=auth_dot_v1_dot_connected__apps__pb2.DenyAppAuthorizationResponse,
+                input=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestRequest,
+                output=auth_dot_v1_dot_connected__apps__pb2.DenyAppConnectionRequestResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

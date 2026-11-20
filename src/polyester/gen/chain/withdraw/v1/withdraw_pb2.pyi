@@ -221,6 +221,56 @@ class CreateWalletTradingWithdrawRequest(_message.Message):
     payload_signature: bytes
     def __init__(self, payload: _Optional[_Union[TradingWithdrawIntentPayload, _Mapping]] = ..., subaccount_id: _Optional[int] = ..., signer_wallet: _Optional[str] = ..., payload_signature: _Optional[bytes] = ...) -> None: ...
 
+class TradingToFundingBatchLeg(_message.Message):
+    __slots__ = ("asset_id", "amount_e18", "destination_address")
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    asset_id: int
+    amount_e18: _u128_pb2.U128
+    destination_address: str
+    def __init__(self, asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination_address: _Optional[str] = ...) -> None: ...
+
+class CreateWalletTradingToFundingBatchRequest(_message.Message):
+    __slots__ = ("legs", "subaccount_id", "deadline_ts_sec", "nonce", "idempotency_key", "signer_wallet", "payload_signature")
+    LEGS_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    DEADLINE_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    NONCE_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    SIGNER_WALLET_FIELD_NUMBER: _ClassVar[int]
+    PAYLOAD_SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    legs: _containers.RepeatedCompositeFieldContainer[TradingToFundingBatchLeg]
+    subaccount_id: int
+    deadline_ts_sec: int
+    nonce: _u128_pb2.U128
+    idempotency_key: str
+    signer_wallet: str
+    payload_signature: bytes
+    def __init__(self, legs: _Optional[_Iterable[_Union[TradingToFundingBatchLeg, _Mapping]]] = ..., subaccount_id: _Optional[int] = ..., deadline_ts_sec: _Optional[int] = ..., nonce: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., idempotency_key: _Optional[str] = ..., signer_wallet: _Optional[str] = ..., payload_signature: _Optional[bytes] = ...) -> None: ...
+
+class TradingToFundingBatchLegResult(_message.Message):
+    __slots__ = ("leg_index", "intent_id", "asset_id", "amount_e18", "destination_address")
+    LEG_INDEX_FIELD_NUMBER: _ClassVar[int]
+    INTENT_ID_FIELD_NUMBER: _ClassVar[int]
+    ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    leg_index: int
+    intent_id: str
+    asset_id: int
+    amount_e18: _u128_pb2.U128
+    destination_address: str
+    def __init__(self, leg_index: _Optional[int] = ..., intent_id: _Optional[str] = ..., asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., destination_address: _Optional[str] = ...) -> None: ...
+
+class CreateWalletTradingToFundingBatchResponse(_message.Message):
+    __slots__ = ("batch_id", "legs")
+    BATCH_ID_FIELD_NUMBER: _ClassVar[int]
+    LEGS_FIELD_NUMBER: _ClassVar[int]
+    batch_id: str
+    legs: _containers.RepeatedCompositeFieldContainer[TradingToFundingBatchLegResult]
+    def __init__(self, batch_id: _Optional[str] = ..., legs: _Optional[_Iterable[_Union[TradingToFundingBatchLegResult, _Mapping]]] = ...) -> None: ...
+
 class ValidateWithdrawDestinationRequest(_message.Message):
     __slots__ = ("destination_chain_id", "destination_address")
     DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]

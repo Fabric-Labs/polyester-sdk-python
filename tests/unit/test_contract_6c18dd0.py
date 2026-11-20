@@ -96,20 +96,20 @@ def test_resource_exhausted_without_the_detail_stays_a_rate_limit() -> None:
 def test_me_names_a_sub_account_keys_scope_and_sub_account() -> None:
     from polyester.codecs.decode.auth import me_from_proto
     from polyester.codecs.scalars import format_id
-    from polyester.gen.auth.v1 import address_book_pb2, auth_pb2
+    from polyester.gen.auth.v1 import account_scope_pb2, auth_pb2
 
     me = me_from_proto(
         auth_pb2.MeResponse(
             account_id=7,
             api_key_id="key-1",
-            api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT,
+            api_key_scope=account_scope_pb2.SCOPE_SUBACCOUNT,
             subaccount_id=12,
         )
     )
     assert (me.api_key_scope, me.subaccount_id) == ("subaccount", format_id(12))
     root = me_from_proto(
         auth_pb2.MeResponse(
-            account_id=7, api_key_id="key-1", api_key_scope=address_book_pb2.SCOPE_ROOT
+            account_id=7, api_key_id="key-1", api_key_scope=account_scope_pb2.SCOPE_ROOT
         )
     )
     assert (root.api_key_scope, root.subaccount_id) == ("root", "")
@@ -120,12 +120,12 @@ def test_me_names_a_sub_account_keys_scope_and_sub_account() -> None:
 def test_me_refuses_a_sub_account_key_without_its_sub_account() -> None:
     from polyester.codecs.decode.auth import me_from_proto
     from polyester.errors import PolyesterResponseContractError
-    from polyester.gen.auth.v1 import address_book_pb2, auth_pb2
+    from polyester.gen.auth.v1 import account_scope_pb2, auth_pb2
 
     with pytest.raises(PolyesterResponseContractError):
         me_from_proto(
             auth_pb2.MeResponse(
-                account_id=7, api_key_id="key-1", api_key_scope=address_book_pb2.SCOPE_SUBACCOUNT
+                account_id=7, api_key_id="key-1", api_key_scope=account_scope_pb2.SCOPE_SUBACCOUNT
             )
         )
 
@@ -237,9 +237,9 @@ def test_message_text_never_makes_a_request_too_large(message: str) -> None:
 def test_me_refuses_an_inconsistent_scope(key, scope, subaccount) -> None:
     from polyester.codecs.decode.auth import me_from_proto
     from polyester.errors import PolyesterResponseContractError
-    from polyester.gen.auth.v1 import address_book_pb2, auth_pb2
+    from polyester.gen.auth.v1 import account_scope_pb2, auth_pb2
 
-    value = address_book_pb2.AccountScopeType.Value(scope) if isinstance(scope, str) else scope
+    value = account_scope_pb2.AccountScopeType.Value(scope) if isinstance(scope, str) else scope
     msg = auth_pb2.MeResponse(
         account_id=7, api_key_id=key, api_key_scope=value, subaccount_id=subaccount
     )

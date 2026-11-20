@@ -1,6 +1,6 @@
 import datetime
 
-from polyester.gen.auth.v1 import address_book_pb2 as _address_book_pb2
+from polyester.gen.auth.v1 import account_scope_pb2 as _account_scope_pb2
 from polyester.gen.auth.v1 import mfa_pb2 as _mfa_pb2
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
@@ -237,10 +237,10 @@ class MeResponse(_message.Message):
     api_key_id: str
     username: str
     root_smart_account_address: str
-    api_key_scope: _address_book_pb2.AccountScopeType
+    api_key_scope: _account_scope_pb2.AccountScopeType
     subaccount_id: int
     session: _mfa_pb2.SessionInfo
-    def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., api_key_scope: _Optional[_Union[_address_book_pb2.AccountScopeType, str]] = ..., subaccount_id: _Optional[int] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
+    def __init__(self, account_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., username: _Optional[str] = ..., root_smart_account_address: _Optional[str] = ..., api_key_scope: _Optional[_Union[_account_scope_pb2.AccountScopeType, str]] = ..., subaccount_id: _Optional[int] = ..., session: _Optional[_Union[_mfa_pb2.SessionInfo, _Mapping]] = ...) -> None: ...
 
 class AuthErrorDetail(_message.Message):
     __slots__ = ("code", "message", "retry_after", "timestamp_window")

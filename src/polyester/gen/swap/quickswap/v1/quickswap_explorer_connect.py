@@ -21,6 +21,9 @@ class QuickSwapExplorerService(Protocol):
     async def list_completed_quick_swaps(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.ListCompletedQuickSwapsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.ListCompletedQuickSwapsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_completed_quick_swap(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_quick_swap_stats(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetQuickSwapStatsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetQuickSwapStatsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -39,6 +42,16 @@ class QuickSwapExplorerServiceASGIApplication(ConnectASGIApplication[QuickSwapEx
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.list_completed_quick_swaps,
+                ),
+                "/swap.quickswap.v1.QuickSwapExplorerService/GetCompletedQuickSwap": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetCompletedQuickSwap",
+                        service_name="swap.quickswap.v1.QuickSwapExplorerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_completed_quick_swap,
                 ),
                 "/swap.quickswap.v1.QuickSwapExplorerService/GetQuickSwapStats": Endpoint.unary(
                     method=MethodInfo(
@@ -84,6 +97,26 @@ class QuickSwapExplorerServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_completed_quick_swap(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCompletedQuickSwap",
+                service_name="swap.quickswap.v1.QuickSwapExplorerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def get_quick_swap_stats(
         self,
         request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetQuickSwapStatsRequest,
@@ -111,6 +144,8 @@ class QuickSwapExplorerServiceClient(ConnectClient):
 class QuickSwapExplorerServiceSync(Protocol):
     def list_completed_quick_swaps(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.ListCompletedQuickSwapsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.ListCompletedQuickSwapsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_completed_quick_swap(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_quick_swap_stats(self, request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetQuickSwapStatsRequest, ctx: RequestContext) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetQuickSwapStatsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -128,6 +163,16 @@ class QuickSwapExplorerServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.list_completed_quick_swaps,
+                ),
+                "/swap.quickswap.v1.QuickSwapExplorerService/GetCompletedQuickSwap": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetCompletedQuickSwap",
+                        service_name="swap.quickswap.v1.QuickSwapExplorerService",
+                        input=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest,
+                        output=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_completed_quick_swap,
                 ),
                 "/swap.quickswap.v1.QuickSwapExplorerService/GetQuickSwapStats": EndpointSync.unary(
                     method=MethodInfo(
@@ -167,6 +212,26 @@ class QuickSwapExplorerServiceClientSync(ConnectClientSync):
                 service_name="swap.quickswap.v1.QuickSwapExplorerService",
                 input=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.ListCompletedQuickSwapsRequest,
                 output=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.ListCompletedQuickSwapsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_completed_quick_swap(
+        self,
+        request: swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCompletedQuickSwap",
+                service_name="swap.quickswap.v1.QuickSwapExplorerService",
+                input=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapRequest,
+                output=swap_dot_quickswap_dot_v1_dot_quickswap__explorer__pb2.GetCompletedQuickSwapResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

@@ -28,7 +28,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from polyester.gen.polyester.api import options_pb2 as polyester_dot_api_dot_options__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1c\x61uth/v1/connected_apps.proto\x12\x07\x61uth.v1\x1a\x1b\x62uf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\"E\n\x12\x43onnectedAppClient\x12\x1b\n\tclient_id\x18\x01 \x01(\tR\x08\x63lientId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\"\xdb\x01\n\x10\x41ppAuthorization\x12\x33\n\x06\x63lient\x18\x01 \x01(\x0b\x32\x1b.auth.v1.ConnectedAppClientR\x06\x63lient\x12\x16\n\x06scopes\x18\x02 \x03(\tR\x06scopes\x12\x1a\n\x08resource\x18\x03 \x01(\tR\x08resource\x12#\n\rredirect_host\x18\x04 \x01(\tR\x0credirectHost\x12\x39\n\nexpires_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt\"\xd9\x02\n\x0c\x43onnectedApp\x12(\n\x10\x63onnected_app_id\x18\x01 \x01(\x06R\x0e\x63onnectedAppId\x12\x33\n\x06\x63lient\x18\x02 \x01(\x0b\x32\x1b.auth.v1.ConnectedAppClientR\x06\x63lient\x12\x16\n\x06scopes\x18\x03 \x03(\tR\x06scopes\x12\x1a\n\x08resource\x18\x04 \x01(\tR\x08resource\x12=\n\x0c\x63onnected_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x0b\x63onnectedAt\x12<\n\x0clast_used_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\nlastUsedAt\x12\x39\n\nexpires_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt\"I\n\x1aGetAppAuthorizationRequest\x12+\n\nrequest_id\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\trequestId\"^\n\x1bGetAppAuthorizationResponse\x12?\n\rauthorization\x18\x01 \x01(\x0b\x32\x19.auth.v1.AppAuthorizationR\rauthorization\"M\n\x1e\x41pproveAppAuthorizationRequest\x12+\n\nrequest_id\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\trequestId\"D\n\x1f\x41pproveAppAuthorizationResponse\x12!\n\x0credirect_url\x18\x01 \x01(\tR\x0bredirectUrl\"J\n\x1b\x44\x65nyAppAuthorizationRequest\x12+\n\nrequest_id\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\trequestId\"A\n\x1c\x44\x65nyAppAuthorizationResponse\x12!\n\x0credirect_url\x18\x01 \x01(\tR\x0bredirectUrl\"\x1a\n\x18ListConnectedAppsRequest\"F\n\x19ListConnectedAppsResponse\x12)\n\x04\x61pps\x18\x01 \x03(\x0b\x32\x15.auth.v1.ConnectedAppR\x04\x61pps\"X\n\x19RevokeConnectedAppRequest\x12;\n\x10\x63onnected_app_id\x18\x01 \x01(\x06\x42\x11\xe0\x41\x02\xbaH\x0bR\t!\x00\x00\x00\x00\x00\x00\x00\x00R\x0e\x63onnectedAppId\"\x1c\n\x1aRevokeConnectedAppResponse2\xbe\x04\n\x13\x43onnectedAppService\x12j\n\x13GetAppAuthorization\x12#.auth.v1.GetAppAuthorizationRequest\x1a$.auth.v1.GetAppAuthorizationResponse\"\x08\x90\x02\x01\xa2\xb5\x18\x01\x01\x12s\n\x17\x41pproveAppAuthorization\x12\'.auth.v1.ApproveAppAuthorizationRequest\x1a(.auth.v1.ApproveAppAuthorizationResponse\"\x05\xa2\xb5\x18\x01\x01\x12j\n\x14\x44\x65nyAppAuthorization\x12$.auth.v1.DenyAppAuthorizationRequest\x1a%.auth.v1.DenyAppAuthorizationResponse\"\x05\xa2\xb5\x18\x01\x01\x12\x64\n\x11ListConnectedApps\x12!.auth.v1.ListConnectedAppsRequest\x1a\".auth.v1.ListConnectedAppsResponse\"\x08\x90\x02\x01\xa2\xb5\x18\x01\x01\x12g\n\x12RevokeConnectedApp\x12\".auth.v1.RevokeConnectedAppRequest\x1a#.auth.v1.RevokeConnectedAppResponse\"\x08\x90\x02\x02\xa2\xb5\x18\x01\x01\x1a\x0b\x8a\xb5\x18\x07\x61\x63\x63ountB<Z:github.com/Fabric-Labs/polyester-sdk-go/gen/auth/v1;authv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1c\x61uth/v1/connected_apps.proto\x12\x07\x61uth.v1\x1a\x1b\x62uf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpolyester/api/options.proto\"E\n\x12\x43onnectedAppClient\x12\x1b\n\tclient_id\x18\x01 \x01(\tR\x08\x63lientId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\"\xdf\x01\n\x14\x41ppConnectionRequest\x12\x33\n\x06\x63lient\x18\x01 \x01(\x0b\x32\x1b.auth.v1.ConnectedAppClientR\x06\x63lient\x12\x16\n\x06scopes\x18\x02 \x03(\tR\x06scopes\x12\x1a\n\x08resource\x18\x03 \x01(\tR\x08resource\x12#\n\rredirect_host\x18\x04 \x01(\tR\x0credirectHost\x12\x39\n\nexpires_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt\"\xd9\x02\n\x0c\x43onnectedApp\x12(\n\x10\x63onnected_app_id\x18\x01 \x01(\x06R\x0e\x63onnectedAppId\x12\x33\n\x06\x63lient\x18\x02 \x01(\x0b\x32\x1b.auth.v1.ConnectedAppClientR\x06\x63lient\x12\x16\n\x06scopes\x18\x03 \x03(\tR\x06scopes\x12\x1a\n\x08resource\x18\x04 \x01(\tR\x08resource\x12=\n\x0c\x63onnected_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\x0b\x63onnectedAt\x12<\n\x0clast_used_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\nlastUsedAt\x12\x39\n\nexpires_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\texpiresAt\"M\n\x1eGetAppConnectionRequestRequest\x12+\n\nrequest_id\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\trequestId\"o\n\x1fGetAppConnectionRequestResponse\x12L\n\x12\x63onnection_request\x18\x01 \x01(\x0b\x32\x1d.auth.v1.AppConnectionRequestR\x11\x63onnectionRequest\"Q\n\"ApproveAppConnectionRequestRequest\x12+\n\nrequest_id\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\trequestId\"H\n#ApproveAppConnectionRequestResponse\x12!\n\x0credirect_url\x18\x01 \x01(\tR\x0bredirectUrl\"N\n\x1f\x44\x65nyAppConnectionRequestRequest\x12+\n\nrequest_id\x18\x01 \x01(\tB\x0c\xe0\x41\x02\xbaH\x06r\x04\x10\x01\x18@R\trequestId\"E\n DenyAppConnectionRequestResponse\x12!\n\x0credirect_url\x18\x01 \x01(\tR\x0bredirectUrl\"\x1a\n\x18ListConnectedAppsRequest\"F\n\x19ListConnectedAppsResponse\x12)\n\x04\x61pps\x18\x01 \x03(\x0b\x32\x15.auth.v1.ConnectedAppR\x04\x61pps\"X\n\x19RevokeConnectedAppRequest\x12;\n\x10\x63onnected_app_id\x18\x01 \x01(\x06\x42\x11\xe0\x41\x02\xbaH\x0bR\t!\x00\x00\x00\x00\x00\x00\x00\x00R\x0e\x63onnectedAppId\"\x1c\n\x1aRevokeConnectedAppResponse2\xf3\x04\n\x13\x43onnectedAppService\x12z\n\x17GetAppConnectionRequest\x12\'.auth.v1.GetAppConnectionRequestRequest\x1a(.auth.v1.GetAppConnectionRequestResponse\"\x0c\x90\x02\x01\x90\xb5\x18\x01\xa2\xb5\x18\x01\x01\x12\x87\x01\n\x1b\x41pproveAppConnectionRequest\x12+.auth.v1.ApproveAppConnectionRequestRequest\x1a,.auth.v1.ApproveAppConnectionRequestResponse\"\r\x90\xb5\x18\x01\x98\xb5\x18\x02\xa2\xb5\x18\x01\x01\x12z\n\x18\x44\x65nyAppConnectionRequest\x12(.auth.v1.DenyAppConnectionRequestRequest\x1a).auth.v1.DenyAppConnectionRequestResponse\"\t\x90\xb5\x18\x01\xa2\xb5\x18\x01\x01\x12\x64\n\x11ListConnectedApps\x12!.auth.v1.ListConnectedAppsRequest\x1a\".auth.v1.ListConnectedAppsResponse\"\x08\x90\x02\x01\xa2\xb5\x18\x01\x01\x12g\n\x12RevokeConnectedApp\x12\".auth.v1.RevokeConnectedAppRequest\x1a#.auth.v1.RevokeConnectedAppResponse\"\x08\x90\x02\x02\xa2\xb5\x18\x01\x01\x1a\x0b\x8a\xb5\x18\x07\x61\x63\x63ountB<Z:github.com/Fabric-Labs/polyester-sdk-go/gen/auth/v1;authv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,52 +36,52 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'auth.v1.connected_apps_pb2'
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z:github.com/Fabric-Labs/polyester-sdk-go/gen/auth/v1;authv1'
-  _globals['_GETAPPAUTHORIZATIONREQUEST'].fields_by_name['request_id']._loaded_options = None
-  _globals['_GETAPPAUTHORIZATIONREQUEST'].fields_by_name['request_id']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
-  _globals['_APPROVEAPPAUTHORIZATIONREQUEST'].fields_by_name['request_id']._loaded_options = None
-  _globals['_APPROVEAPPAUTHORIZATIONREQUEST'].fields_by_name['request_id']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
-  _globals['_DENYAPPAUTHORIZATIONREQUEST'].fields_by_name['request_id']._loaded_options = None
-  _globals['_DENYAPPAUTHORIZATIONREQUEST'].fields_by_name['request_id']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
+  _globals['_GETAPPCONNECTIONREQUESTREQUEST'].fields_by_name['request_id']._loaded_options = None
+  _globals['_GETAPPCONNECTIONREQUESTREQUEST'].fields_by_name['request_id']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
+  _globals['_APPROVEAPPCONNECTIONREQUESTREQUEST'].fields_by_name['request_id']._loaded_options = None
+  _globals['_APPROVEAPPCONNECTIONREQUESTREQUEST'].fields_by_name['request_id']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
+  _globals['_DENYAPPCONNECTIONREQUESTREQUEST'].fields_by_name['request_id']._loaded_options = None
+  _globals['_DENYAPPCONNECTIONREQUESTREQUEST'].fields_by_name['request_id']._serialized_options = b'\340A\002\272H\006r\004\020\001\030@'
   _globals['_REVOKECONNECTEDAPPREQUEST'].fields_by_name['connected_app_id']._loaded_options = None
   _globals['_REVOKECONNECTEDAPPREQUEST'].fields_by_name['connected_app_id']._serialized_options = b'\340A\002\272H\013R\t!\000\000\000\000\000\000\000\000'
   _globals['_CONNECTEDAPPSERVICE']._loaded_options = None
   _globals['_CONNECTEDAPPSERVICE']._serialized_options = b'\212\265\030\007account'
-  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['GetAppAuthorization']._loaded_options = None
-  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['GetAppAuthorization']._serialized_options = b'\220\002\001\242\265\030\001\001'
-  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['ApproveAppAuthorization']._loaded_options = None
-  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['ApproveAppAuthorization']._serialized_options = b'\242\265\030\001\001'
-  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['DenyAppAuthorization']._loaded_options = None
-  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['DenyAppAuthorization']._serialized_options = b'\242\265\030\001\001'
+  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['GetAppConnectionRequest']._loaded_options = None
+  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['GetAppConnectionRequest']._serialized_options = b'\220\002\001\220\265\030\001\242\265\030\001\001'
+  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['ApproveAppConnectionRequest']._loaded_options = None
+  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['ApproveAppConnectionRequest']._serialized_options = b'\220\265\030\001\230\265\030\002\242\265\030\001\001'
+  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['DenyAppConnectionRequest']._loaded_options = None
+  _globals['_CONNECTEDAPPSERVICE'].methods_by_name['DenyAppConnectionRequest']._serialized_options = b'\220\265\030\001\242\265\030\001\001'
   _globals['_CONNECTEDAPPSERVICE'].methods_by_name['ListConnectedApps']._loaded_options = None
   _globals['_CONNECTEDAPPSERVICE'].methods_by_name['ListConnectedApps']._serialized_options = b'\220\002\001\242\265\030\001\001'
   _globals['_CONNECTEDAPPSERVICE'].methods_by_name['RevokeConnectedApp']._loaded_options = None
   _globals['_CONNECTEDAPPSERVICE'].methods_by_name['RevokeConnectedApp']._serialized_options = b'\220\002\002\242\265\030\001\001'
   _globals['_CONNECTEDAPPCLIENT']._serialized_start=165
   _globals['_CONNECTEDAPPCLIENT']._serialized_end=234
-  _globals['_APPAUTHORIZATION']._serialized_start=237
-  _globals['_APPAUTHORIZATION']._serialized_end=456
-  _globals['_CONNECTEDAPP']._serialized_start=459
-  _globals['_CONNECTEDAPP']._serialized_end=804
-  _globals['_GETAPPAUTHORIZATIONREQUEST']._serialized_start=806
-  _globals['_GETAPPAUTHORIZATIONREQUEST']._serialized_end=879
-  _globals['_GETAPPAUTHORIZATIONRESPONSE']._serialized_start=881
-  _globals['_GETAPPAUTHORIZATIONRESPONSE']._serialized_end=975
-  _globals['_APPROVEAPPAUTHORIZATIONREQUEST']._serialized_start=977
-  _globals['_APPROVEAPPAUTHORIZATIONREQUEST']._serialized_end=1054
-  _globals['_APPROVEAPPAUTHORIZATIONRESPONSE']._serialized_start=1056
-  _globals['_APPROVEAPPAUTHORIZATIONRESPONSE']._serialized_end=1124
-  _globals['_DENYAPPAUTHORIZATIONREQUEST']._serialized_start=1126
-  _globals['_DENYAPPAUTHORIZATIONREQUEST']._serialized_end=1200
-  _globals['_DENYAPPAUTHORIZATIONRESPONSE']._serialized_start=1202
-  _globals['_DENYAPPAUTHORIZATIONRESPONSE']._serialized_end=1267
-  _globals['_LISTCONNECTEDAPPSREQUEST']._serialized_start=1269
-  _globals['_LISTCONNECTEDAPPSREQUEST']._serialized_end=1295
-  _globals['_LISTCONNECTEDAPPSRESPONSE']._serialized_start=1297
-  _globals['_LISTCONNECTEDAPPSRESPONSE']._serialized_end=1367
-  _globals['_REVOKECONNECTEDAPPREQUEST']._serialized_start=1369
-  _globals['_REVOKECONNECTEDAPPREQUEST']._serialized_end=1457
-  _globals['_REVOKECONNECTEDAPPRESPONSE']._serialized_start=1459
-  _globals['_REVOKECONNECTEDAPPRESPONSE']._serialized_end=1487
-  _globals['_CONNECTEDAPPSERVICE']._serialized_start=1490
-  _globals['_CONNECTEDAPPSERVICE']._serialized_end=2064
+  _globals['_APPCONNECTIONREQUEST']._serialized_start=237
+  _globals['_APPCONNECTIONREQUEST']._serialized_end=460
+  _globals['_CONNECTEDAPP']._serialized_start=463
+  _globals['_CONNECTEDAPP']._serialized_end=808
+  _globals['_GETAPPCONNECTIONREQUESTREQUEST']._serialized_start=810
+  _globals['_GETAPPCONNECTIONREQUESTREQUEST']._serialized_end=887
+  _globals['_GETAPPCONNECTIONREQUESTRESPONSE']._serialized_start=889
+  _globals['_GETAPPCONNECTIONREQUESTRESPONSE']._serialized_end=1000
+  _globals['_APPROVEAPPCONNECTIONREQUESTREQUEST']._serialized_start=1002
+  _globals['_APPROVEAPPCONNECTIONREQUESTREQUEST']._serialized_end=1083
+  _globals['_APPROVEAPPCONNECTIONREQUESTRESPONSE']._serialized_start=1085
+  _globals['_APPROVEAPPCONNECTIONREQUESTRESPONSE']._serialized_end=1157
+  _globals['_DENYAPPCONNECTIONREQUESTREQUEST']._serialized_start=1159
+  _globals['_DENYAPPCONNECTIONREQUESTREQUEST']._serialized_end=1237
+  _globals['_DENYAPPCONNECTIONREQUESTRESPONSE']._serialized_start=1239
+  _globals['_DENYAPPCONNECTIONREQUESTRESPONSE']._serialized_end=1308
+  _globals['_LISTCONNECTEDAPPSREQUEST']._serialized_start=1310
+  _globals['_LISTCONNECTEDAPPSREQUEST']._serialized_end=1336
+  _globals['_LISTCONNECTEDAPPSRESPONSE']._serialized_start=1338
+  _globals['_LISTCONNECTEDAPPSRESPONSE']._serialized_end=1408
+  _globals['_REVOKECONNECTEDAPPREQUEST']._serialized_start=1410
+  _globals['_REVOKECONNECTEDAPPREQUEST']._serialized_end=1498
+  _globals['_REVOKECONNECTEDAPPRESPONSE']._serialized_start=1500
+  _globals['_REVOKECONNECTEDAPPRESPONSE']._serialized_end=1528
+  _globals['_CONNECTEDAPPSERVICE']._serialized_start=1531
+  _globals['_CONNECTEDAPPSERVICE']._serialized_end=2158
 # @@protoc_insertion_point(module_scope)

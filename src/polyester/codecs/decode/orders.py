@@ -291,8 +291,14 @@ OrderScales = Callable[[int], tuple[int | None, int | None]]
 
 
 def pair_scales(scales: OrderScales | None, symbol_id: int) -> tuple[int | None, int | None]:
-    """The ``(base, quote)`` quantity scales ``scales`` knows for ``symbol_id``."""
-    return scales(int(symbol_id)) if scales is not None else (None, None)
+    """The ``(base, quote)`` quantity scales ``scales`` knows for ``symbol_id``.
+
+    ``(None, None)`` for symbol ID 0, which names no pair: a refused batch
+    replacement read through ``GetOrder`` carries no symbol.
+    """
+    if scales is None or not symbol_id:
+        return None, None
+    return scales(int(symbol_id))
 
 
 def scaled_order_from_proto(msg: Order, scales: OrderScales | None) -> PublicOrder:
@@ -314,12 +320,12 @@ def order_from_proto(
     )
     return PublicOrder(
         order_id=format_uint64_id(msg.order_id),
-        symbol_id=symbol_id,
+        symbol_id=symbol_id or None,
         client_order_id=msg.client_order_id,
-        side=proto_enum_name(orders_pb2.Side, msg.side),
+        side=proto_enum_name(orders_pb2.Side, msg.side) or None,
         status=status,
-        order_type=proto_enum_name(orders_pb2.OrderType, msg.order_type),
-        tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force),
+        order_type=proto_enum_name(orders_pb2.OrderType, msg.order_type) or None,
+        tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force) or None,
         orig_qty=_qty(msg.orig_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         cum_qty=_qty(msg.cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
         inherited_cum_qty=_qty(
@@ -344,9 +350,10 @@ def order_from_proto(
         ),
         version=int(msg.version),
         post_only=bool(msg.post_only),
-        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset),
-        self_trade_prevention_mode=proto_enum_name(
-            orders_pb2.SelfTradePreventionMode, int(msg.self_trade_prevention_mode)
+        fee_asset=proto_enum_name(orders_pb2.FeeAsset, msg.fee_asset) or None,
+        self_trade_prevention_mode=(
+            proto_enum_name(orders_pb2.SelfTradePreventionMode, int(msg.self_trade_prevention_mode))
+            or None
         ),
         submitted_max_quote_debit_scaled=_optional_scaled(msg, "submitted_max_quote_debit_scaled"),
         submitted_quote_proceeds_scaled=_optional_scaled(msg, "submitted_quote_proceeds_scaled"),

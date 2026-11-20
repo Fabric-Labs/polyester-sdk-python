@@ -1,19 +1,25 @@
 from __future__ import annotations
 
+import math
+import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
+import msgspec
 from google.protobuf.message import Message
 
 from polyester.codecs.decode.balances import ledger_amount
 from polyester.codecs.decode.invariants import (
     ts_ns_string_from_response,
 )
-from polyester.codecs.decode.lifecycle import lifecycle_reason_from_code
+from polyester.codecs.decode.lifecycle import (
+    FLOW_ENUM_LABELS,
+    flow_summary_from_proto,
+)
 from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError
-from polyester.gen.chain.zipper.v1 import reason_pb2
+from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
 from polyester.gen.ledger.v1 import catalog_pb2
 from polyester.models.market import (
     Candle,
@@ -64,7 +70,6 @@ from polyester.models.trading import (
     UserTrade,
     UserTradesList,
     WithdrawIntentResult,
-    ZipperReasonDetails,
 )
 
 if TYPE_CHECKING:
@@ -461,62 +466,194 @@ def _lifecycle_flow_payload(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def _decode_zipper_reason(value: Any) -> ZipperReasonDetails | None:
-    if not isinstance(value, dict):
+_FLOW_SUMMARY = lifecycle_read_pb2.FlowSummaryView.DESCRIPTOR
+# Names earlier answers used for a contract field; the contract name wins.
+_LEGACY_FLOW_KEYS = {
+    "intentId": "flow_id",
+    "intent_id": "flow_id",
+    "latestStep": "current_step",
+    "latest_step": "current_step",
+    "reasonCode": "lifecycle_reason",
+    "reason_code": "lifecycle_reason",
+}
+# The LifecycleFlowSummary attribute of each FlowSummaryView enum field.
+_FLOW_ENUM_ATTRS = {"current_step": "latest_step"}
+# An enum number as text, and the "unknown_<...>_<n>" label a binary decoder
+# returns for a number this SDK does not name; both at most int32.
+_ENUM_NUMBER = re.compile(r"-?[0-9]+")
+_UNKNOWN_LABEL = re.compile(r"unknown_[a-z_]+?_(-?[0-9]{1,10})")
+_INT32_MIN, _INT32_MAX = -(2**31), 2**31 - 1
+_ENUM_VALUE_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
+
+# A path into the summary (field names, and list indexes) to the label of an
+# enum value newer than this SDK, which the JSON names but cannot number.
+_NewerLabels = dict[tuple[str | int, ...], str]
+
+
+def _flow_enum_json(
+    field: Any, value: Any, path: tuple[str | int, ...], newer: _NewerLabels
+) -> Any:
+    """A flow enum value as the contract parser takes it: its name or int32
+    number as sent, or the number of the ``LifecycleFlowSummary`` label (such
+    as ``"withdraw"``, ``"-1"`` or ``"unknown_reason_-1"``) or prefixed name it
+    is. A name newer than this SDK parses as 0 and records its label, the name
+    without the enum's prefix, lowercased; any other text is refused."""
+    if value is None:
         return None
-    raw_code = _field(value, "code", default=0)
-    try:
-        if isinstance(raw_code, str) and not raw_code.strip().lstrip("-").isdigit():
-            code = int(reason_pb2.ZipperReasonCode.Value(raw_code.strip()))
-        else:
-            code = int(raw_code or 0)
-    except (TypeError, ValueError):
-        code = 0
-    return ZipperReasonDetails(
-        code=code,
-        reason_id=str(_field(value, "reasonId", "reason_id", default="") or ""),
-        message=str(_field(value, "message", default="") or ""),
+    if not isinstance(value, str):
+        return _enum_number_json(field, value)
+    text = value.strip()
+    enum_type = field.enum_type
+    if text in enum_type.values_by_name:
+        return text
+    if not text:
+        return 0
+    if _ENUM_NUMBER.fullmatch(text):
+        # Any length: digits past int32 are refused, never read as a name.
+        # At most 10 significant digits are converted.
+        digits = text.lstrip("-").lstrip("0")
+        if len(digits) <= 10:
+            number = int(digits or "0") * (-1 if text.startswith("-") else 1)
+            if _INT32_MIN <= number <= _INT32_MAX:
+                return number
+        raise _not_an_enum_value(field, value)
+    label_of = FLOW_ENUM_LABELS.get(enum_type.full_name)
+    if label_of is None:
+        # An enum without a summary label (the Zipper reason code): read by
+        # its name only, as the contract parser reads it.
+        return value
+    unknown = _UNKNOWN_LABEL.fullmatch(text)
+    if unknown:
+        number = int(unknown.group(1))
+        if _INT32_MIN <= number <= _INT32_MAX and label_of(number) == text:
+            return number
+        raise _not_an_enum_value(field, value)
+    prefix = enum_type.values_by_number[0].name.removesuffix("UNSPECIFIED")
+    labels = {_enum_name(text), text.lower(), text.removeprefix(prefix).lower()}
+    for candidate in enum_type.values:
+        if label_of(candidate.number) in labels:
+            return candidate.number
+    if _ENUM_VALUE_NAME.match(text):
+        newer[path] = text.removeprefix(prefix).lower()
+        return 0
+    raise _not_an_enum_value(field, value)
+
+
+def _enum_number_json(field: Any, value: Any) -> int:
+    """A non-text enum value as an int32. The contract parser would read
+    ``true`` as 1 and ``2.9`` as 2, so a boolean, a fractional or non-finite
+    number, a number out of range or any other type is refused."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise _not_an_enum_value(field, value)
+    if isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise _not_an_enum_value(field, value)
+        value = int(value)
+    if not _INT32_MIN <= value <= _INT32_MAX:
+        raise _not_an_enum_value(field, value)
+    return value
+
+
+def _not_an_enum_value(field: Any, value: Any) -> PolyesterResponseContractError:
+    return PolyesterResponseContractError(
+        "FlowSummaryView",
+        f"{field.name} is not a {field.enum_type.name}: {_value_preview(value)}",
     )
 
 
-def _decode_lifecycle_reason(value: Any) -> str:
-    if value is None:
-        return "unspecified"
+def _value_preview(value: Any) -> str:
+    """A short description of a refused value that never converts a large
+    one: its type, and a bounded preview of text or of a small number."""
+    kind = type(value).__name__
     if isinstance(value, str):
-        label = value.strip()
-        if not label or label in {"REASON_UNSPECIFIED", "unspecified"}:
-            return "unspecified"
-        if label.startswith("unknown_reason_"):
-            return label
-        # Accept already-normalized snake labels or SCREAMING enum names.
-        if label == label.lower():
-            return label
-        if label.startswith("REASON_"):
-            label = label.removeprefix("REASON_")
-        return label.lower()
-    try:
-        return lifecycle_reason_from_code(int(value))
-    except (TypeError, ValueError):
-        return "unspecified"
+        return f"{kind} {value[:32]!r}" + ("..." if len(value) > 32 else "")
+    if isinstance(value, bool | float):
+        return f"{kind} {value!r}"
+    if isinstance(value, int):
+        if value.bit_length() <= 64:
+            return f"{kind} {value}"
+        return f"{kind} of {value.bit_length()} bits"
+    return kind
+
+
+def _flow_json_enums(
+    descriptor: Any, data: dict[str, Any], path: tuple[str | int, ...], newer: _NewerLabels
+) -> dict[str, Any]:
+    """``data`` (a message of ``descriptor`` in protobuf JSON) by field name,
+    with every labelled flow enum read back, nested messages included. Keys
+    that are not fields of the message are dropped, as the parser ignores
+    them."""
+    fields = {key: f for f in descriptor.fields for key in (f.name, f.json_name)}
+    out: dict[str, Any] = {}
+    for key, value in data.items():
+        field = fields.get(key)
+        if field is None:
+            continue
+        if field.name in out:
+            # Two spellings (field name and JSON name) of one field: refused,
+            # never one of them chosen.
+            raise PolyesterResponseContractError(
+                "FlowSummaryView",
+                f"{field.name} is sent twice, as {field.name} and {field.json_name}",
+            )
+        here = (*path, field.name)
+        if field.enum_type is not None:
+            value = _flow_enum_json(field, value, here, newer)
+        elif field.message_type is not None and isinstance(value, dict):
+            value = _flow_json_enums(field.message_type, value, here, newer)
+        elif field.message_type is not None and isinstance(value, list):
+            value = [
+                _flow_json_enums(field.message_type, item, (*here, index), newer)
+                if isinstance(item, dict)
+                else item
+                for index, item in enumerate(value)
+            ]
+        out[field.name] = value
+    return out
+
+
+def _with_newer_labels(flow: LifecycleFlowSummary, newer: _NewerLabels) -> LifecycleFlowSummary:
+    """``flow`` with the labels of enum values newer than this SDK."""
+    changes: dict[str, Any] = {}
+    timeline = list(flow.progress_timeline)
+    for path, label in newer.items():
+        if len(path) == 1:
+            name = str(path[0])
+            changes[_FLOW_ENUM_ATTRS.get(name, name)] = label
+        elif path[0] == "request_fee" and flow.request_fee is not None:
+            fee = changes.get("request_fee", flow.request_fee)
+            changes["request_fee"] = msgspec.structs.replace(fee, **{str(path[1]): label})
+        elif path[0] == "progress_timeline" and isinstance(path[1], int):
+            index = path[1]
+            timeline[index] = msgspec.structs.replace(timeline[index], **{str(path[2]): label})
+            changes["progress_timeline"] = timeline
+    return msgspec.structs.replace(flow, **changes) if changes else flow
 
 
 def decode_lifecycle_flow(data: dict[str, Any]) -> LifecycleFlowSummary:
+    """Decode a flow summary (a list item, or a detail view's ``summary``) in
+    its protobuf JSON form exactly as ``flow_summary_from_proto`` decodes the
+    binary one. Earlier names (``intentId``, ``latestStep``, ``reasonCode``)
+    and the labels this SDK returns (``"withdraw"``, ``"validation"``) are
+    read too. An enum name newer than this SDK reads as the name without its
+    prefix, lowercased. A value that breaks the contract raises
+    ``PolyesterResponseContractError``."""
     payload = _lifecycle_flow_payload(data)
-    latest_step = _field(payload, "latestStep", "latest_step", "currentStep", "current_step")
-    flow_kind = _field(payload, "flowKind", "flow_kind")
-    intent_id = _field(payload, "intentId", "intent_id", "flowId", "flow_id", default="")
-    zipper_raw = _field(payload, "zipperReason", "zipper_reason")
-    return LifecycleFlowSummary(
-        intent_id=str(intent_id or ""),
-        flow_kind=_enum_name(flow_kind) if flow_kind is not None else "",
-        latest_step=_enum_name(latest_step) if latest_step is not None else "",
-        is_open=bool(_field(payload, "isOpen", "is_open", default=False)),
-        is_terminal=bool(_field(payload, "isTerminal", "is_terminal", default=False)),
-        lifecycle_reason=_decode_lifecycle_reason(
-            _field(payload, "lifecycleReason", "lifecycle_reason", "reasonCode", "reason_code")
-        ),
-        zipper_reason=_decode_zipper_reason(zipper_raw),
+    contract = dict(payload)
+    for key, name in _LEGACY_FLOW_KEYS.items():
+        field = _FLOW_SUMMARY.fields_by_name[name]
+        if key in payload and name not in payload and field.json_name not in payload:
+            contract[name] = contract.pop(key)
+    # Server provenance, not modelled: never refused.
+    for key in ("latest_lifecycle_source", "latestLifecycleSource"):
+        contract.pop(key, None)
+    newer: _NewerLabels = {}
+    view = _contract_message(
+        _flow_json_enums(_FLOW_SUMMARY, contract, (), newer),
+        lifecycle_read_pb2.FlowSummaryView(),
+        "FlowSummaryView",
     )
+    return _with_newer_labels(flow_summary_from_proto(view), newer)
 
 
 def decode_lifecycle_flows_list(data: dict[str, Any]) -> LifecycleFlowsList:

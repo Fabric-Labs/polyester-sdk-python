@@ -1,12 +1,25 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
+from polyester.codecs.decode.balances import ledger_amount
 from polyester.codecs.decode.common import require_id
 from polyester.codecs.proto_helpers import has_field, proto_enum_name
+from polyester.codecs.scalars import unix_ms_to_datetime
 from polyester.errors import PolyesterResponseContractError, PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
 from polyester.gen.chain.zipper.v1 import reason_pb2
-from polyester.models import LifecycleFlowsList, LifecycleFlowSummary, ZipperReasonDetails
+from polyester.models import (
+    LifecycleFlowProgress,
+    LifecycleFlowsList,
+    LifecycleFlowSummary,
+    LifecycleFlowTimelineItem,
+    LifecycleRequestFee,
+    ZipperReasonDetails,
+)
 from polyester.services._scope import lifecycle_account_fields
+from polyester.types.money import AssetAmount
 
 FlowDetailView = lifecycle_read_pb2.FlowDetailView
 FlowSummaryView = lifecycle_read_pb2.FlowSummaryView
@@ -92,6 +105,144 @@ def flow_participation_label(code: int) -> str:
     return _PARTICIPATION_LABELS.get(int(code), f"unknown_participation_{int(code)}")
 
 
+_DOMAIN_LABELS = {
+    int(types_pb2.DOMAIN_UNSPECIFIED): "unspecified",
+    int(types_pb2.DOMAIN_EXTERNAL_CHAIN): "external_chain",
+    int(types_pb2.DOMAIN_ZIPPER): "zipper",
+    int(types_pb2.DOMAIN_FUNDING): "funding",
+    int(types_pb2.DOMAIN_TRADING): "trading",
+    int(types_pb2.DOMAIN_LENDING): "lending",
+}
+
+_REQUEST_FEE_STATUS_LABELS = {
+    int(types_pb2.REQUEST_FEE_STATUS_UNSPECIFIED): "unspecified",
+    int(types_pb2.REQUEST_FEE_STATUS_LOCKED): "locked",
+    int(types_pb2.REQUEST_FEE_STATUS_SETTLED): "settled",
+    int(types_pb2.REQUEST_FEE_STATUS_KEPT): "kept",
+}
+
+_TIMELINE_STATUS_LABELS = {
+    int(lifecycle_read_pb2.TIMELINE_STATUS_UNSPECIFIED): "unspecified",
+    int(lifecycle_read_pb2.TIMELINE_STATUS_COMPLETED): "completed",
+    int(lifecycle_read_pb2.TIMELINE_STATUS_CURRENT): "current",
+    int(lifecycle_read_pb2.TIMELINE_STATUS_PLANNED): "planned",
+}
+
+
+def flow_domain_label(code: int) -> str:
+    """Name a ``FlowDomain`` lowercased without its ``DOMAIN_`` prefix. A value
+    newer than this SDK reads ``unknown_domain_<n>``, never unspecified."""
+    return _DOMAIN_LABELS.get(int(code), f"unknown_domain_{int(code)}")
+
+
+def _request_fee_status_label(code: int) -> str:
+    return _REQUEST_FEE_STATUS_LABELS.get(int(code), f"unknown_fee_status_{int(code)}")
+
+
+def _timeline_status_label(code: int) -> str:
+    return _TIMELINE_STATUS_LABELS.get(int(code), f"unknown_timeline_status_{int(code)}")
+
+
+def _optional_ledger_amount(msg, asset_id: int) -> AssetAmount | None:
+    """The message's ``amount_e18``, exact ((hi << 64) | lo, never a float), in
+    units of ``asset_id``; None when the server sends none."""
+    if not has_field(msg, "amount_e18"):
+        return None
+    value = msg.amount_e18
+    return ledger_amount((int(value.hi) << 64) | int(value.lo), asset_id or None)
+
+
+def _request_fee(msg: lifecycle_read_pb2.FlowSummaryView) -> LifecycleRequestFee | None:
+    if not has_field(msg, "request_fee"):
+        return None
+    fee = msg.request_fee
+    unified_asset_id = int(fee.asset_ids.unified_asset_id)
+    return LifecycleRequestFee(
+        zipped_asset_id=int(fee.asset_ids.zipped_asset_id),
+        unified_asset_id=unified_asset_id,
+        amount=_optional_ledger_amount(fee, unified_asset_id),
+        recipient_address=str(fee.recipient_address or ""),
+        status=_request_fee_status_label(fee.status),
+    )
+
+
+def _flow_progress(msg: lifecycle_read_pb2.FlowSummaryView) -> LifecycleFlowProgress | None:
+    if not has_field(msg, "current_progress"):
+        return None
+    progress = msg.current_progress
+    return LifecycleFlowProgress(
+        current_step_started_at=unix_ms_to_datetime(progress.current_step_started_at_unix_ms),
+        current_step_expected_duration_ms=int(progress.current_step_expected_duration_ms),
+        current_confirmations=int(progress.current_confirmations),
+        required_confirmations=int(progress.required_confirmations),
+        approve_count=int(progress.approve_count),
+        reject_count=int(progress.reject_count),
+        validator_count=int(progress.validator_count),
+        required_approvals=int(progress.required_approvals),
+        required_rejections=int(progress.required_rejections),
+    )
+
+
+def _flow_timeline(msg: lifecycle_read_pb2.FlowSummaryView) -> list[LifecycleFlowTimelineItem]:
+    return [
+        LifecycleFlowTimelineItem(
+            sequence=int(item.sequence),
+            step=_flow_step_label(item.step),
+            status=_timeline_status_label(item.status),
+            expected_duration_ms=int(item.expected_duration_ms),
+        )
+        for item in msg.progress_timeline
+    ]
+
+
+def _flow_tx_fields(msg: FlowSummaryView | FlowTxMatchView) -> dict[str, Any]:
+    """The asset, chain, amount, transaction and route fields a flow summary
+    and a transaction match both carry, and the time lists order by."""
+    unified_asset_id = int(msg.asset_ids.unified_asset_id)
+    return {
+        "zipped_asset_id": int(msg.asset_ids.zipped_asset_id),
+        "unified_asset_id": unified_asset_id,
+        "polyester_chain_id": int(msg.polyester_chain_id),
+        "amount": _optional_ledger_amount(msg, unified_asset_id),
+        "source_tx_hash": str(msg.source_tx_hash or ""),
+        "tx_occurrence_index": int(msg.tx_occurrence_index),
+        "latest_tx_ref": str(msg.latest_tx_ref or ""),
+        "source_domain": flow_domain_label(msg.source_domain),
+        "destination_domain": flow_domain_label(msg.destination_domain),
+        "last_activity_at": unix_ms_to_datetime(msg.last_activity_at_unix_ms),
+    }
+
+
+def _flow_summary_detail_fields(msg: FlowSummaryView) -> dict[str, Any]:
+    """Every ``LifecycleFlowSummary`` field a ``FlowSummaryView`` carries beyond
+    its kind, step, state, account, reasons, participation and addresses.
+    ``latest_lifecycle_source`` (server provenance) is not modelled."""
+    return {
+        **_flow_tx_fields(msg),
+        "request_fee": _request_fee(msg),
+        "started_at": unix_ms_to_datetime(msg.started_at_unix_ms),
+        "updated_at": unix_ms_to_datetime(msg.updated_at_unix_ms),
+        "terminal_at": unix_ms_to_datetime(msg.terminal_at_unix_ms),
+        "estimated_completion_at": unix_ms_to_datetime(msg.estimated_completion_unix_ms),
+        "current_step_sequence": int(msg.current_step_sequence),
+        "current_progress": _flow_progress(msg),
+        "progress_timeline": _flow_timeline(msg),
+    }
+
+
+# The label each lifecycle flow enum reads as on LifecycleFlowSummary and its
+# nested models, by enum name, so a JSON decoder can read those labels back.
+FLOW_ENUM_LABELS: dict[str, Callable[[int], str]] = {
+    types_pb2.FlowKind.DESCRIPTOR.full_name: _flow_kind_label,
+    lifecycle_read_pb2.FlowStep.DESCRIPTOR.full_name: _flow_step_label,
+    types_pb2.LifecycleReason.DESCRIPTOR.full_name: lifecycle_reason_from_code,
+    lifecycle_read_pb2.FlowParticipation.DESCRIPTOR.full_name: flow_participation_label,
+    types_pb2.FlowDomain.DESCRIPTOR.full_name: flow_domain_label,
+    types_pb2.RequestFeeStatus.DESCRIPTOR.full_name: _request_fee_status_label,
+    lifecycle_read_pb2.FlowTimelineStatus.DESCRIPTOR.full_name: _timeline_status_label,
+}
+
+
 def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> LifecycleFlowSummary:
     account_fields = lifecycle_account_fields(msg)
     return LifecycleFlowSummary(
@@ -107,6 +258,7 @@ def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> Lifecycl
         participation=flow_participation_label(msg.participation),
         source_address=str(msg.source_address or ""),
         destination_address=str(msg.destination_address or ""),
+        **_flow_summary_detail_fields(msg),
     )
 
 
@@ -123,6 +275,8 @@ def flow_tx_match_from_proto(msg: FlowTxMatchView) -> LifecycleFlowSummary:
         zipper_reason=_zipper_reason_if_present(msg),
         source_address=str(msg.source_address or ""),
         destination_address=str(msg.destination_address or ""),
+        # A transaction match carries no fee, progress, timeline or other times.
+        **_flow_tx_fields(msg),
     )
 
 

@@ -1,5 +1,5 @@
 """Every field of the requests and replies public contracts 1945423c and 5c2119f
-added or changed is classified.
+added or changed, and of the lifecycle flow views, is classified.
 
 ``testdata/contract_field_inventory.tsv`` lists each field of those messages,
 and of the messages nested in their new replies, as ``covered`` (naming the
@@ -41,6 +41,13 @@ MESSAGES = [
     "chain.lifecycle.v1.GetAccountFlowResponse",
     "chain.lifecycle.v1.ListAccountFlowsRequest",
     "chain.lifecycle.v1.ListAccountFlowsResponse",
+    # The lifecycle flow views every flow read and update decodes.
+    "chain.lifecycle.v1.FlowSummaryView",
+    "chain.lifecycle.v1.FlowTxMatchView",
+    "chain.lifecycle.v1.AssetIds",
+    "chain.lifecycle.v1.RequestFee",
+    "chain.lifecycle.v1.FlowSummaryProgressView",
+    "chain.lifecycle.v1.FlowTimelineItemView",
     "ledger.read.v1.BalanceSeries",
     "ledger.read.v1.GetBalanceHistoryResponse",
     "ledger.read.v1.CreateStatementExportRequest",

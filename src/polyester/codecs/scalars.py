@@ -465,6 +465,20 @@ def timestamp_parts_to_datetime(seconds: int, nanos: int) -> datetime:
     return _UNIX_EPOCH_UTC + timedelta(seconds=int(seconds), microseconds=int(nanos) // 1000)
 
 
+def unix_ms_to_datetime(value: int) -> datetime | None:
+    """Aware UTC datetime for a time sent in milliseconds since the epoch.
+
+    0 is the contract's "no time" and reads None, as does a value past what
+    ``datetime`` holds (after the year 9999).
+    """
+    if int(value) <= 0:
+        return None
+    try:
+        return _UNIX_EPOCH_UTC + timedelta(milliseconds=int(value))
+    except OverflowError:
+        return None
+
+
 def datetime_to_timestamp_dict(value: datetime) -> dict[str, int]:
     """Exact protobuf ``Timestamp`` fields for an aware datetime.
 

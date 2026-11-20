@@ -13,7 +13,13 @@ from google.protobuf.message import Message
 
 from polyester._catalog_startup import CatalogSource, load_catalog
 from polyester._redact import register, url_secrets
-from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
+from polyester._sync_bridge import (
+    SUBMISSION_TASK_NAME,
+    begin_finishing,
+    close_admission,
+    refuse_on_client_loop,
+    run_on_loop,
+)
 from polyester._sync_services import (
     SyncAddressBookService,
     SyncAlertsService,
@@ -112,6 +118,13 @@ from polyester.services._scope import default_sub_account_scope
 from polyester.services.system import AsyncSystemService
 from polyester.sync_subscribe import SyncSubscription
 from polyester.transport import TransportConfig, TransportFactory
+
+# How long the sync client's close waits for the async client to shut down, and
+# then for its loop thread to stop. The loop thread itself gives a shutdown it
+# finds unfinished the same time, and its other tasks _LOOP_FINISH_SECONDS.
+_SHUTDOWN_WAIT_SECONDS = 10.0
+_LOOP_JOIN_SECONDS = 5.0
+_LOOP_FINISH_SECONDS = 5.0
 
 SPOT_CONFIG = CatalogSource(
     catalog="spot",
@@ -624,8 +637,9 @@ class Polyester:
         catalog_timeout: float | None = None,
     ) -> None:
         self._loop = asyncio.new_event_loop()
+        self._shutdown_task: asyncio.Task[None] | None = None
         self._loop_thread = threading.Thread(
-            target=self._loop.run_forever,
+            target=self._run_loop,
             name="polyester-sync-loop",
             daemon=True,
         )
@@ -638,6 +652,8 @@ class Polyester:
                 self._loop.close()
                 raise PolyesterError("the client's event loop did not start")
         self._active_sync_subscriptions: list[SyncSubscription] = []
+        self._close_lock = threading.Lock()
+        self._closed = False
 
         async def _bootstrap() -> AsyncPolyester:
             client = AsyncPolyester(
@@ -661,8 +677,7 @@ class Polyester:
         try:
             self._client = run_on_loop(self._loop, _bootstrap)
         except BaseException:
-            self._loop.call_soon_threadsafe(self._loop.stop)
-            self._loop_thread.join(timeout=5)
+            self._stop_loop()
             raise
         loop = self._loop
         client = self._client
@@ -767,10 +782,16 @@ class Polyester:
         )
 
     def close(self) -> None:
-        """Close every sync subscription and the client.
+        """Close every sync subscription and the client, and release its event loop.
 
         A subscription that failed with no ``on_error`` raises its failure here, once
         everything has shut down, as does a close a callback scheduled that failed.
+        Once a close has run, further calls, from any thread, return at once and
+        do nothing; one made while a close is running waits for it to finish.
+        From the moment a close begins, every other call on the client, a
+        subscription setup included, raises
+        :class:`~polyester.errors.PolyesterError` saying the client is closed,
+        even while the client loop finishes its shutdown.
 
         Calling it from a client callback raises
         :class:`~polyester.errors.PolyesterError` at once and leaves the client
@@ -778,25 +799,117 @@ class Polyester:
         inside. Close a subscription from its callback instead, or close the
         client from another thread.
         """
+        if self._closed:
+            return
         refuse_on_client_loop(self._loop, "Polyester.close()")
-        first_failure: Exception | None = None
-        for subscription in list(self._active_sync_subscriptions):
-            try:
-                subscription.close()
-            except Exception as exc:
-                first_failure = first_failure or exc
-        self._active_sync_subscriptions.clear()
-
-        async def _shutdown() -> None:
-            await self._client.aclose()
-
-        future = asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
-        with contextlib.suppress(Exception):
-            future.result(timeout=10)
-        self._loop.call_soon_threadsafe(self._loop.stop)
-        self._loop_thread.join(timeout=5)
+        with self._close_lock:
+            if self._closed:
+                return
+            # Before anything can yield the loop: no call or subscription setup
+            # starts once the close has begun, even while the loop finishes.
+            close_admission(self._loop)
+            first_failure: Exception | None = None
+            for subscription in list(self._active_sync_subscriptions):
+                try:
+                    subscription.close()
+                except Exception as exc:
+                    first_failure = first_failure or exc
+            self._active_sync_subscriptions.clear()
+            # A close interrupted after the loop stopped has nothing left to shut down.
+            if self._loop.is_running():
+                self._shut_down_client()
+            self._stop_loop()
+            self._closed = True
         if first_failure is not None:
             raise first_failure
+
+    def _shut_down_client(self) -> None:
+        """Start the async client's shutdown on the loop and wait for it, up to
+        ``_SHUTDOWN_WAIT_SECONDS``.
+
+        The shutdown is created on the loop, so one the loop never reaches
+        leaves nothing behind. One the wait gives up on, because a callback
+        holds the loop, is finished by the loop thread before the loop closes.
+        """
+        finished = threading.Event()
+
+        def settled(task: asyncio.Task[None]) -> None:
+            # A failed shutdown still closes the client: mark it retrieved.
+            if not task.cancelled():
+                task.exception()
+            finished.set()
+
+        def start() -> None:
+            task = self._loop.create_task(self._client.aclose())
+            task.add_done_callback(settled)
+            self._shutdown_task = task
+
+        try:
+            self._loop.call_soon_threadsafe(start)
+        except RuntimeError:
+            return
+        finished.wait(_SHUTDOWN_WAIT_SECONDS)
+
+    def _stop_loop(self) -> None:
+        """Stop the client loop and wait up to ``_LOOP_JOIN_SECONDS`` for its thread.
+
+        The thread closes the loop as it ends, so a thread the wait gives up on
+        still releases the loop's selector and wake-up descriptors once the
+        callback holding it returns.
+        """
+        with contextlib.suppress(RuntimeError):  # closed already
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        self._loop_thread.join(timeout=_LOOP_JOIN_SECONDS)
+
+    def _run_loop(self) -> None:
+        """The loop thread: run the loop until it stops, finish, then close it."""
+        loop = self._loop
+        try:
+            loop.run_forever()
+            # A loop that failed to run has nothing to finish.
+            self._finish_loop()
+        finally:
+            loop.close()
+
+    def _finish_loop(self) -> None:
+        """Finish what the stopped loop holds, as :func:`asyncio.run` does.
+
+        The loop runs again only to finish. Sync calls are cancelled first: one
+        still queued, or whose task has not run yet, never starts (its caller
+        was told it did not run), and one that started is stopped, its caller
+        told its outcome is unknown. Then a client shutdown a close stopped
+        waiting for runs to its end, up to ``_SHUTDOWN_WAIT_SECONDS``. Every
+        other task left is cancelled and given up to ``_LOOP_FINISH_SECONDS``
+        to end, so none is dropped unstarted or mid-call. Async generators left
+        open are closed within the same time. The close has already shut
+        admission, so nothing new is queued meanwhile.
+        """
+        loop = self._loop
+        begin_finishing(loop)
+        for task in asyncio.all_tasks(loop):
+            if task.get_name() == SUBMISSION_TASK_NAME:
+                task.cancel()
+        shutdown = self._shutdown_task
+        if shutdown is not None and not shutdown.done():
+            loop.run_until_complete(asyncio.wait([shutdown], timeout=_SHUTDOWN_WAIT_SECONDS))
+        deadline = time.monotonic() + _LOOP_FINISH_SECONDS
+        while True:
+            pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+            remaining = deadline - time.monotonic()
+            if not pending or remaining <= 0:
+                break
+            for task in pending:
+                task.cancel()
+            loop.run_until_complete(asyncio.wait(pending, timeout=remaining))
+            for task in pending:
+                # Their failures were reported to their callers, if anywhere.
+                if task.done() and not task.cancelled():
+                    task.exception()
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            # Async generators a sync iterator left open, closed as asyncio.run does.
+            with contextlib.suppress(Exception):
+                loop.run_until_complete(asyncio.wait_for(loop.shutdown_asyncgens(), remaining))
 
     def __enter__(self) -> Polyester:
         return self

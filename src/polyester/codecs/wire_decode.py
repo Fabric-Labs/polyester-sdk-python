@@ -256,14 +256,32 @@ def decode_candle(data: dict[str, Any], *, volume_scale: int) -> Candle:
     )
 
 
-def decode_candles_list(data: dict[str, Any], *, volume_scale: int) -> CandlesResult:
+def decode_candles_list(
+    data: dict[str, Any],
+    *,
+    volume_scale: int,
+    include_incomplete: bool = False,
+    page_token: str = "",
+) -> CandlesResult:
+    """Decode a JSON candles page, row-oriented or columnar.
+
+    Rows keep their ``isClosed``. Columns carry no closed flag: as in
+    :func:`~polyester.codecs.decode.market_data.candles_columns_from_proto`, every
+    columnar row reads closed except the newest row of a first page (no
+    ``page_token``) asked with ``include_incomplete``, which reads ``False`` (not
+    known to be closed).
+    """
     candles = [
         decode_candle(item, volume_scale=volume_scale)
         for item in _field(data, "candles", default=[]) or []
         if isinstance(item, dict)
     ]
     if not candles:
-        candles = _decode_columnar_candles(data, volume_scale=volume_scale)
+        candles = _decode_columnar_candles(
+            data,
+            volume_scale=volume_scale,
+            tip_may_be_open=include_incomplete and not page_token,
+        )
     return CandlesResult(
         next_page_token=str(_field(data, "nextPageToken", "next_page_token", default="") or ""),
         symbol_id=int(_field(data, "symbolId", "symbol_id", default=0) or 0),
@@ -272,8 +290,15 @@ def decode_candles_list(data: dict[str, Any], *, volume_scale: int) -> CandlesRe
     )
 
 
-def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int) -> list[Candle]:
+def _decode_columnar_candles(
+    data: dict[str, Any], *, volume_scale: int, tip_may_be_open: bool
+) -> list[Candle]:
     ts_list = _field(data, "tsSec", "ts_sec", default=[]) or []
+    open_index = (
+        max(range(len(ts_list)), key=lambda index: int(ts_list[index]))
+        if tip_may_be_open and ts_list
+        else None
+    )
     opens = _field(data, "open", default=[]) or []
     highs = _field(data, "high", default=[]) or []
     lows = _field(data, "low", default=[]) or []
@@ -294,6 +319,7 @@ def _decode_columnar_candles(data: dict[str, Any], *, volume_scale: int) -> list
                     scale=volume_scale,
                 ),
                 quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
+                is_closed=index != open_index,
             )
         )
     return candles

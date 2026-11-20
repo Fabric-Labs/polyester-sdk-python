@@ -5,10 +5,9 @@ import contextlib
 import threading
 from collections.abc import Awaitable, Callable, Coroutine
 from concurrent.futures import Future
-from concurrent.futures import wait as wait_for_future
 from typing import Any, TypeVar
 
-from polyester._sync_bridge import on_client_loop
+from polyester._sync_bridge import on_client_loop, run_on_loop
 from polyester.errors import PolyesterRealtimeError
 from polyester.orderbook.local_book import parse_bucket_ticks
 from polyester.realtime.client import AsyncSubscription
@@ -51,7 +50,9 @@ class SyncSubscription:
         sub = self._holder.get("sub")
         if sub is not None and hasattr(sub, "set_bucket"):
             parse_bucket_ticks(bucket)
-            self._loop.call_soon_threadsafe(sub.set_bucket, bucket)
+            # Once the client has closed there is no stream left to change.
+            with contextlib.suppress(RuntimeError):
+                self._loop.call_soon_threadsafe(sub.set_bucket, bucket)
 
     def since_last_publication(self) -> float | None:
         """An order book's ``since_last_publication``; ``None`` for other streams."""
@@ -81,6 +82,10 @@ class SyncSubscription:
                 if self._holder is not None:
                     # Read by the delivery loop on the client loop before each event.
                     self._holder["closed"] = True
+                if self._loop.is_closed():
+                    # The client closed, and its loop with it: nothing is left to stop.
+                    self._finished = True
+                    return
                 closing = self._closing = asyncio.run_coroutine_threadsafe(
                     self._close_coro(), self._loop
                 )
@@ -92,22 +97,6 @@ class SyncSubscription:
             if closing.done():
                 with self._lock:
                     self._finished = True
-
-
-def _wait_for_setup(future: Future[None], loop: asyncio.AbstractEventLoop) -> None:
-    """Wait for subscription setup, which its own transport timeouts already bound.
-
-    No fixed deadline here: it would fail slow but valid setups. The wait only ends
-    early if the client loop stops, and never leaves setup running behind the caller.
-    """
-    try:
-        while not wait_for_future([future], timeout=0.25).done:
-            if not loop.is_running():
-                raise PolyesterRealtimeError("client closed during subscription setup")
-    except BaseException:
-        future.cancel()
-        raise
-    future.result()
 
 
 def subscribe_sync(
@@ -165,5 +154,15 @@ def subscribe_sync(
             holder["sub"] = sub
         holder["task"] = asyncio.create_task(_consume(sub))
 
-    _wait_for_setup(asyncio.run_coroutine_threadsafe(_start(), loop), loop)
+    # Setup is bounded by its own transport timeouts, not a fixed deadline that
+    # would fail slow but valid setups. It starts on the loop, so a setup the
+    # closing loop never reaches leaves nothing behind, and the wait ends early,
+    # with the setup stopped, when the client closes or the caller is interrupted.
+    run_on_loop(
+        loop,
+        _start,
+        what="subscribe_sync",
+        closed_error=PolyesterRealtimeError,
+        closed_during="client closed during subscription setup",
+    )
     return SyncSubscription(loop, close_coro=_close, holder=holder)

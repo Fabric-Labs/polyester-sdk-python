@@ -9,10 +9,14 @@ from polyester.codecs.decode.balances import ledger_amount
 from polyester.codecs.decode.invariants import (
     ts_ns_string_from_response,
 )
-from polyester.codecs.decode.lifecycle import lifecycle_reason_from_code
+from polyester.codecs.decode.lifecycle import (
+    flow_summary_detail_fields,
+    lifecycle_reason_from_code,
+)
 from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError
+from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
 from polyester.gen.chain.zipper.v1 import reason_pb2
 from polyester.gen.ledger.v1 import catalog_pb2
 from polyester.models.market import (
@@ -474,6 +478,44 @@ def _decode_lifecycle_reason(value: Any) -> str:
         return "unspecified"
 
 
+# The FlowSummaryView fields flow_summary_detail_fields reads, by their
+# protobuf JSON and field names.
+_FLOW_DETAIL_FIELDS = tuple(
+    lifecycle_read_pb2.FlowSummaryView.DESCRIPTOR.fields_by_name[name]
+    for name in (
+        "asset_ids",
+        "polyester_chain_id",
+        "amount_e18",
+        "request_fee",
+        "source_tx_hash",
+        "tx_occurrence_index",
+        "latest_tx_ref",
+        "source_domain",
+        "destination_domain",
+        "started_at_unix_ms",
+        "updated_at_unix_ms",
+        "terminal_at_unix_ms",
+        "last_activity_at_unix_ms",
+        "estimated_completion_unix_ms",
+        "current_step_sequence",
+        "current_progress",
+        "progress_timeline",
+    )
+)
+_FLOW_DETAIL_KEYS = frozenset(
+    key for field in _FLOW_DETAIL_FIELDS for key in (field.name, field.json_name)
+)
+
+
+def _lifecycle_flow_detail_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """The amount, asset, transaction, route, time and progress fields of a
+    flow in its protobuf JSON form, decoded exactly as the binary response is.
+    A value that breaks the contract raises ``PolyesterResponseContractError``."""
+    subset = {key: value for key, value in payload.items() if key in _FLOW_DETAIL_KEYS}
+    view = _contract_message(subset, lifecycle_read_pb2.FlowSummaryView(), "FlowSummaryView")
+    return flow_summary_detail_fields(view)
+
+
 def decode_lifecycle_flow(data: dict[str, Any]) -> LifecycleFlowSummary:
     payload = _lifecycle_flow_payload(data)
     latest_step = _field(payload, "latestStep", "latest_step", "currentStep", "current_step")
@@ -490,6 +532,7 @@ def decode_lifecycle_flow(data: dict[str, Any]) -> LifecycleFlowSummary:
             _field(payload, "lifecycleReason", "lifecycle_reason", "reasonCode", "reason_code")
         ),
         zipper_reason=_decode_zipper_reason(zipper_raw),
+        **_lifecycle_flow_detail_fields(payload),
     )
 
 

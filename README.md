@@ -2395,6 +2395,20 @@ chain transaction started, and identify an account by its
 A page token is bound to the request it was returned for: continue with the
 same account, participation, scope and order; only `limit` may change.
 
+Every flow read and flow update carries what moved and when. `amount` is the
+gross principal, an exact `AssetAmount` at the 18-decimal ledger scale in units
+of `unified_asset_id` (never a float), and `request_fee` the request's fee apart
+from it. `source_tx_hash` is the transaction that started the flow, with
+`tx_occurrence_index` telling apart the legs of one batched deposit, and
+`latest_tx_ref` an opaque reference to the latest one. `source_domain` and
+`destination_domain` name the route (`funding` to `external_chain` for a Funding
+withdrawal). `started_at`, `updated_at`, `last_activity_at`, `terminal_at`
+(`None` while open) and `estimated_completion_at` (`None` while `is_delayed`;
+read `terminal_at`, not it, for when a flow ended) are aware UTC datetimes.
+`progress_timeline`, `current_step_sequence` and `current_progress` drive a
+progress bar. A transaction lookup carries the amount, asset, transactions,
+route and `last_activity_at`, but no fee, progress or other times.
+
 A deposit whose destination did not accept the credit, for example because
 deposits into it were paused, ends delivered as zTokens to the account's own
 Polyester Chain wallet (`smart_account_address`) instead: a completed flow with

@@ -59,15 +59,35 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     replace keeps the display while the new quantity is above it; otherwise
     the new order is a plain limit order with ``display_qty`` zero, and it
     stays plain.
+
+    A refused batch replacement carries no order terms. When a
+    ``batch_replace`` item is admitted and then refused as it applies, the
+    successor order it would have created never exists, but for 60 seconds
+    from the batch's acceptance ``orders.get`` of that successor's ID answers
+    it: ``status`` ``"rejected"`` with the refusal in ``reject_reason`` (for
+    example ``"modify_apply_expired"``), ``batch_request_id`` set,
+    ``version`` 1, ``created_ts_ns`` the batch's admission, no
+    ``terminal_ts_ns``, and its own ``lineage`` at generation 1. Its
+    ``symbol_id``, ``side``, ``order_type``, ``tif``,
+    ``self_trade_prevention_mode`` and ``fee_asset`` are ``None``, and its
+    quantities and prices are 0 placeholders that name no pair, so the
+    catalogs give them no scale. Take its terms from the batch you sent.
+    After the 60 seconds it is not found. Open orders, order history and the
+    order streams always carry the terms.
     """
 
     order_id: str
-    symbol_id: int
+    # The order's pair. ``None`` only for a refused batch replacement read
+    # through ``orders.get`` (see above).
+    symbol_id: int | None = None
     client_order_id: str = ""
-    side: str = ""
+    # ``buy`` or ``sell``. ``side``, ``order_type``, ``tif``,
+    # ``self_trade_prevention_mode`` and ``fee_asset`` are ``None`` when the
+    # server does not report them, as for a refused batch replacement.
+    side: str | None = None
     status: str = ""
-    order_type: str = ""
-    tif: str = ""
+    order_type: str | None = None
+    tif: str | None = None
     orig_qty: Quantity | None = None
     cum_qty: Quantity | None = None
     inherited_cum_qty: Quantity | None = None
@@ -94,11 +114,12 @@ class Order(msgspec.Struct, kw_only=True, omit_defaults=True):
     terminal_ts_ns: str = ""
     version: int = 0
     post_only: bool = False
-    fee_asset: str = ""
+    # ``quote`` or ``base``; ``None`` when the server does not report it.
+    fee_asset: str | None = None
     # ``expire_taker``, ``expire_maker``, ``expire_both`` or ``decrement``,
-    # which the order's attached exits use too; empty when unset. A mode newer
-    # than this SDK reads as its number.
-    self_trade_prevention_mode: str = ""
+    # which the order's attached exits use too; ``None`` when unset. A mode
+    # newer than this SDK reads as its number.
+    self_trade_prevention_mode: str | None = None
     # A BUY's submitted all-in quote budget, scaled by the pair's quote
     # quantity scale; empty when the order was not sized that way.
     submitted_max_quote_debit_scaled: str = ""

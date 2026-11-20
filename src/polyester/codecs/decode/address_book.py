@@ -4,7 +4,7 @@ from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.sub_accounts import _subaccount_role_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
 from polyester.errors import PolyesterResponseContractError
-from polyester.gen.auth.v1 import address_book_pb2
+from polyester.gen.auth.v1 import account_scope_pb2, address_book_pb2
 from polyester.models.address_book import (
     AccountScope,
     AddressBookEntriesList,
@@ -35,7 +35,7 @@ from polyester.models.address_book import (
 
 def account_scope_from_proto(msg: address_book_pb2.AccountScopeRef) -> AccountScope:
     return AccountScope(
-        scope_type=proto_enum_name(address_book_pb2.AccountScopeType, msg.scope_type),
+        scope_type=proto_enum_name(account_scope_pb2.AccountScopeType, msg.scope_type),
         root_account_id=format_uint64_id(msg.root_account_id),
         sub_account_id=format_uint64_id(msg.subaccount_id),
     )
@@ -56,7 +56,9 @@ def internal_transfer_account_from_proto(
     return InternalTransferAccount(
         root_account_id=format_uint64_id(msg.root_account_id),
         target_account_id=format_uint64_id(msg.target_account_id),
-        target_scope_type=proto_enum_name(address_book_pb2.AccountScopeType, msg.target_scope_type),
+        target_scope_type=proto_enum_name(
+            account_scope_pb2.AccountScopeType, msg.target_scope_type
+        ),
         smart_account_address=msg.smart_account_address,
         root_username=msg.root_username,
         sub_account_label=msg.subaccount_label,
@@ -242,7 +244,7 @@ def internal_whitelist_entry_from_proto(
         root_account_id=format_uint64_id(msg.root_account_id),
         target_account_id=format_uint64_id(msg.target_account_id),
         target_scope_type=proto_enum_name(
-            address_book_pb2.AccountScopeType,
+            account_scope_pb2.AccountScopeType,
             msg.target_scope_type,
         ),
         smart_account_address=msg.smart_account_address,
@@ -344,7 +346,7 @@ def internal_entry_view_from_proto(
         root_account_id=format_uint64_id(msg.root_account_id),
         target_account_id=format_uint64_id(msg.target_account_id),
         target_scope_type=proto_enum_name(
-            address_book_pb2.AccountScopeType,
+            account_scope_pb2.AccountScopeType,
             msg.target_scope_type,
         ),
         smart_account_address=msg.smart_account_address,
@@ -403,7 +405,7 @@ def internal_recent_from_proto(
         root_account_id=format_uint64_id(msg.root_account_id),
         target_account_id=format_uint64_id(msg.target_account_id),
         target_scope_type=proto_enum_name(
-            address_book_pb2.AccountScopeType,
+            account_scope_pb2.AccountScopeType,
             msg.target_scope_type,
         ),
         smart_account_address=msg.smart_account_address,

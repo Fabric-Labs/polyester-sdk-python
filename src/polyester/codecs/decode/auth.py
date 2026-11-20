@@ -9,7 +9,7 @@ from polyester.codecs.proto_helpers import (
     proto_enum_name,
 )
 from polyester.errors import PolyesterResponseContractError
-from polyester.gen.auth.v1 import address_book_pb2, auth_pb2, profile_pb2
+from polyester.gen.auth.v1 import account_scope_pb2, auth_pb2, profile_pb2
 from polyester.models.auth import (
     MeResult,
     UsernameHistoryEntry,
@@ -24,7 +24,7 @@ def me_from_proto(msg: auth_pb2.MeResponse) -> MeResult:
     if msg.HasField("session"):
         require_id("Me", "session.session_id", msg.session.session_id)
         session = protobuf_to_public_dict(msg.session)
-    scope = proto_enum_name(address_book_pb2.AccountScopeType, int(msg.api_key_scope))
+    scope = proto_enum_name(account_scope_pb2.AccountScopeType, int(msg.api_key_scope))
     _check_key_scope(bool((msg.api_key_id or "").strip()), scope, int(msg.subaccount_id))
     return MeResult(
         account_id=format_uint64_id(msg.account_id),

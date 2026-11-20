@@ -103,13 +103,24 @@ class ChangelogPostSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     or ``-3`` suffix for a later post on the same day.
 
     A published post can be republished, for example to correct its copy or
-    withdraw a change. Its ``slug``, ``published_at`` (the time of first
-    publication) and its changes' ``id`` values stay the same. ``revision``
+    withdraw a change. Its ``slug`` and its changes' ``id`` values stay the
+    same, and a republication does not move ``published_at``. ``revision``
     starts at 1 and increases with each republication, and ``updated_at`` is
-    when the current revision was published, equal to ``published_at`` for
-    revision 1. A server that predates revisions sends neither: ``revision``
-    reads 0 and ``updated_at`` ``None``. To follow edits, read a post again
-    when its ``revision`` differs from the one you hold.
+    when the current revision was published. A server that predates
+    revisions sends neither: ``revision`` reads 0 and ``updated_at`` ``None``.
+    To follow edits, read a post again when its ``revision`` differs from the
+    one you hold.
+
+    ``published_at`` is the post's date in the environment the client reads.
+    For a release post it is when the release went live there (that
+    environment's ``live_at``), or the time of first publication while the
+    release is still pending there; so it differs between environments and
+    moves, without a new ``revision``, when the release goes live or its
+    ``live_at`` changes later. Do not keep it as fixed: read it again with the
+    post. Every other post keeps its time of first publication, and its
+    ``updated_at`` equals ``published_at`` at revision 1. A release post's
+    ``updated_at`` is independent of ``published_at`` and can be earlier or
+    later. Posts are listed by ``published_at``, newest first.
 
     A release post announces one release: ``release_version`` (``"0.92.9"``)
     is set, its slug is ``v<release>`` and its content is the same in every
@@ -150,7 +161,12 @@ class ChangelogPost(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class ChangelogChangeEntry(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """One change with the post it was published in."""
+    """One change with the post it was published in.
+
+    ``published_at`` is the post's ``published_at``: for a release post, its
+    live time in the environment read, which can move without a new revision
+    (see :class:`ChangelogPostSummary`).
+    """
 
     change: ChangelogChange
     post_slug: str = ""
@@ -176,8 +192,11 @@ class ChangelogDeploymentGroupPost(msgspec.Struct, kw_only=True, omit_defaults=T
     """One published release post a deployment group brought.
 
     ``slug`` (``"v0.92.9"``) reads the post with ``get_post``;
-    ``published_at`` is its first publication and ``updated_at`` that of its
-    current ``revision`` (from 1).
+    ``published_at`` is when the release went live in the environment read
+    (its ``live_at``), or the post's first publication while the release is
+    pending there, and can move without a new ``revision`` (see
+    :class:`ChangelogPostSummary`). ``updated_at`` is when its current
+    ``revision`` (from 1) was published, independent of ``published_at``.
     """
 
     slug: str = ""

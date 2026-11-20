@@ -1,5 +1,5 @@
 {
-  "source": "Fabric-Labs/polyester-proto develop 6c18dd0edc14d978bbb0cc8bbb0be9d9e1feab73 docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
+  "source": "Fabric-Labs/polyester-proto develop 8894e54cf35d4211b45c0986abd3ff369e9bbd4f docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
   "codes": [
     {"code": "ACCOUNT_ORDERS_SUSPENDED", "status": 400, "connect": "failed_precondition"},
     {"code": "ACCOUNT_REPAIRING", "status": 400, "connect": "failed_precondition"},
@@ -148,6 +148,7 @@
     {"code": "MISSING_ACCOUNT_ID", "status": 400, "connect": "invalid_argument"},
     {"code": "MISSING_WALLET", "status": 400, "connect": "invalid_argument"},
     {"code": "MODIFICATION_REQUIRES_REPLACE", "status": 400, "connect": "invalid_argument"},
+    {"code": "MODIFY_APPLY_EXPIRED", "status": 400, "connect": "failed_precondition"},
     {"code": "NEW_ACCOUNT_CAPACITY_REACHED", "status": 429, "connect": "resource_exhausted"},
     {"code": "NOT_FOUND", "status": 404, "connect": "not_found"},
     {"code": "ORDER_ALREADY_TERMINAL", "status": 400, "connect": "failed_precondition"},
@@ -186,6 +187,8 @@
     {"code": "POST_ONLY_CROSS", "status": 400, "connect": "invalid_argument"},
     {"code": "POST_ONLY_LIMIT_ONLY", "status": 400, "connect": "invalid_argument"},
     {"code": "POST_ONLY_NOT_ALLOWED_IN_AUCTION", "status": 400, "connect": "failed_precondition"},
+    {"code": "PRICE_BAND_STALE", "status": 503, "connect": "unavailable"},
+    {"code": "PRICE_BAND_UNKNOWN", "status": 503, "connect": "unavailable"},
     {"code": "PRICE_BAND_VIOLATION", "status": 400, "connect": "invalid_argument"},
     {"code": "PRICE_LEVELS_EXHAUSTED", "status": 429, "connect": "resource_exhausted"},
     {"code": "PRICE_LEVEL_QUANTITY_LIMIT", "status": 400, "connect": "failed_precondition"},

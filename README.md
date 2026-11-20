@@ -2025,6 +2025,10 @@ newer whatever its `book_seq` and a new epoch may restart `book_seq`; keep the n
 and drop one of an older epoch. A snapshot is a frozen view at its own position: never
 apply stream deltas to it. A managed subscription's views carry `book_epoch` `""`,
 as the delta stream names no epoch.
+A snapshot's `ts` is the server's best-effort snapshot time, an aware UTC `datetime`
+exact to the microsecond, `None` when the server sends none (never the local receipt
+time). A raw delta's `ts`, and a managed view's `ts` (that of the latest snapshot or
+delta applied to the book), follow the same rule. Order snapshots by position, not `ts`.
 
 ```python
 from polyester.orderbook import compare_snapshots
@@ -2083,6 +2087,11 @@ candle, when requested, is prepended). `get_candles_columns()` normalizes its
 column response oldest-first within each page; continuation pages go toward
 older candles. Sort explicitly by `ts_sec` before feeding a chronological
 indicator, rather than appending continuation pages as newer candles.
+The columnar response has no closed flag: its candles read `is_closed=True`,
+except the newest primary candle of a first page (no `page_token`) asked with
+`include_incomplete=True`, which reads `False` (not known to be closed).
+Continuation pages and reference candles are always closed. `get_candles()`
+carries the server's flag on every row.
 
 Merged market overview stream (snapshot + live updates). The create call waits
 for the WebSocket handshake and initial snapshot. With `symbols=[...]`, the
@@ -2420,6 +2429,20 @@ chain transaction started, and identify an account by its
 
 A page token is bound to the request it was returned for: continue with the
 same account, participation, scope and order; only `limit` may change.
+
+Every flow read and flow update carries what moved and when. `amount` is the
+gross principal, an exact `AssetAmount` at the 18-decimal ledger scale in units
+of `unified_asset_id` (never a float), and `request_fee` the request's fee apart
+from it. `source_tx_hash` is the transaction that started the flow, with
+`tx_occurrence_index` telling apart the legs of one batched deposit, and
+`latest_tx_ref` an opaque reference to the latest one. `source_domain` and
+`destination_domain` name the route (`funding` to `external_chain` for a Funding
+withdrawal). `started_at`, `updated_at`, `last_activity_at`, `terminal_at`
+(`None` while open) and `estimated_completion_at` (`None` while `is_delayed`;
+read `terminal_at`, not it, for when a flow ended) are aware UTC datetimes.
+`progress_timeline`, `current_step_sequence` and `current_progress` drive a
+progress bar. A transaction lookup carries the amount, asset, transactions,
+route and `last_activity_at`, but no fee, progress or other times.
 
 A deposit whose destination did not accept the credit, for example because
 deposits into it were paused, ends delivered as zTokens to the account's own

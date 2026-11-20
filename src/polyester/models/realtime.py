@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import msgspec
 
 from polyester.models.address_book import AccountScope
@@ -22,3 +24,7 @@ class OrderBookDeltaUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):
     reset: bool = False
     bids: list[tuple[str, str]] = msgspec.field(default_factory=list)
     asks: list[tuple[str, str]] = msgspec.field(default_factory=list)
+    ts: datetime | None = None
+    """The server's best-effort time for this update, an aware UTC datetime
+    exact to the microsecond; ``None`` when the server sent none, never the
+    local receipt time."""

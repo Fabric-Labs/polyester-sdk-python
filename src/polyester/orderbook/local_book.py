@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from polyester.codecs.scalars import parse_price_ticks
 from polyester.errors import PolyesterValidationError
 from polyester.models import OrderbookData, OrderbookLevel
@@ -136,8 +138,10 @@ def build_orderbook_data(
     quantity_scale: int,
     bucket_ticks: int | None = None,
     available: bool = True,
+    ts: datetime | None = None,
 ) -> OrderbookData:
-    """Render the book with up to ``depth`` levels per side; 0 renders none."""
+    """Render the book with up to ``depth`` levels per side; 0 renders none.
+    ``ts`` is the server time of the book's state, ``None`` for none."""
     if depth < 0:
         raise PolyesterValidationError(f"orderbook depth must not be negative, got {depth}")
     return OrderbookData(
@@ -145,6 +149,7 @@ def build_orderbook_data(
         depth=depth,
         book_seq=str(book_seq),
         available=available,
+        ts=ts,
         bids=side_to_levels(
             bids,
             side="bids",

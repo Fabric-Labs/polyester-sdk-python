@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
 from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.codecs.scalars import format_price_ticks, format_qty_scaled
@@ -143,12 +145,39 @@ def candles_from_proto(
     )
 
 
+def _newest_row_open(
+    ts_secs: Sequence[int], *, include_incomplete: bool, page_token: str
+) -> int | None:
+    """The primary row whose ``is_closed`` reads ``False`` in a columnar page, if any.
+
+    The columns carry no closed flag. Only a first page (no ``page_token``)
+    asked with ``include_incomplete`` can end with the open candle, so its
+    newest row is not known to be closed. A continuation cursor pages only
+    older closed candles.
+    """
+    if not include_incomplete or page_token or not ts_secs:
+        return None
+    return max(range(len(ts_secs)), key=lambda index: int(ts_secs[index]))
+
+
 def candles_columns_from_proto(
     msg: marketdata_pb2.GetCandlesColumnsResponse,
     *,
     volume_scale: int,
     reference_price_scale: int | None = None,
+    include_incomplete: bool = False,
+    page_token: str = "",
 ) -> CandlesResult:
+    """Decode a ``GetCandlesColumns`` page into rows, oldest-first.
+
+    The response has no closed column, so ``is_closed`` follows the request
+    the page answers (its ``include_incomplete`` and ``page_token``). Every row
+    reads ``True`` except the newest primary row of a first page (no
+    ``page_token``) asked with ``include_incomplete``, which reads ``False``:
+    not known to be closed, as it is the open candle when one was available.
+    Rows of a continuation page, which holds only older closed candles, and
+    every reference row, always a closed bucket, read ``True``.
+    """
     row_count = len(msg.ts_sec)
     lengths = {
         "open": len(msg.open),
@@ -166,6 +195,9 @@ def candles_columns_from_proto(
         )
         raise PolyesterTransportError(f"invalid GetCandlesColumns response lengths: {rendered}")
 
+    open_index = _newest_row_open(
+        msg.ts_sec, include_incomplete=include_incomplete, page_token=page_token
+    )
     candles: list[Candle] = []
     for index, ts in enumerate(msg.ts_sec):
         candles.append(
@@ -180,6 +212,7 @@ def candles_columns_from_proto(
                     scale=volume_scale,
                 ),
                 quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
+                is_closed=index != open_index,
             )
         )
     reference = _reference_candles_from_columns(
@@ -232,6 +265,8 @@ def _reference_candles_from_columns(
                 low=_decode_price_field(msg.reference_low[index], scale=reference_price_scale),
                 close=_decode_price_field(msg.reference_close[index], scale=reference_price_scale),
                 volume=_decode_volume_field(msg.reference_volume[index], scale=volume_scale),
+                # The reference series is never extended with an open candle.
+                is_closed=True,
             )
         )
     return candles

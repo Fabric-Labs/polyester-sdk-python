@@ -5,6 +5,7 @@ import contextlib
 import operator
 import time
 from collections.abc import Callable
+from datetime import datetime
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orderbook import orderbook_from_proto
@@ -16,6 +17,7 @@ from polyester.codecs.orderbook import (
     require_published_stream_depth,
     require_served_tier,
 )
+from polyester.codecs.proto_helpers import optional_timestamp
 from polyester.codecs.realtime_decode import decode_orderbook_delta_bytes
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orderbook.v1.orderbook_connect import OrderbookServiceClient
@@ -141,6 +143,10 @@ class AsyncOrderbookService(BaseService):
         stream's next reset (or a new snapshot from ``refresh_snapshot`` or a reconnect)
         instead of fetching snapshots.
 
+        Each view's ``ts`` is the server time of the latest snapshot or delta applied
+        to the book, ``None`` when that one carried none, never the local receipt time;
+        a stale or out-of-sequence delta, which is not applied, leaves it unchanged.
+
         ``bucket`` is ``None`` or ``""`` for no bucketing, or a positive price with at most
         9 decimal places, such as ``"0.01"``; any other bucket raises
         :class:`PolyesterValidationError` before connecting, as ``set_bucket`` does.
@@ -187,6 +193,9 @@ class AsyncOrderbookService(BaseService):
         # After a sequence gap the book no longer matches the stream: it waits for the
         # next reset (or a new snapshot), and its views read unavailable meanwhile.
         awaiting_reset = False
+        # The server time of the latest snapshot or delta applied to the book, None
+        # when that one carried none.
+        book_ts: datetime | None = None
         # Pacing for requests of a snapshot that came back unavailable.
         last_view_unavailable = False
         recheck_delay = _UNAVAILABLE_SNAPSHOT_INITIAL_DELAY
@@ -210,6 +219,7 @@ class AsyncOrderbookService(BaseService):
                 bucket_ticks=bucket_ticks,
                 quantity_scale=self._require_quantity_scale(symbol),
                 available=available,
+                ts=book_ts,
             )
             if on_event is not None:
                 on_event(data)
@@ -256,10 +266,12 @@ class AsyncOrderbookService(BaseService):
 
         def apply_snapshot(snapshot, buffered_deltas: list[OrderBookDeltaUpdate]) -> None:
             nonlocal bids_map, asks_map, current_book_seq, book_available, awaiting_reset
+            nonlocal book_ts
             bids_map = levels_from_proto_levels(snapshot.bids)
             asks_map = levels_from_proto_levels(snapshot.asks)
             current_book_seq = int(snapshot.book_seq or 0)
             book_available = bool(snapshot.available)
+            book_ts = optional_timestamp(snapshot, "ts")
             # A new snapshot is a known book state again.
             awaiting_reset = False
             # The snapshot and the deltas buffered behind it are one book state, so they
@@ -322,7 +334,7 @@ class AsyncOrderbookService(BaseService):
             rather than refetching snapshots: a snapshot need not line up with the
             stream, while a reset always does.
             """
-            nonlocal current_book_seq, awaiting_reset
+            nonlocal current_book_seq, awaiting_reset, book_ts
             if awaiting_reset and not delta.reset:
                 return False
             previous_seq = current_book_seq
@@ -339,6 +351,9 @@ class AsyncOrderbookService(BaseService):
                 if on_sequence_gap is not None:
                     on_sequence_gap()
                 return True
+            if current_book_seq != previous_seq:
+                # Applied: the book is now this delta's state, and has its time.
+                book_ts = delta.ts
             if delta.reset and current_book_seq > previous_seq:
                 awaiting_reset = False
             elif awaiting_reset:

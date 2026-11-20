@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from polyester.codecs.orderbook import require_served_tier
+from polyester.codecs.proto_helpers import optional_timestamp
 from polyester.gen.orderbook.v1 import orderbook_pb2
 from polyester.models import OrderbookData, OrderbookLevel
 from polyester.orderbook.local_book import format_orderbook_level
@@ -29,7 +30,8 @@ def orderbook_from_proto(
 ) -> OrderbookData:
     """Decode a snapshot requested at ``depth`` levels per side. The response
     names the tier it served in every answer: one without it, or with another
-    tier than the one requested, breaks the contract."""
+    tier than the one requested, breaks the contract. Its ``ts`` is the
+    snapshot's time, ``None`` when the response has none."""
     served = require_served_tier("GetOrderBook", int(msg.depth), depth)
     return OrderbookData(
         symbol=symbol,
@@ -45,4 +47,5 @@ def orderbook_from_proto(
         ],
         available=bool(msg.available),
         book_epoch=str(msg.book_epoch),
+        ts=optional_timestamp(msg, "ts"),
     )

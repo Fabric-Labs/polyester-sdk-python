@@ -562,6 +562,140 @@ class LifecycleFlowSummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     # sent it and source_address when it received it.
     source_address: str = ""
     destination_address: str = ""
+    # The flow's asset: the chain-specific asset mapping (zToken) row, and the
+    # unified asset Funding, Trading and the other balances count it in. 0 when
+    # the server sends none.
+    zipped_asset_id: int = 0
+    unified_asset_id: int = 0
+    # The Polyester Chain the flow belongs to; 0 when it is not known.
+    polyester_chain_id: int = 0
+    # The flow's gross principal, exact, at the 18-decimal ledger scale
+    # (domain ``ledger_e18``) in units of ``unified_asset_id``; never a float.
+    # It does not include the request fee (``request_fee``). A deposit keeps
+    # its deposited amount after Zipper returned it or transferred it out,
+    # which is not the amount Zipper paid. None when the server sends none.
+    amount: AssetAmount | None = None
+    # The request's fee when one applies and is visible for the current step;
+    # None otherwise. Transaction lookups do not carry it.
+    request_fee: LifecycleRequestFee | None = None
+    # The first observed source transaction of the flow; for a transfer
+    # between Trading accounts, the Polyester Chain transaction that records
+    # the settled transfer. Empty until it is observed.
+    source_tx_hash: str = ""
+    # Tells apart the flows of one transaction: the leg index of a batched
+    # source-chain deposit, or the log (or equivalent) index of an on-chain
+    # fact. 0 when none is available, which is also a first leg's index.
+    tx_occurrence_index: int = 0
+    # The latest transaction behind the current visible state. Opaque: a chain
+    # transaction hash or another reference, such as a decimal ID, depending
+    # on the step. Empty when there is none.
+    latest_tx_ref: str = ""
+    # The product domains where the whole flow starts and where it ends or
+    # currently settles, for route labels such as Funding to Trading:
+    # "external_chain", "zipper", "funding", "trading" or "lending";
+    # "unspecified" when the server sends none, and "unknown_domain_<n>" for a
+    # domain newer than this SDK.
+    source_domain: str = "unspecified"
+    destination_domain: str = "unspecified"
+    # The flow's first observed business time and the summary's last update,
+    # as aware UTC datetimes; None when the server sends none. Transaction
+    # lookups carry neither.
+    started_at: datetime | None = None
+    updated_at: datetime | None = None
+    # When the flow reached its final state; None while it is open.
+    # Transaction lookups do not carry it.
+    terminal_at: datetime | None = None
+    # The time lists order flows by; None when the server sends none.
+    last_activity_at: datetime | None = None
+    # When the flow is expected to complete; None when the server sends none,
+    # as transaction lookups do.
+    #
+    # The contract sends no estimate (None here) while ``is_delayed`` is true,
+    # because no reliable one exists then.
+    #
+    # The contract does not say what a terminal flow carries here. Devnet
+    # sends the flow's terminal time, the same as ``terminal_at``, but do not
+    # rely on that: read ``terminal_at`` for when a flow ended.
+    estimated_completion_at: datetime | None = None
+    # The one-based position of ``latest_step`` in ``progress_timeline``; 0
+    # when the server sends none.
+    current_step_sequence: int = 0
+    # The current step's progress while the flow is open; None when the server
+    # sends none. On a flow that is no longer open it may be present with
+    # every field zero. Transaction lookups do not carry it.
+    current_progress: LifecycleFlowProgress | None = None
+    # The flow's expected steps in order, for a progress bar. Its current step
+    # may be derived ahead of the latest step actually observed. Empty when
+    # the server sends none, as transaction lookups do.
+    progress_timeline: list[LifecycleFlowTimelineItem] = []
+
+
+class LifecycleRequestFee(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The fee a lifecycle flow's request pays, apart from the flow's gross
+    ``amount``.
+
+    ``zipped_asset_id`` and ``unified_asset_id`` name the fee asset, as on
+    :class:`LifecycleFlowSummary`. ``amount`` is the fee, exact, at the
+    18-decimal ledger scale in units of the fee asset; None when the server
+    sends none. ``recipient_address`` receives the fee once it settles on
+    chain; empty before. ``status`` is ``"locked"`` (the request locked the fee
+    when it was created), ``"settled"`` (the request completed far enough for
+    the fee to settle) or ``"kept"`` (the request did not complete and the fee
+    was charged anyway: Zipper does not refund a withdrawal's fee when it
+    rejects the withdrawal or its execution fails); ``"unspecified"`` when the
+    server sends none, and ``"unknown_fee_status_<n>"`` for a status newer than
+    this SDK.
+    """
+
+    zipped_asset_id: int = 0
+    unified_asset_id: int = 0
+    amount: AssetAmount | None = None
+    recipient_address: str = ""
+    status: str = "unspecified"
+
+
+class LifecycleFlowProgress(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The progress of an open lifecycle flow's current step.
+
+    ``current_step_started_at`` is when the current step started (aware UTC;
+    None when the server sends none), and ``current_step_expected_duration_ms``
+    how long it is expected to take, in milliseconds. The counts are 0 when
+    they do not apply to the step: confirmations to a step waiting on
+    source-chain confirmations, approvals and rejections to a validation step.
+    ``validator_count`` is the validator set's size, ``required_approvals`` the
+    approvals the step needs and ``required_rejections`` the rejections that
+    would fail it.
+    """
+
+    current_step_started_at: datetime | None = None
+    current_step_expected_duration_ms: int = 0
+    current_confirmations: int = 0
+    required_confirmations: int = 0
+    approve_count: int = 0
+    reject_count: int = 0
+    validator_count: int = 0
+    required_approvals: int = 0
+    required_rejections: int = 0
+
+
+class LifecycleFlowTimelineItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One step of a lifecycle flow's progress timeline.
+
+    ``sequence`` is the step's one-based position in the timeline, and
+    ``step`` names the step as :attr:`LifecycleFlowSummary.latest_step` does.
+    ``status`` is ``"completed"`` (observed, or behind the current step),
+    ``"current"`` or ``"planned"`` (expected, not observed yet);
+    ``"unspecified"`` when the server sends none, and
+    ``"unknown_timeline_status_<n>"`` for a status newer than this SDK.
+    ``expected_duration_ms`` is how long the step is expected to take, in
+    milliseconds, from recent timing of the same kind of flow; 0 when there is
+    no estimate.
+    """
+
+    sequence: int = 0
+    step: str = "unspecified"
+    status: str = "unspecified"
+    expected_duration_ms: int = 0
 
 
 class LifecycleFlowsList(msgspec.Struct, kw_only=True, omit_defaults=True):

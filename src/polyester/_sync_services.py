@@ -17,7 +17,7 @@ import inspect
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, TypeVar, Unpack, overload
 
-from polyester._sync_bridge import refuse_on_client_loop, run_on_loop
+from polyester._sync_bridge import admits_calls, refuse_on_client_loop, run_on_loop
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.services import (
     AsyncAddressBookService,
@@ -164,7 +164,12 @@ class _SyncService:
             def call(*args: Any, **kwargs: Any) -> Any:
                 result = attr(*args, **kwargs)
                 if asyncio.iscoroutine(result):
-                    return run_on_loop(self._loop, lambda: result, what=f"{name}()")
+                    try:
+                        return run_on_loop(self._loop, lambda: result, what=f"{name}()")
+                    finally:
+                        # A call that never started leaves its coroutine unawaited.
+                        if inspect.getcoroutinestate(result) == inspect.CORO_CREATED:
+                            result.close()
                 return result
 
             return call
@@ -198,7 +203,8 @@ class _SyncService:
                         return
                     yield item  # type: ignore[misc]
             finally:
-                if self._loop.is_running():
+                # A closing client finishes the generator as its loop shuts down.
+                if admits_calls(self._loop):
                     run_on_loop(self._loop, agen.aclose)  # type: ignore[attr-defined]
 
         return iterate

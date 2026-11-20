@@ -223,7 +223,7 @@ def test_order_read_carries_the_self_trade_prevention_mode() -> None:
         order_id=7, symbol_id=1, self_trade_prevention_mode=orders_pb2.EXPIRE_TAKER
     )
     assert order_from_proto(read).self_trade_prevention_mode == "expire_taker"
-    assert order_from_proto(orders_read_pb2.Order(order_id=7)).self_trade_prevention_mode == ""
+    assert order_from_proto(orders_read_pb2.Order(order_id=7)).self_trade_prevention_mode is None
 
     newer = orders_read_pb2.Order(order_id=7, symbol_id=1)
     newer.self_trade_prevention_mode = 9  # type: ignore[assignment]

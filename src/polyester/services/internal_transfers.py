@@ -193,10 +193,17 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         ``request_id`` :meth:`batch_create` returned
         (``GetInternalTransferBatch``), answered as the batch was answered.
 
-        It neither submits nor retries the batch and needs no fresh MFA. The
-        caller must be allowed to read the transfers of every source account
-        of the batch. ``request_id`` is the decimal string the batch carries:
-        1 to 39 ASCII digits without a leading zero.
+        It neither submits nor retries the batch and needs no fresh MFA. An
+        API key whose policy does not grant ``READ_INTERNAL_TRANSFERS`` is
+        refused for every request ID, whether the batch exists or not, with
+        :class:`~polyester.errors.PolyesterAuthError` whose ``code`` is
+        ``ERROR_CODE_PERMISSION_DENIED`` (ConnectRPC ``permission_denied``),
+        its message naming the action to grant: grant it on the key's policy
+        rather than treating the batch as unknown. A caller allowed to read
+        transfers must be allowed to read those of every source account of the
+        batch; any other batch answers ``ERROR_CODE_NOT_FOUND``, as an unknown
+        one does. ``request_id`` is the decimal string the batch carries: 1 to
+        39 ASCII digits without a leading zero.
         """
         checked = _batch_request_id(request_id)
         return await unary_auth_decoded(

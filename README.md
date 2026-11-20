@@ -770,6 +770,17 @@ reads back from `orders.get`, `orders.list_open`, `orders.list_history` and
 `orders.subscribe` with `Order.batch_request_id` set to the receipt's
 `batch_request_id`; it is `""` for an order of any other origin.
 
+An item admitted and then refused as it applies creates no successor, but for
+60 seconds from the batch's acceptance `orders.get` of its
+`replacement_order_id` answers an order without terms: `status` `"rejected"`
+with the refusal in `reject_reason` (for example `"modify_apply_expired"`, an
+admitted item not applied within 2 seconds), `batch_request_id` set and
+`version` 1. Its `symbol_id`, `side`, `order_type`, `tif`,
+`self_trade_prevention_mode` and `fee_asset` are `None` and its quantities and
+prices are 0 placeholders; take its terms from the batch you sent. After the
+60 seconds it is not found. Open orders, order history and `orders.subscribe`
+always carry the terms.
+
 <!-- readme-setup
 order_id = "Bht3tfQZv8E"
 -->
@@ -852,6 +863,8 @@ from polyester.models import OrderId
 
 order = (await client.orders.get(key=OrderId(order_id))).order
 assert order is not None  # None only when the order is not found
+# symbol_id is None only for a refused batch replacement, which has no fills.
+assert order.symbol_id is not None
 base_scale = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)
 quote_scale = client.catalogs.quote_quantity_scale_for_symbol("BTC-USDT")
 used = order.quote_used(base_scale)
@@ -1056,17 +1069,22 @@ needs no API key, and the server rate-limits it per client address.
 - `list_posts(limit=, page_token=)` returns one page of post summaries, newest
   first, with change counts by kind. `iter_posts(...)` yields every post
   across pages. A published post can be republished, for example to correct
-  its copy or withdraw a change: its `slug`, `published_at` and change ids stay
-  the same, `revision` (from 1) increases and `updated_at` is when the current
-  revision was published. To follow edits, read a post again when its
-  `revision` differs from the one you hold, and drop a post that is no longer
-  listed.
+  its copy or withdraw a change: its `slug` and change ids stay the same, a
+  republication does not move `published_at`, `revision` (from 1) increases
+  and `updated_at` is when the current revision was published. `published_at`
+  is the post's date in the environment you read: a release post's is when
+  the release went live there (that environment's `live_at`), or its first
+  publication while the release is still pending there, so it differs between
+  environments and can move without a new `revision`; every other post keeps
+  its first publication time. For a release post, `updated_at` is independent
+  of `published_at`. To follow edits, read a post again when its `revision`
+  differs from the one you hold, and drop a post that is no longer listed.
 - `get_post(slug)` returns one full post with its sections and changes. A slug
   is the post's coverage cutoff date, `YYYY-MM-DD`; a second or third post on
   the same day gets `-2` or `-3`. An unknown slug raises `PolyesterApiError`
   with code `not_found` (`is_not_found(err)` is true).
 - `list_changes(...)` returns one page of changes across posts, each with its
-  post slug, first publication time and section heading. It filters by
+  post slug, `published_at` and section heading. It filters by
   `categories`, `action_required`, `surfaces`, `audiences`, `start_time`
   (inclusive), `end_time` (exclusive), `post_slug` and `sort` (`"desc"`, the
   default, or `"asc"`). Filters on different fields combine with AND; values
@@ -1076,9 +1094,11 @@ needs no API key, and the server rate-limits it per client address.
   with code `invalid_argument`.
 - `breaking_changes_since(t)` and `action_required_since(t)` return every
   breaking or action-required change published at or after `t`, newest post
-  first, each change once with the wording last received. They filter on first
-  publication, so they don't report an edit to an older post; compare
-  `revision` for that.
+  first, each change once with the wording last received. They filter on
+  `published_at`, which a republication does not move, so they don't report an
+  edit to an older post; compare `revision` for that. A release post's
+  `published_at` can move into or out of the window when its release goes
+  live.
 - `list_deployment_groups(limit=, page_token=)` returns one page of the
   environment's deployment groups, newest deployment first (`limit` defaults
   to 20, at most 100); `iter_deployment_groups(...)` yields every group across
@@ -1713,6 +1733,12 @@ accounts. The result's `status` is `"accepted"` (every leg `"credited"`),
 `"not_moved"`, the ones that caused it with an `error_code` such as
 `"insufficient_funds"`). A refused batch is final for its idempotency key: try
 again under a new key.
+
+`internal_transfers.get_batch(request_id=...)` with an API key whose policy
+does not grant `READ_INTERNAL_TRANSFERS` raises `PolyesterAuthError` with code
+`ERROR_CODE_PERMISSION_DENIED` for every request ID, whether the batch exists or
+not, and its message names the action to grant. A key allowed to read transfers
+gets `ERROR_CODE_NOT_FOUND` for an unknown batch and for one it may not read.
 
 A batch that fails with a server error (HTTP 5xx) may or may not have been
 admitted: the error's outcome is unknown (`mutation_outcome_unknown(err)` is

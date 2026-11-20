@@ -177,3 +177,15 @@ reason = "The public Quick Swap explorer is outside the trading SDK surface, lik
 [[allowlist]]
 service = "auth.v1.ConnectedAppService"
 reason = "Connecting outside apps with OAuth is session-only, for the website; API keys are not accepted."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.WithdrawService/CreateWalletTradingToFundingBatch"
+reason = "The Trading to Funding withdraw batch takes an interactive session with a wallet signature and recent MFA or a fresh step-up; API keys are not accepted."
+
+[[allowlist]]
+procedure = "/marketdata.v1.MarketDataService/GetPriceBand"
+reason = "The public live price band read is not wrapped in this SDK yet; call it with the generated MarketDataService client."
+
+[[allowlist]]
+service = "strategies.v1.StrategiesService"
+reason = "preview, not served yet"

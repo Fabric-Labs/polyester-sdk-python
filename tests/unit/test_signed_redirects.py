@@ -25,7 +25,7 @@ from polyester import AsyncPolyester, PolyesterError, PolyesterRedirectError
 from polyester.auth import ApiKeyCredentials
 from polyester.codecs.scalars import format_id
 from polyester.errors import is_retryable_error, mutation_outcome_unknown
-from polyester.gen.auth.v1.address_book_pb2 import SCOPE_ROOT
+from polyester.gen.auth.v1.account_scope_pb2 import SCOPE_ROOT
 from polyester.gen.auth.v1.auth_connect import AuthServiceClient
 from polyester.gen.auth.v1.auth_pb2 import MeRequest, MeResponse
 from polyester.models.order_key import OrderId

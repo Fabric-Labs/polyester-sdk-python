@@ -9,7 +9,7 @@ from __future__ import annotations
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs.realtime_decode import decode_address_book_invalidation_bytes
-from polyester.gen.auth.v1 import address_book_pb2
+from polyester.gen.auth.v1 import account_scope_pb2, address_book_pb2
 from polyester.models.address_book import AccountScope
 
 # The Devnet account from the ticket: root Xiw8QFupu6d, sub-account 2nphEX67UQT.
@@ -29,7 +29,7 @@ def test_a_sub_account_change_names_the_sub_account_and_its_scope_type() -> None
     event = decode_address_book_invalidation_bytes(
         _payload(
             address_book_pb2.AccountScopeRef(
-                scope_type=address_book_pb2.SCOPE_SUBACCOUNT,
+                scope_type=account_scope_pb2.SCOPE_SUBACCOUNT,
                 root_account_id=ROOT_ID,
                 subaccount_id=SUB_ID,
             ),
@@ -47,7 +47,7 @@ def test_a_root_change_names_the_root_and_no_sub_account() -> None:
     event = decode_address_book_invalidation_bytes(
         _payload(
             address_book_pb2.AccountScopeRef(
-                scope_type=address_book_pb2.SCOPE_ROOT, root_account_id=ROOT_ID
+                scope_type=account_scope_pb2.SCOPE_ROOT, root_account_id=ROOT_ID
             ),
             1004923642104,
         )

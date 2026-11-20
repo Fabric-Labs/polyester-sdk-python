@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from polyester.codecs.decode.balances import ledger_amount
@@ -212,7 +213,7 @@ def _flow_tx_fields(msg: FlowSummaryView | FlowTxMatchView) -> dict[str, Any]:
     }
 
 
-def flow_summary_detail_fields(msg: FlowSummaryView) -> dict[str, Any]:
+def _flow_summary_detail_fields(msg: FlowSummaryView) -> dict[str, Any]:
     """Every ``LifecycleFlowSummary`` field a ``FlowSummaryView`` carries beyond
     its kind, step, state, account, reasons, participation and addresses.
     ``latest_lifecycle_source`` (server provenance) is not modelled."""
@@ -227,6 +228,19 @@ def flow_summary_detail_fields(msg: FlowSummaryView) -> dict[str, Any]:
         "current_progress": _flow_progress(msg),
         "progress_timeline": _flow_timeline(msg),
     }
+
+
+# The label each lifecycle flow enum reads as on LifecycleFlowSummary and its
+# nested models, by enum name, so a JSON decoder can read those labels back.
+FLOW_ENUM_LABELS: dict[str, Callable[[int], str]] = {
+    types_pb2.FlowKind.DESCRIPTOR.full_name: _flow_kind_label,
+    lifecycle_read_pb2.FlowStep.DESCRIPTOR.full_name: _flow_step_label,
+    types_pb2.LifecycleReason.DESCRIPTOR.full_name: lifecycle_reason_from_code,
+    lifecycle_read_pb2.FlowParticipation.DESCRIPTOR.full_name: flow_participation_label,
+    types_pb2.FlowDomain.DESCRIPTOR.full_name: flow_domain_label,
+    types_pb2.RequestFeeStatus.DESCRIPTOR.full_name: _request_fee_status_label,
+    lifecycle_read_pb2.FlowTimelineStatus.DESCRIPTOR.full_name: _timeline_status_label,
+}
 
 
 def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> LifecycleFlowSummary:
@@ -244,7 +258,7 @@ def flow_summary_from_proto(msg: lifecycle_read_pb2.FlowSummaryView) -> Lifecycl
         participation=flow_participation_label(msg.participation),
         source_address=str(msg.source_address or ""),
         destination_address=str(msg.destination_address or ""),
-        **flow_summary_detail_fields(msg),
+        **_flow_summary_detail_fields(msg),
     )
 
 

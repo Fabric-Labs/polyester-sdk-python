@@ -20,6 +20,7 @@ from polyester.codecs.wire_decode import decode_lifecycle_flow, decode_lifecycle
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2 as lr
 from polyester.gen.chain.lifecycle.v1 import types_pb2
+from polyester.gen.chain.zipper.v1 import reason_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
 from polyester.models import (
     LifecycleFlowProgress,
@@ -352,3 +353,122 @@ def test_flow_enums_newer_than_the_sdk_keep_their_number() -> None:
     assert flow.request_fee is not None and flow.request_fee.status == "unknown_fee_status_9"
     assert flow.progress_timeline[0].status == "unknown_timeline_status_7"
     assert flow.progress_timeline[0].step == "unspecified"
+
+
+def _delayed_withdraw() -> lr.FlowSummaryView:
+    """A populated delayed flow: every summary field the contract sends, with
+    no estimate, as the contract sends none while a flow is delayed."""
+    view = _open_withdraw()
+    view.is_delayed = True
+    view.ClearField("estimated_completion_unix_ms")
+    view.participation = lr.PARTICIPATION_OWNER
+    view.lifecycle_reason = types_pb2.ZIPPER_VALIDATION_REJECTED
+    view.zipper_reason.code = reason_pb2.DEPOSIT_AMOUNT_BELOW_MINIMUM
+    view.zipper_reason.reason_id = "deposit_amount_below_minimum"
+    view.zipper_reason.message = "amount below minimum"
+    return view
+
+
+def _check_delayed_withdraw(flow: LifecycleFlowSummary) -> None:
+    assert flow.is_delayed is True and flow.is_open is True and flow.is_terminal is False
+    assert flow.estimated_completion_at is None
+    assert flow.smart_account_address == "0x00000000000000000000000000000000000000a1"
+    assert flow.source_address == "0x00000000000000000000000000000000000000a1"
+    assert flow.destination_address == "0x00000000000000000000000000000000000000b2"
+    assert flow.participation == "owner"
+    assert (flow.flow_kind, flow.latest_step) == ("withdraw", "validation")
+    assert flow.lifecycle_reason == "zipper_validation_rejected"
+    assert flow.zipper_reason is not None
+    assert flow.zipper_reason.code == int(reason_pb2.DEPOSIT_AMOUNT_BELOW_MINIMUM)
+    assert flow.zipper_reason.reason_id == "deposit_amount_below_minimum"
+    assert (flow.source_domain, flow.destination_domain) == ("funding", "external_chain")
+    _check_ledger_amount(flow.amount, 23446744073709551616, 1)
+
+
+@pytest.mark.parametrize(
+    "encoding",
+    [
+        {},
+        {"preserving_proto_field_name": True},
+        {"use_integers_for_enums": True},
+        {"use_integers_for_enums": True, "preserving_proto_field_name": True},
+    ],
+    ids=["camel-names", "snake-names", "camel-numbers", "snake-numbers"],
+)
+def test_json_flow_matches_the_binary_decoder_field_for_field(encoding) -> None:
+    view = _delayed_withdraw()
+    binary = flow_summary_from_proto(view)
+    _check_delayed_withdraw(binary)
+    item = json_format.MessageToDict(view, **encoding)
+    detail = json_format.MessageToDict(lr.FlowDetailView(summary=view), **encoding)
+    listed = decode_lifecycle_flows_list({"flows": [item]}).flows[0]
+    for flow in (decode_lifecycle_flow(item), decode_lifecycle_flow(detail), listed):
+        _check_delayed_withdraw(flow)
+        assert flow == binary
+
+
+def test_json_flow_reads_an_empty_summary_as_the_binary_decoder_does() -> None:
+    assert decode_lifecycle_flow({}) == flow_summary_from_proto(lr.FlowSummaryView())
+
+
+def test_json_flow_keeps_reading_legacy_names_and_labels() -> None:
+    flow = decode_lifecycle_flow(
+        {
+            "intentId": "flow_legacy",
+            "flowKind": "withdraw",
+            "latestStep": "validation",
+            "participation": "recipient",
+            "sourceDomain": "trading",
+            "reasonCode": "zipper_execution_rejected",
+            "isDelayed": True,
+        }
+    )
+    assert (flow.intent_id, flow.flow_kind, flow.latest_step) == (
+        "flow_legacy",
+        "withdraw",
+        "validation",
+    )
+    assert (flow.participation, flow.source_domain) == ("recipient", "trading")
+    assert flow.lifecycle_reason == "zipper_execution_rejected"
+    assert flow.is_delayed is True
+    newer = decode_lifecycle_flow({"flowId": "f", "lifecycleReason": "unknown_reason_2001"})
+    assert newer.lifecycle_reason == "unknown_reason_2001"
+    numbered = decode_lifecycle_flow({"flowId": "f", "flowKind": "2", "currentStep": " 4 "})
+    assert (numbered.flow_kind, numbered.latest_step) == (
+        flow_summary_from_proto(lr.FlowSummaryView(flow_kind=2, current_step=4)).flow_kind,  # type: ignore[arg-type]
+        flow_summary_from_proto(lr.FlowSummaryView(flow_kind=2, current_step=4)).latest_step,  # type: ignore[arg-type]
+    )
+    assert numbered.flow_kind == "withdraw"
+    for bad in ({"flowKind": "not a kind"}, {"isDelayed": "yes"}, {"flowKind": "\u00b2"}):
+        with pytest.raises(PolyesterResponseContractError):
+            decode_lifecycle_flow({"flowId": "f", **bad})
+    # The contract name wins over a legacy alias.
+    both = decode_lifecycle_flow({"flowId": "flow_new", "intentId": "flow_old"})
+    assert both.intent_id == "flow_new"
+
+
+def test_json_flow_reads_enum_names_newer_than_the_sdk_by_name() -> None:
+    flow = decode_lifecycle_flow(
+        {
+            "flowId": "flow_newer",
+            "flowKind": "KIND_SWAP",
+            "sourceDomain": "DOMAIN_LIQUIDITY",
+            "destinationDomain": "DOMAIN_TRADING",
+            "requestFee": {"status": "REQUEST_FEE_STATUS_WAIVED"},
+            "progressTimeline": [
+                {"sequence": 1, "step": "FLOW_STEP_REQUEST", "status": "TIMELINE_STATUS_SKIPPED"},
+                {"sequence": 2, "step": "FLOW_STEP_TELEPORT", "status": "TIMELINE_STATUS_PLANNED"},
+            ],
+            "latestLifecycleSource": "SOURCE_SOMETHING_NEW",
+        }
+    )
+    assert (flow.flow_kind, flow.source_domain, flow.destination_domain) == (
+        "swap",
+        "liquidity",
+        "trading",
+    )
+    assert flow.request_fee is not None and flow.request_fee.status == "waived"
+    assert flow.progress_timeline == [
+        LifecycleFlowTimelineItem(sequence=1, step="request", status="skipped"),
+        LifecycleFlowTimelineItem(sequence=2, step="teleport", status="planned"),
+    ]

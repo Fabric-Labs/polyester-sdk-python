@@ -440,3 +440,154 @@ def test_a_call_queued_in_the_loops_final_iteration_leaves_no_coroutine() -> Non
     assert reached == []
     assert loop.is_closed()
     assert [str(w.message) for w in caught] == []
+
+
+def _pause_before_finishing(client: Polyester) -> tuple[threading.Event, threading.Event]:
+    """Hold the loop thread between ``run_forever`` returning and its finishing.
+
+    Returns ``(paused, resume)``: ``paused`` is set once the loop has stopped
+    and not yet finished; setting ``resume`` lets it finish and close.
+    """
+    paused = threading.Event()
+    resume = threading.Event()
+    finish = client._finish_loop
+
+    def paused_finish() -> None:
+        paused.set()
+        resume.wait(30)
+        finish()
+
+    client._finish_loop = paused_finish  # type: ignore[method-assign]
+    return paused, resume
+
+
+def _record_scheduling_from(loop: asyncio.AbstractEventLoop, name: str) -> threading.Event:
+    """Set once the thread called ``name`` schedules work on ``loop``."""
+    scheduled = threading.Event()
+    call_soon_threadsafe = loop.call_soon_threadsafe
+
+    def recording(callback, *args, **kwargs):
+        handle = call_soon_threadsafe(callback, *args, **kwargs)
+        if threading.current_thread().name == name:
+            scheduled.set()
+        return handle
+
+    loop.call_soon_threadsafe = recording  # type: ignore[method-assign]
+    return scheduled
+
+
+def _hold_loop(client: Polyester) -> threading.Event:
+    blocking = threading.Event()
+    release = threading.Event()
+
+    def block() -> None:
+        blocking.set()
+        release.wait(60)
+
+    client._loop.call_soon_threadsafe(block)
+    assert blocking.wait(5), "the blocking callback never ran"
+    return release
+
+
+@pytest.mark.parametrize("kind", ["read", "write"])
+def test_a_call_queued_before_a_timed_out_close_never_starts_after_it_failed(
+    monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    from polyester.errors import mutation_outcome_unknown
+    from polyester.models import OrderId
+
+    monkeypatch.setattr("polyester.client._SHUTDOWN_WAIT_SECONDS", 0.2)
+    monkeypatch.setattr("polyester.client._LOOP_JOIN_SECONDS", 0.2)
+    client = Polyester(hydrate_catalogs=False)
+    sent: list[str] = []
+
+    async def get_time():
+        sent.append("get_time")
+
+    async def cancel(*args, **kwargs):
+        sent.append("cancel")
+
+    client._client.get_time = get_time  # type: ignore[method-assign]
+    client._client.orders.cancel = cancel  # type: ignore[method-assign]
+    paused, resume = _pause_before_finishing(client)
+    release = _hold_loop(client)
+    queued = _record_scheduling_from(client._loop, "caller")
+    outcome: list[BaseException] = []
+
+    def caller() -> None:
+        try:
+            if kind == "read":
+                client.get_time()
+            else:
+                client.orders.cancel(key=OrderId(11))
+        except BaseException as error:
+            outcome.append(error)
+
+    waiter = threading.Thread(target=caller, name="caller", daemon=True)
+    waiter.start()
+    try:
+        assert queued.wait(5), "the call was never queued"
+        client.close()  # times out: the callback still holds the loop
+        release.set()
+        assert paused.wait(5), "the loop never stopped"
+        # Stopped, not yet finished: the caller is told now that the call failed.
+        waiter.join(5)
+        assert not waiter.is_alive(), "the caller kept waiting on a stopped loop"
+    finally:
+        release.set()
+        resume.set()
+    client._loop_thread.join(10)
+    assert not client._loop_thread.is_alive()
+    assert len(outcome) == 1
+    error = outcome[0]
+    assert isinstance(error, PolyesterError)
+    assert "closed" in str(error)
+    # Told it failed, the call never started: its failure is definite.
+    assert sent == []
+    assert not mutation_outcome_unknown(error)
+
+
+def test_a_write_in_flight_when_the_loop_stops_has_an_unknown_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from polyester.errors import mutation_outcome_unknown
+    from polyester.models import OrderId
+
+    client = Polyester(hydrate_catalogs=False)
+    started = threading.Event()
+
+    async def cancel(*args, **kwargs):
+        # Sent, and waiting for its answer when the client closes.
+        started.set()
+        await asyncio.Event().wait()
+
+    client._client.orders.cancel = cancel  # type: ignore[method-assign]
+    paused, resume = _pause_before_finishing(client)
+    outcome: list[BaseException] = []
+
+    def caller() -> None:
+        try:
+            client.orders.cancel(key=OrderId(11))
+        except BaseException as error:
+            outcome.append(error)
+
+    waiter = threading.Thread(target=caller, name="caller", daemon=True)
+    waiter.start()
+    try:
+        assert started.wait(5), "the write never started"
+        closer = threading.Thread(target=client.close, daemon=True)
+        closer.start()
+        assert paused.wait(10), "the loop never stopped"
+        # The write started: its caller must not be told yet that it failed.
+        time.sleep(3 * 0.25)  # three of the caller's polls of the stopped loop
+        assert waiter.is_alive(), f"the caller returned while its write was in flight: {outcome}"
+    finally:
+        resume.set()
+    waiter.join(10)
+    closer.join(10)
+    assert not waiter.is_alive()
+    assert len(outcome) == 1
+    error = outcome[0]
+    assert isinstance(error, PolyesterError)
+    assert mutation_outcome_unknown(error), repr(error)
+    assert client._loop.is_closed()

@@ -13,7 +13,13 @@ from google.protobuf.message import Message
 
 from polyester._catalog_startup import CatalogSource, load_catalog
 from polyester._redact import register, url_secrets
-from polyester._sync_bridge import close_admission, refuse_on_client_loop, run_on_loop
+from polyester._sync_bridge import (
+    SUBMISSION_TASK_NAME,
+    begin_finishing,
+    close_admission,
+    refuse_on_client_loop,
+    run_on_loop,
+)
 from polyester._sync_services import (
     SyncAddressBookService,
     SyncAlertsService,
@@ -868,14 +874,21 @@ class Polyester:
     def _finish_loop(self) -> None:
         """Finish what the stopped loop holds, as :func:`asyncio.run` does.
 
-        A client shutdown a close stopped waiting for runs to its end, up to
-        ``_SHUTDOWN_WAIT_SECONDS``. Every other task left is cancelled and given
-        up to ``_LOOP_FINISH_SECONDS`` to end, so none is dropped unstarted or
-        mid-call: a sync caller waiting on one gets the closed client's error.
-        Async generators left open are closed within the same time. The close
-        has already shut admission, so nothing new starts meanwhile.
+        The loop runs again only to finish. Sync calls are cancelled first: one
+        still queued, or whose task has not run yet, never starts (its caller
+        was told it did not run), and one that started is stopped, its caller
+        told its outcome is unknown. Then a client shutdown a close stopped
+        waiting for runs to its end, up to ``_SHUTDOWN_WAIT_SECONDS``. Every
+        other task left is cancelled and given up to ``_LOOP_FINISH_SECONDS``
+        to end, so none is dropped unstarted or mid-call. Async generators left
+        open are closed within the same time. The close has already shut
+        admission, so nothing new is queued meanwhile.
         """
         loop = self._loop
+        begin_finishing(loop)
+        for task in asyncio.all_tasks(loop):
+            if task.get_name() == SUBMISSION_TASK_NAME:
+                task.cancel()
         shutdown = self._shutdown_task
         if shutdown is not None and not shutdown.done():
             loop.run_until_complete(asyncio.wait([shutdown], timeout=_SHUTDOWN_WAIT_SECONDS))

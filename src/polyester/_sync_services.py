@@ -164,7 +164,12 @@ class _SyncService:
             def call(*args: Any, **kwargs: Any) -> Any:
                 result = attr(*args, **kwargs)
                 if asyncio.iscoroutine(result):
-                    return run_on_loop(self._loop, lambda: result, what=f"{name}()")
+                    try:
+                        return run_on_loop(self._loop, lambda: result, what=f"{name}()")
+                    finally:
+                        # A call that never started leaves its coroutine unawaited.
+                        if inspect.getcoroutinestate(result) == inspect.CORO_CREATED:
+                            result.close()
                 return result
 
             return call

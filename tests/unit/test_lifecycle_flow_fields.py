@@ -610,3 +610,50 @@ def test_json_flow_reads_null_and_int32_enum_numbers() -> None:
         assert (flow.source_domain, flow.destination_domain) == ("unspecified", "zipper")
         assert flow.lifecycle_reason == lifecycle_reason_from_code(-(2**31))
         assert flow.zipper_reason is not None and flow.zipper_reason.code == 1003
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["21474836480", "-21474836481", "9" * 4301, "-" + "9" * 4301],
+    ids=["past-int32", "below-int32", "4301-digits", "signed-4301-digits"],
+)
+@pytest.mark.parametrize("key", ["zipperCode", "flowKind", "feeStatus"])
+def test_json_flow_refuses_digit_text_outside_int32_for_every_enum(key, value) -> None:
+    summary = {
+        "zipperCode": {"zipperReason": {"code": value}},
+        "flowKind": {"flowKind": value},
+        "feeStatus": {"requestFee": {"status": value}},
+    }[key]
+    item = {"flowId": "flow_digits", **summary}
+    with pytest.raises(PolyesterResponseContractError):
+        decode_lifecycle_flow({"summary": item, "steps": []})
+    with pytest.raises(PolyesterResponseContractError):
+        decode_lifecycle_flows_list({"flows": [item]})
+
+
+@pytest.mark.parametrize("code", ["1003", "DEPOSIT_AMOUNT_BELOW_MINIMUM", 1003, " 1003 "])
+def test_json_flow_still_reads_numeric_and_named_zipper_codes(code) -> None:
+    for flow in _decode_both_ways({"zipperReason": {"code": code}}):
+        assert flow.zipper_reason is not None
+        assert flow.zipper_reason.code == int(reason_pb2.DEPOSIT_AMOUNT_BELOW_MINIMUM)
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        lambda v: {"zipperReason": {"code": v}},
+        lambda v: {"requestFee": {"status": v}},
+        lambda v: {"flowKind": v},
+    ],
+    ids=["zipper-code", "fee-status", "kind"],
+)
+@pytest.mark.parametrize("value", [10**5000, -(10**5000)], ids=["huge", "negative-huge"])
+def test_json_flow_refuses_a_huge_enum_number_with_a_bounded_message(where, value) -> None:
+    item = {"flowId": "flow_huge", **where(value)}
+    for decode in (
+        lambda: decode_lifecycle_flow({"summary": item, "steps": []}),
+        lambda: decode_lifecycle_flows_list({"flows": [item]}),
+    ):
+        with pytest.raises(PolyesterResponseContractError) as refused:
+            decode()
+        assert len(str(refused.value)) < 300

@@ -454,7 +454,7 @@ _LEGACY_FLOW_KEYS = {
 _FLOW_ENUM_ATTRS = {"current_step": "latest_step"}
 # An enum number as text, and the "unknown_<...>_<n>" label a binary decoder
 # returns for a number this SDK does not name; both at most int32.
-_ENUM_NUMBER = re.compile(r"-?[0-9]{1,10}")
+_ENUM_NUMBER = re.compile(r"-?[0-9]+")
 _UNKNOWN_LABEL = re.compile(r"unknown_[a-z_]+?_(-?[0-9]{1,10})")
 _INT32_MIN, _INT32_MAX = -(2**31), 2**31 - 1
 _ENUM_VALUE_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -483,9 +483,13 @@ def _flow_enum_json(
     if not text:
         return 0
     if _ENUM_NUMBER.fullmatch(text):
-        number = int(text)
-        if _INT32_MIN <= number <= _INT32_MAX:
-            return number
+        # Any length: digits past int32 are refused, never read as a name.
+        # At most 10 significant digits are converted.
+        digits = text.lstrip("-").lstrip("0")
+        if len(digits) <= 10:
+            number = int(digits or "0") * (-1 if text.startswith("-") else 1)
+            if _INT32_MIN <= number <= _INT32_MAX:
+                return number
         raise _not_an_enum_value(field, value)
     label_of = FLOW_ENUM_LABELS.get(enum_type.full_name)
     if label_of is None:
@@ -525,11 +529,25 @@ def _enum_number_json(field: Any, value: Any) -> int:
 
 
 def _not_an_enum_value(field: Any, value: Any) -> PolyesterResponseContractError:
-    text = repr(value)
-    shown = text if len(text) <= 64 else f"{text[:64]}..."
     return PolyesterResponseContractError(
-        "FlowSummaryView", f"{field.name} is not a {field.enum_type.name}: {shown}"
+        "FlowSummaryView",
+        f"{field.name} is not a {field.enum_type.name}: {_value_preview(value)}",
     )
+
+
+def _value_preview(value: Any) -> str:
+    """A short description of a refused value that never converts a large
+    one: its type, and a bounded preview of text or of a small number."""
+    kind = type(value).__name__
+    if isinstance(value, str):
+        return f"{kind} {value[:32]!r}" + ("..." if len(value) > 32 else "")
+    if isinstance(value, bool | float):
+        return f"{kind} {value!r}"
+    if isinstance(value, int):
+        if value.bit_length() <= 64:
+            return f"{kind} {value}"
+        return f"{kind} of {value.bit_length()} bits"
+    return kind
 
 
 def _flow_json_enums(

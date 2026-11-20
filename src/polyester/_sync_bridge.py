@@ -138,17 +138,19 @@ def run_on_loop(
         else:
             task.cancel()
 
-    with _admission:
-        # Checked again with the close excluded: ``start`` is queued before a
-        # close that begins later, or not at all.
-        if not admits_calls(loop):
-            raise closed_error("the client is closed")
-        try:
-            loop.call_soon_threadsafe(start)
-        except RuntimeError:
-            # The loop closed since the check: ``start`` never runs.
-            raise closed_error("the client is closed") from None
+    # Scheduling and waiting share one cleanup: an interruption at any point,
+    # even right after ``start`` is queued, abandons a call that has not started.
     try:
+        with _admission:
+            # Checked again with the close excluded: ``start`` is queued before a
+            # close that begins later, or not at all.
+            if not admits_calls(loop):
+                raise closed_error("the client is closed")
+            try:
+                loop.call_soon_threadsafe(start)
+            except RuntimeError:
+                # The loop closed since the check: ``start`` never runs.
+                raise closed_error("the client is closed") from None
         while not finished.wait(_POLL_SECONDS):
             if loop.is_running():
                 continue

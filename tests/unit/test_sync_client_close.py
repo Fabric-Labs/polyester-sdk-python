@@ -591,3 +591,55 @@ def test_a_write_in_flight_when_the_loop_stops_has_an_unknown_outcome(
     assert isinstance(error, PolyesterError)
     assert mutation_outcome_unknown(error), repr(error)
     assert client._loop.is_closed()
+
+
+class _Interrupted(BaseException):
+    """Stands in for a KeyboardInterrupt delivered to the caller."""
+
+
+def test_a_caller_interrupted_right_after_queueing_its_call_never_sends_it() -> None:
+    from polyester.models import OrderId
+
+    client = Polyester(hydrate_catalogs=False)
+    sent: list[str] = []
+
+    async def cancel(*args, **kwargs):
+        sent.append("cancel")
+
+    client._client.orders.cancel = cancel  # type: ignore[method-assign]
+    # The loop is held, so the queued start cannot run before the interruption.
+    release = _hold_loop(client)
+    loop = client._loop
+    call_soon_threadsafe = loop.call_soon_threadsafe
+
+    def queue_then_interrupt(callback, *args, **kwargs):
+        handle = call_soon_threadsafe(callback, *args, **kwargs)
+        if threading.current_thread().name == "caller":
+            # Delivered after the call is queued, before the submission returns.
+            raise _Interrupted
+        return handle
+
+    loop.call_soon_threadsafe = queue_then_interrupt  # type: ignore[method-assign]
+    outcome: list[str] = []
+
+    def caller() -> None:
+        try:
+            client.orders.cancel(key=OrderId(11))
+        except BaseException as error:
+            outcome.append(type(error).__name__)
+
+    waiter = threading.Thread(target=caller, name="caller", daemon=True)
+    waiter.start()
+    waiter.join(5)
+    try:
+        assert not waiter.is_alive()
+        assert outcome == ["_Interrupted"]
+    finally:
+        loop.call_soon_threadsafe = call_soon_threadsafe  # type: ignore[method-assign]
+        release.set()
+    # Let the loop run everything queued before this (a start, then its task's
+    # first step, each a turn of the loop) before closing: the write never ran.
+    for _ in range(3):
+        asyncio.run_coroutine_threadsafe(asyncio.sleep(0), loop).result(5)
+    client.close()
+    assert sent == []

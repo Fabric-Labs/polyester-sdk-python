@@ -14,7 +14,7 @@ from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from polyester import AsyncPolyester
-from polyester.codecs.decode.lifecycle import flow_summary_from_proto
+from polyester.codecs.decode.lifecycle import flow_summary_from_proto, lifecycle_reason_from_code
 from polyester.codecs.realtime_decode import decode_flow_detail_bytes, decode_flow_summary_bytes
 from polyester.codecs.wire_decode import decode_lifecycle_flow, decode_lifecycle_flows_list
 from polyester.errors import PolyesterResponseContractError
@@ -472,3 +472,62 @@ def test_json_flow_reads_enum_names_newer_than_the_sdk_by_name() -> None:
         LifecycleFlowTimelineItem(sequence=1, step="request", status="skipped"),
         LifecycleFlowTimelineItem(sequence=2, step="teleport", status="planned"),
     ]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"progressTimeline": [{"status": "TIMELINE_STATUS_NEW"}], "progress_timeline": []},
+        {"sourceDomain": "DOMAIN_FUTURE", "source_domain": "DOMAIN_FUNDING"},
+        {"requestFee": {"status": "REQUEST_FEE_STATUS_NEW"}, "request_fee": {}},
+        {"progressTimeline": [{"expectedDurationMs": "1", "expected_duration_ms": "2"}]},
+    ],
+    ids=["timeline", "scalar-enum", "fee", "nested-scalar"],
+)
+def test_json_flow_refuses_a_field_spelled_twice(payload) -> None:
+    with pytest.raises(PolyesterResponseContractError):
+        decode_lifecycle_flow({"flowId": "flow_twice", **payload})
+
+
+@pytest.mark.parametrize("number", [-1, -(2**31), 2**31 - 1, 7, 2001])
+def test_json_flow_reads_back_every_label_the_binary_decoder_returns(number) -> None:
+    binary = flow_summary_from_proto(
+        lr.FlowSummaryView(
+            flow_id="flow_signed",
+            flow_kind=number,  # type: ignore[arg-type]
+            current_step=number,  # type: ignore[arg-type]
+            lifecycle_reason=number,  # type: ignore[arg-type]
+            participation=number,  # type: ignore[arg-type]
+            source_domain=number,  # type: ignore[arg-type]
+            request_fee=types_pb2.RequestFee(status=number),  # type: ignore[arg-type]
+            progress_timeline=[lr.FlowTimelineItemView(sequence=1, status=number)],  # type: ignore[arg-type]
+        )
+    )
+    assert binary.lifecycle_reason == lifecycle_reason_from_code(number)
+    assert binary.request_fee is not None
+    labelled = {
+        "flowId": "flow_signed",
+        "flowKind": binary.flow_kind,
+        "currentStep": binary.latest_step,
+        "lifecycleReason": binary.lifecycle_reason,
+        "participation": binary.participation,
+        "sourceDomain": binary.source_domain,
+        "requestFee": {"status": binary.request_fee.status},
+        "progressTimeline": [{"sequence": 1, "status": binary.progress_timeline[0].status}],
+    }
+    assert decode_lifecycle_flow(labelled) == binary
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["9" * 4301, "-" + "9" * 4301, str(2**31), str(-(2**31) - 1), "unknown_reason_" + "9" * 4301],
+)
+def test_json_flow_refuses_an_enum_number_out_of_range_with_a_typed_error(value) -> None:
+    for key in ("flowKind", "lifecycleReason"):
+        with pytest.raises(PolyesterResponseContractError):
+            decode_lifecycle_flow({"flowId": "flow_big", key: value})
+
+
+def test_json_flow_refuses_a_fallback_label_of_another_field() -> None:
+    with pytest.raises(PolyesterResponseContractError):
+        decode_lifecycle_flow({"flowId": "flow_x", "lifecycleReason": "unknown_domain_3"})

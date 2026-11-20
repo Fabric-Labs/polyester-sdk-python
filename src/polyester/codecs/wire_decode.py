@@ -451,7 +451,11 @@ _LEGACY_FLOW_KEYS = {
 }
 # The LifecycleFlowSummary attribute of each FlowSummaryView enum field.
 _FLOW_ENUM_ATTRS = {"current_step": "latest_step"}
-_UNKNOWN_LABEL = re.compile(r"^unknown_[a-z_]+_([0-9]+)$")
+# An enum number as text, and the "unknown_<...>_<n>" label a binary decoder
+# returns for a number this SDK does not name; both at most int32.
+_ENUM_NUMBER = re.compile(r"-?[0-9]{1,10}")
+_UNKNOWN_LABEL = re.compile(r"unknown_[a-z_]+?_(-?[0-9]{1,10})")
+_INT32_MIN, _INT32_MAX = -(2**31), 2**31 - 1
 _ENUM_VALUE_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 # A path into the summary (field names, and list indexes) to the label of an
@@ -462,26 +466,32 @@ _NewerLabels = dict[tuple[str | int, ...], str]
 def _flow_enum_json(
     field: Any, value: Any, path: tuple[str | int, ...], newer: _NewerLabels
 ) -> Any:
-    """A flow enum value as the contract parser takes it: its name or number
-    as sent, or the number of the ``LifecycleFlowSummary`` label (such as
-    ``"withdraw"`` or ``"unknown_reason_2001"``) or prefixed name it is. A name
-    newer than this SDK parses as 0 and records its label, the name without
-    the enum's prefix, lowercased; any other text is refused."""
+    """A flow enum value as the contract parser takes it: its name or int32
+    number as sent, or the number of the ``LifecycleFlowSummary`` label (such
+    as ``"withdraw"``, ``"-1"`` or ``"unknown_reason_-1"``) or prefixed name it
+    is. A name newer than this SDK parses as 0 and records its label, the name
+    without the enum's prefix, lowercased; any other text is refused."""
     if not isinstance(value, str):
         return value
     text = value.strip()
     enum_type = field.enum_type
     if text in enum_type.values_by_name:
         return text
-    if text.isascii() and text.isdigit():
-        return int(text)
     if not text:
         return 0
-    unknown = _UNKNOWN_LABEL.match(text)
-    if unknown:
-        return int(unknown.group(1))
-    prefix = enum_type.values_by_number[0].name.removesuffix("UNSPECIFIED")
     label_of = FLOW_ENUM_LABELS[enum_type.full_name]
+    if _ENUM_NUMBER.fullmatch(text):
+        number = int(text)
+        if _INT32_MIN <= number <= _INT32_MAX:
+            return number
+        raise _not_an_enum_value(field, value)
+    unknown = _UNKNOWN_LABEL.fullmatch(text)
+    if unknown:
+        number = int(unknown.group(1))
+        if _INT32_MIN <= number <= _INT32_MAX and label_of(number) == text:
+            return number
+        raise _not_an_enum_value(field, value)
+    prefix = enum_type.values_by_number[0].name.removesuffix("UNSPECIFIED")
     labels = {_enum_name(text), text.lower(), text.removeprefix(prefix).lower()}
     for candidate in enum_type.values:
         if label_of(candidate.number) in labels:
@@ -489,8 +499,13 @@ def _flow_enum_json(
     if _ENUM_VALUE_NAME.match(text):
         newer[path] = text.removeprefix(prefix).lower()
         return 0
-    raise PolyesterResponseContractError(
-        "FlowSummaryView", f"{field.name} is not a {enum_type.name}: {value!r}"
+    raise _not_an_enum_value(field, value)
+
+
+def _not_an_enum_value(field: Any, value: str) -> PolyesterResponseContractError:
+    shown = value if len(value) <= 64 else f"{value[:64]}..."
+    return PolyesterResponseContractError(
+        "FlowSummaryView", f"{field.name} is not a {field.enum_type.name}: {shown!r}"
     )
 
 
@@ -507,6 +522,13 @@ def _flow_json_enums(
         field = fields.get(key)
         if field is None:
             continue
+        if field.name in out:
+            # Two spellings (field name and JSON name) of one field: refused,
+            # never one of them chosen.
+            raise PolyesterResponseContractError(
+                "FlowSummaryView",
+                f"{field.name} is sent twice, as {field.name} and {field.json_name}",
+            )
         here = (*path, field.name)
         if field.enum_type is not None and field.enum_type.full_name in FLOW_ENUM_LABELS:
             value = _flow_enum_json(field, value, here, newer)

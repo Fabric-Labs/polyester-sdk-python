@@ -34,6 +34,9 @@ class MarketDataService(Protocol):
     async def get_spot_config(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_price_band(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class MarketDataServiceASGIApplication(ConnectASGIApplication[MarketDataService]):
     def __init__(self, service: MarketDataService | AsyncGenerator[MarketDataService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -89,6 +92,16 @@ class MarketDataServiceASGIApplication(ConnectASGIApplication[MarketDataService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_spot_config,
+                ),
+                "/marketdata.v1.MarketDataService/GetPriceBand": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetPriceBand",
+                        service_name="marketdata.v1.MarketDataService",
+                        input=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest,
+                        output=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_price_band,
                 ),
             },
             interceptors=interceptors,
@@ -206,6 +219,26 @@ class MarketDataServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_price_band(
+        self,
+        request: marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPriceBand",
+                service_name="marketdata.v1.MarketDataService",
+                input=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest,
+                output=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -220,6 +253,8 @@ class MarketDataServiceSync(Protocol):
     def get_candles_columns(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_spot_config(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_price_band(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -276,6 +311,16 @@ class MarketDataServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_spot_config,
+                ),
+                "/marketdata.v1.MarketDataService/GetPriceBand": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetPriceBand",
+                        service_name="marketdata.v1.MarketDataService",
+                        input=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest,
+                        output=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_price_band,
                 ),
             },
             interceptors=interceptors,
@@ -387,6 +432,26 @@ class MarketDataServiceClientSync(ConnectClientSync):
                 service_name="marketdata.v1.MarketDataService",
                 input=marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigRequest,
                 output=marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_price_band(
+        self,
+        request: marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetPriceBand",
+                service_name="marketdata.v1.MarketDataService",
+                input=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest,
+                output=marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

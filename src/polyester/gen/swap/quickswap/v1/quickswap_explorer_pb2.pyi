@@ -5,7 +5,6 @@ from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.swap.quickswap.v1 import quickswap_pb2 as _quickswap_pb2
-from polyester.gen.swap.quickswap.v1 import quickswap_broker_pb2 as _quickswap_broker_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -64,7 +63,7 @@ class ExplorerWithdrawal(_message.Message):
     def __init__(self, tx_hash: _Optional[str] = ..., address: _Optional[str] = ...) -> None: ...
 
 class ExplorerQuickSwap(_message.Message):
-    __slots__ = ("swap_id", "completed_at", "source_zipped_asset_id", "destination_zipped_asset_id", "source_amount", "destination_amount", "legs", "deposits", "withdrawals")
+    __slots__ = ("swap_id", "completed_at", "source_zipped_asset_id", "destination_zipped_asset_id", "source_amount", "destination_amount", "legs", "deposits", "withdrawals", "source_value_usd", "destination_value_usd")
     SWAP_ID_FIELD_NUMBER: _ClassVar[int]
     COMPLETED_AT_FIELD_NUMBER: _ClassVar[int]
     SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
@@ -74,6 +73,8 @@ class ExplorerQuickSwap(_message.Message):
     LEGS_FIELD_NUMBER: _ClassVar[int]
     DEPOSITS_FIELD_NUMBER: _ClassVar[int]
     WITHDRAWALS_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
     swap_id: int
     completed_at: _timestamp_pb2.Timestamp
     source_zipped_asset_id: int
@@ -83,19 +84,29 @@ class ExplorerQuickSwap(_message.Message):
     legs: _containers.RepeatedCompositeFieldContainer[ExplorerRouteLeg]
     deposits: _containers.RepeatedCompositeFieldContainer[ExplorerDeposit]
     withdrawals: _containers.RepeatedCompositeFieldContainer[ExplorerWithdrawal]
-    def __init__(self, swap_id: _Optional[int] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., source_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[ExplorerRouteLeg, _Mapping]]] = ..., deposits: _Optional[_Iterable[_Union[ExplorerDeposit, _Mapping]]] = ..., withdrawals: _Optional[_Iterable[_Union[ExplorerWithdrawal, _Mapping]]] = ...) -> None: ...
+    source_value_usd: _quickswap_pb2.TokenAmount
+    destination_value_usd: _quickswap_pb2.TokenAmount
+    def __init__(self, swap_id: _Optional[int] = ..., completed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., source_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[ExplorerRouteLeg, _Mapping]]] = ..., deposits: _Optional[_Iterable[_Union[ExplorerDeposit, _Mapping]]] = ..., withdrawals: _Optional[_Iterable[_Union[ExplorerWithdrawal, _Mapping]]] = ..., source_value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
 
 class ListCompletedQuickSwapsRequest(_message.Message):
-    __slots__ = ("source_zipped_asset_id", "destination_zipped_asset_id", "limit", "page_token")
-    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("source_zipped_asset_ids", "destination_zipped_asset_ids", "limit", "page_token", "source_asset_ids", "destination_asset_ids", "min_source_value_usd", "max_source_value_usd")
+    SOURCE_ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
-    source_zipped_asset_id: int
-    destination_zipped_asset_id: int
+    SOURCE_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    MIN_SOURCE_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    MAX_SOURCE_VALUE_USD_FIELD_NUMBER: _ClassVar[int]
+    source_zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    destination_zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
     limit: int
     page_token: str
-    def __init__(self, source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+    source_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    destination_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    min_source_value_usd: str
+    max_source_value_usd: str
+    def __init__(self, source_zipped_asset_ids: _Optional[_Iterable[int]] = ..., destination_zipped_asset_ids: _Optional[_Iterable[int]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., source_asset_ids: _Optional[_Iterable[int]] = ..., destination_asset_ids: _Optional[_Iterable[int]] = ..., min_source_value_usd: _Optional[str] = ..., max_source_value_usd: _Optional[str] = ...) -> None: ...
 
 class ListCompletedQuickSwapsResponse(_message.Message):
     __slots__ = ("quick_swaps", "next_page_token")
@@ -105,61 +116,77 @@ class ListCompletedQuickSwapsResponse(_message.Message):
     next_page_token: str
     def __init__(self, quick_swaps: _Optional[_Iterable[_Union[ExplorerQuickSwap, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
-class ZippedAssetVolume(_message.Message):
-    __slots__ = ("zipped_asset_id", "amount")
-    ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    AMOUNT_FIELD_NUMBER: _ClassVar[int]
-    zipped_asset_id: int
-    amount: _quickswap_pb2.TokenAmount
-    def __init__(self, zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
+class GetCompletedQuickSwapRequest(_message.Message):
+    __slots__ = ("swap_id",)
+    SWAP_ID_FIELD_NUMBER: _ClassVar[int]
+    swap_id: int
+    def __init__(self, swap_id: _Optional[int] = ...) -> None: ...
+
+class GetCompletedQuickSwapResponse(_message.Message):
+    __slots__ = ("quick_swap",)
+    QUICK_SWAP_FIELD_NUMBER: _ClassVar[int]
+    quick_swap: ExplorerQuickSwap
+    def __init__(self, quick_swap: _Optional[_Union[ExplorerQuickSwap, _Mapping]] = ...) -> None: ...
 
 class QuickSwapStatsTotals(_message.Message):
-    __slots__ = ("swap_count", "source_volume", "destination_volume", "fees", "source_volume_usd", "destination_volume_usd", "fees_usd", "unvalued_count")
+    __slots__ = ("swap_count", "unvalued_count", "source_volume_usd", "destination_volume_usd", "fees_usd", "source_volume", "destination_volume", "fees", "fees_usd_by_asset", "fees_unvalued_count")
     SWAP_COUNT_FIELD_NUMBER: _ClassVar[int]
-    SOURCE_VOLUME_FIELD_NUMBER: _ClassVar[int]
-    DESTINATION_VOLUME_FIELD_NUMBER: _ClassVar[int]
-    FEES_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
     SOURCE_VOLUME_USD_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_VOLUME_USD_FIELD_NUMBER: _ClassVar[int]
     FEES_USD_FIELD_NUMBER: _ClassVar[int]
-    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_VOLUME_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_VOLUME_FIELD_NUMBER: _ClassVar[int]
+    FEES_FIELD_NUMBER: _ClassVar[int]
+    FEES_USD_BY_ASSET_FIELD_NUMBER: _ClassVar[int]
+    FEES_UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
     swap_count: int
-    source_volume: _containers.RepeatedCompositeFieldContainer[ZippedAssetVolume]
-    destination_volume: _containers.RepeatedCompositeFieldContainer[ZippedAssetVolume]
-    fees: _containers.RepeatedCompositeFieldContainer[_quickswap_broker_pb2.AssetVolume]
-    source_volume_usd: _quickswap_pb2.TokenAmount
-    destination_volume_usd: _quickswap_pb2.TokenAmount
-    fees_usd: _quickswap_pb2.TokenAmount
     unvalued_count: int
-    def __init__(self, swap_count: _Optional[int] = ..., source_volume: _Optional[_Iterable[_Union[ZippedAssetVolume, _Mapping]]] = ..., destination_volume: _Optional[_Iterable[_Union[ZippedAssetVolume, _Mapping]]] = ..., fees: _Optional[_Iterable[_Union[_quickswap_broker_pb2.AssetVolume, _Mapping]]] = ..., source_volume_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_volume_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., fees_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unvalued_count: _Optional[int] = ...) -> None: ...
+    source_volume_usd: str
+    destination_volume_usd: str
+    fees_usd: str
+    source_volume: _containers.RepeatedScalarFieldContainer[str]
+    destination_volume: _containers.RepeatedScalarFieldContainer[str]
+    fees: _containers.RepeatedScalarFieldContainer[str]
+    fees_usd_by_asset: _containers.RepeatedScalarFieldContainer[str]
+    fees_unvalued_count: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, swap_count: _Optional[int] = ..., unvalued_count: _Optional[int] = ..., source_volume_usd: _Optional[str] = ..., destination_volume_usd: _Optional[str] = ..., fees_usd: _Optional[str] = ..., source_volume: _Optional[_Iterable[str]] = ..., destination_volume: _Optional[_Iterable[str]] = ..., fees: _Optional[_Iterable[str]] = ..., fees_usd_by_asset: _Optional[_Iterable[str]] = ..., fees_unvalued_count: _Optional[_Iterable[int]] = ...) -> None: ...
 
-class QuickSwapStatsBucket(_message.Message):
-    __slots__ = ("start_time", "totals")
-    START_TIME_FIELD_NUMBER: _ClassVar[int]
-    TOTALS_FIELD_NUMBER: _ClassVar[int]
-    start_time: _timestamp_pb2.Timestamp
-    totals: QuickSwapStatsTotals
-    def __init__(self, start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., totals: _Optional[_Union[QuickSwapStatsTotals, _Mapping]] = ...) -> None: ...
-
-class QuickSwapRouteStats(_message.Message):
-    __slots__ = ("source_zipped_asset_id", "destination_zipped_asset_id", "swap_count", "source_volume", "destination_volume", "source_volume_usd", "destination_volume_usd", "unvalued_count")
-    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
-    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+class QuickSwapStatsBuckets(_message.Message):
+    __slots__ = ("swap_count", "unvalued_count", "source_volume_usd", "destination_volume_usd", "fees_usd", "fees_unvalued_count")
     SWAP_COUNT_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_VOLUME_USD_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_VOLUME_USD_FIELD_NUMBER: _ClassVar[int]
+    FEES_USD_FIELD_NUMBER: _ClassVar[int]
+    FEES_UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    swap_count: _containers.RepeatedScalarFieldContainer[int]
+    unvalued_count: _containers.RepeatedScalarFieldContainer[int]
+    source_volume_usd: _containers.RepeatedScalarFieldContainer[str]
+    destination_volume_usd: _containers.RepeatedScalarFieldContainer[str]
+    fees_usd: _containers.RepeatedScalarFieldContainer[str]
+    fees_unvalued_count: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, swap_count: _Optional[_Iterable[int]] = ..., unvalued_count: _Optional[_Iterable[int]] = ..., source_volume_usd: _Optional[_Iterable[str]] = ..., destination_volume_usd: _Optional[_Iterable[str]] = ..., fees_usd: _Optional[_Iterable[str]] = ..., fees_unvalued_count: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class QuickSwapStatsRoutes(_message.Message):
+    __slots__ = ("source_zipped_asset_ids", "destination_zipped_asset_ids", "swap_count", "unvalued_count", "source_volume", "destination_volume", "source_volume_usd", "destination_volume_usd")
+    SOURCE_ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    SWAP_COUNT_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
     SOURCE_VOLUME_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_VOLUME_FIELD_NUMBER: _ClassVar[int]
     SOURCE_VOLUME_USD_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_VOLUME_USD_FIELD_NUMBER: _ClassVar[int]
-    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
-    source_zipped_asset_id: int
-    destination_zipped_asset_id: int
-    swap_count: int
-    source_volume: _quickswap_pb2.TokenAmount
-    destination_volume: _quickswap_pb2.TokenAmount
-    source_volume_usd: _quickswap_pb2.TokenAmount
-    destination_volume_usd: _quickswap_pb2.TokenAmount
-    unvalued_count: int
-    def __init__(self, source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., swap_count: _Optional[int] = ..., source_volume: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_volume: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., source_volume_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., destination_volume_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unvalued_count: _Optional[int] = ...) -> None: ...
+    source_zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    destination_zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    swap_count: _containers.RepeatedScalarFieldContainer[int]
+    unvalued_count: _containers.RepeatedScalarFieldContainer[int]
+    source_volume: _containers.RepeatedScalarFieldContainer[str]
+    destination_volume: _containers.RepeatedScalarFieldContainer[str]
+    source_volume_usd: _containers.RepeatedScalarFieldContainer[str]
+    destination_volume_usd: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, source_zipped_asset_ids: _Optional[_Iterable[int]] = ..., destination_zipped_asset_ids: _Optional[_Iterable[int]] = ..., swap_count: _Optional[_Iterable[int]] = ..., unvalued_count: _Optional[_Iterable[int]] = ..., source_volume: _Optional[_Iterable[str]] = ..., destination_volume: _Optional[_Iterable[str]] = ..., source_volume_usd: _Optional[_Iterable[str]] = ..., destination_volume_usd: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class GetQuickSwapStatsRequest(_message.Message):
     __slots__ = ("window",)
@@ -168,11 +195,14 @@ class GetQuickSwapStatsRequest(_message.Message):
     def __init__(self, window: _Optional[_Union[QuickSwapStatsWindow, str]] = ...) -> None: ...
 
 class GetQuickSwapStatsResponse(_message.Message):
-    __slots__ = ("window", "start_time", "end_time", "bucket_size", "totals", "previous_totals", "buckets", "routes", "as_of")
+    __slots__ = ("window", "start_time", "end_time", "bucket_size", "zipped_asset_ids", "zipped_asset_decimals", "fee_asset_ids", "totals", "previous_totals", "buckets", "routes", "as_of")
     WINDOW_FIELD_NUMBER: _ClassVar[int]
     START_TIME_FIELD_NUMBER: _ClassVar[int]
     END_TIME_FIELD_NUMBER: _ClassVar[int]
     BUCKET_SIZE_FIELD_NUMBER: _ClassVar[int]
+    ZIPPED_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    ZIPPED_ASSET_DECIMALS_FIELD_NUMBER: _ClassVar[int]
+    FEE_ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
     TOTALS_FIELD_NUMBER: _ClassVar[int]
     PREVIOUS_TOTALS_FIELD_NUMBER: _ClassVar[int]
     BUCKETS_FIELD_NUMBER: _ClassVar[int]
@@ -182,9 +212,12 @@ class GetQuickSwapStatsResponse(_message.Message):
     start_time: _timestamp_pb2.Timestamp
     end_time: _timestamp_pb2.Timestamp
     bucket_size: QuickSwapStatsBucketSize
+    zipped_asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    zipped_asset_decimals: _containers.RepeatedScalarFieldContainer[int]
+    fee_asset_ids: _containers.RepeatedScalarFieldContainer[int]
     totals: QuickSwapStatsTotals
     previous_totals: QuickSwapStatsTotals
-    buckets: _containers.RepeatedCompositeFieldContainer[QuickSwapStatsBucket]
-    routes: _containers.RepeatedCompositeFieldContainer[QuickSwapRouteStats]
+    buckets: QuickSwapStatsBuckets
+    routes: QuickSwapStatsRoutes
     as_of: _timestamp_pb2.Timestamp
-    def __init__(self, window: _Optional[_Union[QuickSwapStatsWindow, str]] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bucket_size: _Optional[_Union[QuickSwapStatsBucketSize, str]] = ..., totals: _Optional[_Union[QuickSwapStatsTotals, _Mapping]] = ..., previous_totals: _Optional[_Union[QuickSwapStatsTotals, _Mapping]] = ..., buckets: _Optional[_Iterable[_Union[QuickSwapStatsBucket, _Mapping]]] = ..., routes: _Optional[_Iterable[_Union[QuickSwapRouteStats, _Mapping]]] = ..., as_of: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, window: _Optional[_Union[QuickSwapStatsWindow, str]] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bucket_size: _Optional[_Union[QuickSwapStatsBucketSize, str]] = ..., zipped_asset_ids: _Optional[_Iterable[int]] = ..., zipped_asset_decimals: _Optional[_Iterable[int]] = ..., fee_asset_ids: _Optional[_Iterable[int]] = ..., totals: _Optional[_Union[QuickSwapStatsTotals, _Mapping]] = ..., previous_totals: _Optional[_Union[QuickSwapStatsTotals, _Mapping]] = ..., buckets: _Optional[_Union[QuickSwapStatsBuckets, _Mapping]] = ..., routes: _Optional[_Union[QuickSwapStatsRoutes, _Mapping]] = ..., as_of: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...

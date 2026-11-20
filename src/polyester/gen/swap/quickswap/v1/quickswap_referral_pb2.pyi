@@ -5,6 +5,7 @@ from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.swap.quickswap.v1 import quickswap_pb2 as _quickswap_pb2
+from polyester.gen.swap.quickswap.v1 import quickswap_broker_pb2 as _quickswap_broker_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -252,3 +253,23 @@ class GetReferredQuickSwapResponse(_message.Message):
     quick_swap: ReferredQuickSwap
     breakdown: ReferralBreakdown
     def __init__(self, quick_swap: _Optional[_Union[ReferredQuickSwap, _Mapping]] = ..., breakdown: _Optional[_Union[ReferralBreakdown, _Mapping]] = ...) -> None: ...
+
+class ListReferralLedgerRequest(_message.Message):
+    __slots__ = ("start_time", "end_time", "limit", "page_token")
+    START_TIME_FIELD_NUMBER: _ClassVar[int]
+    END_TIME_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    start_time: _timestamp_pb2.Timestamp
+    end_time: _timestamp_pb2.Timestamp
+    limit: int
+    page_token: str
+    def __init__(self, start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListReferralLedgerResponse(_message.Message):
+    __slots__ = ("entries", "next_page_token")
+    ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    entries: _containers.RepeatedCompositeFieldContainer[_quickswap_broker_pb2.VaultLedgerEntry]
+    next_page_token: str
+    def __init__(self, entries: _Optional[_Iterable[_Union[_quickswap_broker_pb2.VaultLedgerEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...

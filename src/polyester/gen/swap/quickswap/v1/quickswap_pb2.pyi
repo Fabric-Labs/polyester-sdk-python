@@ -432,7 +432,7 @@ class DepositInstructions(_message.Message):
     def __init__(self, address: _Optional[str] = ..., memo: _Optional[str] = ..., zipped_asset_id: _Optional[int] = ..., issued_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., funding_expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., address_retires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., address_state: _Optional[_Union[DepositAddressState, str]] = ..., min_native_gas_limit: _Optional[int] = ...) -> None: ...
 
 class Deposit(_message.Message):
-    __slots__ = ("index", "tx_hash", "tx_occurrence_index", "zipped_asset_id", "amount", "disposition", "reason", "confirmations", "required_confirmations", "detected_at", "credited_at", "flow_id", "direct_return")
+    __slots__ = ("index", "tx_hash", "tx_occurrence_index", "zipped_asset_id", "amount", "disposition", "reason", "confirmations", "required_confirmations", "detected_at", "credited_at", "flow_id", "direct_return", "network_fee")
     INDEX_FIELD_NUMBER: _ClassVar[int]
     TX_HASH_FIELD_NUMBER: _ClassVar[int]
     TX_OCCURRENCE_INDEX_FIELD_NUMBER: _ClassVar[int]
@@ -446,6 +446,7 @@ class Deposit(_message.Message):
     CREDITED_AT_FIELD_NUMBER: _ClassVar[int]
     FLOW_ID_FIELD_NUMBER: _ClassVar[int]
     DIRECT_RETURN_FIELD_NUMBER: _ClassVar[int]
+    NETWORK_FEE_FIELD_NUMBER: _ClassVar[int]
     index: int
     tx_hash: str
     tx_occurrence_index: int
@@ -459,7 +460,8 @@ class Deposit(_message.Message):
     credited_at: _timestamp_pb2.Timestamp
     flow_id: str
     direct_return: DepositReturn
-    def __init__(self, index: _Optional[int] = ..., tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., disposition: _Optional[_Union[DepositDisposition, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., credited_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow_id: _Optional[str] = ..., direct_return: _Optional[_Union[DepositReturn, _Mapping]] = ...) -> None: ...
+    network_fee: TokenAmount
+    def __init__(self, index: _Optional[int] = ..., tx_hash: _Optional[str] = ..., tx_occurrence_index: _Optional[int] = ..., zipped_asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., disposition: _Optional[_Union[DepositDisposition, str]] = ..., reason: _Optional[_Union[QuickSwapReason, str]] = ..., confirmations: _Optional[int] = ..., required_confirmations: _Optional[int] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., credited_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow_id: _Optional[str] = ..., direct_return: _Optional[_Union[DepositReturn, _Mapping]] = ..., network_fee: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
 
 class DepositReturn(_message.Message):
     __slots__ = ("state", "tx_hash", "updated_at")

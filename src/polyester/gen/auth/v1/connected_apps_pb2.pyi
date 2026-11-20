@@ -20,7 +20,7 @@ class ConnectedAppClient(_message.Message):
     name: str
     def __init__(self, client_id: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
 
-class AppAuthorization(_message.Message):
+class AppConnectionRequest(_message.Message):
     __slots__ = ("client", "scopes", "resource", "redirect_host", "expires_at")
     CLIENT_FIELD_NUMBER: _ClassVar[int]
     SCOPES_FIELD_NUMBER: _ClassVar[int]
@@ -52,37 +52,37 @@ class ConnectedApp(_message.Message):
     expires_at: _timestamp_pb2.Timestamp
     def __init__(self, connected_app_id: _Optional[int] = ..., client: _Optional[_Union[ConnectedAppClient, _Mapping]] = ..., scopes: _Optional[_Iterable[str]] = ..., resource: _Optional[str] = ..., connected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_used_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
-class GetAppAuthorizationRequest(_message.Message):
+class GetAppConnectionRequestRequest(_message.Message):
     __slots__ = ("request_id",)
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     def __init__(self, request_id: _Optional[str] = ...) -> None: ...
 
-class GetAppAuthorizationResponse(_message.Message):
-    __slots__ = ("authorization",)
-    AUTHORIZATION_FIELD_NUMBER: _ClassVar[int]
-    authorization: AppAuthorization
-    def __init__(self, authorization: _Optional[_Union[AppAuthorization, _Mapping]] = ...) -> None: ...
+class GetAppConnectionRequestResponse(_message.Message):
+    __slots__ = ("connection_request",)
+    CONNECTION_REQUEST_FIELD_NUMBER: _ClassVar[int]
+    connection_request: AppConnectionRequest
+    def __init__(self, connection_request: _Optional[_Union[AppConnectionRequest, _Mapping]] = ...) -> None: ...
 
-class ApproveAppAuthorizationRequest(_message.Message):
+class ApproveAppConnectionRequestRequest(_message.Message):
     __slots__ = ("request_id",)
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     def __init__(self, request_id: _Optional[str] = ...) -> None: ...
 
-class ApproveAppAuthorizationResponse(_message.Message):
+class ApproveAppConnectionRequestResponse(_message.Message):
     __slots__ = ("redirect_url",)
     REDIRECT_URL_FIELD_NUMBER: _ClassVar[int]
     redirect_url: str
     def __init__(self, redirect_url: _Optional[str] = ...) -> None: ...
 
-class DenyAppAuthorizationRequest(_message.Message):
+class DenyAppConnectionRequestRequest(_message.Message):
     __slots__ = ("request_id",)
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     def __init__(self, request_id: _Optional[str] = ...) -> None: ...
 
-class DenyAppAuthorizationResponse(_message.Message):
+class DenyAppConnectionRequestResponse(_message.Message):
     __slots__ = ("redirect_url",)
     REDIRECT_URL_FIELD_NUMBER: _ClassVar[int]
     redirect_url: str

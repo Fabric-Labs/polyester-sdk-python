@@ -48,6 +48,21 @@ class PairStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PAIR_STATUS_POST_ONLY: _ClassVar[PairStatus]
     PAIR_STATUS_REDUCE_ONLY: _ClassVar[PairStatus]
     PAIR_STATUS_HALTED: _ClassVar[PairStatus]
+
+class PriceBandState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BAND_STATE_UNSPECIFIED: _ClassVar[PriceBandState]
+    ACTIVE: _ClassVar[PriceBandState]
+    OFF: _ClassVar[PriceBandState]
+    EMPTY: _ClassVar[PriceBandState]
+    UNKNOWN: _ClassVar[PriceBandState]
+
+class PriceBandReferenceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    REFERENCE_SOURCE_UNSPECIFIED: _ClassVar[PriceBandReferenceSource]
+    LAST_TRADE: _ClassVar[PriceBandReferenceSource]
+    LISTING_REFERENCE: _ClassVar[PriceBandReferenceSource]
+    INDEX_PRICE: _ClassVar[PriceBandReferenceSource]
 SIDE_UNSPECIFIED: SideFilter
 BUY: SideFilter
 SELL: SideFilter
@@ -75,6 +90,15 @@ PAIR_STATUS_CANCEL_ONLY: PairStatus
 PAIR_STATUS_POST_ONLY: PairStatus
 PAIR_STATUS_REDUCE_ONLY: PairStatus
 PAIR_STATUS_HALTED: PairStatus
+BAND_STATE_UNSPECIFIED: PriceBandState
+ACTIVE: PriceBandState
+OFF: PriceBandState
+EMPTY: PriceBandState
+UNKNOWN: PriceBandState
+REFERENCE_SOURCE_UNSPECIFIED: PriceBandReferenceSource
+LAST_TRADE: PriceBandReferenceSource
+LISTING_REFERENCE: PriceBandReferenceSource
+INDEX_PRICE: PriceBandReferenceSource
 
 class GetTradesRequest(_message.Message):
     __slots__ = ("symbol_id", "limit", "start_time", "end_time", "side", "page_token", "after_trade_id")
@@ -373,3 +397,51 @@ class GetSpotConfigResponse(_message.Message):
     ts_sec: int
     max_open_orders_total: int
     def __init__(self, assets: _Optional[_Iterable[_Union[AssetConfig, _Mapping]]] = ..., pairs: _Optional[_Iterable[_Union[PairConfig, _Mapping]]] = ..., ts_sec: _Optional[int] = ..., max_open_orders_total: _Optional[int] = ...) -> None: ...
+
+class LivePriceBand(_message.Message):
+    __slots__ = ("symbol_id", "state", "reference_price_ticks", "reference_source", "max_buy_price_ticks", "min_sell_price_ticks", "min_buy_price_ticks", "max_sell_price_ticks", "updated_ts_ns", "reanchor_eligible_ts_ns", "reanchor_pending", "parameters", "epoch", "update_id", "as_of_ts_ns", "valid_until_ts_ns")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    REFERENCE_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    REFERENCE_SOURCE_FIELD_NUMBER: _ClassVar[int]
+    MAX_BUY_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MIN_SELL_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MIN_BUY_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MAX_SELL_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    REANCHOR_ELIGIBLE_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    REANCHOR_PENDING_FIELD_NUMBER: _ClassVar[int]
+    PARAMETERS_FIELD_NUMBER: _ClassVar[int]
+    EPOCH_FIELD_NUMBER: _ClassVar[int]
+    UPDATE_ID_FIELD_NUMBER: _ClassVar[int]
+    AS_OF_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    VALID_UNTIL_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: int
+    state: PriceBandState
+    reference_price_ticks: int
+    reference_source: PriceBandReferenceSource
+    max_buy_price_ticks: int
+    min_sell_price_ticks: int
+    min_buy_price_ticks: int
+    max_sell_price_ticks: int
+    updated_ts_ns: int
+    reanchor_eligible_ts_ns: int
+    reanchor_pending: bool
+    parameters: PriceBand
+    epoch: int
+    update_id: int
+    as_of_ts_ns: int
+    valid_until_ts_ns: int
+    def __init__(self, symbol_id: _Optional[int] = ..., state: _Optional[_Union[PriceBandState, str]] = ..., reference_price_ticks: _Optional[int] = ..., reference_source: _Optional[_Union[PriceBandReferenceSource, str]] = ..., max_buy_price_ticks: _Optional[int] = ..., min_sell_price_ticks: _Optional[int] = ..., min_buy_price_ticks: _Optional[int] = ..., max_sell_price_ticks: _Optional[int] = ..., updated_ts_ns: _Optional[int] = ..., reanchor_eligible_ts_ns: _Optional[int] = ..., reanchor_pending: _Optional[bool] = ..., parameters: _Optional[_Union[PriceBand, _Mapping]] = ..., epoch: _Optional[int] = ..., update_id: _Optional[int] = ..., as_of_ts_ns: _Optional[int] = ..., valid_until_ts_ns: _Optional[int] = ...) -> None: ...
+
+class GetPriceBandRequest(_message.Message):
+    __slots__ = ("symbol_id",)
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: int
+    def __init__(self, symbol_id: _Optional[int] = ...) -> None: ...
+
+class GetPriceBandResponse(_message.Message):
+    __slots__ = ("band",)
+    BAND_FIELD_NUMBER: _ClassVar[int]
+    band: LivePriceBand
+    def __init__(self, band: _Optional[_Union[LivePriceBand, _Mapping]] = ...) -> None: ...

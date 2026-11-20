@@ -264,6 +264,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_INVALID_PEG: _ClassVar[ErrorCode]
     ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE: _ClassVar[ErrorCode]
     ERROR_CODE_CLIENT_LIST_ID_INVALID: _ClassVar[ErrorCode]
+    ERROR_CODE_MODIFY_APPLY_EXPIRED: _ClassVar[ErrorCode]
 
 class TriggerPriceSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -532,6 +533,7 @@ ERROR_CODE_PEG_REFERENCE_UNAVAILABLE: ErrorCode
 ERROR_CODE_INVALID_PEG: ErrorCode
 ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE: ErrorCode
 ERROR_CODE_CLIENT_LIST_ID_INVALID: ErrorCode
+ERROR_CODE_MODIFY_APPLY_EXPIRED: ErrorCode
 TRIGGER_PRICE_SOURCE_UNSPECIFIED: TriggerPriceSource
 LAST_PRICE: TriggerPriceSource
 INDEX_PRICE: TriggerPriceSource

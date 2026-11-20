@@ -113,6 +113,7 @@ class FundingMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FUNDING_UNSPECIFIED: _ClassVar[FundingMode]
     CREDITS: _ClassVar[FundingMode]
     OWN_KEY: _ClassVar[FundingMode]
+    SPONSORED: _ClassVar[FundingMode]
 
 class DisplaySetting(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -238,6 +239,7 @@ KEY_MODEL_UNAVAILABLE: ModelKeyCheck
 FUNDING_UNSPECIFIED: FundingMode
 CREDITS: FundingMode
 OWN_KEY: FundingMode
+SPONSORED: FundingMode
 SETTING_UNSPECIFIED: DisplaySetting
 APPEARANCE: DisplaySetting
 LANGUAGE: DisplaySetting
@@ -487,26 +489,30 @@ class DiscardPartial(_message.Message):
     def __init__(self, from_seq: _Optional[int] = ...) -> None: ...
 
 class ToolStarted(_message.Message):
-    __slots__ = ("tool_call_id", "name", "input")
+    __slots__ = ("tool_call_id", "name", "input", "subagent_id")
     TOOL_CALL_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     INPUT_FIELD_NUMBER: _ClassVar[int]
+    SUBAGENT_ID_FIELD_NUMBER: _ClassVar[int]
     tool_call_id: str
     name: str
     input: _struct_pb2.Struct
-    def __init__(self, tool_call_id: _Optional[str] = ..., name: _Optional[str] = ..., input: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ...) -> None: ...
+    subagent_id: str
+    def __init__(self, tool_call_id: _Optional[str] = ..., name: _Optional[str] = ..., input: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., subagent_id: _Optional[str] = ...) -> None: ...
 
 class ToolFinished(_message.Message):
-    __slots__ = ("tool_call_id", "name", "ok", "error_message")
+    __slots__ = ("tool_call_id", "name", "ok", "error_message", "subagent_id")
     TOOL_CALL_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     OK_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SUBAGENT_ID_FIELD_NUMBER: _ClassVar[int]
     tool_call_id: str
     name: str
     ok: bool
     error_message: str
-    def __init__(self, tool_call_id: _Optional[str] = ..., name: _Optional[str] = ..., ok: _Optional[bool] = ..., error_message: _Optional[str] = ...) -> None: ...
+    subagent_id: str
+    def __init__(self, tool_call_id: _Optional[str] = ..., name: _Optional[str] = ..., ok: _Optional[bool] = ..., error_message: _Optional[str] = ..., subagent_id: _Optional[str] = ...) -> None: ...
 
 class RecalledMemory(_message.Message):
     __slots__ = ("memory_id", "text", "kind")
@@ -551,24 +557,30 @@ class SkillLoaded(_message.Message):
     def __init__(self, name: _Optional[str] = ...) -> None: ...
 
 class SubagentStarted(_message.Message):
-    __slots__ = ("subagent_id", "name")
+    __slots__ = ("subagent_id", "name", "funding", "credit_cap")
     SUBAGENT_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
+    FUNDING_FIELD_NUMBER: _ClassVar[int]
+    CREDIT_CAP_FIELD_NUMBER: _ClassVar[int]
     subagent_id: str
     name: str
-    def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+    funding: FundingMode
+    credit_cap: int
+    def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ..., funding: _Optional[_Union[FundingMode, str]] = ..., credit_cap: _Optional[int] = ...) -> None: ...
 
 class SubagentFinished(_message.Message):
-    __slots__ = ("subagent_id", "name", "ok", "summary")
+    __slots__ = ("subagent_id", "name", "ok", "summary", "deploy_url")
     SUBAGENT_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     OK_FIELD_NUMBER: _ClassVar[int]
     SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    DEPLOY_URL_FIELD_NUMBER: _ClassVar[int]
     subagent_id: str
     name: str
     ok: bool
     summary: str
-    def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ..., ok: _Optional[bool] = ..., summary: _Optional[str] = ...) -> None: ...
+    deploy_url: str
+    def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ..., ok: _Optional[bool] = ..., summary: _Optional[str] = ..., deploy_url: _Optional[str] = ...) -> None: ...
 
 class ApprovalParameter(_message.Message):
     __slots__ = ("label", "value")

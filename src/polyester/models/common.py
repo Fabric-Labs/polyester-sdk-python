@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Required, TypedDict
 
@@ -40,6 +41,12 @@ class OrderbookData(msgspec.Struct, kw_only=True, omit_defaults=True):
     restart ``book_seq``. ``depth`` is the levels per side of the tier a
     snapshot was served at, or of a view. A snapshot is a frozen view at its
     own ``(book_epoch, book_seq)``: never apply stream deltas to it.
+
+    ``ts`` is the server's best-effort time for this view, an aware UTC
+    datetime exact to the microsecond: a snapshot's own time, or on a managed
+    subscription's view that of the latest snapshot or delta applied to the
+    book. ``None`` when the server sent none; it is never the local receipt
+    time. Order snapshots by ``(book_epoch, book_seq)``, not by ``ts``.
     """
 
     symbol: str
@@ -49,6 +56,7 @@ class OrderbookData(msgspec.Struct, kw_only=True, omit_defaults=True):
     asks: list[OrderbookLevel]
     available: bool = True
     book_epoch: str = ""
+    ts: datetime | None = None
 
 
 class ApiData(msgspec.Struct, kw_only=True, omit_defaults=True):

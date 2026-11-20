@@ -24,6 +24,7 @@ from polyester.codecs.decode.triggers import (
     scaled_trigger_from_proto,
     trigger_event_from_proto,
 )
+from polyester.codecs.proto_helpers import optional_timestamp
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterRealtimeError
 from polyester.models import ApiData, AssetBalance, LedgerTransfer, UserTrade
@@ -242,6 +243,7 @@ def decode_orderbook_delta_bytes(payload: bytes) -> OrderBookDeltaUpdate:
         reset=bool(msg.reset),
         bids=[(str(level.price_ticks), str(level.qty_scaled)) for level in msg.bids],
         asks=[(str(level.price_ticks), str(level.qty_scaled)) for level in msg.asks],
+        ts=optional_timestamp(msg, "ts"),
     )
 
 

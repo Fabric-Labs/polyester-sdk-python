@@ -1999,6 +1999,10 @@ newer whatever its `book_seq` and a new epoch may restart `book_seq`; keep the n
 and drop one of an older epoch. A snapshot is a frozen view at its own position: never
 apply stream deltas to it. A managed subscription's views carry `book_epoch` `""`,
 as the delta stream names no epoch.
+A snapshot's `ts` is the server's best-effort snapshot time, an aware UTC `datetime`
+exact to the microsecond, `None` when the server sends none (never the local receipt
+time). A raw delta's `ts`, and a managed view's `ts` (that of the latest snapshot or
+delta applied to the book), follow the same rule. Order snapshots by position, not `ts`.
 
 ```python
 from polyester.orderbook import compare_snapshots

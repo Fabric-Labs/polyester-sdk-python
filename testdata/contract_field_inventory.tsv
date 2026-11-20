@@ -191,7 +191,7 @@ orderbook.v1.GetOrderBookResponse.book_epoch	covered	OrderbookData.book_epoch
 orderbook.v1.GetOrderBookResponse.book_seq	covered	OrderbookData.book_seq
 orderbook.v1.GetOrderBookResponse.depth	covered	OrderbookData.depth (the tier served)
 orderbook.v1.GetOrderBookResponse.symbol_id	covered	OrderbookData.symbol (the symbol the caller passed)
-orderbook.v1.GetOrderBookResponse.ts	omitted	a best-effort snapshot time this contract did not change; order snapshots by (book_epoch, book_seq)
+orderbook.v1.GetOrderBookResponse.ts	covered	OrderbookData.ts (None when the response has none)
 orders.v1.ErrorDetail.cause_code	covered	PolyesterApiError.cause_code, PolyesterRateLimitError.cause_code
 orders.v1.ErrorDetail.code	covered	PolyesterApiError.code, PolyesterValidationError.code, PolyesterRateLimitError.code
 orders.v1.ErrorDetail.existing_order_id	covered	PolyesterApiError.existing_order_id

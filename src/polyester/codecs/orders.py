@@ -17,6 +17,8 @@ from polyester.codecs.bps import (
     validate_bps,
 )
 from polyester.codecs.correlation_id import (
+    REQUEST_ID_MAX_LEN,
+    check_correlation_id,
     optional_client_id,
     optional_request_id,
     required_client_id,
@@ -1535,6 +1537,20 @@ def modify_order_to_proto(
     return proto
 
 
+def cancel_all_orders_request_id(request_id: object) -> str:
+    """``orders.cancel_all``'s idempotency key, sent exactly as given.
+
+    One that is not 1 to 64 of ``[A-Za-z0-9._:/-]``, an empty or padded one
+    included, is refused, never trimmed or replaced, so a retry cannot become
+    a new cancel. Left out (``None``), one is generated.
+    """
+    if request_id is None:
+        return f"cancel-all-{uuid.uuid4().hex[:12]}"
+    if not isinstance(request_id, str):
+        raise PolyesterValidationError("request_id must be a string")
+    return check_correlation_id(request_id, "request_id", REQUEST_ID_MAX_LEN)
+
+
 def cancel_all_orders_to_proto(
     *,
     sub_account_id: str | int | None = None,
@@ -1545,8 +1561,14 @@ def cancel_all_orders_to_proto(
     request_id: str | None = None,
     include_triggers: bool = False,
 ) -> orders_pb2.CancelAllOrdersRequest:
+    """Encode a cancel-all of open orders.
+
+    ``symbol_ids`` are resolved pair IDs (empty matches every pair).
+    ``request_id`` is sent exactly as given (see
+    :func:`cancel_all_orders_request_id`); left out, one is generated.
+    """
     proto = orders_pb2.CancelAllOrdersRequest(
-        request_id=optional_request_id(request_id) or f"cancel-all-{uuid.uuid4().hex[:12]}",
+        request_id=cancel_all_orders_request_id(request_id),
         dry_run=dry_run,
         include_triggers=_include_triggers(include_triggers, "cancel_all"),
     )

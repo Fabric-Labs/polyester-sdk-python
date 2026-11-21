@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import time
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Unpack, overload
 
 import msgspec
@@ -28,6 +28,7 @@ from polyester.codecs.orders import (
     batch_create_orders_to_proto,
     batch_replace_orders_to_proto,
     cancel_all_after_to_proto,
+    cancel_all_orders_request_id,
     cancel_all_orders_to_proto,
     catalog_order_scales,
     create_order_to_proto,
@@ -39,7 +40,7 @@ from polyester.codecs.orders import (
     resolve_quote_quantity_scale,
     set_order_key,
 )
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, market_ids
 from polyester.errors import (
     PolyesterApiError,
     PolyesterBatchReplaceTimeoutError,
@@ -117,6 +118,57 @@ def _stop_all_already_ended(exc: Exception) -> bool:
 BATCH_REPLACE_STATUS_WINDOW_SECONDS = 60.0
 _BATCH_REPLACE_POLL_INITIAL = 0.05
 _BATCH_REPLACE_POLL_MAX = 0.5
+
+
+def _cancel_all_symbol(symbol: object) -> str | None:
+    """``orders.cancel_all``'s ``symbol`` as a pair name, or refused."""
+    if symbol is None:
+        return None
+    if not isinstance(symbol, str):
+        raise PolyesterValidationError(
+            f"orders.cancel_all symbol must be a pair name, not {type(symbol).__name__}"
+        )
+    if not symbol.strip():
+        raise PolyesterValidationError(
+            "orders.cancel_all symbol must not be blank; leave it out to match every pair"
+        )
+    return symbol
+
+
+def _cancel_all_symbols(symbols: object) -> list[str] | None:
+    """``orders.cancel_all``'s ``symbols`` as a list of pair names, or refused."""
+    if symbols is None:
+        return None
+    if isinstance(symbols, str | bytes | bytearray | memoryview | Mapping) or not isinstance(
+        symbols, Iterable
+    ):
+        raise PolyesterValidationError(
+            f"orders.cancel_all symbols must be a list of pair names, not {type(symbols).__name__}"
+        )
+    names = list(symbols)
+    for index, item in enumerate(names):
+        if not isinstance(item, str) or not item.strip():
+            raise PolyesterValidationError(
+                f"orders.cancel_all symbols[{index}] must not be blank; "
+                "leave symbols out to match every pair"
+            )
+    return names
+
+
+def _cancel_all_symbol_ids(values: object) -> list[int] | None:
+    """``orders.cancel_all``'s ``symbol_ids`` as pair IDs, or refused.
+
+    A str, raw bytes (``memoryview`` included) or mapping is refused, never
+    iterated, so ``b"\\x01"`` is not pair 1 and an empty buffer never widens
+    the cancel to every pair.
+    """
+    if values is None:
+        return None
+    if isinstance(values, memoryview):
+        raise PolyesterValidationError(
+            "orders.cancel_all symbol_ids must be a list of integer market IDs, not memoryview"
+        )
+    return market_ids(values, "orders.cancel_all symbol_ids")
 
 
 class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
@@ -606,21 +658,38 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         original outcome and covers nothing admitted since; send it with the
         same ``include_triggers``. The result confirms admission, not
         completion.
+
+        ``symbol``, ``symbols`` or ``symbol_ids`` select up to 100 pairs (none
+        matches every pair). A supplied symbol must name a pair: a blank
+        ``symbol``, or a blank entry in ``symbols``, raises
+        ``PolyesterValidationError`` instead of matching every pair; leave them
+        out to cancel on every pair. ``request_id`` is sent exactly as given:
+        one that is empty, padded or otherwise malformed is refused, never
+        replaced. Left out (``None``), the SDK generates one but does not
+        return it, so such a request cannot be retried safely; supply your own
+        whenever a retry may follow.
         """
-        if symbol or symbols:
+        # A malformed filter must never read as "every pair": a blank name, or
+        # a str, raw bytes or mapping where a list belongs, is refused before
+        # anything is sent or awaited. An empty list is a deliberate "every pair".
+        symbol = _cancel_all_symbol(symbol)
+        symbol_list = _cancel_all_symbols(symbols)
+        id_list = _cancel_all_symbol_ids(symbol_ids)
+        key = cancel_all_orders_request_id(request_id)
+        if symbol or symbol_list:
             await self._ensure_catalogs()
         proto_request = cancel_all_orders_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             symbol_ids=resolve_cancel_all_symbol_ids(
                 self._catalogs,
                 symbol=symbol,
-                symbols=symbols,
-                symbol_ids=symbol_ids,
+                symbols=symbol_list,
+                symbol_ids=id_list,
                 label="orders.cancel_all",
             ),
             side=side,
             dry_run=dry_run,
-            request_id=request_id,
+            request_id=key,
             include_triggers=include_triggers,
         )
         return await unary_auth_decoded(
@@ -663,10 +732,17 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         other reason is recorded in ``trigger_failures`` with its error (each
         listed leg of an OCO whose cancel failed); the other triggers are
         still canceled and the cancel-all still runs. An error from the
-        cancel-all itself is raised.
+        cancel-all itself is raised. A blank ``symbol``, or a ``request_id``
+        that :meth:`cancel_all` would refuse, is refused before anything is
+        listed or canceled.
         """
         if self._triggers is None:
             raise PolyesterValidationError("stop_all_trading needs the client's triggers service")
+        # The final cancel_all refuses a blank symbol or a request_id it would
+        # not send as given: refuse it here, before any trigger is canceled.
+        _cancel_all_symbol(symbol)
+        if request_id is not None:
+            cancel_all_orders_request_id(request_id)
         scope = self._resolve_sub_account_id(sub_account_id, account=account)
         # The resolved account, named explicitly so each step acts on it
         # whatever the client's default is: "main" for the main account.

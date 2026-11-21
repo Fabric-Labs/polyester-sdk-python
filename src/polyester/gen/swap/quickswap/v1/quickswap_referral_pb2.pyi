@@ -273,3 +273,29 @@ class ListReferralLedgerResponse(_message.Message):
     entries: _containers.RepeatedCompositeFieldContainer[_quickswap_broker_pb2.VaultLedgerEntry]
     next_page_token: str
     def __init__(self, entries: _Optional[_Iterable[_Union[_quickswap_broker_pb2.VaultLedgerEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class GetReferralStatsRequest(_message.Message):
+    __slots__ = ("group_by", "start_time", "end_time", "breakdown", "route", "source_zipped_asset_id", "destination_zipped_asset_id", "include_cells")
+    GROUP_BY_FIELD_NUMBER: _ClassVar[int]
+    START_TIME_FIELD_NUMBER: _ClassVar[int]
+    END_TIME_FIELD_NUMBER: _ClassVar[int]
+    BREAKDOWN_FIELD_NUMBER: _ClassVar[int]
+    ROUTE_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_CELLS_FIELD_NUMBER: _ClassVar[int]
+    group_by: _quickswap_broker_pb2.StatsPeriod
+    start_time: _timestamp_pb2.Timestamp
+    end_time: _timestamp_pb2.Timestamp
+    breakdown: _quickswap_broker_pb2.StatsBreakdown
+    route: _quickswap_broker_pb2.StatsRoute
+    source_zipped_asset_id: int
+    destination_zipped_asset_id: int
+    include_cells: bool
+    def __init__(self, group_by: _Optional[_Union[_quickswap_broker_pb2.StatsPeriod, str]] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., breakdown: _Optional[_Union[_quickswap_broker_pb2.StatsBreakdown, str]] = ..., route: _Optional[_Union[_quickswap_broker_pb2.StatsRoute, _Mapping]] = ..., source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., include_cells: _Optional[bool] = ...) -> None: ...
+
+class GetReferralStatsResponse(_message.Message):
+    __slots__ = ("stats",)
+    STATS_FIELD_NUMBER: _ClassVar[int]
+    stats: _quickswap_broker_pb2.GetBrokerStatsResponse
+    def __init__(self, stats: _Optional[_Union[_quickswap_broker_pb2.GetBrokerStatsResponse, _Mapping]] = ...) -> None: ...

@@ -7,7 +7,6 @@ import msgspec
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.api_keys import api_key_from_proto
-from polyester.codecs.decode.balances import asset_balance_from_proto
 from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
 from polyester.codecs.decode.market_data import candle_point_from_proto
 from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
@@ -27,7 +26,8 @@ from polyester.codecs.decode.triggers import (
 from polyester.codecs.proto_helpers import optional_timestamp
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterRealtimeError
-from polyester.models import ApiData, AssetBalance, LedgerTransfer, UserTrade
+from polyester.gen.ledger.read.v1 import ledger_read_pb2
+from polyester.models import ApiData, LedgerTransfer, UserTrade
 from polyester.models.auth import AccountIdentity
 from polyester.models.market import Candle, MarketOverviewList, MarketTrade
 from polyester.models.policies import ApiPolicy, SubaccountPolicy
@@ -73,10 +73,11 @@ def _decode_batch_members(
     return members
 
 
-def decode_asset_balance_bytes(payload: bytes) -> AssetBalance:
-    from polyester.gen.ledger.read.v1.ledger_read_pb2 import AssetBalance as AssetBalancePb
-
-    return asset_balance_from_proto(_parse_proto(payload, AssetBalancePb))
+def decode_balance_update_bytes(payload: bytes) -> ledger_read_pb2.BalanceUpdate:
+    """A balance stream publication as the generated message, as published:
+    field presence and unknown fields are kept, nothing is converted."""
+    message: ledger_read_pb2.BalanceUpdate = _parse_proto(payload, ledger_read_pb2.BalanceUpdate)
+    return message
 
 
 def decode_user_trade_bytes(payload: bytes) -> UserTrade:

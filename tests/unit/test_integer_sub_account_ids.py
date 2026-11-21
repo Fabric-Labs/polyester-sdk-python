@@ -79,7 +79,7 @@ def test_int_account_id_keeps_its_value(value: int) -> None:
 async def test_balances_list_sends_the_int_sub_account(value: int) -> None:
     capture = CaptureUnary(ledger_read_pb2.GetBalancesResponse())
     service = AsyncBalancesService(MagicMock())
-    with patch("polyester.services.balances.unary_auth_decoded", capture):
+    with patch("polyester.services.balances.unary_auth_decoded_retry_unavailable", capture):
         await service.list(sub_account_id=value)
         assert capture.request.subaccount_id == value
         await service.list(account={"subaccountId": value})
@@ -126,7 +126,7 @@ async def test_balances_list_refuses_sub_account_zero(scope: dict) -> None:
     capture = CaptureUnary(ledger_read_pb2.GetBalancesResponse())
     service = AsyncBalancesService(MagicMock(), default_sub_account_id="ignored")
     with (
-        patch("polyester.services.balances.unary_auth_decoded", capture),
+        patch("polyester.services.balances.unary_auth_decoded_retry_unavailable", capture),
         pytest.raises(PolyesterValidationError, match=ZERO),
     ):
         await service.list(**scope)

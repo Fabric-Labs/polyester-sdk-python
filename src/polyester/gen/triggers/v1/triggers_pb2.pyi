@@ -715,6 +715,42 @@ class BatchCancelTriggersResponse(_message.Message):
     ts_ns: int
     def __init__(self, results: _Optional[_Iterable[_Union[BatchCancelTriggersResultItem, _Mapping]]] = ..., accepted_count: _Optional[int] = ..., rejected_count: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
+class CancelAllTriggersRequest(_message.Message):
+    __slots__ = ("subaccount_id", "symbol_ids", "side", "dry_run", "request_id", "trigger_types")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_IDS_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    DRY_RUN_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_TYPES_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    symbol_ids: _containers.RepeatedScalarFieldContainer[int]
+    side: _orders_pb2.Side
+    dry_run: bool
+    request_id: str
+    trigger_types: _containers.RepeatedScalarFieldContainer[TriggerType]
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_ids: _Optional[_Iterable[int]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., dry_run: _Optional[bool] = ..., request_id: _Optional[str] = ..., trigger_types: _Optional[_Iterable[_Union[TriggerType, str]]] = ...) -> None: ...
+
+class CancelAllTriggersResponse(_message.Message):
+    __slots__ = ("status", "matched_triggers", "ts", "ts_ns")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATUS_UNSPECIFIED: _ClassVar[CancelAllTriggersResponse.Status]
+        SUBMITTED: _ClassVar[CancelAllTriggersResponse.Status]
+        DRY_RUN: _ClassVar[CancelAllTriggersResponse.Status]
+    STATUS_UNSPECIFIED: CancelAllTriggersResponse.Status
+    SUBMITTED: CancelAllTriggersResponse.Status
+    DRY_RUN: CancelAllTriggersResponse.Status
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    MATCHED_TRIGGERS_FIELD_NUMBER: _ClassVar[int]
+    TS_FIELD_NUMBER: _ClassVar[int]
+    TS_NS_FIELD_NUMBER: _ClassVar[int]
+    status: CancelAllTriggersResponse.Status
+    matched_triggers: int
+    ts: _timestamp_pb2.Timestamp
+    ts_ns: int
+    def __init__(self, status: _Optional[_Union[CancelAllTriggersResponse.Status, str]] = ..., matched_triggers: _Optional[int] = ..., ts: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ts_ns: _Optional[int] = ...) -> None: ...
+
 class ModifyTriggerRequest(_message.Message):
     __slots__ = ("trigger_id", "subaccount_id", "symbol_id", "trigger_price_ticks", "limit_price_ticks", "trailing_distance_ticks", "trailing_distance_bps", "activation_price_ticks", "max_slippage_ticks", "max_slippage_bps")
     TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]

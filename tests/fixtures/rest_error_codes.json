@@ -1,5 +1,5 @@
 {
-  "source": "Fabric-Labs/polyester-proto develop 8894e54cf35d4211b45c0986abd3ff369e9bbd4f docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
+  "source": "Fabric-Labs/polyester-proto develop 74b89c528efa62b7df288697a46f64ad4d9baee2 docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
   "codes": [
     {"code": "ACCOUNT_ORDERS_SUSPENDED", "status": 400, "connect": "failed_precondition"},
     {"code": "ACCOUNT_REPAIRING", "status": 400, "connect": "failed_precondition"},

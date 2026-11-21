@@ -41,6 +41,7 @@ from polyester._sync_services import (
     SyncOrdersService,
     SyncPoliciesService,
     SyncProfileService,
+    SyncProfitAndLossService,
     SyncRateLimitService,
     SyncRealtimeClient,
     SyncSocialVerificationService,
@@ -103,6 +104,7 @@ from polyester.services import (
     AsyncOrderbookService,
     AsyncOrdersService,
     AsyncPoliciesService,
+    AsyncProfitAndLossService,
     AsyncRateLimitService,
     AsyncSocialVerificationService,
     AsyncStatementsService,
@@ -373,6 +375,12 @@ class AsyncPolyester:
         )
         self.social_verification = AsyncSocialVerificationService(self._transport)
         self.guard_signer = AsyncGuardSignerService(self._transport, default_sub_account_id)
+        self.pnl = AsyncProfitAndLossService(
+            self._transport,
+            default_sub_account_id,
+            catalogs=self.catalogs,
+            wait_for_catalogs=catalog_wait,
+        )
         self.rate_limits = AsyncRateLimitService(self._transport, default_sub_account_id)
         self.vip = AsyncVIPService(self._transport)
         self.changelog = AsyncChangelogService(self._transport)
@@ -714,6 +722,7 @@ class Polyester:
         self.address_book = SyncAddressBookService(loop, client.address_book, subscriptions)
         self.social_verification = SyncSocialVerificationService(loop, client.social_verification)
         self.guard_signer = SyncGuardSignerService(loop, client.guard_signer)
+        self.pnl = SyncProfitAndLossService(loop, client.pnl)
         self.rate_limits = SyncRateLimitService(loop, client.rate_limits)
         self.vip = SyncVIPService(loop, client.vip)
         self.changelog = SyncChangelogService(loop, client.changelog)

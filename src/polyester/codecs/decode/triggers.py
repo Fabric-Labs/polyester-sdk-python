@@ -14,6 +14,7 @@ from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models import (
     BatchCancelTriggerResultItem,
     BatchCancelTriggersResult,
+    CancelAllTriggersResult,
     CancelOcoResult,
     CreateOcoResult,
     Trigger,
@@ -543,6 +544,21 @@ def batch_cancel_triggers_from_proto(
         results=results,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
+    )
+
+
+def cancel_all_triggers_from_proto(
+    msg: triggers_pb2.CancelAllTriggersResponse,
+) -> CancelAllTriggersResult:
+    name = proto_enum_name(triggers_pb2.CancelAllTriggersResponse.Status, msg.status)
+    if name not in {"submitted", "dry_run"}:
+        raise PolyesterResponseContractError(
+            "CancelAllTriggers", f"cancel-all triggers response has unknown status: {msg.status}"
+        )
+    return CancelAllTriggersResult(
+        status=name,
+        matched_triggers=int(msg.matched_triggers),
         ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 

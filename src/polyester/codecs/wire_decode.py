@@ -18,7 +18,7 @@ from polyester.codecs.decode.lifecycle import (
 )
 from polyester.codecs.decode.market_data import _decode_price_field, _decode_volume_field
 from polyester.codecs.scalars import format_id
-from polyester.errors import PolyesterResponseContractError
+from polyester.errors import PolyesterResponseContractError, PolyesterTransportError
 from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2
 from polyester.gen.ledger.v1 import catalog_pb2
 from polyester.models.market import (
@@ -270,11 +270,11 @@ def decode_candles_list(
 ) -> CandlesResult:
     """Decode a JSON candles page, row-oriented or columnar.
 
-    Rows keep their ``isClosed``. Columns carry no closed flag: as in
-    :func:`~polyester.codecs.decode.market_data.candles_columns_from_proto`, every
-    columnar row reads closed except the newest row of a first page (no
-    ``page_token``) asked with ``include_incomplete``, which reads ``False`` (not
-    known to be closed).
+    Rows keep their ``isClosed``. Columnar rows read the ``isClosed`` column,
+    as in :func:`~polyester.codecs.decode.market_data.candles_columns_from_proto`;
+    without it (a server that predates it) every columnar row reads closed
+    except the newest row of a first page (no ``page_token``) asked with
+    ``include_incomplete``, which reads ``False`` (not known to be closed).
     """
     candles = [
         decode_candle(item, volume_scale=volume_scale)
@@ -310,6 +310,12 @@ def _decode_columnar_candles(
     closes = _field(data, "close", default=[]) or []
     volumes = _field(data, "volume", default=[]) or []
     quote_volumes = _field(data, "quoteVolume", "quote_volume", default=[]) or []
+    closed_flags = _field(data, "isClosed", "is_closed", default=[]) or []
+    if closed_flags and len(closed_flags) != len(ts_list):
+        raise PolyesterTransportError(
+            f"invalid GetCandlesColumns response lengths: ts_sec={len(ts_list)}, "
+            f"is_closed={len(closed_flags)}"
+        )
     candles: list[Candle] = []
     for index, ts in enumerate(ts_list):
         candles.append(
@@ -324,7 +330,7 @@ def _decode_columnar_candles(
                     scale=volume_scale,
                 ),
                 quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
-                is_closed=index != open_index,
+                is_closed=bool(closed_flags[index]) if closed_flags else index != open_index,
             )
         )
     return candles
@@ -444,7 +450,6 @@ def decode_asset_balance(data: dict[str, Any]) -> AssetBalance:
         funding=_u128_str(_field(data, "funding")),
         reserved=_u128_str(_field(data, "reserved")),
         available=_u128_str(_field(data, "available")),
-        trading_revision=int(_field(data, "tradingRevision", "trading_revision", default=0) or 0),
         funding_revision=int(_field(data, "fundingRevision", "funding_revision", default=0) or 0),
     )
 
@@ -455,7 +460,21 @@ def decode_balances_list(data: dict[str, Any]) -> BalancesList:
         for item in _field(data, "balances", default=[]) or []
         if isinstance(item, dict)
     ]
-    return BalancesList(balances=balances)
+    # Unsigned 64-bit positions: decimal strings in protobuf JSON.
+    return BalancesList(
+        balances=balances,
+        trading_epoch=int(_field(data, "tradingEpoch", "trading_epoch", default=0) or 0),
+        trading_sequence=int(_field(data, "tradingSequence", "trading_sequence", default=0) or 0),
+        trading_applied_through_ts_ns=int(
+            _field(
+                data,
+                "tradingAppliedThroughTsNs",
+                "trading_applied_through_ts_ns",
+                default=0,
+            )
+            or 0
+        ),
+    )
 
 
 def _lifecycle_flow_payload(data: dict[str, Any]) -> dict[str, Any]:
@@ -825,6 +844,7 @@ def decode_ledger_transfer(data: dict[str, Any]) -> LedgerTransfer:
         is_debit=bool(_field(data, "isDebit", "is_debit", default=False)),
         source=_decode_transfer_side(_field(data, "source")),
         destination=_decode_transfer_side(_field(data, "destination")),
+        ts_ns=int(_field(data, "tsNs", "ts_ns", default=0) or 0),
     )
 
 

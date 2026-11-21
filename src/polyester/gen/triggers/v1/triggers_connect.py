@@ -42,6 +42,9 @@ class TriggersService(Protocol):
     async def batch_cancel_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def cancel_all_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def modify_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.ModifyTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.ModifyTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -136,6 +139,16 @@ class TriggersServiceASGIApplication(ConnectASGIApplication[TriggersService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.batch_cancel_triggers,
+                ),
+                "/triggers.v1.TriggersService/CancelAllTriggers": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CancelAllTriggers",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.cancel_all_triggers,
                 ),
                 "/triggers.v1.TriggersService/ModifyTrigger": Endpoint.unary(
                     method=MethodInfo(
@@ -341,6 +354,26 @@ class TriggersServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def cancel_all_triggers(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelAllTriggers",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def modify_trigger(
         self,
         request: triggers_dot_v1_dot_triggers__pb2.ModifyTriggerRequest,
@@ -421,6 +454,8 @@ class TriggersServiceSync(Protocol):
     def cancel_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.CancelTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def batch_cancel_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def cancel_all_triggers(self, request: triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def modify_trigger(self, request: triggers_dot_v1_dot_triggers__pb2.ModifyTriggerRequest, ctx: RequestContext) -> triggers_dot_v1_dot_triggers__pb2.ModifyTriggerResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -513,6 +548,16 @@ class TriggersServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.batch_cancel_triggers,
+                ),
+                "/triggers.v1.TriggersService/CancelAllTriggers": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CancelAllTriggers",
+                        service_name="triggers.v1.TriggersService",
+                        input=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest,
+                        output=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.cancel_all_triggers,
                 ),
                 "/triggers.v1.TriggersService/ModifyTrigger": EndpointSync.unary(
                     method=MethodInfo(
@@ -712,6 +757,26 @@ class TriggersServiceClientSync(ConnectClientSync):
                 service_name="triggers.v1.TriggersService",
                 input=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersRequest,
                 output=triggers_dot_v1_dot_triggers__pb2.BatchCancelTriggersResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def cancel_all_triggers(
+        self,
+        request: triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelAllTriggers",
+                service_name="triggers.v1.TriggersService",
+                input=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersRequest,
+                output=triggers_dot_v1_dot_triggers__pb2.CancelAllTriggersResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

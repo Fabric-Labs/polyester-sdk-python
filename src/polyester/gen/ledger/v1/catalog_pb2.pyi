@@ -25,6 +25,7 @@ class TransferCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TRADING_TO_FUNDING: _ClassVar[TransferCode]
     TRADING_WITHDRAW_RESERVE: _ClassVar[TransferCode]
     FUNDING_USER_TRANSFER: _ClassVar[TransferCode]
+    FUNDING_OPENING_BALANCE: _ClassVar[TransferCode]
     TRADING_WITHDRAW_REQUEST_FEE: _ClassVar[TransferCode]
     TRADING_WITHDRAW_FEE_LEG: _ClassVar[TransferCode]
     QUICKSWAP_POLYESTER_FEE: _ClassVar[TransferCode]
@@ -51,6 +52,7 @@ FUNDING_TO_TRADING: TransferCode
 TRADING_TO_FUNDING: TransferCode
 TRADING_WITHDRAW_RESERVE: TransferCode
 FUNDING_USER_TRANSFER: TransferCode
+FUNDING_OPENING_BALANCE: TransferCode
 TRADING_WITHDRAW_REQUEST_FEE: TransferCode
 TRADING_WITHDRAW_FEE_LEG: TransferCode
 QUICKSWAP_POLYESTER_FEE: TransferCode

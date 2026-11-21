@@ -237,7 +237,7 @@ class GetCandlesResponse(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., candles: _Optional[_Iterable[_Union[CandlePoint, _Mapping]]] = ..., reference_candles: _Optional[_Iterable[_Union[CandlePoint, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class GetCandlesColumnsResponse(_message.Message):
-    __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume", "reference_ts_sec", "reference_open", "reference_high", "reference_low", "reference_close", "reference_volume", "next_page_token", "quote_volume")
+    __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume", "reference_ts_sec", "reference_open", "reference_high", "reference_low", "reference_close", "reference_volume", "next_page_token", "quote_volume", "is_closed")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
     TS_SEC_FIELD_NUMBER: _ClassVar[int]
@@ -254,6 +254,7 @@ class GetCandlesColumnsResponse(_message.Message):
     REFERENCE_VOLUME_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     QUOTE_VOLUME_FIELD_NUMBER: _ClassVar[int]
+    IS_CLOSED_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     timeframe: Timeframe
     ts_sec: _containers.RepeatedScalarFieldContainer[int]
@@ -270,7 +271,8 @@ class GetCandlesColumnsResponse(_message.Message):
     reference_volume: _containers.RepeatedScalarFieldContainer[int]
     next_page_token: str
     quote_volume: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[_Iterable[int]] = ..., open: _Optional[_Iterable[int]] = ..., high: _Optional[_Iterable[int]] = ..., low: _Optional[_Iterable[int]] = ..., close: _Optional[_Iterable[int]] = ..., volume: _Optional[_Iterable[int]] = ..., reference_ts_sec: _Optional[_Iterable[int]] = ..., reference_open: _Optional[_Iterable[int]] = ..., reference_high: _Optional[_Iterable[int]] = ..., reference_low: _Optional[_Iterable[int]] = ..., reference_close: _Optional[_Iterable[int]] = ..., reference_volume: _Optional[_Iterable[int]] = ..., next_page_token: _Optional[str] = ..., quote_volume: _Optional[_Iterable[str]] = ...) -> None: ...
+    is_closed: _containers.RepeatedScalarFieldContainer[bool]
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[_Iterable[int]] = ..., open: _Optional[_Iterable[int]] = ..., high: _Optional[_Iterable[int]] = ..., low: _Optional[_Iterable[int]] = ..., close: _Optional[_Iterable[int]] = ..., volume: _Optional[_Iterable[int]] = ..., reference_ts_sec: _Optional[_Iterable[int]] = ..., reference_open: _Optional[_Iterable[int]] = ..., reference_high: _Optional[_Iterable[int]] = ..., reference_low: _Optional[_Iterable[int]] = ..., reference_close: _Optional[_Iterable[int]] = ..., reference_volume: _Optional[_Iterable[int]] = ..., next_page_token: _Optional[str] = ..., quote_volume: _Optional[_Iterable[str]] = ..., is_closed: _Optional[_Iterable[bool]] = ...) -> None: ...
 
 class Candle(_message.Message):
     __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume", "quote_volume")

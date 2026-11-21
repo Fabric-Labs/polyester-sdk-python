@@ -1,6 +1,7 @@
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
+from polyester.gen.marketdata.v1 import marketdata_pb2 as _marketdata_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -76,7 +77,7 @@ class Sparkline(_message.Message):
     def __init__(self, interval: _Optional[_Union[SparklineInterval, str]] = ..., close_ticks: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class MarketOverview(_message.Message):
-    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "volume_24h_usd_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks")
+    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "volume_24h_usd_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks", "price_band")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LAST_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     LAST_TRADE_TS_NS_FIELD_NUMBER: _ClassVar[int]
@@ -93,6 +94,7 @@ class MarketOverview(_message.Message):
     BEST_ASK_QTY_SCALED_FIELD_NUMBER: _ClassVar[int]
     SPARKLINES_FIELD_NUMBER: _ClassVar[int]
     INDEX_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
+    PRICE_BAND_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     last_price_ticks: int
     last_trade_ts_ns: int
@@ -109,7 +111,8 @@ class MarketOverview(_message.Message):
     best_ask_qty_scaled: int
     sparklines: _containers.RepeatedCompositeFieldContainer[Sparkline]
     index_price_ticks: int
-    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., volume_24h_usd_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ...) -> None: ...
+    price_band: _marketdata_pb2.LivePriceBand
+    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., volume_24h_usd_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ..., price_band: _Optional[_Union[_marketdata_pb2.LivePriceBand, _Mapping]] = ...) -> None: ...
 
 class ListMarketOverviewRequest(_message.Message):
     __slots__ = ("symbol_id", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals")

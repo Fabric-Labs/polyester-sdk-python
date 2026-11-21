@@ -103,28 +103,50 @@ class GetBalancesRequest(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ...) -> None: ...
 
 class AssetBalance(_message.Message):
-    __slots__ = ("asset_id", "trading", "funding", "reserved", "available", "trading_revision", "funding_revision")
+    __slots__ = ("asset_id", "trading", "funding", "reserved", "available", "funding_revision")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     TRADING_FIELD_NUMBER: _ClassVar[int]
     FUNDING_FIELD_NUMBER: _ClassVar[int]
     RESERVED_FIELD_NUMBER: _ClassVar[int]
     AVAILABLE_FIELD_NUMBER: _ClassVar[int]
-    TRADING_REVISION_FIELD_NUMBER: _ClassVar[int]
     FUNDING_REVISION_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     trading: _u128_pb2.U128
     funding: _u128_pb2.U128
     reserved: _u128_pb2.U128
     available: _u128_pb2.U128
-    trading_revision: int
     funding_revision: int
-    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., trading_revision: _Optional[int] = ..., funding_revision: _Optional[int] = ...) -> None: ...
+    def __init__(self, asset_id: _Optional[int] = ..., trading: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., reserved: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., available: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., funding_revision: _Optional[int] = ...) -> None: ...
 
 class GetBalancesResponse(_message.Message):
-    __slots__ = ("balances",)
+    __slots__ = ("balances", "trading_epoch", "trading_sequence", "trading_applied_through_ts_ns")
     BALANCES_FIELD_NUMBER: _ClassVar[int]
+    TRADING_EPOCH_FIELD_NUMBER: _ClassVar[int]
+    TRADING_SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    TRADING_APPLIED_THROUGH_TS_NS_FIELD_NUMBER: _ClassVar[int]
     balances: _containers.RepeatedCompositeFieldContainer[AssetBalance]
-    def __init__(self, balances: _Optional[_Iterable[_Union[AssetBalance, _Mapping]]] = ...) -> None: ...
+    trading_epoch: int
+    trading_sequence: int
+    trading_applied_through_ts_ns: int
+    def __init__(self, balances: _Optional[_Iterable[_Union[AssetBalance, _Mapping]]] = ..., trading_epoch: _Optional[int] = ..., trading_sequence: _Optional[int] = ..., trading_applied_through_ts_ns: _Optional[int] = ...) -> None: ...
+
+class BalanceUpdate(_message.Message):
+    __slots__ = ("account", "trading_epoch", "trading_sequence", "complete", "balances", "transfers", "trading_applied_through_ts_ns")
+    ACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    TRADING_EPOCH_FIELD_NUMBER: _ClassVar[int]
+    TRADING_SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    COMPLETE_FIELD_NUMBER: _ClassVar[int]
+    BALANCES_FIELD_NUMBER: _ClassVar[int]
+    TRANSFERS_FIELD_NUMBER: _ClassVar[int]
+    TRADING_APPLIED_THROUGH_TS_NS_FIELD_NUMBER: _ClassVar[int]
+    account: _catalog_pb2.AccountCode
+    trading_epoch: int
+    trading_sequence: int
+    complete: bool
+    balances: _containers.RepeatedCompositeFieldContainer[AssetBalance]
+    transfers: _containers.RepeatedCompositeFieldContainer[TransferRow]
+    trading_applied_through_ts_ns: int
+    def __init__(self, account: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., trading_epoch: _Optional[int] = ..., trading_sequence: _Optional[int] = ..., complete: _Optional[bool] = ..., balances: _Optional[_Iterable[_Union[AssetBalance, _Mapping]]] = ..., transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., trading_applied_through_ts_ns: _Optional[int] = ...) -> None: ...
 
 class GetBalanceHistoryRequest(_message.Message):
     __slots__ = ("subaccount_id", "range", "ledger", "account_codes")
@@ -329,7 +351,7 @@ class TransferSide(_message.Message):
     def __init__(self, kind: _Optional[_Union[TransferSideKind, str]] = ..., account_id: _Optional[int] = ..., address: _Optional[str] = ..., chain_id: _Optional[int] = ...) -> None: ...
 
 class TransferRow(_message.Message):
-    __slots__ = ("asset_id", "amount_e18", "transfer_code", "account_code", "ts_us", "balance_after_e18", "is_debit", "link_id", "flow_id", "source", "destination", "transfer_id")
+    __slots__ = ("asset_id", "amount_e18", "transfer_code", "account_code", "ts_us", "balance_after_e18", "is_debit", "link_id", "flow_id", "source", "destination", "transfer_id", "ts_ns")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_CODE_FIELD_NUMBER: _ClassVar[int]
@@ -342,6 +364,7 @@ class TransferRow(_message.Message):
     SOURCE_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_FIELD_NUMBER: _ClassVar[int]
     TRANSFER_ID_FIELD_NUMBER: _ClassVar[int]
+    TS_NS_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     amount_e18: _u128_pb2.U128
     transfer_code: _catalog_pb2.TransferCode
@@ -354,7 +377,8 @@ class TransferRow(_message.Message):
     source: TransferSide
     destination: TransferSide
     transfer_id: str
-    def __init__(self, asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., ts_us: _Optional[int] = ..., balance_after_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ..., source: _Optional[_Union[TransferSide, _Mapping]] = ..., destination: _Optional[_Union[TransferSide, _Mapping]] = ..., transfer_id: _Optional[str] = ...) -> None: ...
+    ts_ns: int
+    def __init__(self, asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., transfer_code: _Optional[_Union[_catalog_pb2.TransferCode, str]] = ..., account_code: _Optional[_Union[_catalog_pb2.AccountCode, str]] = ..., ts_us: _Optional[int] = ..., balance_after_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., is_debit: _Optional[bool] = ..., link_id: _Optional[int] = ..., flow_id: _Optional[str] = ..., source: _Optional[_Union[TransferSide, _Mapping]] = ..., destination: _Optional[_Union[TransferSide, _Mapping]] = ..., transfer_id: _Optional[str] = ..., ts_ns: _Optional[int] = ...) -> None: ...
 
 class TransferRowBatch(_message.Message):
     __slots__ = ("events",)

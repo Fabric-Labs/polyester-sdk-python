@@ -3,9 +3,10 @@
 ``CandlePoint.is_closed`` is true for a closed bucket (historical rows and a
 live terminal update) and false only while the bucket is still open. Each path
 that builds a :class:`~polyester.models.Candle` from a ``CandlePoint`` must
-carry it through, both ways. The columnar response has no closed column: only
-the newest primary row of a first page asked with ``include_incomplete`` is not
-known to be closed; continuation pages and reference rows are closed.
+carry it through, both ways. The columnar response carries the same flag in its
+``is_closed`` column; reference rows are always closed. From a server that sends
+no column, only the newest primary row of a first page asked with
+``include_incomplete`` is not known to be closed.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import pytest
 from polyester.catalogs import CatalogManager
 from polyester.codecs.realtime_decode import decode_candle_point_bytes
 from polyester.codecs.wire_decode import decode_candles_list
+from polyester.errors import PolyesterTransportError
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.services.market_data import AsyncMarketDataService
 from tests.unit.support import CaptureUnary
@@ -126,12 +128,58 @@ def test_json_candle_rows_keep_is_closed(is_closed: bool) -> None:
     assert [candle.is_closed for candle in result.candles] == [is_closed]
 
 
-def test_columnar_candles_have_no_closed_flag_in_the_contract() -> None:
-    # GetCandlesColumnsResponse carries no closed column, so columnar candles
-    # derive is_closed from include_incomplete (tests below). When the contract
-    # adds one, decode it in candles_columns_from_proto and replace this check.
-    fields = marketdata_pb2.GetCandlesColumnsResponse.DESCRIPTOR.fields_by_name
-    assert not [name for name in fields if "closed" in name]
+def test_columnar_candles_keep_the_servers_is_closed_column() -> None:
+    from polyester.codecs.decode.market_data import candles_columns_from_proto
+
+    # The server's flag wins over the request: here the open candle is not the
+    # newest row the request would guess, and a continuation page says so too.
+    msg = _columns()
+    msg.is_closed.extend([True, False, True])
+    for include_incomplete, page_token in ((False, ""), (True, ""), (True, "eyJ2IjoxfQ==")):
+        result = candles_columns_from_proto(
+            msg,
+            volume_scale=8,
+            reference_price_scale=8,
+            include_incomplete=include_incomplete,
+            page_token=page_token,
+        )
+        assert [c.is_closed for c in result.candles] == [True, False, True]
+        # Reference rows are always closed buckets; they have no flag of their own.
+        assert [c.is_closed for c in result.reference_candles] == [True, True, True]
+
+
+def test_columnar_is_closed_of_another_length_is_refused() -> None:
+    from polyester.codecs.decode.market_data import candles_columns_from_proto
+
+    msg = _columns()
+    msg.is_closed.extend([True, False])
+    with pytest.raises(PolyesterTransportError, match="is_closed=2"):
+        candles_columns_from_proto(msg, volume_scale=8, reference_price_scale=8)
+    data = {
+        "tsSec": ["120", "180"],
+        "open": ["2000000000"] * 2,
+        "high": ["2000000000"] * 2,
+        "low": ["2000000000"] * 2,
+        "close": ["2000000000"] * 2,
+        "volume": ["10000000"] * 2,
+        "isClosed": [True],
+    }
+    with pytest.raises(PolyesterTransportError, match="is_closed=1"):
+        decode_candles_list(data, volume_scale=8)
+
+
+def test_json_columnar_candles_keep_the_servers_is_closed_column() -> None:
+    data = {
+        "tsSec": ["120", "180"],
+        "open": ["2000000000"] * 2,
+        "high": ["2000000000"] * 2,
+        "low": ["2000000000"] * 2,
+        "close": ["2000000000"] * 2,
+        "volume": ["10000000"] * 2,
+        "isClosed": [True, False],
+    }
+    result = decode_candles_list(data, volume_scale=8, page_token="eyJ2IjoxfQ==")
+    assert [c.is_closed for c in result.candles] == [True, False]
 
 
 def _columns() -> marketdata_pb2.GetCandlesColumnsResponse:
@@ -167,7 +215,7 @@ def _columns() -> marketdata_pb2.GetCandlesColumnsResponse:
     ],
 )
 @pytest.mark.asyncio
-async def test_get_candles_columns_is_closed_follows_the_request(
+async def test_get_candles_columns_without_the_column_follow_the_request(
     include_incomplete: bool, page_token: str, expected: list[bool]
 ) -> None:
     capture = CaptureUnary(_columns())
@@ -229,7 +277,7 @@ def test_columnar_decoder_marks_only_a_first_pages_newest_primary_row() -> None:
         (True, "eyJ2IjoxfQ==", [True, True]),
     ],
 )
-def test_json_columnar_candles_is_closed_follows_the_request(
+def test_json_columnar_candles_without_the_column_follow_the_request(
     include_incomplete: bool, page_token: str, expected: list[bool]
 ) -> None:
     data = {

@@ -5,6 +5,7 @@ from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from polyester.gen.google.api import annotations_pb2 as _annotations_pb2_1
 from polyester.gen.google.api import field_behavior_pb2 as _field_behavior_pb2
 from google.protobuf import field_mask_pb2 as _field_mask_pb2
+from polyester.gen.auth.v1 import policies_pb2 as _policies_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.api.validation.v1 import predefined_string_rules_pb2 as _predefined_string_rules_pb2
@@ -30,6 +31,7 @@ class ApiKeyPurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STANDARD: _ClassVar[ApiKeyPurpose]
     ASSISTANT: _ClassVar[ApiKeyPurpose]
     ADMIN_KEY: _ClassVar[ApiKeyPurpose]
+    STRATEGY_BOT: _ClassVar[ApiKeyPurpose]
 
 class AssistantKeyPreset(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -44,12 +46,13 @@ PURPOSE_UNSPECIFIED: ApiKeyPurpose
 STANDARD: ApiKeyPurpose
 ASSISTANT: ApiKeyPurpose
 ADMIN_KEY: ApiKeyPurpose
+STRATEGY_BOT: ApiKeyPurpose
 PRESET_UNSPECIFIED: AssistantKeyPreset
 READ_ONLY: AssistantKeyPreset
 TRADE_WITH_APPROVAL: AssistantKeyPreset
 
 class ApiKey(_message.Message):
-    __slots__ = ("key_id", "label", "icon", "color", "ip_whitelist", "status", "subaccount_id", "policy_id", "created_at", "last_used_at", "public_key_ed25519", "expires_at", "created_by_actor", "updated_at", "revision", "purpose")
+    __slots__ = ("key_id", "label", "icon", "color", "ip_whitelist", "status", "subaccount_id", "policy_id", "created_at", "last_used_at", "public_key_ed25519", "expires_at", "created_by_actor", "updated_at", "revision", "purpose", "strategy_bot_id")
     KEY_ID_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
@@ -66,6 +69,7 @@ class ApiKey(_message.Message):
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     PURPOSE_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_BOT_ID_FIELD_NUMBER: _ClassVar[int]
     key_id: str
     label: str
     icon: str
@@ -82,7 +86,8 @@ class ApiKey(_message.Message):
     updated_at: _timestamp_pb2.Timestamp
     revision: int
     purpose: ApiKeyPurpose
-    def __init__(self, key_id: _Optional[str] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_used_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., public_key_ed25519: _Optional[bytes] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_by_actor: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., purpose: _Optional[_Union[ApiKeyPurpose, str]] = ...) -> None: ...
+    strategy_bot_id: int
+    def __init__(self, key_id: _Optional[str] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., ip_whitelist: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[ApiKeyStatus, str]] = ..., subaccount_id: _Optional[int] = ..., policy_id: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_used_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., public_key_ed25519: _Optional[bytes] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_by_actor: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., purpose: _Optional[_Union[ApiKeyPurpose, str]] = ..., strategy_bot_id: _Optional[int] = ...) -> None: ...
 
 class CreateApiKeyRequest(_message.Message):
     __slots__ = ("label", "subaccount_id", "icon", "color", "ip_whitelist", "public_key_ed25519", "purpose")
@@ -225,3 +230,51 @@ class DeleteAssistantKeysResponse(_message.Message):
     REVOKED_KEY_IDS_FIELD_NUMBER: _ClassVar[int]
     revoked_key_ids: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, revoked_key_ids: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class StrategyBotLimits(_message.Message):
+    __slots__ = ("spot_markets", "spot_market_scope", "max_order_notional", "max_open_orders")
+    SPOT_MARKETS_FIELD_NUMBER: _ClassVar[int]
+    SPOT_MARKET_SCOPE_FIELD_NUMBER: _ClassVar[int]
+    MAX_ORDER_NOTIONAL_FIELD_NUMBER: _ClassVar[int]
+    MAX_OPEN_ORDERS_FIELD_NUMBER: _ClassVar[int]
+    spot_markets: _containers.RepeatedCompositeFieldContainer[_policies_pb2.SpotMarketSelector]
+    spot_market_scope: _policies_pb2.MarketScope.Value
+    max_order_notional: int
+    max_open_orders: int
+    def __init__(self, spot_markets: _Optional[_Iterable[_Union[_policies_pb2.SpotMarketSelector, _Mapping]]] = ..., spot_market_scope: _Optional[_Union[_policies_pb2.MarketScope.Value, str]] = ..., max_order_notional: _Optional[int] = ..., max_open_orders: _Optional[int] = ...) -> None: ...
+
+class SetStrategyBotAccessRequest(_message.Message):
+    __slots__ = ("deploy_operation_id", "subaccount_id", "public_key_ed25519", "strategy_bot_id", "limits")
+    DEPLOY_OPERATION_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    PUBLIC_KEY_ED25519_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMITS_FIELD_NUMBER: _ClassVar[int]
+    deploy_operation_id: str
+    subaccount_id: int
+    public_key_ed25519: bytes
+    strategy_bot_id: int
+    limits: StrategyBotLimits
+    def __init__(self, deploy_operation_id: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., public_key_ed25519: _Optional[bytes] = ..., strategy_bot_id: _Optional[int] = ..., limits: _Optional[_Union[StrategyBotLimits, _Mapping]] = ...) -> None: ...
+
+class SetStrategyBotAccessResponse(_message.Message):
+    __slots__ = ("key_id", "api_policy_id", "subaccount_policy_id")
+    KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    API_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    key_id: str
+    api_policy_id: int
+    subaccount_policy_id: int
+    def __init__(self, key_id: _Optional[str] = ..., api_policy_id: _Optional[int] = ..., subaccount_policy_id: _Optional[int] = ...) -> None: ...
+
+class EndStrategyBotAccessRequest(_message.Message):
+    __slots__ = ("deploy_operation_id",)
+    DEPLOY_OPERATION_ID_FIELD_NUMBER: _ClassVar[int]
+    deploy_operation_id: str
+    def __init__(self, deploy_operation_id: _Optional[str] = ...) -> None: ...
+
+class EndStrategyBotAccessResponse(_message.Message):
+    __slots__ = ("revoked_key_id",)
+    REVOKED_KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    revoked_key_id: str
+    def __init__(self, revoked_key_id: _Optional[str] = ...) -> None: ...

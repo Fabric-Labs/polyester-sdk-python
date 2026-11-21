@@ -30,9 +30,12 @@ def _response(*, with_balances: bool) -> subaccounts_pb2.GetSubaccountResponse:
                         asset_id=1,
                         trading=u128_pb2.U128(lo=1_500_000_000_000_000_000),
                         available=u128_pb2.U128(lo=1_500_000_000_000_000_000),
-                        trading_revision=3,
+                        funding_revision=3,
                     )
-                ]
+                ],
+                trading_epoch=2**32 + 7,
+                trading_sequence=42,
+                trading_applied_through_ts_ns=1_767_225_600_123_456_789,
             )
         )
     return response
@@ -58,10 +61,12 @@ async def test_get_requests_and_parses_balances_when_asked() -> None:
                 funding="0",
                 reserved="0",
                 available="1500000000000000000",
-                trading_revision=3,
-                funding_revision=0,
+                funding_revision=3,
             )
-        ]
+        ],
+        trading_epoch=2**32 + 7,
+        trading_sequence=42,
+        trading_applied_through_ts_ns=1_767_225_600_123_456_789,
     )
 
 

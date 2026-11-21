@@ -70,6 +70,16 @@ class AsyncHeatmapService(BaseService):
         the tier served, and a reply naming none, or another tier, raises
         :class:`~polyester.errors.PolyesterResponseContractError`. A depth below 0 or above
         1000 is refused.
+
+        The page's chain replays the top ``depth`` levels per side: start from
+        ``chain.base_keyframe`` and apply each ``chain.deltas`` bucket oldest
+        first, setting each listed level and deleting a level whose quantity is
+        ``0``, with no clipping. A ``0`` means the level left the top ``depth``
+        levels, not only that it left the book; a level that enters them is
+        listed even when the bucket did not change it. The replay after each
+        bucket is the same at every page ``limit``. In ``"peak"`` mode the base
+        keyframe is only the replay's starting point, not a bucket: do not
+        render it.
         """
         validated_limit = validate_limit(limit, GetOrderbookHeatmapRequest)
         if symbol:
@@ -135,6 +145,11 @@ class AsyncHeatmapService(BaseService):
 
         ``interval`` is ``"1s"``, ``"1m"``, ``"5m"`` or ``"1h"`` (or ``"INTERVAL_1S"``);
         any other value is refused before connecting.
+
+        Key buckets by ``ts_sec`` and replace a stored bucket only with one of a
+        higher ``book_seq_end``, final or not: a finalized bucket can be
+        published again with later updates, and the same payload can arrive
+        more than once. Updates of a bucket still open are best effort.
         """
         label = heatmap_interval_channel_label(interval)
         if symbol:

@@ -6,7 +6,7 @@ import msgspec
 
 
 class TradingRateLimitRule(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """Weighted placement or cancellation quota for one VIP tier."""
+    """Weighted placement, cancellation or read quota for one VIP tier."""
 
     policy_class: str = ""
     vip_tier: int = 0
@@ -27,12 +27,17 @@ class TradingRateLimits(msgspec.Struct, kw_only=True, omit_defaults=True):
     """Effective trading limits for one account target and caller.
 
     Trading limits apply per account: the root account and each sub-account
-    have their own, and every API key and session that trades for an account
-    shares them. ``rules`` are the enforced placement and cancellation rules
-    for the selected account (placement first, cancellation second): budget
-    against them. ``api_key_rules``, present only for an API-key caller, are
-    the rules resolved for that key and are informational only: trading
-    requests are not limited per API key, so adding keys adds no capacity.
+    have their own, and every API key and session that trades or reads for an
+    account shares them. ``rules`` are the enforced placement, cancellation
+    and read rules of the selected account, in that order: budget against
+    them. A read (orders, fills, triggers, trading limits and fees) and an
+    order preview cost units of the read limit of the account they read, the
+    root account or a sub-account. ``api_key_rules``, present only for an
+    API-key caller, are the rules resolved for that key, in the same order.
+    Its read rule is enforced on top of the account's: a read or preview is
+    refused when either is exhausted. Its placement and cancellation rules are
+    informational only: orders are not limited per API key, so adding keys
+    adds no capacity.
     """
 
     policy_version: int = 0

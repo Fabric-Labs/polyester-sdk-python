@@ -254,6 +254,11 @@ class AsyncAddressBookService(ScopedSubAccountMixin, BaseService):
         *,
         root_account_public_id: str | int | None = None,
     ) -> AsyncSubscription[AddressBookViewInvalidation]:
+        """Invalidations of the account's own address book. An API key needs
+        ``READ_ADDRESS_BOOK``; a token refusal raises with the read's own error
+        code. Invalidations of sub-accounts' address books stream on a separate
+        channel for signed-in sessions only; an API key cannot subscribe to it.
+        """
         return await subscribe_account_proto(
             self._realtime,
             channel_template="private:auth:address-books:{account_id}:proto",

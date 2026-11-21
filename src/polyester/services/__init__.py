@@ -16,6 +16,7 @@ from polyester.services.market_data import AsyncMarketDataService
 from polyester.services.market_overview import AsyncMarketOverviewService
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.orders import AsyncOrdersService
+from polyester.services.pnl import AsyncProfitAndLossService
 from polyester.services.policies import AsyncPoliciesService
 from polyester.services.profile import AsyncProfileService
 from polyester.services.rate_limits import AsyncRateLimitService
@@ -51,6 +52,7 @@ __all__ = [
     "AsyncOrdersService",
     "AsyncPoliciesService",
     "AsyncProfileService",
+    "AsyncProfitAndLossService",
     "AsyncRateLimitService",
     "AsyncSocialVerificationService",
     "AsyncStatementsService",

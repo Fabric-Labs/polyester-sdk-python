@@ -748,6 +748,61 @@ def batch_cancel_triggers_to_proto(
     return proto
 
 
+# The contract's bounds on a CancelAllTriggers request.
+CANCEL_ALL_TRIGGERS_MAX_SYMBOLS = 100
+CANCEL_ALL_TRIGGERS_MAX_TYPES = 5
+
+
+def cancel_all_triggers_to_proto(
+    *,
+    sub_account_id: str | int | None = None,
+    symbol_ids: Sequence[int] = (),
+    side: str | None = None,
+    trigger_types: Sequence[str] | None = None,
+    dry_run: bool = False,
+    request_id: str | None = None,
+) -> triggers_pb2.CancelAllTriggersRequest:
+    """Encode a cancel of every matching trigger.
+
+    ``symbol_ids`` are resolved pair IDs (empty matches every pair), ``side``
+    is ``buy`` or ``sell`` (``None`` matches both) and ``trigger_types`` takes
+    up to 5 ``triggers.create`` type labels (empty matches every type);
+    repeats are sent once. ``request_id`` is the request's idempotency key;
+    left out or empty, one is generated.
+    """
+    if not isinstance(dry_run, bool):
+        raise PolyesterValidationError("dry_run must be a bool")
+    proto = triggers_pb2.CancelAllTriggersRequest(
+        request_id=optional_request_id(request_id) or f"trg-cancel-all-{uuid.uuid4().hex[:12]}",
+        dry_run=dry_run,
+    )
+    if sub_account_id is not None:
+        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
+    unique_ids = list(dict.fromkeys(symbol_ids))
+    if any(value <= 0 for value in unique_ids):
+        raise PolyesterValidationError("triggers.cancel_all symbol_ids must be positive")
+    if len(unique_ids) > CANCEL_ALL_TRIGGERS_MAX_SYMBOLS:
+        raise PolyesterValidationError(
+            f"triggers.cancel_all accepts at most {CANCEL_ALL_TRIGGERS_MAX_SYMBOLS} pairs"
+        )
+    proto.symbol_ids.extend(unique_ids)
+    if side is not None:
+        key = side.strip().lower() if isinstance(side, str) else ""
+        if key not in ("buy", "sell"):
+            raise PolyesterValidationError("side must be buy or sell")
+        proto.side = orders_pb2.BUY if key == "buy" else orders_pb2.SELL
+    if trigger_types is not None:
+        if isinstance(trigger_types, (str, bytes)):
+            raise PolyesterValidationError("trigger_types must be a list of trigger types")
+        types = list(dict.fromkeys(trigger_type_to_proto(value) for value in trigger_types))
+        if len(types) > CANCEL_ALL_TRIGGERS_MAX_TYPES:
+            raise PolyesterValidationError(
+                f"trigger_types takes at most {CANCEL_ALL_TRIGGERS_MAX_TYPES} distinct types"
+            )
+        proto.trigger_types.extend(types)
+    return proto
+
+
 # The contract's rule on TriggerIntent.client_trigger_id: 1 to 36 bytes of
 # UTF-8, in any characters.
 CLIENT_TRIGGER_ID_MAX_BYTES = contract_string_max_bytes(

@@ -336,6 +336,11 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[SubAccount]:
+        """Updates of the sub-accounts the account owns. An API key needs
+        ``READ_SUBACCOUNTS``; a token refusal raises with the read's own error
+        code. Records reached through a delegated sub-account role stream on a separate
+        channel for signed-in sessions only; an API key cannot subscribe to it.
+        """
         return await subscribe_account_proto(
             self._realtime,
             channel_template="private:auth:subaccounts:{account_id}:proto",

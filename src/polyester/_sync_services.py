@@ -40,6 +40,7 @@ from polyester.services import (
     AsyncOrdersService,
     AsyncPoliciesService,
     AsyncProfileService,
+    AsyncProfitAndLossService,
     AsyncRateLimitService,
     AsyncSocialVerificationService,
     AsyncStatementsService,
@@ -60,7 +61,7 @@ if TYPE_CHECKING:
         ApiData,
         ApiKeySummary,
         ApiPolicy,
-        AssetBalance,
+        BalanceUpdate,
         Candle,
         CreateOrderParams,
         CreateOrderRequest,
@@ -441,7 +442,7 @@ class SyncBalancesService(_SyncSubscribeService):
     def subscribe_sync(
         self,
         *,
-        on_event: Callable[[AssetBalance], object],
+        on_event: Callable[[BalanceUpdate], object],
         on_error: Callable[[Exception], object] | None = None,
         account_id: str | int | None = None,
     ) -> SyncSubscription:
@@ -574,6 +575,7 @@ class SyncTriggersService(_SyncSubscribeService):
 
     batch_cancel = call(AsyncTriggersService.batch_cancel)
     cancel = call(AsyncTriggersService.cancel)
+    cancel_all = call(AsyncTriggersService.cancel_all)
     cancel_oco = call(AsyncTriggersService.cancel_oco)
     create = call(AsyncTriggersService.create)
     create_oco = call(AsyncTriggersService.create_oco)
@@ -815,6 +817,15 @@ class SyncGuardSignerService(_SyncService):
     get_status = call(AsyncGuardSignerService.get_status)
     rotate_wallet = call(AsyncGuardSignerService.rotate_wallet)
     sign_protected_action = call(AsyncGuardSignerService.sign_protected_action)
+
+
+class SyncProfitAndLossService(_SyncService):
+    """``Polyester`` view of :class:`~polyester.services.AsyncProfitAndLossService`."""
+
+    get = call(AsyncProfitAndLossService.get)
+    get_trading_statistics = call(AsyncProfitAndLossService.get_trading_statistics)
+    iter_daily = iterate(AsyncProfitAndLossService.iter_daily)
+    list_daily = call(AsyncProfitAndLossService.list_daily)
 
 
 class SyncRateLimitService(_SyncService):

@@ -498,17 +498,40 @@ class UserTradesList(msgspec.Struct, kw_only=True, omit_defaults=True):
 
 
 class AssetBalance(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One asset's balances, exact integers at the 18-decimal ledger scale.
+
+    ``trading``, ``reserved`` and ``available`` are the Trading values;
+    ``funding`` and ``funding_revision`` the Funding ones. A Funding value is
+    newer than another of the same asset when its ``funding_revision`` is
+    higher. Trading values are ordered by the position of the read or update
+    that carries them (``trading_epoch``, ``trading_sequence``), not per asset.
+    """
+
     asset_id: int
     trading: str = "0"
     funding: str = "0"
     reserved: str = "0"
     available: str = "0"
-    trading_revision: int = 0
     funding_revision: int = 0
 
 
 class BalancesList(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """``balances.list``: every asset's balances, and the position the Trading
+    values are at.
+
+    The Trading values of every asset are one cut, taken at
+    ``(trading_epoch, trading_sequence)``: apply the balance stream's Trading
+    updates of that epoch from ``trading_sequence + 1`` on. Compare
+    ``trading_epoch`` only for equality; it is an opaque number that changes
+    when the numbering restarts. Every Trading transfer of the account with a
+    ``ts_ns`` at or below ``trading_applied_through_ts_ns`` is applied in
+    these balances. The three are 0 from a server that predates them.
+    """
+
     balances: list[AssetBalance]
+    trading_epoch: int = 0
+    trading_sequence: int = 0
+    trading_applied_through_ts_ns: int = 0
 
 
 class ZipperReasonDetails(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -955,6 +978,23 @@ class BatchCancelTriggersResult(msgspec.Struct, kw_only=True, omit_defaults=True
     ts_ns: int | None = None
 
 
+class CancelAllTriggersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Outcome of ``triggers.cancel_all``.
+
+    ``status`` is ``"submitted"``, or ``"dry_run"`` for a dry run, which
+    cancels nothing. ``matched_triggers`` counts every trigger that matched,
+    each leg canceled together with a matching one included (an order's
+    attached legs, an OCO's two legs). The answer lists no trigger IDs: read
+    the triggers again for their state. ``ts_ns`` is the server time of the
+    answer in nanoseconds since the Unix epoch; None when the server sent no
+    time.
+    """
+
+    status: str = ""
+    matched_triggers: int = 0
+    ts_ns: int | None = None
+
+
 class TransferSide(msgspec.Struct, kw_only=True, omit_defaults=True):
     """One display side of a ledger transfer.
 
@@ -1007,6 +1047,44 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     balance_after: str | None = None
     # Decimal correlation ID that groups related transfer legs; empty when none.
     link_id: str = ""
+    # The transfer's exact time in Unix nanoseconds; ``timestamp`` is the same
+    # time in microseconds. 0 from a server that predates it. A Trading
+    # transfer with ``ts_ns`` at or below a ``trading_applied_through_ts_ns``
+    # of the account's current epoch is applied in those balances.
+    ts_ns: int = 0
+
+
+class BalanceUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One publication of the balance stream (``balances.subscribe``), as sent.
+
+    ``account`` says which balances it carries:
+
+    - ``"trading"``: one step of the account's Trading balances, at position
+      ``(trading_epoch, trading_sequence)``. ``balances`` lists the assets it
+      changed, with their Trading fields only (``trading``, ``reserved``,
+      ``available``); ``transfers`` the Trading transfer legs it applied, each
+      identified by ``(transfer_id, is_debit)``. ``complete`` is true when the
+      Trading values are a consistent snapshot after this update; when false,
+      the same step continues in the next sequence. Every Trading transfer at
+      or before ``trading_applied_through_ts_ns`` is in these balances. A
+      Trading update's epoch is never 0.
+    - ``"funding"``: one asset's Funding balance (``funding`` and
+      ``funding_revision``), with no Trading fields and no position
+      (``trading_epoch`` and ``trading_sequence`` are 0). Apply it when its
+      ``funding_revision`` is higher than the asset's.
+
+    A value this SDK does not know reads as its number. Tell the kinds apart
+    by ``account``, never by the epoch. The SDK neither buffers nor reorders
+    updates: see "Keeping exact balances" in the README for the reload loop.
+    """
+
+    account: str = ""
+    trading_epoch: int = 0
+    trading_sequence: int = 0
+    complete: bool = False
+    balances: list[AssetBalance] = []
+    transfers: list[LedgerTransfer] = []
+    trading_applied_through_ts_ns: int = 0
 
 
 class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -1247,7 +1325,10 @@ class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     updated_at: datetime | None = None
     revision: int = 0
     # "standard" for a key the user created, "assistant" for a key of the
-    # Polyester assistant; "" when the server does not say.
+    # Polyester assistant, "admin_key" for an admin key, "strategy_bot" for a
+    # strategy bot's trade key; "" when the server does not say. A strategy
+    # bot manages its key: an update, policy change or delete of it is
+    # refused with AUTH_STRATEGY_BOT_MANAGED.
     purpose: str = ""
     # Public ID of the API policy attached to the key, as ``ApiPolicy.id``;
     # "" when none is attached, in which case the key has no permissions.
@@ -1260,6 +1341,9 @@ class ApiKeySummary(msgspec.Struct, kw_only=True, omit_defaults=True):
     expires_at: datetime | None = None
     # Hex of the key's Ed25519 public key; "" when the server sends none.
     public_key_ed25519: str = ""
+    # Public ID of the strategy bot a "strategy_bot" key trades for; "" on
+    # every other key.
+    strategy_bot_id: str = ""
 
 
 class ApiKeysList(msgspec.Struct, kw_only=True, omit_defaults=True):

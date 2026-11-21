@@ -11,14 +11,10 @@ from polyester.gen.polyester.type.v1 import u128_pb2
 
 
 def test_asset_balance_from_proto_preserves_uint64_revisions() -> None:
-    msg = ledger_read_pb2.AssetBalance(
-        asset_id=1,
-        trading_revision=2**63 + 1,
-        funding_revision=2**63 + 2,
-    )
+    msg = ledger_read_pb2.AssetBalance(asset_id=1, funding_revision=2**63 + 2)
     result = asset_balance_from_proto(msg)
-    assert result.trading_revision == 2**63 + 1
     assert result.funding_revision == 2**63 + 2
+    assert not hasattr(result, "trading_revision")
 
 
 def test_balance_history_from_proto() -> None:

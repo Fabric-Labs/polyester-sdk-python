@@ -32,6 +32,7 @@ Requires **Python 3.11+**.
 | VIP tiers + status | Yes |
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
+| Profit and loss + trading statistics | Yes |
 | Product changelog (posts + changes) | Yes |
 | Server build version | Yes |
 | Price alerts (devnet) | Yes |
@@ -955,6 +956,40 @@ cancel-all always runs; an error from the cancel-all itself is raised. The resul
 `trigger_failures` (each a `StopAllTradingTriggerFailure` with `trigger_id`
 and `error`: check them, such a trigger may still be live) and `cancel_all`.
 
+`triggers.cancel_all(...)` cancels, in one request, every trigger that matches
+`symbol`, `symbols` or `symbol_ids` (up to 100 pairs), `side` and
+`trigger_types` (up to 5 of `stop_loss`, `take_profit`, `trailing_stop`, `twap`
+and `ladder`), and cancels no order; leave a filter out to match everything.
+It replaces listing triggers and canceling them in batches of 50. Each matching
+trigger ends canceled with reason `cancel_all`, releases its reserved funds and
+places no order after the answer; a TWAP's working slice, a ladder's open
+levels and an attached leg's working exit end with it, but an order a stop
+already placed stays open. An order's attached legs end together, and so do an
+OCO's two legs: when one matches, all are canceled and counted. The result has
+`status` (`"submitted"` or `"dry_run"`), `matched_triggers` and `ts_ns`, and no
+trigger IDs, so read the triggers again afterwards. `dry_run=True` counts the
+matches for a confirmation. As for `cancel_all`, what it cancels is fixed when
+its `request_id` is first accepted; a retry with the same `request_id` and
+criteria within two minutes returns the original count, and the SDK generates a
+`request_id` when you give none. Every request counts 10 against the cancel
+rate limit, a dry run and a retry included. While a cancel of triggers (this
+call, or `orders.cancel_all(include_triggers=True)`) is ending an order's
+attached legs, a modify of that order that adds or changes an attached leg is
+refused with the retryable `ERROR_CODE_ORDER_MODIFY_IN_PROGRESS`; retry it once
+the legs have ended.
+
+```python
+preview = await client.triggers.cancel_all(
+    symbol="BTC-USDT", trigger_types=["stop_loss", "take_profit"], dry_run=True
+)
+if preview.matched_triggers:
+    await client.triggers.cancel_all(
+        symbol="BTC-USDT",
+        trigger_types=["stop_loss", "take_profit"],
+        request_id="tpsl-cancel-all-1",
+    )
+```
+
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
@@ -1008,12 +1043,17 @@ when unset. `VIPStatus.settled_volume_quality` and `average_aop_quality` say how
 each 30-day metric is: `status` is `complete`, `price_unavailable` (the metric is a lower
 bound) or `incomplete_history`, with `incomplete_hours` out of 720. Both are `None` when the
 assignment carries no qualification evidence. `policy_class` uses full protobuf enum names
-(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Rate-limit rules expose
+(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL` / `_READ`). Rate-limit rules expose
 `vip_tier` (not `tier`). Trading limits apply per account: the root account and each
-sub-account have their own, and every API key and session that trades for an account shares
-them. Budget against `TradingRateLimits.rules` (placement first, cancellation second);
-`api_key_rules` are informational only, since trading requests are not limited per API key,
-so adding keys does not add capacity.
+sub-account have their own, and every API key and session that trades or reads for an
+account shares them. Budget against `TradingRateLimits.rules` (placement, cancellation, then
+read). Order, fill, trigger, trading-limit and fee reads and order previews cost units of the
+read limit of the account they read: reading one sub-account no longer uses another's
+budget, and a sub-account reads at its own read-limit override, else its VIP tier's limit,
+never its root account's override. Select the sub-account to see its read rule. In
+`api_key_rules` the read rule (third) is enforced on top of the account's: a read is refused
+when either is exhausted. Its placement and cancellation rules are informational only, since
+orders are not limited per API key, so adding keys does not add capacity.
 
 ```python
 tiers = await client.vip.list_vip_tiers()
@@ -1021,6 +1061,51 @@ status = await client.vip.get_vip_status()
 fees = await client.fees.get_spot_fee_rates()
 catalog = await client.rate_limits.get_rate_limit_config()
 limits = await client.rate_limits.get_trading_rate_limits()
+```
+
+## Profit and loss
+
+`client.pnl` reports the profit and loss of the main account or one sub-account
+in USD. Spot profit and loss uses each asset's weighted average cost: every trade
+is valued at its execution time, every fee is a realized expense, and deposits,
+withdrawals and transfers are never profit or loss (deposited coins have no
+known cost). An API key needs `READ_PNL` on its policy. Without `account` or
+`sub_account_id`, a main-account key reads the main account together with every
+sub-account it owns, and a sub-account key its own sub-account.
+
+- `pnl.get(window=...)` returns `ProfitAndLoss` over `"today"`, `"7d"`, `"30d"` or
+  `"lifetime"` (each from 00:00 UTC): `pnl_usd`, `realized_pnl_usd` (after
+  fees), `unrealized_pnl_change_usd`, `unrealized_pnl_usd`, fees and volume, by
+  product and by market, and every asset held now (`holdings`) with its
+  quantity, quantity of unknown cost, cost, average entry price, mark price and
+  unrealized profit and loss. `product="spot"` filters every figure; `symbol`
+  or `symbol_id` filters `markets` only.
+- `pnl.get_trading_statistics(window=...)` returns `TradingStatistics`: trade
+  count, volume, fees and realized profit and loss over the window, and the
+  whole account's `return_pct` (time-weighted, in percent), `max_drawdown_pct`
+  and annualized `sharpe` over its closed UTC days, with `return_days`.
+- `pnl.list_daily(start=..., end=...)` returns one page of `DailyProfitAndLoss`
+  per UTC day, oldest first, days without activity included, with each day's
+  equity at its start and end and its net flow; `pnl.iter_daily(...)` walks
+  every page. `start` and `end` are a `date` or an aware `datetime` at 00:00
+  UTC, at most 366 days apart.
+
+Amounts, quantities, prices and percentages are exact `Decimal`s, never floats.
+A figure that needs a price that is not available is `None`, never 0, and
+`notices` says why (`"price_unavailable"`, `"mark_unavailable"`,
+`"equity_unavailable"`, `"sharpe_insufficient_days"` and others). `as_of` is
+when the figures were last published: a trade settled just before it may not be
+included yet. Reads that answer `unavailable` are retried for about 2 seconds.
+
+```python
+from datetime import date
+
+week = await client.pnl.get(window="7d")
+print(week.pnl_usd, week.realized_pnl_usd, week.notices)
+stats = await client.pnl.get_trading_statistics(window="30d")
+print(stats.return_pct, stats.max_drawdown_pct, stats.sharpe, stats.return_days)
+async for day in client.pnl.iter_daily(start=date(2026, 11, 1), end=date(2026, 12, 1)):
+    print(day.day, day.pnl_usd, day.net_flow_usd)
 ```
 
 ## Address book and social handles
@@ -1719,6 +1804,79 @@ SDK notes:
   exact balance per point in each series' `balance`: an `AssetAmount` at 18
   decimals (`amount.as_decimal()`), never a float.
 
+### Keeping exact balances
+
+`balances.list()` returns every asset's balances and the position its Trading
+values are at: `trading_epoch` and `trading_sequence`, one cut across every
+asset, and `trading_applied_through_ts_ns` (every Trading transfer at or before
+that time is in these balances). `balances.subscribe()` yields each publication
+of the account's balance stream as a `BalanceUpdate`, exactly as sent: the SDK
+does not buffer, reorder or merge them.
+
+- A `"trading"` update (`account`) is one numbered step of the Trading
+  balances at `(trading_epoch, trading_sequence)`. Its `balances` hold only the
+  assets it changed, with their Trading fields (`trading`, `reserved`,
+  `available`); `transfers` are the Trading transfer legs it applied, each
+  identified by `(transfer_id, is_debit)`. Its epoch is never 0.
+- A `"funding"` update carries one asset's `funding` and `funding_revision`,
+  and no position (epoch and sequence 0). Tell the two apart by `account`,
+  never by the epoch.
+
+`trading_epoch` is opaque: compare it only for equality. To keep exact
+balances:
+
+1. Subscribe and buffer the updates.
+2. Call `balances.list()` and apply its balances. Remember its position: epoch
+   E and sequence Q. It retries an `unavailable` answer for about 2 seconds and
+   then raises a retryable `PolyesterServerError`; retry it with a backoff.
+3. Drop buffered and later Trading updates of epoch E with a sequence at or
+   below Q, and apply E's sequences Q + 1, Q + 2 and so on, in order.
+4. Keep a set of dropped epochs: every epoch you held before E, and every
+   epoch other than E of an update received before the `balances.list()` call
+   that answered E began. Drop a Trading update of a dropped epoch without
+   reloading. Reload from step 2 when a Trading update's epoch is neither E
+   nor dropped (the numbering restarted), when its sequence skips a number
+   (an update was missed), when E's next sequence does not arrive within 2
+   seconds after an update whose `complete` is false (Funding updates, repeats
+   and dropped epochs do not stop that timer), or when the subscription
+   reports a reconnect: `take_resubscribed()` returns True once per reconnect,
+   and publications missed meanwhile are not replayed.
+5. Apply a Funding update when its `funding_revision` is higher than the
+   asset's. Take only the Trading fields from a Trading update and only the
+   Funding fields from a Funding update; keep the others.
+
+Show Trading values after an update whose `complete` is true: in between, the
+same step continues in the next update. The updates of a new epoch up to its
+first complete one carry every asset the account holds in Trading. After a
+move to a new epoch, its values can lag the previous epoch's last ones until
+its `trading_applied_through_ts_ns` reaches the last one you saw; its later
+updates then apply those transfers, and a leg can arrive a second time. A
+transfer (from `transfers.list` or `transfers.subscribe`, `LedgerTransfer.ts_ns`)
+is in the Trading balances once a `trading_applied_through_ts_ns` of the
+current epoch is at or past its `ts_ns`, or its leg arrived in an update of the
+current epoch.
+
+```python
+import asyncio
+
+from polyester.models import BalanceUpdate
+
+sub = await client.balances.subscribe()
+buffered: list[BalanceUpdate] = []
+
+
+async def read_into_buffer() -> None:
+    async for update in sub:
+        buffered.append(update)
+
+
+reader = asyncio.create_task(read_into_buffer())
+snapshot = await client.balances.list()
+epoch, sequence = snapshot.trading_epoch, snapshot.trading_sequence
+# Apply the buffered and later updates as above; when sub.take_resubscribed()
+# returns True, call balances.list() again.
+```
+
 ### Batch internal transfers
 
 `internal_transfers.batch_create` moves Trading to Trading transfers together:
@@ -2087,11 +2245,12 @@ candle, when requested, is prepended). `get_candles_columns()` normalizes its
 column response oldest-first within each page; continuation pages go toward
 older candles. Sort explicitly by `ts_sec` before feeding a chronological
 indicator, rather than appending continuation pages as newer candles.
-The columnar response has no closed flag: its candles read `is_closed=True`,
-except the newest primary candle of a first page (no `page_token`) asked with
+Both calls carry the server's `is_closed` on every primary candle: with
+`include_incomplete=True`, the open candle (first page only) is the one that
+reads `False`. Reference candles are always closed. From a server that sends no
+closed column, a columnar candle reads `is_closed=True`, except the newest
+primary candle of a first page (no `page_token`) asked with
 `include_incomplete=True`, which reads `False` (not known to be closed).
-Continuation pages and reference candles are always closed. `get_candles()`
-carries the server's flag on every row.
 
 Merged market overview stream (snapshot + live updates). The create call waits
 for the WebSocket handshake and initial snapshot. With `symbols=[...]`, the

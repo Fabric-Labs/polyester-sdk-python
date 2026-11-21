@@ -33,6 +33,7 @@ def api_key_from_proto(msg: api_keys_pb2.ApiKey) -> ApiKeySummary:
         # Integer arithmetic: the exact time to the microsecond.
         expires_at=msg.expires_at.ToDatetime(tzinfo=UTC) if msg.HasField("expires_at") else None,
         public_key_ed25519=msg.public_key_ed25519.hex(),
+        strategy_bot_id=format_optional_uint64_id(msg.strategy_bot_id),
     )
 
 

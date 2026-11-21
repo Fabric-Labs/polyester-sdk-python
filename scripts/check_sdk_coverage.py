@@ -679,6 +679,11 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "any_services": ["ratelimit.v1.RateLimitService"],
     },
     {
+        "id": "pnl",
+        "label": "Profit and loss + trading statistics",
+        "any_services": ["pnl.v1.ProfitAndLossService"],
+    },
+    {
         "id": "changelog",
         "label": "Product changelog (posts + changes)",
         "any_services": ["changelog.v1.ChangelogService"],

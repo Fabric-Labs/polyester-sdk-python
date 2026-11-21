@@ -8,6 +8,7 @@ from typing import Any
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.triggers import (
     batch_cancel_triggers_from_proto,
+    cancel_all_triggers_from_proto,
     cancel_oco_from_proto,
     create_oco_from_proto,
     get_trigger_from_proto,
@@ -26,6 +27,7 @@ from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigge
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
     batch_cancel_triggers_to_proto,
+    cancel_all_triggers_to_proto,
     create_trigger_to_proto,
     modify_trigger_to_proto,
     trigger_type_to_proto,
@@ -44,6 +46,7 @@ from polyester.gen.triggers.v1.triggers_pb2 import (
 )
 from polyester.models import (
     BatchCancelTriggersResult,
+    CancelAllTriggersResult,
     CancelOcoResult,
     CreateOcoResult,
     RiskLeg,
@@ -67,6 +70,7 @@ from polyester.services._retry import (
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import (
     display_symbol_for_id,
+    resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
     resolve_symbol_id,
 )
@@ -583,6 +587,76 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.batch_cancel_triggers(req),
             request,
             batch_cancel_triggers_from_proto,
+        )
+
+    async def cancel_all(
+        self,
+        *,
+        account: AccountScope | None = None,
+        sub_account_id: str | int | None = None,
+        symbol: str | None = None,
+        symbols: Sequence[str] | None = None,
+        symbol_ids: Sequence[int] | None = None,
+        side: str | None = None,
+        trigger_types: Sequence[str] | None = None,
+        dry_run: bool = False,
+        request_id: str | None = None,
+    ) -> CancelAllTriggersResult:
+        """Cancel every trigger of the account that matches, in one request.
+
+        It cancels triggers only, never an order: a TWAP's working slice, a
+        ladder's open levels and an attached leg's working exit end with their
+        trigger, but an order a stop already placed stays open. Each matching
+        trigger ends canceled (reason ``cancel_all``), releases its reserved
+        funds and places no order after the answer. An order's attached
+        take-profit, stop-loss and trailing legs end together, and so do an
+        OCO's two legs: when one matches, all are canceled and counted in
+        ``matched_triggers``. A ``dry_run`` counts the matches and cancels
+        nothing. The answer lists no trigger IDs: read the triggers again.
+
+        ``symbol``, ``symbols`` or ``symbol_ids`` select up to 100 pairs (none
+        matches every pair); ``side`` is ``buy`` or ``sell`` (none matches
+        both: a trigger matches the side its orders trade on);
+        ``trigger_types`` takes up to 5 of ``stop_loss``, ``take_profit``,
+        ``trailing_stop``, ``twap`` and ``ladder``, as :meth:`list` reports
+        them (none matches every type).
+
+        What it cancels is fixed when its ``request_id`` is first accepted:
+        triggers created later keep running. A retry with the same
+        ``request_id`` and criteria within two minutes returns the original
+        count and cancels nothing again, so retry a request that timed out or
+        answered ``ORDER_CANCEL_OUTCOME_UNKNOWN`` unchanged; the same
+        ``request_id`` with other criteria is refused
+        ``CONFLICT_IDEMPOTENCY_KEY_REUSE``. Left out or empty, the SDK
+        generates one; set one you keep when you may need to retry. Every
+        request, a dry run or a retry included, counts 10 against the
+        account's cancel rate limit. While it is ending an order's attached
+        legs, a modify of that order that adds or changes an attached leg is
+        refused with the retryable ``ORDER_MODIFY_IN_PROGRESS``: retry the
+        modify once the legs have ended.
+        """
+        if symbol or symbols:
+            await self._ensure_catalogs()
+        request = cancel_all_triggers_to_proto(
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
+            symbol_ids=resolve_cancel_all_symbol_ids(
+                self._catalogs,
+                symbol=symbol,
+                symbols=None if symbols is None else list(symbols),
+                symbol_ids=None if symbol_ids is None else list(symbol_ids),
+                label="triggers.cancel_all",
+            ),
+            side=side,
+            trigger_types=trigger_types,
+            dry_run=dry_run,
+            request_id=request_id,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            TriggersServiceClient,
+            lambda client, req: client.cancel_all_triggers(req),
+            request,
+            cancel_all_triggers_from_proto,
         )
 
     async def modify(

@@ -960,8 +960,9 @@ and `error`: check them, such a trigger may still be live) and `cancel_all`.
 `symbol`, `symbols` or `symbol_ids` (up to 100 pairs), `side` and
 `trigger_types` (up to 5 of `stop_loss`, `take_profit`, `trailing_stop`, `twap`
 and `ladder`), and cancels no order; leave a filter out to match everything. A
-blank `symbol`, or a blank entry in `symbols`, is refused rather than read as
-every pair.
+blank `symbol`, a blank entry in `symbols`, or a string, bytes or mapping
+passed where a list belongs, is refused before sending rather than read as every
+pair; an empty list does match every pair.
 It replaces listing triggers and canceling them in batches of 50. Each matching
 trigger ends canceled with reason `cancel_all`, releases its reserved funds and
 places no order after the answer; a TWAP's working slice, a ladder's open
@@ -973,9 +974,10 @@ trigger IDs, so read the triggers again afterwards. `dry_run=True` counts the
 matches for a confirmation. As for `cancel_all`, what it cancels is fixed when
 its `request_id` is first accepted; a retry with the same `request_id` and
 criteria within two minutes returns the original count. Generate the
-`request_id` once per user action and keep it for retries: when you give none,
-the SDK generates one but does not return it, so that request cannot be retried
-safely. Every request counts 10 against the cancel
+`request_id` once per user action and keep it for retries. It is sent exactly as
+given: an empty, padded or otherwise malformed one is refused, never replaced.
+When you give none, the SDK generates one but does not return it, so that
+request cannot be retried safely. Every request counts 10 against the cancel
 rate limit, a dry run and a retry included. While a cancel of triggers (this
 call, or `orders.cancel_all(include_triggers=True)`) is ending an order's
 attached legs, a modify of that order that adds or changes an attached leg is
@@ -1814,17 +1816,22 @@ SDK notes:
 values are at: `trading_epoch` and `trading_sequence`, one cut across every
 asset, and `trading_applied_through_ts_ns` (every Trading transfer at or before
 that time is in these balances). `balances.subscribe()` yields each publication
-of the account's balance stream as a `BalanceUpdate`, exactly as sent: the SDK
-does not buffer, reorder or merge them.
+of the account's balance stream as the generated
+`ledger.read.v1.BalanceUpdate` (`polyester.gen.ledger.read.v1.ledger_read_pb2`),
+exactly as sent: field presence and unknown fields are kept, and the SDK does
+not buffer, reorder or merge updates. Amounts are 18-decimal `U128` messages:
+`format_ledger_u128((amount.hi << 64) | amount.lo)` formats one.
 
-- A `"trading"` update (`account`) is one numbered step of the Trading
-  balances at `(trading_epoch, trading_sequence)`. Its `balances` hold only the
-  assets it changed, with their Trading fields (`trading`, `reserved`,
-  `available`); `transfers` are the Trading transfer legs it applied, each
-  identified by `(transfer_id, is_debit)`. Its epoch is never 0.
-- A `"funding"` update carries one asset's `funding` and `funding_revision`,
-  and no position (epoch and sequence 0). Tell the two apart by `account`,
-  never by the epoch.
+- A Trading update (`account == catalog_pb2.TRADING`, from
+  `polyester.gen.ledger.v1`) is one numbered step of the Trading balances at
+  `(trading_epoch, trading_sequence)`. Its `balances` hold only the assets it
+  changed, with only their Trading fields set (`trading`, `reserved`,
+  `available`; `HasField("funding")` is false); `transfers` are the Trading
+  transfer legs it applied, each identified by `(transfer_id, is_debit)`. Its
+  epoch is never 0.
+- A Funding update (`account == catalog_pb2.FUNDING`) carries one asset's
+  `funding` and `funding_revision`, and no position (epoch and sequence 0).
+  Tell the two apart by `account`, never by the epoch.
 
 Read the stream and `balances.list()` for the same account, and name it in
 both: an unset `account_id` on `subscribe` is the client's `default_account_id`,
@@ -1853,7 +1860,10 @@ balances:
    reports a reconnect: `take_resubscribed()` returns True once per reconnect,
    and publications missed meanwhile are not replayed. Check it on a timer of
    its own, not only when an update arrives: an idle account may publish
-   nothing more after the reconnect.
+   nothing more after the reconnect. With the sync client, the handle
+   `balances.subscribe_sync(...)` returns has the same `take_resubscribed()`
+   (and `resubscribed`), callable from any thread; `on_event` is not called
+   for a reconnect.
 5. Apply a Funding update when its `funding_revision` is higher than the
    asset's. Take only the Trading fields from a Trading update and only the
    Funding fields from a Funding update; keep the others.
@@ -1875,7 +1885,7 @@ main_account_id = "3gDmDv6tjHJ"
 ```python
 import asyncio
 
-from polyester.models import BalanceUpdate
+from polyester.gen.ledger.read.v1.ledger_read_pb2 import BalanceUpdate
 
 sub = await client.balances.subscribe(account_id=main_account_id)
 buffered: list[BalanceUpdate] = []

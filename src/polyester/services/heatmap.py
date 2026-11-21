@@ -146,10 +146,15 @@ class AsyncHeatmapService(BaseService):
         ``interval`` is ``"1s"``, ``"1m"``, ``"5m"`` or ``"1h"`` (or ``"INTERVAL_1S"``);
         any other value is refused before connecting.
 
-        Key buckets by ``ts_sec`` and replace a stored bucket only with one of a
-        higher ``book_seq_end``, final or not: a finalized bucket can be
-        published again with later updates, and the same payload can arrive
-        more than once. Updates of a bucket still open are best effort.
+        Key buckets by ``ts_sec``. Replace a stored bucket with one of a
+        higher ``book_seq_end``, final or not, and at an equal
+        ``book_seq_end`` with a final one (``is_final``) over a provisional
+        one; never replace a bucket with a lower ``book_seq_end``. Updates of a
+        bucket still open are best effort: a later update or the final payload
+        supersedes them. A finalized bucket can be published again with later
+        updates and a higher ``book_seq_end``, and the same final payload can
+        arrive more than once (after a service restart, for example): a repeat
+        changes nothing.
         """
         label = heatmap_interval_channel_label(interval)
         if symbol:

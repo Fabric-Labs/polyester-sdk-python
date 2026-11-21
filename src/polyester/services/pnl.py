@@ -69,7 +69,11 @@ def _utc_day(value: object, name: str) -> datetime:
     if isinstance(value, datetime):
         if value.tzinfo is None:
             raise PolyesterValidationError(f"{name} must be a timezone-aware datetime or a date")
-        moment = value.astimezone(UTC)
+        try:
+            moment = value.astimezone(UTC)
+        except OverflowError:
+            # An offset that moves the time past year 1 or 9999 names no UTC day.
+            raise PolyesterValidationError(f"{name} is outside the supported date range") from None
         if moment.time() != time(0):
             raise PolyesterValidationError(f"{name} must be 00:00 UTC of a day")
         return moment
@@ -217,7 +221,8 @@ class AsyncProfitAndLossService(ScopedSubAccountMixin, BaseService):
         """
         start_day = _utc_day(start, "start")
         end_day = _utc_day(end, "end")
-        if not start_day < end_day <= start_day + timedelta(days=DAILY_MAX_DAYS):
+        # Compared as a difference: start + 366 days overflows near year 9999.
+        if not start_day < end_day or end_day - start_day > timedelta(days=DAILY_MAX_DAYS):
             raise PolyesterValidationError(
                 f"end must be after start and at most {DAILY_MAX_DAYS} days after it"
             )

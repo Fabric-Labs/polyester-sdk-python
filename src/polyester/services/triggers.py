@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -24,7 +24,7 @@ from polyester.codecs.orders import (
     resolve_quantity_scale,
 )
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import id_to_int, market_ids
 from polyester.codecs.triggers import (
     batch_cancel_triggers_to_proto,
     cancel_all_triggers_to_proto,
@@ -76,6 +76,25 @@ from polyester.services._symbols import (
 )
 from polyester.services._validation import validate_limit
 from polyester.types.money import Price
+
+
+def _cancel_all_symbols(symbols: object) -> list[str] | None:
+    """``triggers.cancel_all``'s ``symbols`` as a list of pair names, or refused."""
+    if symbols is None:
+        return None
+    if isinstance(symbols, str | bytes | bytearray | Mapping) or not isinstance(symbols, Iterable):
+        raise PolyesterValidationError(
+            "triggers.cancel_all symbols must be a list of pair names, "
+            f"not {type(symbols).__name__}"
+        )
+    names = list(symbols)
+    for index, item in enumerate(names):
+        if not isinstance(item, str) or not item.strip():
+            raise PolyesterValidationError(
+                f"triggers.cancel_all symbols[{index}] must not be blank; "
+                "leave symbols out to match every pair"
+            )
+    return names
 
 
 class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
@@ -631,9 +650,11 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         answered ``ORDER_CANCEL_OUTCOME_UNKNOWN`` unchanged; the same
         ``request_id`` with other criteria is refused
         ``CONFLICT_IDEMPOTENCY_KEY_REUSE``. Generate it once per user action
-        and keep it: a retry needs the same key and criteria. Left out or
-        empty, the SDK generates one but does not return it, so such a request
-        cannot be retried safely; supply your own whenever a retry may follow.
+        and keep it: a retry needs the same key and criteria. It is sent
+        exactly as given: one that is empty, padded or otherwise malformed is
+        refused, never replaced. Left out (``None``), the SDK generates one but
+        does not return it, so such a request cannot be retried safely; supply
+        your own whenever a retry may follow.
         Every
         request, a dry run or a retry included, counts 10 against the
         account's cancel rate limit. While it is ending an order's attached
@@ -641,26 +662,30 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         refused with the retryable ``ORDER_MODIFY_IN_PROGRESS``: retry the
         modify once the legs have ended.
         """
-        # A blank filter would resolve to no pair, and so match every pair.
-        if symbol is not None and (not isinstance(symbol, str) or not symbol.strip()):
+        # A malformed filter must never read as "every pair": a blank name, or
+        # a str, bytes or mapping where a list belongs, is refused before
+        # anything is sent. An empty list is a deliberate "every pair".
+        if symbol is not None and not isinstance(symbol, str):
+            raise PolyesterValidationError(
+                f"triggers.cancel_all symbol must be a pair name, not {type(symbol).__name__}"
+            )
+        if symbol is not None and not symbol.strip():
             raise PolyesterValidationError(
                 "triggers.cancel_all symbol must not be blank; leave it out to match every pair"
             )
-        for index, item in enumerate(symbols or ()):
-            if not isinstance(item, str) or not item.strip():
-                raise PolyesterValidationError(
-                    f"triggers.cancel_all symbols[{index}] must not be blank; "
-                    "leave symbols out to match every pair"
-                )
-        if symbol or symbols:
+        symbol_list = _cancel_all_symbols(symbols)
+        id_list = (
+            None if symbol_ids is None else market_ids(symbol_ids, "triggers.cancel_all symbol_ids")
+        )
+        if symbol or symbol_list:
             await self._ensure_catalogs()
         request = cancel_all_triggers_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             symbol_ids=resolve_cancel_all_symbol_ids(
                 self._catalogs,
                 symbol=symbol,
-                symbols=None if symbols is None else list(symbols),
-                symbol_ids=None if symbol_ids is None else list(symbol_ids),
+                symbols=symbol_list,
+                symbol_ids=id_list,
                 label="triggers.cancel_all",
             ),
             side=side,

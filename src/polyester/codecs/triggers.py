@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from polyester.catalogs import CatalogManager
@@ -12,7 +12,11 @@ from polyester.codecs.bps import (
     validate_bps,
 )
 from polyester.codecs.contract_limits import contract_string_max_bytes
-from polyester.codecs.correlation_id import optional_request_id
+from polyester.codecs.correlation_id import (
+    REQUEST_ID_MAX_LEN,
+    check_correlation_id,
+    optional_request_id,
+)
 from polyester.codecs.refusal_codes import (
     BAD_PRICE,
     CLIENT_TRIGGER_ID_INVALID,
@@ -34,6 +38,7 @@ from polyester.codecs.scalars import (
     INT64_MAX,
     exact_integer,
     id_to_int,
+    market_ids,
     parse_account_id,
     tick_count,
 )
@@ -767,18 +772,24 @@ def cancel_all_triggers_to_proto(
     ``symbol_ids`` are resolved pair IDs (empty matches every pair), ``side``
     is ``buy`` or ``sell`` (``None`` matches both) and ``trigger_types`` takes
     up to 5 ``triggers.create`` type labels (empty matches every type);
-    repeats are sent once. ``request_id`` is the request's idempotency key;
-    left out or empty, one is generated.
+    repeats are sent once. ``request_id`` is the request's idempotency key,
+    sent exactly as given: one that is not 1 to 64 of ``[A-Za-z0-9._:/-]``,
+    an empty or padded one included, is refused, never replaced, so a retry
+    cannot become a new cancel. Left out (``None``), one is generated.
     """
     if not isinstance(dry_run, bool):
         raise PolyesterValidationError("dry_run must be a bool")
-    proto = triggers_pb2.CancelAllTriggersRequest(
-        request_id=optional_request_id(request_id) or f"trg-cancel-all-{uuid.uuid4().hex[:12]}",
-        dry_run=dry_run,
-    )
+    if request_id is None:
+        key = f"trg-cancel-all-{uuid.uuid4().hex[:12]}"
+    elif isinstance(request_id, str):
+        key = check_correlation_id(request_id, "request_id", REQUEST_ID_MAX_LEN)
+    else:
+        raise PolyesterValidationError("request_id must be a string")
+    proto = triggers_pb2.CancelAllTriggersRequest(request_id=key, dry_run=dry_run)
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
-    unique_ids = list(dict.fromkeys(symbol_ids))
+    # A str, bytes or mapping is refused, never iterated: b"\x01" is not pair 1.
+    unique_ids = list(dict.fromkeys(market_ids(symbol_ids, "triggers.cancel_all symbol_ids")))
     if any(value <= 0 for value in unique_ids):
         raise PolyesterValidationError("triggers.cancel_all symbol_ids must be positive")
     if len(unique_ids) > CANCEL_ALL_TRIGGERS_MAX_SYMBOLS:
@@ -792,7 +803,9 @@ def cancel_all_triggers_to_proto(
             raise PolyesterValidationError("side must be buy or sell")
         proto.side = orders_pb2.BUY if key == "buy" else orders_pb2.SELL
     if trigger_types is not None:
-        if isinstance(trigger_types, (str, bytes)):
+        if isinstance(trigger_types, str | bytes | bytearray | Mapping) or not isinstance(
+            trigger_types, Iterable
+        ):
             raise PolyesterValidationError("trigger_types must be a list of trigger types")
         types = list(dict.fromkeys(trigger_type_to_proto(value) for value in trigger_types))
         if len(types) > CANCEL_ALL_TRIGGERS_MAX_TYPES:

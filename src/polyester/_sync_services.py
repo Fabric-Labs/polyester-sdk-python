@@ -57,11 +57,11 @@ from polyester.sync_subscribe import SyncSubscription
 from polyester.sync_subscribe import subscribe_sync as _subscribe_sync_impl
 
 if TYPE_CHECKING:
+    from polyester.gen.ledger.read.v1 import ledger_read_pb2
     from polyester.models import (
         ApiData,
         ApiKeySummary,
         ApiPolicy,
-        BalanceUpdate,
         Candle,
         CreateOrderParams,
         CreateOrderRequest,
@@ -442,7 +442,7 @@ class SyncBalancesService(_SyncSubscribeService):
     def subscribe_sync(
         self,
         *,
-        on_event: Callable[[BalanceUpdate], object],
+        on_event: Callable[[ledger_read_pb2.BalanceUpdate], object],
         on_error: Callable[[Exception], object] | None = None,
         account_id: str | int | None = None,
     ) -> SyncSubscription:

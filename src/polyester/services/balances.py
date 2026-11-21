@@ -11,6 +11,7 @@ from polyester.codecs.decode.balances import (
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.realtime_decode import decode_balance_update_bytes
+from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
@@ -20,7 +21,6 @@ from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
 from polyester.models import (
     BalanceHistory,
     BalancesList,
-    BalanceUpdate,
     EquityHistory,
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
@@ -141,12 +141,17 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account_id: str | int | None = None,
-    ) -> AsyncSubscription[BalanceUpdate]:
-        """The account's balance stream: each publication as one
-        :class:`~polyester.models.BalanceUpdate`, in the order received.
+    ) -> AsyncSubscription[ledger_read_pb2.BalanceUpdate]:
+        """The account's balance stream: each publication as the generated
+        ``ledger.read.v1.BalanceUpdate``, exactly as published and in the order
+        received. Field presence and unknown fields are kept.
 
-        A ``"trading"`` update is one numbered step of the Trading balances and
-        a ``"funding"`` update one asset's Funding balance. The SDK does not
+        ``account`` is ``AccountCode.TRADING`` for one numbered step of the
+        Trading balances at ``(trading_epoch, trading_sequence)``, whose
+        ``balances`` set only the Trading fields of the assets it changed, and
+        ``AccountCode.FUNDING`` for one asset's Funding balance and
+        ``funding_revision``, with no position. Amounts are 18-decimal ``U128``
+        messages (``(hi << 64) | lo``). The SDK does not
         buffer, reorder or merge them, and a reconnect can miss or repeat
         updates: ``take_resubscribed()`` on the subscription reports each
         reconnect. Check it on a timer of its own, not only when an update

@@ -6,9 +6,10 @@ overview's live price band and strategy bot keys."""
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -40,7 +41,7 @@ from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.pnl.v1 import pnl_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
-from polyester.models import AssetBalance, BalanceUpdate
+from polyester.models import AssetBalance
 from polyester.realtime.client import AsyncRealtimeClient
 from polyester.realtime.resubscribe import SubaccountAccess
 from polyester.services import _retry
@@ -200,7 +201,7 @@ async def test_balances_list_raises_unavailable_after_the_retry_budget(
     assert 1 <= len(requests) <= 3
 
 
-# --- the balance stream: BalanceUpdate as published -------------------------------------------
+# --- the balance stream: the generated BalanceUpdate as published ---------------------------
 
 
 def _trading_update(sequence: int, *, complete: bool = True) -> ledger_read_pb2.BalanceUpdate:
@@ -278,36 +279,31 @@ async def test_balance_stream_yields_each_update_as_published() -> None:
         async with asyncio.timeout(5):
             received = [await anext(sub) for _ in range(4)]
 
+        # The generated message as published, not an SDK model.
+        assert all(type(u) is ledger_read_pb2.BalanceUpdate for u in received)
         assert [(u.account, u.trading_sequence, u.complete) for u in received] == [
-            ("trading", 44, False),
-            ("funding", 0, False),
-            ("trading", 43, True),
-            ("trading", 43, True),
+            (catalog_pb2.TRADING, 44, False),
+            (catalog_pb2.FUNDING, 0, False),
+            (catalog_pb2.TRADING, 43, True),
+            (catalog_pb2.TRADING, 43, True),
         ]
         trading = received[0]
-        assert isinstance(trading, BalanceUpdate)
-        assert trading.trading_epoch == _EPOCH
-        assert trading.trading_applied_through_ts_ns == _APPLIED_NS
-        assert trading.balances == [
-            AssetBalance(
-                asset_id=1,
-                trading=str(250 * _E18),
-                reserved=str(25 * _E18),
-                available=str(225 * _E18),
-            )
-        ]
+        assert trading == _trading_update(44, complete=False)
+        (balance,) = trading.balances
+        # Presence is kept: a Trading update sets no Funding field.
+        assert balance.HasField("trading") and not balance.HasField("funding")
+        assert (balance.trading.hi << 64) | balance.trading.lo == 250 * _E18
         (leg,) = trading.transfers
-        assert (leg.transfer_id, leg.is_debit, leg.ts_ns, leg.transfer_type) == (
+        assert (leg.transfer_id, leg.is_debit, leg.ts_ns) == (
             "340282366920938463463374607431768211455",
             True,
             _APPLIED_NS,
-            1064,
         )
         funding = received[1]
+        assert funding == _funding_update()
         assert funding.trading_epoch == 0
-        assert funding.balances == [
-            AssetBalance(asset_id=1, funding=str(1000 * _E18), funding_revision=81)
-        ]
+        (funding_balance,) = funding.balances
+        assert funding_balance.HasField("funding") and not funding_balance.HasField("trading")
         assert sub.take_resubscribed() is False
 
         # The reconnect signal is unchanged: clients reload on it.
@@ -320,13 +316,91 @@ async def test_balance_stream_yields_each_update_as_published() -> None:
         await realtime.aclose()
 
 
-def test_balance_update_of_an_unknown_account_reads_as_its_number() -> None:
+def test_sync_balance_handle_reports_reconnects_without_an_update(monkeypatch) -> None:
+    from polyester import Polyester
+    from polyester.realtime.client import AsyncSubscription
+
+    made: list[AsyncSubscription] = []
+
+    async def subscribe(self, **kwargs):
+        sub: AsyncSubscription = AsyncSubscription(queue=asyncio.Queue(), close=asyncio.Event())
+        made.append(sub)
+        return sub
+
+    monkeypatch.setattr(AsyncBalancesService, "subscribe", subscribe)
+    events: list[object] = []
+    client = Polyester(hydrate_catalogs=False)
+    try:
+        handle = client.balances.subscribe_sync(on_event=events.append)
+        assert handle.take_resubscribed() is False
+        assert handle.resubscribed == 0
+        # A reconnect with no update after it: the account is idle.
+        reconnected = threading.Event()
+
+        def reconnect() -> None:
+            made[0]._mark_resubscribed()
+            reconnected.set()
+
+        client._loop.call_soon_threadsafe(reconnect)
+        assert reconnected.wait(5)
+        assert handle.resubscribed == 1
+        assert handle.take_resubscribed() is True
+        assert handle.take_resubscribed() is False
+        assert events == []
+        handle.close()
+    finally:
+        client.close()
+
+
+def test_sync_handle_take_never_loses_or_repeats_a_reconnect() -> None:
+    from polyester.realtime.client import AsyncSubscription
+    from polyester.sync_subscribe import SyncSubscription
+
+    loop = asyncio.new_event_loop()
+    try:
+        sub: AsyncSubscription = AsyncSubscription(queue=asyncio.Queue(), close=asyncio.Event())
+
+        async def close() -> None:
+            return None
+
+        handle = SyncSubscription(loop, close_coro=close, holder={"sub": sub, "closed": False})
+        marks = 20_000
+        taken = 0
+        done = threading.Event()
+
+        def mark() -> None:
+            for _ in range(marks):
+                sub._mark_resubscribed()
+            done.set()
+
+        marker = threading.Thread(target=mark)
+        marker.start()
+        while not done.is_set():
+            taken += handle.take_resubscribed()
+        marker.join()
+        taken += handle.take_resubscribed()
+        assert handle.resubscribed == marks
+        # Each take saw a distinct pending reconnect, and the last one was not lost.
+        assert 1 <= taken <= marks
+        assert handle.take_resubscribed() is False
+    finally:
+        loop.close()
+
+
+def test_balance_update_keeps_unknown_values_and_fields() -> None:
     from polyester.codecs.realtime_decode import decode_balance_update_bytes
 
-    update = decode_balance_update_bytes(
-        ledger_read_pb2.BalanceUpdate(account=302).SerializeToString()  # type: ignore[arg-type]
+    # An account this SDK's contract does not name, and a field it does not
+    # know (15, a varint), reach the caller as published.
+    payload = (
+        ledger_read_pb2.BalanceUpdate(account=302, trading_epoch=7).SerializeToString()  # type: ignore[arg-type]
+        + bytes([15 << 3 | 0, 1])
     )
-    assert update.account == "302"
+    update = decode_balance_update_bytes(payload)
+    assert type(update) is ledger_read_pb2.BalanceUpdate
+    assert update.account == 302
+    assert update.trading_epoch == 7
+    assert update.SerializeToString() == payload
 
 
 def test_ledger_transfer_keeps_its_exact_time() -> None:
@@ -589,6 +663,29 @@ async def test_pnl_list_daily_refuses_what_the_contract_refuses(kwargs, match) -
     assert requests == []
 
 
+async def test_pnl_list_daily_accepts_the_last_representable_days() -> None:
+    reply = pnl_pb2.ListDailyProfitAndLossResponse()
+    async with _client(lambda req: _reply(reply, req)) as (client, requests):
+        await client.pnl.list_daily(start=date(9999, 12, 30), end=date(9999, 12, 31))
+        await client.pnl.list_daily(start=date(9998, 12, 30), end=date(9999, 12, 31))
+    first, second = (_request(req, pnl_pb2.ListDailyProfitAndLossRequest) for req in requests)
+    assert first.start_time.ToDatetime(tzinfo=UTC) == datetime(9999, 12, 30, tzinfo=UTC)
+    assert first.end_time.ToDatetime(tzinfo=UTC) == datetime(9999, 12, 31, tzinfo=UTC)
+    assert second.start_time.ToDatetime(tzinfo=UTC) == datetime(9998, 12, 30, tzinfo=UTC)
+
+
+async def test_pnl_list_daily_refuses_a_range_one_day_too_long_at_the_last_date() -> None:
+    async with _client(lambda _req: HttpScript.not_found()) as (client, requests):
+        with pytest.raises(PolyesterValidationError, match="366 days"):
+            await client.pnl.list_daily(start=date(9998, 12, 29), end=date(9999, 12, 31))
+        with pytest.raises(PolyesterValidationError, match="date range"):
+            await client.pnl.list_daily(
+                start=date(9999, 12, 30),
+                end=datetime(9999, 12, 31, 23, tzinfo=timezone(timedelta(hours=-2))),
+            )
+    assert requests == []
+
+
 # --- cancel-all for triggers --------------------------------------------------------------------
 
 
@@ -620,7 +717,6 @@ def test_cancel_all_triggers_matches_everything_and_generates_a_request_id() -> 
     assert request.dry_run is False
     assert request.request_id.startswith("trg-cancel-all-")
     assert len(request.request_id) <= 64
-    assert cancel_all_triggers_to_proto(request_id="  ").request_id.startswith("trg-cancel-all-")
 
 
 @pytest.mark.parametrize(
@@ -633,6 +729,13 @@ def test_cancel_all_triggers_matches_everything_and_generates_a_request_id() -> 
         ({"trigger_types": ["oco"]}, "trigger_type"),
         ({"request_id": "has space"}, "request_id"),
         ({"request_id": "x" * 65}, "request_id"),
+        ({"request_id": ""}, "request_id"),
+        ({"request_id": "  "}, "request_id"),
+        ({"request_id": " twap-1"}, "request_id"),
+        ({"request_id": 7}, "request_id"),
+        ({"symbol_ids": b"\x01"}, "list of integer market IDs"),
+        ({"symbol_ids": "1"}, "list of integer market IDs"),
+        ({"trigger_types": {"twap": 1}}, "list"),
         ({"dry_run": "yes"}, "dry_run"),
     ],
 )
@@ -711,6 +814,53 @@ async def test_triggers_cancel_all_refuses_a_blank_symbol_filter(kwargs, match) 
         with pytest.raises(PolyesterValidationError, match=match):
             await client.triggers.cancel_all(dry_run=True, **kwargs)
     assert requests == []
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"symbols": ""}, "list of pair names"),
+        ({"symbols": "BTC-USDT"}, "list of pair names"),
+        ({"symbols": b""}, "list of pair names"),
+        ({"symbols": {"BTC-USDT": 1}}, "list of pair names"),
+        ({"symbols": 7}, "list of pair names"),
+        ({"symbol": b"BTC-USDT"}, "must be a pair name"),
+        ({"symbol_ids": b""}, "list of integer market IDs"),
+        ({"symbol_ids": b"\x01"}, "list of integer market IDs"),
+        ({"symbol_ids": "12"}, "list of integer market IDs"),
+        ({"symbol_ids": {1: 1}}, "list of integer market IDs"),
+        ({"symbol_ids": 1}, "list of integer market IDs"),
+        ({"symbol_ids": [True]}, "symbol_ids"),
+        ({"trigger_types": b"twap"}, "list of trigger types"),
+        ({"trigger_types": {"twap": 1}}, "list of trigger types"),
+        ({"request_id": ""}, "request_id"),
+        ({"request_id": "   "}, "request_id"),
+        ({"request_id": "twap-1 "}, "request_id"),
+    ],
+    ids=repr,
+)
+async def test_triggers_cancel_all_refuses_malformed_filters_before_sending(kwargs, match) -> None:
+    # A malformed filter must never reach the server as an account-wide cancel.
+    async with _client(lambda _req: HttpScript.not_found()) as (client, requests):
+        with pytest.raises(PolyesterValidationError, match=match):
+            await client.triggers.cancel_all(dry_run=True, **kwargs)
+    assert requests == []
+
+
+async def test_triggers_cancel_all_empty_lists_match_every_pair() -> None:
+    reply = triggers_pb2.CancelAllTriggersResponse(
+        status=triggers_pb2.CancelAllTriggersResponse.DRY_RUN, matched_triggers=2
+    )
+    async with _client(lambda req: _reply(reply, req)) as (client, requests):
+        await client.triggers.cancel_all(dry_run=True, symbols=[], request_id="all-1")
+        await client.triggers.cancel_all(dry_run=True, symbol_ids=(), request_id="all-2")
+        await client.triggers.cancel_all(dry_run=True, trigger_types=[], request_id="all-3")
+    sent = [_request(req, triggers_pb2.CancelAllTriggersRequest) for req in requests]
+    assert [(list(r.symbol_ids), list(r.trigger_types), r.request_id) for r in sent] == [
+        ([], [], "all-1"),
+        ([], [], "all-2"),
+        ([], [], "all-3"),
+    ]
 
 
 # --- the market overview's live price band ------------------------------------------------------

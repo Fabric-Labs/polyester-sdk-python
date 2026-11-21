@@ -1054,39 +1054,6 @@ class LedgerTransfer(msgspec.Struct, kw_only=True, omit_defaults=True):
     ts_ns: int = 0
 
 
-class BalanceUpdate(msgspec.Struct, kw_only=True, omit_defaults=True):
-    """One publication of the balance stream (``balances.subscribe``), as sent.
-
-    ``account`` says which balances it carries:
-
-    - ``"trading"``: one step of the account's Trading balances, at position
-      ``(trading_epoch, trading_sequence)``. ``balances`` lists the assets it
-      changed, with their Trading fields only (``trading``, ``reserved``,
-      ``available``); ``transfers`` the Trading transfer legs it applied, each
-      identified by ``(transfer_id, is_debit)``. ``complete`` is true when the
-      Trading values are a consistent snapshot after this update; when false,
-      the same step continues in the next sequence. Every Trading transfer at
-      or before ``trading_applied_through_ts_ns`` is in these balances. A
-      Trading update's epoch is never 0.
-    - ``"funding"``: one asset's Funding balance (``funding`` and
-      ``funding_revision``), with no Trading fields and no position
-      (``trading_epoch`` and ``trading_sequence`` are 0). Apply it when its
-      ``funding_revision`` is higher than the asset's.
-
-    A value this SDK does not know reads as its number. Tell the kinds apart
-    by ``account``, never by the epoch. The SDK neither buffers nor reorders
-    updates: see "Keeping exact balances" in the README for the reload loop.
-    """
-
-    account: str = ""
-    trading_epoch: int = 0
-    trading_sequence: int = 0
-    complete: bool = False
-    balances: list[AssetBalance] = []
-    transfers: list[LedgerTransfer] = []
-    trading_applied_through_ts_ns: int = 0
-
-
 class TransfersList(msgspec.Struct, kw_only=True, omit_defaults=True):
     transfers: list[LedgerTransfer]
     # Opaque continuation token; empty means the terminal page.

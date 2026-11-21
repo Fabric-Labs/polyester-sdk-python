@@ -75,10 +75,18 @@ async def test_invalid_subaccount_code_reaches_the_caller() -> None:
     assert not mutation_outcome_unknown(error)
 
 
-async def test_unavailable_ledger_detail_stays_a_server_failure() -> None:
+async def test_unavailable_ledger_detail_stays_a_server_failure(monkeypatch) -> None:
+    from polyester.services import _retry
+
+    async def instant(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(_retry, "_sleep", instant)
     error, calls = await _balances_error(
         503, _body(ledger_read.ERROR_CODE_UPSTREAM_ERROR, "unavailable")
     )
-    assert calls == 1
+    # GetBalances answers unavailable while it catches up: the contract says to
+    # retry it, so balances.list does before raising the last answer.
+    assert calls > 1
     assert type(error) is PolyesterServerError
     assert error.code == "ERROR_CODE_UPSTREAM_ERROR"

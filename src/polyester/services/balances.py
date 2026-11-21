@@ -149,10 +149,20 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         a ``"funding"`` update one asset's Funding balance. The SDK does not
         buffer, reorder or merge them, and a reconnect can miss or repeat
         updates: ``take_resubscribed()`` on the subscription reports each
-        reconnect. Keep exact balances with the loop in the README's "Keeping
-        exact balances": buffer, :meth:`list`, apply in sequence order, and
-        reload on an epoch change, a gap, a stalled incomplete update or a
-        reconnect.
+        reconnect. Check it on a timer of its own, not only when an update
+        arrives: an idle account may publish nothing more after a reconnect.
+        Keep exact balances with the loop in the README's "Keeping exact
+        balances": buffer, :meth:`list`, apply in sequence order, and reload on
+        an epoch change, a gap, a stalled incomplete update or a reconnect.
+
+        Read the stream and :meth:`list` for the same account. An unset
+        ``account_id`` here is the client's ``default_account_id``, while
+        :meth:`list` with no account reads the client's
+        ``default_sub_account_id`` or the main account, so name the account in
+        both: ``subscribe(account_id=main_account_id)`` with
+        ``list(account="main")`` for the main account, and
+        ``subscribe(account_id=sub_id)`` with ``list(sub_account_id=sub_id)``
+        for a sub-account.
         """
         return await subscribe_account_proto(
             self._realtime,

@@ -615,7 +615,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         nothing. The answer lists no trigger IDs: read the triggers again.
 
         ``symbol``, ``symbols`` or ``symbol_ids`` select up to 100 pairs (none
-        matches every pair); ``side`` is ``buy`` or ``sell`` (none matches
+        matches every pair). A supplied symbol must name a pair: a blank
+        ``symbol``, or a blank entry in ``symbols``, raises
+        ``PolyesterValidationError`` instead of matching every pair; leave them
+        out to cancel on every pair. ``side`` is ``buy`` or ``sell`` (none matches
         both: a trigger matches the side its orders trade on);
         ``trigger_types`` takes up to 5 of ``stop_loss``, ``take_profit``,
         ``trailing_stop``, ``twap`` and ``ladder``, as :meth:`list` reports
@@ -627,14 +630,28 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         count and cancels nothing again, so retry a request that timed out or
         answered ``ORDER_CANCEL_OUTCOME_UNKNOWN`` unchanged; the same
         ``request_id`` with other criteria is refused
-        ``CONFLICT_IDEMPOTENCY_KEY_REUSE``. Left out or empty, the SDK
-        generates one; set one you keep when you may need to retry. Every
+        ``CONFLICT_IDEMPOTENCY_KEY_REUSE``. Generate it once per user action
+        and keep it: a retry needs the same key and criteria. Left out or
+        empty, the SDK generates one but does not return it, so such a request
+        cannot be retried safely; supply your own whenever a retry may follow.
+        Every
         request, a dry run or a retry included, counts 10 against the
         account's cancel rate limit. While it is ending an order's attached
         legs, a modify of that order that adds or changes an attached leg is
         refused with the retryable ``ORDER_MODIFY_IN_PROGRESS``: retry the
         modify once the legs have ended.
         """
+        # A blank filter would resolve to no pair, and so match every pair.
+        if symbol is not None and (not isinstance(symbol, str) or not symbol.strip()):
+            raise PolyesterValidationError(
+                "triggers.cancel_all symbol must not be blank; leave it out to match every pair"
+            )
+        for index, item in enumerate(symbols or ()):
+            if not isinstance(item, str) or not item.strip():
+                raise PolyesterValidationError(
+                    f"triggers.cancel_all symbols[{index}] must not be blank; "
+                    "leave symbols out to match every pair"
+                )
         if symbol or symbols:
             await self._ensure_catalogs()
         request = cancel_all_triggers_to_proto(

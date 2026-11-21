@@ -26,7 +26,7 @@ Requires **Python 3.11+**.
 | Profile (identity subscribe) | Yes |
 | API keys (list/get/subscribe/local keypair generation) | Yes |
 | Subaccounts (list/get/members/invites/activity/subscribe) | Yes |
-| Address book (list/view/create/update/subscribe) | Yes |
+| Address book (list/view/subscribe/create/update) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
 | VIP tiers + status | Yes |
@@ -959,7 +959,9 @@ and `error`: check them, such a trigger may still be live) and `cancel_all`.
 `triggers.cancel_all(...)` cancels, in one request, every trigger that matches
 `symbol`, `symbols` or `symbol_ids` (up to 100 pairs), `side` and
 `trigger_types` (up to 5 of `stop_loss`, `take_profit`, `trailing_stop`, `twap`
-and `ladder`), and cancels no order; leave a filter out to match everything.
+and `ladder`), and cancels no order; leave a filter out to match everything. A
+blank `symbol`, or a blank entry in `symbols`, is refused rather than read as
+every pair.
 It replaces listing triggers and canceling them in batches of 50. Each matching
 trigger ends canceled with reason `cancel_all`, releases its reserved funds and
 places no order after the answer; a TWAP's working slice, a ladder's open
@@ -970,8 +972,10 @@ OCO's two legs: when one matches, all are canceled and counted. The result has
 trigger IDs, so read the triggers again afterwards. `dry_run=True` counts the
 matches for a confirmation. As for `cancel_all`, what it cancels is fixed when
 its `request_id` is first accepted; a retry with the same `request_id` and
-criteria within two minutes returns the original count, and the SDK generates a
-`request_id` when you give none. Every request counts 10 against the cancel
+criteria within two minutes returns the original count. Generate the
+`request_id` once per user action and keep it for retries: when you give none,
+the SDK generates one but does not return it, so that request cannot be retried
+safely. Every request counts 10 against the cancel
 rate limit, a dry run and a retry included. While a cancel of triggers (this
 call, or `orders.cancel_all(include_triggers=True)`) is ending an order's
 attached legs, a modify of that order that adds or changes an attached leg is
@@ -1822,6 +1826,13 @@ does not buffer, reorder or merge them.
   and no position (epoch and sequence 0). Tell the two apart by `account`,
   never by the epoch.
 
+Read the stream and `balances.list()` for the same account, and name it in
+both: an unset `account_id` on `subscribe` is the client's `default_account_id`,
+while `list()` without an account reads the client's `default_sub_account_id` or
+the main account. For the main account use
+`subscribe(account_id=main_account_id)` with `list(account="main")`; for a
+sub-account, `subscribe(account_id=sub_id)` with `list(sub_account_id=sub_id)`.
+
 `trading_epoch` is opaque: compare it only for equality. To keep exact
 balances:
 
@@ -1840,7 +1851,9 @@ balances:
    seconds after an update whose `complete` is false (Funding updates, repeats
    and dropped epochs do not stop that timer), or when the subscription
    reports a reconnect: `take_resubscribed()` returns True once per reconnect,
-   and publications missed meanwhile are not replayed.
+   and publications missed meanwhile are not replayed. Check it on a timer of
+   its own, not only when an update arrives: an idle account may publish
+   nothing more after the reconnect.
 5. Apply a Funding update when its `funding_revision` is higher than the
    asset's. Take only the Trading fields from a Trading update and only the
    Funding fields from a Funding update; keep the others.
@@ -1856,13 +1869,17 @@ is in the Trading balances once a `trading_applied_through_ts_ns` of the
 current epoch is at or past its `ts_ns`, or its leg arrived in an update of the
 current epoch.
 
+<!-- readme-setup
+main_account_id = "3gDmDv6tjHJ"
+-->
 ```python
 import asyncio
 
 from polyester.models import BalanceUpdate
 
-sub = await client.balances.subscribe()
+sub = await client.balances.subscribe(account_id=main_account_id)
 buffered: list[BalanceUpdate] = []
+reload_needed = asyncio.Event()
 
 
 async def read_into_buffer() -> None:
@@ -1870,11 +1887,20 @@ async def read_into_buffer() -> None:
         buffered.append(update)
 
 
+async def watch_reconnects() -> None:
+    # On its own timer: an idle account may publish nothing after a reconnect.
+    while True:
+        await asyncio.sleep(1)
+        if sub.take_resubscribed():
+            reload_needed.set()
+
+
 reader = asyncio.create_task(read_into_buffer())
-snapshot = await client.balances.list()
+watcher = asyncio.create_task(watch_reconnects())
+snapshot = await client.balances.list(account="main")
 epoch, sequence = snapshot.trading_epoch, snapshot.trading_sequence
-# Apply the buffered and later updates as above; when sub.take_resubscribed()
-# returns True, call balances.list() again.
+# Apply the buffered and later updates as above, and call balances.list()
+# again whenever reload_needed is set.
 ```
 
 ### Batch internal transfers

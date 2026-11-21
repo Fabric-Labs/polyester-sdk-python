@@ -7,7 +7,8 @@ is sent; leaving the filters out is still the intentional cancel of every pair.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import asyncio
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -16,7 +17,7 @@ from google.protobuf import json_format
 
 from polyester import AsyncPolyester
 from polyester.codecs.orders import cancel_all_orders_to_proto
-from polyester.errors import PolyesterValidationError
+from polyester.errors import PolyesterCatalogHydrationError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from tests.hardening_support import (
     HttpScript,
@@ -102,6 +103,8 @@ _REFUSED: list[dict[str, Any]] = [
     {"symbol": "   ", "symbol_ids": [1]},
     {"symbol": "BTC-USDT", "symbol_ids": [1]},
     {"symbols": ["BTC-USDT"], "symbol_ids": [1]},
+    {"symbol": "BTC-USDT", "symbols": ["BTC-USDT"]},
+    {"symbol": "BTC-USDT", "request_id": "bad!key"},
     {"request_id": ""},
     {"request_id": "   "},
     {"request_id": " retry-1"},
@@ -112,30 +115,58 @@ _REFUSED: list[dict[str, Any]] = [
 ]
 
 
+def _catalog_wait(outcome: str, waits: list[str]) -> Callable[[], Awaitable[None]]:
+    """A catalog wait that records each call, then fails or never ends."""
+
+    async def wait() -> None:
+        waits.append(outcome)
+        if outcome == "failed":
+            raise PolyesterCatalogHydrationError("spot config unavailable")
+        await asyncio.Event().wait()
+
+    return wait
+
+
+@pytest.mark.parametrize("catalogs", ["failed", "pending"])
 @pytest.mark.parametrize("kwargs", _REFUSED, ids=repr)
 async def test_orders_cancel_all_refuses_a_blank_or_malformed_filter_before_sending(
-    kwargs: dict[str, Any],
+    kwargs: dict[str, Any], catalogs: str
 ) -> None:
-    # A malformed filter must never reach the server as an account-wide cancel.
+    # A malformed filter must never reach the server as an account-wide cancel,
+    # and is refused before the catalogs are awaited: a failed or pending
+    # catalog load never decides the answer.
+    waits: list[str] = []
     async with _client(_cancel_all_reply) as (client, requests):
+        client.orders._wait_for_catalogs = _catalog_wait(catalogs, waits)
         with pytest.raises(PolyesterValidationError):
-            await client.orders.cancel_all(dry_run=True, **kwargs)
+            await asyncio.wait_for(client.orders.cancel_all(dry_run=True, **kwargs), 5)
+    assert waits == []
     assert requests == []
 
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"symbol": ""}, {"symbol": "  "}, {"request_id": " stop-1"}, {"request_id": ""}],
+    [
+        {"symbol": ""},
+        {"symbol": "  "},
+        {"request_id": " stop-1"},
+        {"request_id": ""},
+        {"request_id": "bad!key"},
+        {"request_id": "r" * 65},
+    ],
     ids=repr,
 )
 async def test_stop_all_trading_refuses_a_blank_filter_before_canceling_triggers(
     kwargs: dict[str, Any],
 ) -> None:
-    # Refused up front: no trigger is listed or canceled before the
-    # cancel-all would have been refused.
+    # Refused up front: no catalog wait, and no trigger is listed or canceled
+    # before the cancel-all would have been refused.
+    waits: list[str] = []
     async with _client(_cancel_all_reply) as (client, requests):
+        client.orders._wait_for_catalogs = _catalog_wait("failed", waits)
         with pytest.raises(PolyesterValidationError):
             await client.orders.stop_all_trading(**kwargs)
+    assert waits == []
     assert requests == []
 
 

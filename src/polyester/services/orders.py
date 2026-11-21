@@ -663,7 +663,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         matches every pair). A supplied symbol must name a pair: a blank
         ``symbol``, or a blank entry in ``symbols``, raises
         ``PolyesterValidationError`` instead of matching every pair; leave them
-        out to cancel on every pair. ``request_id`` is sent exactly as given:
+        out to cancel on every pair; more than one of ``symbol``, ``symbols``
+        and ``symbol_ids`` is refused before the catalogs are awaited.
+        ``request_id`` is sent exactly as given:
         one that is empty, padded or otherwise malformed is refused, never
         replaced. Left out (``None``), the SDK generates one but does not
         return it, so such a request cannot be retried safely; supply your own
@@ -675,6 +677,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         symbol = _cancel_all_symbol(symbol)
         symbol_list = _cancel_all_symbols(symbols)
         id_list = _cancel_all_symbol_ids(symbol_ids)
+        # More than one selector is refused before the catalogs are awaited,
+        # so a failed or pending catalog load never decides the answer.
+        if sum(1 for group in (symbol, symbol_list, id_list) if group) > 1:
+            raise PolyesterValidationError(
+                "orders.cancel_all accepts only one of symbol, symbols, or symbol_ids"
+            )
         key = cancel_all_orders_request_id(request_id)
         if symbol or symbol_list:
             await self._ensure_catalogs()

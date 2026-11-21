@@ -44,6 +44,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     IMAGE_TYPE_UNSUPPORTED: _ClassVar[ErrorCode]
     TOO_MANY_IMAGES: _ClassVar[ErrorCode]
     IMAGE_NOT_FOUND: _ClassVar[ErrorCode]
+    CONVERSATION_SUBJECT_MISMATCH: _ClassVar[ErrorCode]
 
 class MessageRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -200,6 +201,7 @@ IMAGE_TOO_LARGE: ErrorCode
 IMAGE_TYPE_UNSUPPORTED: ErrorCode
 TOO_MANY_IMAGES: ErrorCode
 IMAGE_NOT_FOUND: ErrorCode
+CONVERSATION_SUBJECT_MISMATCH: ErrorCode
 ROLE_UNSPECIFIED: MessageRole
 USER: MessageRole
 ASSISTANT: MessageRole
@@ -289,16 +291,18 @@ class ErrorDetail(_message.Message):
     def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class Conversation(_message.Message):
-    __slots__ = ("conversation_id", "title", "created_at", "updated_at")
+    __slots__ = ("conversation_id", "title", "created_at", "updated_at", "subject")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    SUBJECT_FIELD_NUMBER: _ClassVar[int]
     conversation_id: int
     title: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, conversation_id: _Optional[int] = ..., title: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    subject: Subject
+    def __init__(self, conversation_id: _Optional[int] = ..., title: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., subject: _Optional[_Union[Subject, _Mapping]] = ...) -> None: ...
 
 class Message(_message.Message):
     __slots__ = ("message_id", "role", "text", "created_at", "run_id", "images")
@@ -1158,8 +1162,20 @@ class CurrentPage(_message.Message):
     title: str
     def __init__(self, destination_id: _Optional[str] = ..., route: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
 
+class Subject(_message.Message):
+    __slots__ = ("strategy",)
+    STRATEGY_FIELD_NUMBER: _ClassVar[int]
+    strategy: StrategySubject
+    def __init__(self, strategy: _Optional[_Union[StrategySubject, _Mapping]] = ...) -> None: ...
+
+class StrategySubject(_message.Message):
+    __slots__ = ("strategy_id",)
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    def __init__(self, strategy_id: _Optional[int] = ...) -> None: ...
+
 class SendMessageRequest(_message.Message):
-    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings", "account_selection", "expected_latest_run_id", "images")
+    __slots__ = ("conversation_id", "text", "idempotency_key", "subaccount_id", "destinations", "page", "display_settings", "account_selection", "expected_latest_run_id", "images", "subject")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
@@ -1170,6 +1186,7 @@ class SendMessageRequest(_message.Message):
     ACCOUNT_SELECTION_FIELD_NUMBER: _ClassVar[int]
     EXPECTED_LATEST_RUN_ID_FIELD_NUMBER: _ClassVar[int]
     IMAGES_FIELD_NUMBER: _ClassVar[int]
+    SUBJECT_FIELD_NUMBER: _ClassVar[int]
     conversation_id: int
     text: str
     idempotency_key: str
@@ -1180,7 +1197,8 @@ class SendMessageRequest(_message.Message):
     account_selection: AccountSelection
     expected_latest_run_id: int
     images: _containers.RepeatedCompositeFieldContainer[ImageAttachment]
-    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ..., account_selection: _Optional[_Union[AccountSelection, str]] = ..., expected_latest_run_id: _Optional[int] = ..., images: _Optional[_Iterable[_Union[ImageAttachment, _Mapping]]] = ...) -> None: ...
+    subject: Subject
+    def __init__(self, conversation_id: _Optional[int] = ..., text: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., destinations: _Optional[_Iterable[_Union[Destination, _Mapping]]] = ..., page: _Optional[_Union[CurrentPage, _Mapping]] = ..., display_settings: _Optional[_Iterable[_Union[DisplaySetting, str]]] = ..., account_selection: _Optional[_Union[AccountSelection, str]] = ..., expected_latest_run_id: _Optional[int] = ..., images: _Optional[_Iterable[_Union[ImageAttachment, _Mapping]]] = ..., subject: _Optional[_Union[Subject, _Mapping]] = ...) -> None: ...
 
 class SendMessageResponse(_message.Message):
     __slots__ = ("run_id", "conversation_id")
@@ -1229,12 +1247,14 @@ class DecideApprovalResponse(_message.Message):
     def __init__(self, status: _Optional[_Union[ApprovalStatus, str]] = ...) -> None: ...
 
 class ListConversationsRequest(_message.Message):
-    __slots__ = ("limit", "page_token")
+    __slots__ = ("limit", "page_token", "subject")
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    SUBJECT_FIELD_NUMBER: _ClassVar[int]
     limit: int
     page_token: str
-    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+    subject: Subject
+    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ..., subject: _Optional[_Union[Subject, _Mapping]] = ...) -> None: ...
 
 class ListConversationsResponse(_message.Message):
     __slots__ = ("conversations", "next_page_token")

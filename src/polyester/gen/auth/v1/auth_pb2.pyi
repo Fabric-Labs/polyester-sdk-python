@@ -95,6 +95,9 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_ADMIN_KEY_ALLOWLIST_INVALID: _ClassVar[AuthErrorCode]
     AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED: _ClassVar[AuthErrorCode]
     AUTH_CONNECTED_APP_LIMIT_REACHED: _ClassVar[AuthErrorCode]
+    AUTH_STRATEGY_BOT_MANAGED: _ClassVar[AuthErrorCode]
+    AUTH_STRATEGY_BOT_SUBACCOUNT_INELIGIBLE: _ClassVar[AuthErrorCode]
+    AUTH_STRATEGY_BOT_OPERATION_CONFLICT: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -169,6 +172,9 @@ AUTH_ADMIN_KEY_FORBIDDEN_TARGET: AuthErrorCode
 AUTH_ADMIN_KEY_ALLOWLIST_INVALID: AuthErrorCode
 AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED: AuthErrorCode
 AUTH_CONNECTED_APP_LIMIT_REACHED: AuthErrorCode
+AUTH_STRATEGY_BOT_MANAGED: AuthErrorCode
+AUTH_STRATEGY_BOT_SUBACCOUNT_INELIGIBLE: AuthErrorCode
+AUTH_STRATEGY_BOT_OPERATION_CONFLICT: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

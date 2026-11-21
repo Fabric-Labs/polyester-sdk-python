@@ -39,12 +39,26 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     IDEMPOTENCY_CONFLICT: _ClassVar[ErrorCode]
     SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
     FUNDING_SUBACCOUNT_NOT_FOUND: _ClassVar[ErrorCode]
+    BOT_NOT_RUNNING: _ClassVar[ErrorCode]
+    BOT_ALREADY_STOPPING: _ClassVar[ErrorCode]
+    STRATEGY_NOT_FOUND: _ClassVar[ErrorCode]
+    DRAFT_REVISION_CONFLICT: _ClassVar[ErrorCode]
+    STRATEGY_CAP_REACHED: _ClassVar[ErrorCode]
+    TEMPLATE_NOT_FOUND: _ClassVar[ErrorCode]
+    STRATEGY_IN_USE: _ClassVar[ErrorCode]
+    REVISION_NOT_FOUND: _ClassVar[ErrorCode]
 
 class OrderSide(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SIDE_UNSPECIFIED: _ClassVar[OrderSide]
     BUY: _ClassVar[OrderSide]
     SELL: _ClassVar[OrderSide]
+
+class StopMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    STOP_UNSPECIFIED: _ClassVar[StopMode]
+    KEEP_ORDERS: _ClassVar[StopMode]
+    CANCEL_ORDERS: _ClassVar[StopMode]
 ERROR_UNSPECIFIED: ErrorCode
 VERSION_NOT_FOUND: ErrorCode
 BACKTEST_NOT_FOUND: ErrorCode
@@ -68,9 +82,20 @@ INDICATOR_SETTINGS_LIMIT_REACHED: ErrorCode
 IDEMPOTENCY_CONFLICT: ErrorCode
 SERVICE_UNAVAILABLE: ErrorCode
 FUNDING_SUBACCOUNT_NOT_FOUND: ErrorCode
+BOT_NOT_RUNNING: ErrorCode
+BOT_ALREADY_STOPPING: ErrorCode
+STRATEGY_NOT_FOUND: ErrorCode
+DRAFT_REVISION_CONFLICT: ErrorCode
+STRATEGY_CAP_REACHED: ErrorCode
+TEMPLATE_NOT_FOUND: ErrorCode
+STRATEGY_IN_USE: ErrorCode
+REVISION_NOT_FOUND: ErrorCode
 SIDE_UNSPECIFIED: OrderSide
 BUY: OrderSide
 SELL: OrderSide
+STOP_UNSPECIFIED: StopMode
+KEEP_ORDERS: StopMode
+CANCEL_ORDERS: StopMode
 
 class BotCapDetail(_message.Message):
     __slots__ = ("vip_tier", "bot_cap", "bots", "next_vip_tier", "next_bot_cap")
@@ -86,21 +111,41 @@ class BotCapDetail(_message.Message):
     next_bot_cap: int
     def __init__(self, vip_tier: _Optional[int] = ..., bot_cap: _Optional[int] = ..., bots: _Optional[int] = ..., next_vip_tier: _Optional[int] = ..., next_bot_cap: _Optional[int] = ...) -> None: ...
 
+class StrategyCapDetail(_message.Message):
+    __slots__ = ("strategy_cap", "strategies")
+    STRATEGY_CAP_FIELD_NUMBER: _ClassVar[int]
+    STRATEGIES_FIELD_NUMBER: _ClassVar[int]
+    strategy_cap: int
+    strategies: int
+    def __init__(self, strategy_cap: _Optional[int] = ..., strategies: _Optional[int] = ...) -> None: ...
+
+class RevisionConflictDetail(_message.Message):
+    __slots__ = ("revision", "head_version_id")
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    HEAD_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    revision: int
+    head_version_id: str
+    def __init__(self, revision: _Optional[int] = ..., head_version_id: _Optional[str] = ...) -> None: ...
+
 class ErrorDetail(_message.Message):
-    __slots__ = ("code", "field_path", "retry_after", "bot_cap", "markets", "shortfall")
+    __slots__ = ("code", "field_path", "retry_after", "bot_cap", "markets", "shortfall", "strategy_cap", "revision_conflict")
     CODE_FIELD_NUMBER: _ClassVar[int]
     FIELD_PATH_FIELD_NUMBER: _ClassVar[int]
     RETRY_AFTER_FIELD_NUMBER: _ClassVar[int]
     BOT_CAP_FIELD_NUMBER: _ClassVar[int]
     MARKETS_FIELD_NUMBER: _ClassVar[int]
     SHORTFALL_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_CAP_FIELD_NUMBER: _ClassVar[int]
+    REVISION_CONFLICT_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     field_path: str
     retry_after: _timestamp_pb2.Timestamp
     bot_cap: BotCapDetail
     markets: _containers.RepeatedScalarFieldContainer[str]
     shortfall: _containers.RepeatedCompositeFieldContainer[Money]
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., field_path: _Optional[str] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot_cap: _Optional[_Union[BotCapDetail, _Mapping]] = ..., markets: _Optional[_Iterable[str]] = ..., shortfall: _Optional[_Iterable[_Union[Money, _Mapping]]] = ...) -> None: ...
+    strategy_cap: StrategyCapDetail
+    revision_conflict: RevisionConflictDetail
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., field_path: _Optional[str] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot_cap: _Optional[_Union[BotCapDetail, _Mapping]] = ..., markets: _Optional[_Iterable[str]] = ..., shortfall: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., strategy_cap: _Optional[_Union[StrategyCapDetail, _Mapping]] = ..., revision_conflict: _Optional[_Union[RevisionConflictDetail, _Mapping]] = ...) -> None: ...
 
 class Money(_message.Message):
     __slots__ = ("asset", "amount")
@@ -157,24 +202,20 @@ class Indicator(_message.Message):
     def __init__(self, name: _Optional[str] = ..., description: _Optional[str] = ..., parameters: _Optional[_Iterable[_Union[IndicatorParameter, _Mapping]]] = ..., outputs: _Optional[_Iterable[str]] = ..., warmup_bars: _Optional[str] = ...) -> None: ...
 
 class StrategyLimits(_message.Message):
-    __slots__ = ("cpu_ms_per_call", "memory_bytes_per_call", "state_bytes", "code_bytes", "manifest_bytes", "unique_indicator_settings", "backtests_per_day", "scenario_runs_per_minute")
+    __slots__ = ("cpu_ms_per_call", "memory_bytes_per_call", "state_bytes", "code_bytes", "manifest_bytes", "scenario_runs_per_minute")
     CPU_MS_PER_CALL_FIELD_NUMBER: _ClassVar[int]
     MEMORY_BYTES_PER_CALL_FIELD_NUMBER: _ClassVar[int]
     STATE_BYTES_FIELD_NUMBER: _ClassVar[int]
     CODE_BYTES_FIELD_NUMBER: _ClassVar[int]
     MANIFEST_BYTES_FIELD_NUMBER: _ClassVar[int]
-    UNIQUE_INDICATOR_SETTINGS_FIELD_NUMBER: _ClassVar[int]
-    BACKTESTS_PER_DAY_FIELD_NUMBER: _ClassVar[int]
     SCENARIO_RUNS_PER_MINUTE_FIELD_NUMBER: _ClassVar[int]
     cpu_ms_per_call: int
     memory_bytes_per_call: int
     state_bytes: int
     code_bytes: int
     manifest_bytes: int
-    unique_indicator_settings: int
-    backtests_per_day: int
     scenario_runs_per_minute: int
-    def __init__(self, cpu_ms_per_call: _Optional[int] = ..., memory_bytes_per_call: _Optional[int] = ..., state_bytes: _Optional[int] = ..., code_bytes: _Optional[int] = ..., manifest_bytes: _Optional[int] = ..., unique_indicator_settings: _Optional[int] = ..., backtests_per_day: _Optional[int] = ..., scenario_runs_per_minute: _Optional[int] = ...) -> None: ...
+    def __init__(self, cpu_ms_per_call: _Optional[int] = ..., memory_bytes_per_call: _Optional[int] = ..., state_bytes: _Optional[int] = ..., code_bytes: _Optional[int] = ..., manifest_bytes: _Optional[int] = ..., scenario_runs_per_minute: _Optional[int] = ...) -> None: ...
 
 class GetStrategyReferenceRequest(_message.Message):
     __slots__ = ("runtime_version",)
@@ -286,20 +327,8 @@ class SettingField(_message.Message):
     maximum: str
     def __init__(self, name: _Optional[str] = ..., description: _Optional[str] = ..., kind: _Optional[str] = ..., asset: _Optional[str] = ..., default_value: _Optional[str] = ..., minimum: _Optional[str] = ..., maximum: _Optional[str] = ...) -> None: ...
 
-class ValidateStrategyRequest(_message.Message):
-    __slots__ = ("name", "manifest", "code", "runtime_version")
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    MANIFEST_FIELD_NUMBER: _ClassVar[int]
-    CODE_FIELD_NUMBER: _ClassVar[int]
-    RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
-    name: str
-    manifest: _struct_pb2.Struct
-    code: str
-    runtime_version: str
-    def __init__(self, name: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., runtime_version: _Optional[str] = ...) -> None: ...
-
-class ValidateStrategyResponse(_message.Message):
-    __slots__ = ("version_id", "runtime_version", "valid", "errors", "warnings", "money_card", "settings_form")
+class VersionValidation(_message.Message):
+    __slots__ = ("version_id", "runtime_version", "valid", "errors", "warnings", "money_card", "settings_form", "flow")
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
     VALID_FIELD_NUMBER: _ClassVar[int]
@@ -307,6 +336,7 @@ class ValidateStrategyResponse(_message.Message):
     WARNINGS_FIELD_NUMBER: _ClassVar[int]
     MONEY_CARD_FIELD_NUMBER: _ClassVar[int]
     SETTINGS_FORM_FIELD_NUMBER: _ClassVar[int]
+    FLOW_FIELD_NUMBER: _ClassVar[int]
     version_id: str
     runtime_version: str
     valid: bool
@@ -314,7 +344,8 @@ class ValidateStrategyResponse(_message.Message):
     warnings: _containers.RepeatedCompositeFieldContainer[ValidationIssue]
     money_card: MoneyCard
     settings_form: _containers.RepeatedCompositeFieldContainer[SettingField]
-    def __init__(self, version_id: _Optional[str] = ..., runtime_version: _Optional[str] = ..., valid: _Optional[bool] = ..., errors: _Optional[_Iterable[_Union[ValidationIssue, _Mapping]]] = ..., warnings: _Optional[_Iterable[_Union[ValidationIssue, _Mapping]]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ...) -> None: ...
+    flow: StrategyFlow
+    def __init__(self, version_id: _Optional[str] = ..., runtime_version: _Optional[str] = ..., valid: _Optional[bool] = ..., errors: _Optional[_Iterable[_Union[ValidationIssue, _Mapping]]] = ..., warnings: _Optional[_Iterable[_Union[ValidationIssue, _Mapping]]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., flow: _Optional[_Union[StrategyFlow, _Mapping]] = ...) -> None: ...
 
 class RunScenariosRequest(_message.Message):
     __slots__ = ("version_id",)
@@ -561,15 +592,21 @@ class ExplainStrategyResponse(_message.Message):
     def __init__(self, version_id: _Optional[str] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., scenarios: _Optional[_Iterable[_Union[ScenarioSummary, _Mapping]]] = ..., backtest: _Optional[_Union[BacktestSummary, _Mapping]] = ..., backtest_absent_reason: _Optional[str] = ..., warnings: _Optional[_Iterable[str]] = ..., limitations: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class SettingValue(_message.Message):
-    __slots__ = ("name", "value")
+    __slots__ = ("name", "value", "description", "kind", "asset")
     NAME_FIELD_NUMBER: _ClassVar[int]
     VALUE_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    ASSET_FIELD_NUMBER: _ClassVar[int]
     name: str
     value: str
-    def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    description: str
+    kind: str
+    asset: str
+    def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ..., description: _Optional[str] = ..., kind: _Optional[str] = ..., asset: _Optional[str] = ...) -> None: ...
 
 class DeployProposalSummary(_message.Message):
-    __slots__ = ("version_id", "bot_name", "money_card", "settings", "funding_subaccount_id", "funding", "scenarios_passed", "backtest")
+    __slots__ = ("version_id", "bot_name", "money_card", "settings", "funding_subaccount_id", "funding", "scenarios_passed", "backtest", "strategy_id", "revision")
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     BOT_NAME_FIELD_NUMBER: _ClassVar[int]
     MONEY_CARD_FIELD_NUMBER: _ClassVar[int]
@@ -578,6 +615,8 @@ class DeployProposalSummary(_message.Message):
     FUNDING_FIELD_NUMBER: _ClassVar[int]
     SCENARIOS_PASSED_FIELD_NUMBER: _ClassVar[int]
     BACKTEST_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     version_id: str
     bot_name: str
     money_card: MoneyCard
@@ -586,23 +625,27 @@ class DeployProposalSummary(_message.Message):
     funding: _containers.RepeatedCompositeFieldContainer[Money]
     scenarios_passed: int
     backtest: BacktestSummary
-    def __init__(self, version_id: _Optional[str] = ..., bot_name: _Optional[str] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., funding_subaccount_id: _Optional[int] = ..., funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., scenarios_passed: _Optional[int] = ..., backtest: _Optional[_Union[BacktestSummary, _Mapping]] = ...) -> None: ...
+    strategy_id: int
+    revision: int
+    def __init__(self, version_id: _Optional[str] = ..., bot_name: _Optional[str] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., funding_subaccount_id: _Optional[int] = ..., funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., scenarios_passed: _Optional[int] = ..., backtest: _Optional[_Union[BacktestSummary, _Mapping]] = ..., strategy_id: _Optional[int] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ProposeDeployRequest(_message.Message):
-    __slots__ = ("version_id", "bot_name", "settings", "funding", "idempotency_key", "funding_subaccount_id")
-    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("strategy_id", "revision", "bot_name", "settings", "funding", "idempotency_key", "funding_subaccount_id")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     BOT_NAME_FIELD_NUMBER: _ClassVar[int]
     SETTINGS_FIELD_NUMBER: _ClassVar[int]
     FUNDING_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     FUNDING_SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    version_id: str
+    strategy_id: int
+    revision: int
     bot_name: str
     settings: _containers.RepeatedCompositeFieldContainer[SettingValue]
     funding: _containers.RepeatedCompositeFieldContainer[Money]
     idempotency_key: str
     funding_subaccount_id: int
-    def __init__(self, version_id: _Optional[str] = ..., bot_name: _Optional[str] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., idempotency_key: _Optional[str] = ..., funding_subaccount_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, strategy_id: _Optional[int] = ..., revision: _Optional[int] = ..., bot_name: _Optional[str] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., idempotency_key: _Optional[str] = ..., funding_subaccount_id: _Optional[int] = ...) -> None: ...
 
 class ProposeDeployResponse(_message.Message):
     __slots__ = ("proposal_id", "deploy_url", "summary", "expires_at")
@@ -617,7 +660,7 @@ class ProposeDeployResponse(_message.Message):
     def __init__(self, proposal_id: _Optional[int] = ..., deploy_url: _Optional[str] = ..., summary: _Optional[_Union[DeployProposalSummary, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class DeployStatus(_message.Message):
-    __slots__ = ("proposal_id", "state", "step", "bot_id", "subaccount_id", "failure", "expires_at", "updated_at")
+    __slots__ = ("proposal_id", "state", "step", "bot_id", "subaccount_id", "failure", "expires_at", "updated_at", "failed_at")
     class State(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATE_UNSPECIFIED: _ClassVar[DeployStatus.State]
@@ -646,6 +689,7 @@ class DeployStatus(_message.Message):
     FAILURE_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    FAILED_AT_FIELD_NUMBER: _ClassVar[int]
     proposal_id: int
     state: DeployStatus.State
     step: str
@@ -654,7 +698,8 @@ class DeployStatus(_message.Message):
     failure: str
     expires_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, proposal_id: _Optional[int] = ..., state: _Optional[_Union[DeployStatus.State, str]] = ..., step: _Optional[str] = ..., bot_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., failure: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    failed_at: DeployStatus.State
+    def __init__(self, proposal_id: _Optional[int] = ..., state: _Optional[_Union[DeployStatus.State, str]] = ..., step: _Optional[str] = ..., bot_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., failure: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., failed_at: _Optional[_Union[DeployStatus.State, str]] = ...) -> None: ...
 
 class GetDeployStatusRequest(_message.Message):
     __slots__ = ("proposal_id",)
@@ -668,8 +713,28 @@ class GetDeployStatusResponse(_message.Message):
     status: DeployStatus
     def __init__(self, status: _Optional[_Union[DeployStatus, _Mapping]] = ...) -> None: ...
 
+class GetDeployProposalRequest(_message.Message):
+    __slots__ = ("proposal_id",)
+    PROPOSAL_ID_FIELD_NUMBER: _ClassVar[int]
+    proposal_id: int
+    def __init__(self, proposal_id: _Optional[int] = ...) -> None: ...
+
+class GetDeployProposalResponse(_message.Message):
+    __slots__ = ("proposal_id", "summary", "status", "created_at", "funding_subaccount_label")
+    PROPOSAL_ID_FIELD_NUMBER: _ClassVar[int]
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    FUNDING_SUBACCOUNT_LABEL_FIELD_NUMBER: _ClassVar[int]
+    proposal_id: int
+    summary: DeployProposalSummary
+    status: DeployStatus
+    created_at: _timestamp_pb2.Timestamp
+    funding_subaccount_label: str
+    def __init__(self, proposal_id: _Optional[int] = ..., summary: _Optional[_Union[DeployProposalSummary, _Mapping]] = ..., status: _Optional[_Union[DeployStatus, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., funding_subaccount_label: _Optional[str] = ...) -> None: ...
+
 class Bot(_message.Message):
-    __slots__ = ("bot_id", "name", "subaccount_id", "status", "status_reason", "version_id", "profit_and_loss", "last_decision_at", "created_at", "quote_asset")
+    __slots__ = ("bot_id", "name", "subaccount_id", "status", "status_reason", "version_id", "profit_and_loss", "last_decision_at", "created_at", "quote_asset", "markets", "funding", "uptime_ratio", "running_since", "pause_reason")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[Bot.Status]
@@ -678,14 +743,22 @@ class Bot(_message.Message):
         STOPPING: _ClassVar[Bot.Status]
         STOPPED: _ClassVar[Bot.Status]
         PAUSED: _ClassVar[Bot.Status]
-        QUARANTINED: _ClassVar[Bot.Status]
     STATUS_UNSPECIFIED: Bot.Status
     DEPLOYING: Bot.Status
     RUNNING: Bot.Status
     STOPPING: Bot.Status
     STOPPED: Bot.Status
     PAUSED: Bot.Status
-    QUARANTINED: Bot.Status
+    class PauseReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        PAUSE_REASON_UNSPECIFIED: _ClassVar[Bot.PauseReason]
+        BOT_DECIDED: _ClassVar[Bot.PauseReason]
+        FAILURES_IN_A_ROW: _ClassVar[Bot.PauseReason]
+        ENVIRONMENT_RESET: _ClassVar[Bot.PauseReason]
+    PAUSE_REASON_UNSPECIFIED: Bot.PauseReason
+    BOT_DECIDED: Bot.PauseReason
+    FAILURES_IN_A_ROW: Bot.PauseReason
+    ENVIRONMENT_RESET: Bot.PauseReason
     BOT_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -696,6 +769,11 @@ class Bot(_message.Message):
     LAST_DECISION_AT_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     QUOTE_ASSET_FIELD_NUMBER: _ClassVar[int]
+    MARKETS_FIELD_NUMBER: _ClassVar[int]
+    FUNDING_FIELD_NUMBER: _ClassVar[int]
+    UPTIME_RATIO_FIELD_NUMBER: _ClassVar[int]
+    RUNNING_SINCE_FIELD_NUMBER: _ClassVar[int]
+    PAUSE_REASON_FIELD_NUMBER: _ClassVar[int]
     bot_id: int
     name: str
     subaccount_id: int
@@ -706,7 +784,30 @@ class Bot(_message.Message):
     last_decision_at: _timestamp_pb2.Timestamp
     created_at: _timestamp_pb2.Timestamp
     quote_asset: str
-    def __init__(self, bot_id: _Optional[int] = ..., name: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ..., status_reason: _Optional[str] = ..., version_id: _Optional[str] = ..., profit_and_loss: _Optional[str] = ..., last_decision_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., quote_asset: _Optional[str] = ...) -> None: ...
+    markets: _containers.RepeatedScalarFieldContainer[str]
+    funding: BotFunding
+    uptime_ratio: str
+    running_since: _timestamp_pb2.Timestamp
+    pause_reason: Bot.PauseReason
+    def __init__(self, bot_id: _Optional[int] = ..., name: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ..., status_reason: _Optional[str] = ..., version_id: _Optional[str] = ..., profit_and_loss: _Optional[str] = ..., last_decision_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., quote_asset: _Optional[str] = ..., markets: _Optional[_Iterable[str]] = ..., funding: _Optional[_Union[BotFunding, _Mapping]] = ..., uptime_ratio: _Optional[str] = ..., running_since: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pause_reason: _Optional[_Union[Bot.PauseReason, str]] = ...) -> None: ...
+
+class BotFunding(_message.Message):
+    __slots__ = ("subaccount_id", "subaccount_label", "initial_funding")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_LABEL_FIELD_NUMBER: _ClassVar[int]
+    INITIAL_FUNDING_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    subaccount_label: str
+    initial_funding: _containers.RepeatedCompositeFieldContainer[Money]
+    def __init__(self, subaccount_id: _Optional[int] = ..., subaccount_label: _Optional[str] = ..., initial_funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ...) -> None: ...
+
+class BotStatusCount(_message.Message):
+    __slots__ = ("status", "count")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    COUNT_FIELD_NUMBER: _ClassVar[int]
+    status: Bot.Status
+    count: int
+    def __init__(self, status: _Optional[_Union[Bot.Status, str]] = ..., count: _Optional[int] = ...) -> None: ...
 
 class ListBotsRequest(_message.Message):
     __slots__ = ("limit", "page_token")
@@ -717,12 +818,14 @@ class ListBotsRequest(_message.Message):
     def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListBotsResponse(_message.Message):
-    __slots__ = ("bots", "next_page_token")
+    __slots__ = ("bots", "next_page_token", "status_counts")
     BOTS_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    STATUS_COUNTS_FIELD_NUMBER: _ClassVar[int]
     bots: _containers.RepeatedCompositeFieldContainer[Bot]
     next_page_token: str
-    def __init__(self, bots: _Optional[_Iterable[_Union[Bot, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    status_counts: _containers.RepeatedCompositeFieldContainer[BotStatusCount]
+    def __init__(self, bots: _Optional[_Iterable[_Union[Bot, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., status_counts: _Optional[_Iterable[_Union[BotStatusCount, _Mapping]]] = ...) -> None: ...
 
 class BotBalance(_message.Message):
     __slots__ = ("asset", "free", "locked")
@@ -784,6 +887,24 @@ class GetBotRequest(_message.Message):
     bot_id: int
     def __init__(self, bot_id: _Optional[int] = ...) -> None: ...
 
+class StopBotRequest(_message.Message):
+    __slots__ = ("bot_id", "mode", "idempotency_key")
+    BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    MODE_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    bot_id: int
+    mode: StopMode
+    idempotency_key: str
+    def __init__(self, bot_id: _Optional[int] = ..., mode: _Optional[_Union[StopMode, str]] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+
+class StopBotResponse(_message.Message):
+    __slots__ = ("bot", "mode")
+    BOT_FIELD_NUMBER: _ClassVar[int]
+    MODE_FIELD_NUMBER: _ClassVar[int]
+    bot: Bot
+    mode: StopMode
+    def __init__(self, bot: _Optional[_Union[Bot, _Mapping]] = ..., mode: _Optional[_Union[StopMode, str]] = ...) -> None: ...
+
 class GetBotResponse(_message.Message):
     __slots__ = ("bot", "money_card", "settings", "balances", "open_orders", "decisions", "errors")
     BOT_FIELD_NUMBER: _ClassVar[int]
@@ -801,6 +922,310 @@ class GetBotResponse(_message.Message):
     decisions: _containers.RepeatedCompositeFieldContainer[BotDecision]
     errors: _containers.RepeatedCompositeFieldContainer[BotError]
     def __init__(self, bot: _Optional[_Union[Bot, _Mapping]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., balances: _Optional[_Iterable[_Union[BotBalance, _Mapping]]] = ..., open_orders: _Optional[_Iterable[_Union[BotOrder, _Mapping]]] = ..., decisions: _Optional[_Iterable[_Union[BotDecision, _Mapping]]] = ..., errors: _Optional[_Iterable[_Union[BotError, _Mapping]]] = ...) -> None: ...
+
+class ListBotVersionsRequest(_message.Message):
+    __slots__ = ("bot_id", "limit", "page_token")
+    BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    bot_id: int
+    limit: int
+    page_token: str
+    def __init__(self, bot_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class BotVersion(_message.Message):
+    __slots__ = ("version_id", "name", "runtime_version", "started_at", "stopped_at")
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
+    STARTED_AT_FIELD_NUMBER: _ClassVar[int]
+    STOPPED_AT_FIELD_NUMBER: _ClassVar[int]
+    version_id: str
+    name: str
+    runtime_version: str
+    started_at: _timestamp_pb2.Timestamp
+    stopped_at: _timestamp_pb2.Timestamp
+    def __init__(self, version_id: _Optional[str] = ..., name: _Optional[str] = ..., runtime_version: _Optional[str] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., stopped_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ListBotVersionsResponse(_message.Message):
+    __slots__ = ("versions", "next_page_token")
+    VERSIONS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    versions: _containers.RepeatedCompositeFieldContainer[BotVersion]
+    next_page_token: str
+    def __init__(self, versions: _Optional[_Iterable[_Union[BotVersion, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class GetStrategyVersionRequest(_message.Message):
+    __slots__ = ("version_id",)
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    version_id: str
+    def __init__(self, version_id: _Optional[str] = ...) -> None: ...
+
+class GetStrategyVersionResponse(_message.Message):
+    __slots__ = ("version_id", "name", "runtime_version", "manifest", "code", "settings_form", "valid", "created_at", "flow")
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
+    MANIFEST_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    SETTINGS_FORM_FIELD_NUMBER: _ClassVar[int]
+    VALID_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    FLOW_FIELD_NUMBER: _ClassVar[int]
+    version_id: str
+    name: str
+    runtime_version: str
+    manifest: _struct_pb2.Struct
+    code: str
+    settings_form: _containers.RepeatedCompositeFieldContainer[SettingField]
+    valid: bool
+    created_at: _timestamp_pb2.Timestamp
+    flow: StrategyFlow
+    def __init__(self, version_id: _Optional[str] = ..., name: _Optional[str] = ..., runtime_version: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., valid: _Optional[bool] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow: _Optional[_Union[StrategyFlow, _Mapping]] = ...) -> None: ...
+
+class StrategyFlow(_message.Message):
+    __slots__ = ("nodes", "edges", "notes", "complete")
+    NODES_FIELD_NUMBER: _ClassVar[int]
+    EDGES_FIELD_NUMBER: _ClassVar[int]
+    NOTES_FIELD_NUMBER: _ClassVar[int]
+    COMPLETE_FIELD_NUMBER: _ClassVar[int]
+    nodes: _containers.RepeatedCompositeFieldContainer[FlowNode]
+    edges: _containers.RepeatedCompositeFieldContainer[FlowEdge]
+    notes: _containers.RepeatedScalarFieldContainer[str]
+    complete: bool
+    def __init__(self, nodes: _Optional[_Iterable[_Union[FlowNode, _Mapping]]] = ..., edges: _Optional[_Iterable[_Union[FlowEdge, _Mapping]]] = ..., notes: _Optional[_Iterable[str]] = ..., complete: _Optional[bool] = ...) -> None: ...
+
+class FlowNode(_message.Message):
+    __slots__ = ("node_id", "kind", "label", "span", "event", "action", "settings")
+    class Kind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        KIND_UNSPECIFIED: _ClassVar[FlowNode.Kind]
+        TRIGGER: _ClassVar[FlowNode.Kind]
+        CONDITION: _ClassVar[FlowNode.Kind]
+        ACTION: _ClassVar[FlowNode.Kind]
+    KIND_UNSPECIFIED: FlowNode.Kind
+    TRIGGER: FlowNode.Kind
+    CONDITION: FlowNode.Kind
+    ACTION: FlowNode.Kind
+    NODE_ID_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    SPAN_FIELD_NUMBER: _ClassVar[int]
+    EVENT_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    SETTINGS_FIELD_NUMBER: _ClassVar[int]
+    node_id: str
+    kind: FlowNode.Kind
+    label: str
+    span: SourceSpan
+    event: str
+    action: str
+    settings: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, node_id: _Optional[str] = ..., kind: _Optional[_Union[FlowNode.Kind, str]] = ..., label: _Optional[str] = ..., span: _Optional[_Union[SourceSpan, _Mapping]] = ..., event: _Optional[str] = ..., action: _Optional[str] = ..., settings: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class FlowEdge(_message.Message):
+    __slots__ = ("from_node_id", "to_node_id", "branch")
+    FROM_NODE_ID_FIELD_NUMBER: _ClassVar[int]
+    TO_NODE_ID_FIELD_NUMBER: _ClassVar[int]
+    BRANCH_FIELD_NUMBER: _ClassVar[int]
+    from_node_id: str
+    to_node_id: str
+    branch: str
+    def __init__(self, from_node_id: _Optional[str] = ..., to_node_id: _Optional[str] = ..., branch: _Optional[str] = ...) -> None: ...
+
+class SourceSpan(_message.Message):
+    __slots__ = ("start_line", "end_line")
+    START_LINE_FIELD_NUMBER: _ClassVar[int]
+    END_LINE_FIELD_NUMBER: _ClassVar[int]
+    start_line: int
+    end_line: int
+    def __init__(self, start_line: _Optional[int] = ..., end_line: _Optional[int] = ...) -> None: ...
+
+class Strategy(_message.Message):
+    __slots__ = ("strategy_id", "name", "revision", "head_version_id", "valid", "origin", "created_at", "updated_at", "bot")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    HEAD_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    VALID_FIELD_NUMBER: _ClassVar[int]
+    ORIGIN_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    BOT_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    name: str
+    revision: int
+    head_version_id: str
+    valid: bool
+    origin: StrategyOrigin
+    created_at: _timestamp_pb2.Timestamp
+    updated_at: _timestamp_pb2.Timestamp
+    bot: StrategyBot
+    def __init__(self, strategy_id: _Optional[int] = ..., name: _Optional[str] = ..., revision: _Optional[int] = ..., head_version_id: _Optional[str] = ..., valid: _Optional[bool] = ..., origin: _Optional[_Union[StrategyOrigin, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot: _Optional[_Union[StrategyBot, _Mapping]] = ...) -> None: ...
+
+class StrategyBot(_message.Message):
+    __slots__ = ("bot_id", "status")
+    BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    bot_id: int
+    status: Bot.Status
+    def __init__(self, bot_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ...) -> None: ...
+
+class StrategyOrigin(_message.Message):
+    __slots__ = ("template_id", "duplicate")
+    TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
+    DUPLICATE_FIELD_NUMBER: _ClassVar[int]
+    template_id: str
+    duplicate: StrategyDuplicateOrigin
+    def __init__(self, template_id: _Optional[str] = ..., duplicate: _Optional[_Union[StrategyDuplicateOrigin, _Mapping]] = ...) -> None: ...
+
+class StrategyDuplicateOrigin(_message.Message):
+    __slots__ = ("source_version_id",)
+    SOURCE_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    source_version_id: str
+    def __init__(self, source_version_id: _Optional[str] = ...) -> None: ...
+
+class StrategyRevision(_message.Message):
+    __slots__ = ("revision", "version_id", "valid", "saved_at", "saved_by")
+    class SavedBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        SAVED_BY_UNSPECIFIED: _ClassVar[StrategyRevision.SavedBy]
+        SESSION: _ClassVar[StrategyRevision.SavedBy]
+        API_KEY: _ClassVar[StrategyRevision.SavedBy]
+        CONNECTED_APP: _ClassVar[StrategyRevision.SavedBy]
+    SAVED_BY_UNSPECIFIED: StrategyRevision.SavedBy
+    SESSION: StrategyRevision.SavedBy
+    API_KEY: StrategyRevision.SavedBy
+    CONNECTED_APP: StrategyRevision.SavedBy
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    VALID_FIELD_NUMBER: _ClassVar[int]
+    SAVED_AT_FIELD_NUMBER: _ClassVar[int]
+    SAVED_BY_FIELD_NUMBER: _ClassVar[int]
+    revision: int
+    version_id: str
+    valid: bool
+    saved_at: _timestamp_pb2.Timestamp
+    saved_by: StrategyRevision.SavedBy
+    def __init__(self, revision: _Optional[int] = ..., version_id: _Optional[str] = ..., valid: _Optional[bool] = ..., saved_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., saved_by: _Optional[_Union[StrategyRevision.SavedBy, str]] = ...) -> None: ...
+
+class CreateStrategyRequest(_message.Message):
+    __slots__ = ("name", "template_id", "version_id", "idempotency_key")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    template_id: str
+    version_id: str
+    idempotency_key: str
+    def __init__(self, name: _Optional[str] = ..., template_id: _Optional[str] = ..., version_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+
+class CreateStrategyResponse(_message.Message):
+    __slots__ = ("strategy", "version")
+    STRATEGY_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    strategy: Strategy
+    version: VersionValidation
+    def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ..., version: _Optional[_Union[VersionValidation, _Mapping]] = ...) -> None: ...
+
+class SaveDraftVersionRequest(_message.Message):
+    __slots__ = ("strategy_id", "expected_revision", "name", "manifest", "code", "runtime_version", "idempotency_key")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_REVISION_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    MANIFEST_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    expected_revision: int
+    name: str
+    manifest: _struct_pb2.Struct
+    code: str
+    runtime_version: str
+    idempotency_key: str
+    def __init__(self, strategy_id: _Optional[int] = ..., expected_revision: _Optional[int] = ..., name: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., runtime_version: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+
+class SaveDraftVersionResponse(_message.Message):
+    __slots__ = ("revision", "version")
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    revision: int
+    version: VersionValidation
+    def __init__(self, revision: _Optional[int] = ..., version: _Optional[_Union[VersionValidation, _Mapping]] = ...) -> None: ...
+
+class GetStrategyRequest(_message.Message):
+    __slots__ = ("strategy_id",)
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    def __init__(self, strategy_id: _Optional[int] = ...) -> None: ...
+
+class GetStrategyResponse(_message.Message):
+    __slots__ = ("strategy", "head")
+    STRATEGY_FIELD_NUMBER: _ClassVar[int]
+    HEAD_FIELD_NUMBER: _ClassVar[int]
+    strategy: Strategy
+    head: GetStrategyVersionResponse
+    def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ..., head: _Optional[_Union[GetStrategyVersionResponse, _Mapping]] = ...) -> None: ...
+
+class ListStrategiesRequest(_message.Message):
+    __slots__ = ("limit", "page_token")
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    limit: int
+    page_token: str
+    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListStrategiesResponse(_message.Message):
+    __slots__ = ("strategies", "next_page_token")
+    STRATEGIES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    strategies: _containers.RepeatedCompositeFieldContainer[Strategy]
+    next_page_token: str
+    def __init__(self, strategies: _Optional[_Iterable[_Union[Strategy, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class ListStrategyRevisionsRequest(_message.Message):
+    __slots__ = ("strategy_id", "limit", "page_token")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    limit: int
+    page_token: str
+    def __init__(self, strategy_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListStrategyRevisionsResponse(_message.Message):
+    __slots__ = ("revisions", "next_page_token")
+    REVISIONS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    revisions: _containers.RepeatedCompositeFieldContainer[StrategyRevision]
+    next_page_token: str
+    def __init__(self, revisions: _Optional[_Iterable[_Union[StrategyRevision, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class RenameStrategyRequest(_message.Message):
+    __slots__ = ("strategy_id", "name")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    name: str
+    def __init__(self, strategy_id: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+
+class RenameStrategyResponse(_message.Message):
+    __slots__ = ("strategy",)
+    STRATEGY_FIELD_NUMBER: _ClassVar[int]
+    strategy: Strategy
+    def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ...) -> None: ...
+
+class DeleteStrategyRequest(_message.Message):
+    __slots__ = ("strategy_id",)
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    def __init__(self, strategy_id: _Optional[int] = ...) -> None: ...
+
+class DeleteStrategyResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
 
 class BotLogEntry(_message.Message):
     __slots__ = ("sequence", "time", "kind", "message")

@@ -42,6 +42,12 @@ class ApiKeyService(Protocol):
     async def delete_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def set_strategy_bot_access(self, request: auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def end_strategy_bot_access(self, request: auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class ApiKeyServiceASGIApplication(ConnectASGIApplication[ApiKeyService]):
     def __init__(self, service: ApiKeyService | AsyncGenerator[ApiKeyService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -127,6 +133,26 @@ class ApiKeyServiceASGIApplication(ConnectASGIApplication[ApiKeyService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.delete_assistant_keys,
+                ),
+                "/auth.v1.ApiKeyService/SetStrategyBotAccess": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SetStrategyBotAccess",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.set_strategy_bot_access,
+                ),
+                "/auth.v1.ApiKeyService/EndStrategyBotAccess": Endpoint.unary(
+                    method=MethodInfo(
+                        name="EndStrategyBotAccess",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.end_strategy_bot_access,
                 ),
             },
             interceptors=interceptors,
@@ -302,6 +328,46 @@ class ApiKeyServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def set_strategy_bot_access(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetStrategyBotAccess",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def end_strategy_bot_access(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="EndStrategyBotAccess",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -322,6 +388,10 @@ class ApiKeyServiceSync(Protocol):
     def list_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.ListAssistantKeysResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def delete_assistant_keys(self, request: auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def set_strategy_bot_access(self, request: auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def end_strategy_bot_access(self, request: auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest, ctx: RequestContext) -> auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -408,6 +478,26 @@ class ApiKeyServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.delete_assistant_keys,
+                ),
+                "/auth.v1.ApiKeyService/SetStrategyBotAccess": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SetStrategyBotAccess",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.set_strategy_bot_access,
+                ),
+                "/auth.v1.ApiKeyService/EndStrategyBotAccess": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="EndStrategyBotAccess",
+                        service_name="auth.v1.ApiKeyService",
+                        input=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest,
+                        output=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.end_strategy_bot_access,
                 ),
             },
             interceptors=interceptors,
@@ -578,6 +668,46 @@ class ApiKeyServiceClientSync(ConnectClientSync):
                 input=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysRequest,
                 output=auth_dot_v1_dot_api__keys__pb2.DeleteAssistantKeysResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def set_strategy_bot_access(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SetStrategyBotAccess",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.SetStrategyBotAccessResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def end_strategy_bot_access(
+        self,
+        request: auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="EndStrategyBotAccess",
+                service_name="auth.v1.ApiKeyService",
+                input=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessRequest,
+                output=auth_dot_v1_dot_api__keys__pb2.EndStrategyBotAccessResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
             ),
             headers=headers,
             timeout_ms=timeout_ms,

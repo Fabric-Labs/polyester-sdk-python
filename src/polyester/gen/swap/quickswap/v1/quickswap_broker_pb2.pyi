@@ -5,6 +5,7 @@ from polyester.gen.chain.withdraw.v1 import auto_withdraw_pb2 as _auto_withdraw_
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
+from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
 from polyester.gen.swap.quickswap.v1 import quickswap_pb2 as _quickswap_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -42,6 +43,15 @@ class StatsPeriod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PERIOD_UNSPECIFIED: _ClassVar[StatsPeriod]
     DAY: _ClassVar[StatsPeriod]
     MONTH: _ClassVar[StatsPeriod]
+    HOUR: _ClassVar[StatsPeriod]
+
+class StatsBreakdown(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BREAKDOWN_UNSPECIFIED: _ClassVar[StatsBreakdown]
+    ROUTE: _ClassVar[StatsBreakdown]
+    VAULT: _ClassVar[StatsBreakdown]
+    SOURCE_ASSET: _ClassVar[StatsBreakdown]
+    DESTINATION_ASSET: _ClassVar[StatsBreakdown]
 
 class PayoutStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -123,6 +133,12 @@ BY_MONTH: FeeTotalsGrouping
 PERIOD_UNSPECIFIED: StatsPeriod
 DAY: StatsPeriod
 MONTH: StatsPeriod
+HOUR: StatsPeriod
+BREAKDOWN_UNSPECIFIED: StatsBreakdown
+ROUTE: StatsBreakdown
+VAULT: StatsBreakdown
+SOURCE_ASSET: StatsBreakdown
+DESTINATION_ASSET: StatsBreakdown
 PAYOUT_STATUS_UNSPECIFIED: PayoutStatus
 PAYOUT_PAID: PayoutStatus
 PAYOUT_PARTIALLY_PAID: PayoutStatus
@@ -621,25 +637,37 @@ class GetFeeTotalsResponse(_message.Message):
     totals: _containers.RepeatedCompositeFieldContainer[FeeTotal]
     def __init__(self, totals: _Optional[_Iterable[_Union[FeeTotal, _Mapping]]] = ...) -> None: ...
 
+class StatsRoute(_message.Message):
+    __slots__ = ("source_zipped_asset_id", "destination_zipped_asset_id")
+    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    source_zipped_asset_id: int
+    destination_zipped_asset_id: int
+    def __init__(self, source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ...) -> None: ...
+
 class GetBrokerStatsRequest(_message.Message):
-    __slots__ = ("broker", "group_by", "start_time", "end_time")
+    __slots__ = ("broker", "group_by", "start_time", "end_time", "breakdown", "route", "vault_account_id", "source_zipped_asset_id", "destination_zipped_asset_id", "include_cells")
     BROKER_FIELD_NUMBER: _ClassVar[int]
     GROUP_BY_FIELD_NUMBER: _ClassVar[int]
     START_TIME_FIELD_NUMBER: _ClassVar[int]
     END_TIME_FIELD_NUMBER: _ClassVar[int]
+    BREAKDOWN_FIELD_NUMBER: _ClassVar[int]
+    ROUTE_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_CELLS_FIELD_NUMBER: _ClassVar[int]
     broker: str
     group_by: StatsPeriod
     start_time: _timestamp_pb2.Timestamp
     end_time: _timestamp_pb2.Timestamp
-    def __init__(self, broker: _Optional[str] = ..., group_by: _Optional[_Union[StatsPeriod, str]] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
-
-class StatusCount(_message.Message):
-    __slots__ = ("status", "count")
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    COUNT_FIELD_NUMBER: _ClassVar[int]
-    status: _quickswap_pb2.QuickSwapStatus
-    count: int
-    def __init__(self, status: _Optional[_Union[_quickswap_pb2.QuickSwapStatus, str]] = ..., count: _Optional[int] = ...) -> None: ...
+    breakdown: StatsBreakdown
+    route: StatsRoute
+    vault_account_id: int
+    source_zipped_asset_id: int
+    destination_zipped_asset_id: int
+    include_cells: bool
+    def __init__(self, broker: _Optional[str] = ..., group_by: _Optional[_Union[StatsPeriod, str]] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., breakdown: _Optional[_Union[StatsBreakdown, str]] = ..., route: _Optional[_Union[StatsRoute, _Mapping]] = ..., vault_account_id: _Optional[int] = ..., source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., include_cells: _Optional[bool] = ...) -> None: ...
 
 class AssetVolume(_message.Message):
     __slots__ = ("asset_id", "amount", "value_usd", "unvalued_count")
@@ -677,27 +705,91 @@ class FeeSplit(_message.Message):
     unvalued_count: int
     def __init__(self, asset_id: _Optional[int] = ..., service_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., broker_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., affiliate_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., referral_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., service_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., broker_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., affiliate_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., referral_fee_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unvalued_count: _Optional[int] = ...) -> None: ...
 
-class BrokerStatsPeriod(_message.Message):
-    __slots__ = ("period_start", "created_count", "statuses", "deposited", "delivered", "fees")
-    PERIOD_START_FIELD_NUMBER: _ClassVar[int]
+class BrokerStatsSeries(_message.Message):
+    __slots__ = ("totals", "route", "vault_account_id", "source_zipped_asset_id", "destination_zipped_asset_id", "others", "created_count", "status_counts", "deposited", "delivered", "fees", "deposited_usd_q4", "delivered_usd_q4", "fees_usd_q4", "unvalued_count", "created", "completed", "deposited_usd", "delivered_usd", "fees_usd", "unvalued", "service_fee_usd", "broker_fee_usd", "affiliate_fee_usd", "referral_fee_usd", "cell_bucket", "cell_asset", "cell_deposited", "cell_delivered", "cell_service_fee", "cell_broker_fee", "cell_affiliate_fee", "cell_referral_fee")
+    TOTALS_FIELD_NUMBER: _ClassVar[int]
+    ROUTE_FIELD_NUMBER: _ClassVar[int]
+    VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    OTHERS_FIELD_NUMBER: _ClassVar[int]
     CREATED_COUNT_FIELD_NUMBER: _ClassVar[int]
-    STATUSES_FIELD_NUMBER: _ClassVar[int]
+    STATUS_COUNTS_FIELD_NUMBER: _ClassVar[int]
     DEPOSITED_FIELD_NUMBER: _ClassVar[int]
     DELIVERED_FIELD_NUMBER: _ClassVar[int]
     FEES_FIELD_NUMBER: _ClassVar[int]
-    period_start: _timestamp_pb2.Timestamp
+    DEPOSITED_USD_Q4_FIELD_NUMBER: _ClassVar[int]
+    DELIVERED_USD_Q4_FIELD_NUMBER: _ClassVar[int]
+    FEES_USD_Q4_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    CREATED_FIELD_NUMBER: _ClassVar[int]
+    COMPLETED_FIELD_NUMBER: _ClassVar[int]
+    DEPOSITED_USD_FIELD_NUMBER: _ClassVar[int]
+    DELIVERED_USD_FIELD_NUMBER: _ClassVar[int]
+    FEES_USD_FIELD_NUMBER: _ClassVar[int]
+    UNVALUED_FIELD_NUMBER: _ClassVar[int]
+    SERVICE_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    BROKER_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    AFFILIATE_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    REFERRAL_FEE_USD_FIELD_NUMBER: _ClassVar[int]
+    CELL_BUCKET_FIELD_NUMBER: _ClassVar[int]
+    CELL_ASSET_FIELD_NUMBER: _ClassVar[int]
+    CELL_DEPOSITED_FIELD_NUMBER: _ClassVar[int]
+    CELL_DELIVERED_FIELD_NUMBER: _ClassVar[int]
+    CELL_SERVICE_FEE_FIELD_NUMBER: _ClassVar[int]
+    CELL_BROKER_FEE_FIELD_NUMBER: _ClassVar[int]
+    CELL_AFFILIATE_FEE_FIELD_NUMBER: _ClassVar[int]
+    CELL_REFERRAL_FEE_FIELD_NUMBER: _ClassVar[int]
+    totals: bool
+    route: StatsRoute
+    vault_account_id: int
+    source_zipped_asset_id: int
+    destination_zipped_asset_id: int
+    others: bool
     created_count: int
-    statuses: _containers.RepeatedCompositeFieldContainer[StatusCount]
-    deposited: _containers.RepeatedCompositeFieldContainer[AssetVolume]
-    delivered: _containers.RepeatedCompositeFieldContainer[AssetVolume]
-    fees: _containers.RepeatedCompositeFieldContainer[FeeSplit]
-    def __init__(self, period_start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_count: _Optional[int] = ..., statuses: _Optional[_Iterable[_Union[StatusCount, _Mapping]]] = ..., deposited: _Optional[_Iterable[_Union[AssetVolume, _Mapping]]] = ..., delivered: _Optional[_Iterable[_Union[AssetVolume, _Mapping]]] = ..., fees: _Optional[_Iterable[_Union[FeeSplit, _Mapping]]] = ...) -> None: ...
+    status_counts: _containers.RepeatedScalarFieldContainer[int]
+    deposited: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    delivered: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    fees: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    deposited_usd_q4: int
+    delivered_usd_q4: int
+    fees_usd_q4: int
+    unvalued_count: int
+    created: _containers.RepeatedScalarFieldContainer[int]
+    completed: _containers.RepeatedScalarFieldContainer[int]
+    deposited_usd: _containers.RepeatedScalarFieldContainer[int]
+    delivered_usd: _containers.RepeatedScalarFieldContainer[int]
+    fees_usd: _containers.RepeatedScalarFieldContainer[int]
+    unvalued: _containers.RepeatedScalarFieldContainer[int]
+    service_fee_usd: _containers.RepeatedScalarFieldContainer[int]
+    broker_fee_usd: _containers.RepeatedScalarFieldContainer[int]
+    affiliate_fee_usd: _containers.RepeatedScalarFieldContainer[int]
+    referral_fee_usd: _containers.RepeatedScalarFieldContainer[int]
+    cell_bucket: _containers.RepeatedScalarFieldContainer[int]
+    cell_asset: _containers.RepeatedScalarFieldContainer[int]
+    cell_deposited: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    cell_delivered: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    cell_service_fee: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    cell_broker_fee: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    cell_affiliate_fee: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    cell_referral_fee: _containers.RepeatedCompositeFieldContainer[_u128_pb2.U128]
+    def __init__(self, totals: _Optional[bool] = ..., route: _Optional[_Union[StatsRoute, _Mapping]] = ..., vault_account_id: _Optional[int] = ..., source_zipped_asset_id: _Optional[int] = ..., destination_zipped_asset_id: _Optional[int] = ..., others: _Optional[bool] = ..., created_count: _Optional[int] = ..., status_counts: _Optional[_Iterable[int]] = ..., deposited: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., delivered: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., fees: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., deposited_usd_q4: _Optional[int] = ..., delivered_usd_q4: _Optional[int] = ..., fees_usd_q4: _Optional[int] = ..., unvalued_count: _Optional[int] = ..., created: _Optional[_Iterable[int]] = ..., completed: _Optional[_Iterable[int]] = ..., deposited_usd: _Optional[_Iterable[int]] = ..., delivered_usd: _Optional[_Iterable[int]] = ..., fees_usd: _Optional[_Iterable[int]] = ..., unvalued: _Optional[_Iterable[int]] = ..., service_fee_usd: _Optional[_Iterable[int]] = ..., broker_fee_usd: _Optional[_Iterable[int]] = ..., affiliate_fee_usd: _Optional[_Iterable[int]] = ..., referral_fee_usd: _Optional[_Iterable[int]] = ..., cell_bucket: _Optional[_Iterable[int]] = ..., cell_asset: _Optional[_Iterable[int]] = ..., cell_deposited: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., cell_delivered: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., cell_service_fee: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., cell_broker_fee: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., cell_affiliate_fee: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ..., cell_referral_fee: _Optional[_Iterable[_Union[_u128_pb2.U128, _Mapping]]] = ...) -> None: ...
 
 class GetBrokerStatsResponse(_message.Message):
-    __slots__ = ("periods",)
-    PERIODS_FIELD_NUMBER: _ClassVar[int]
-    periods: _containers.RepeatedCompositeFieldContainer[BrokerStatsPeriod]
-    def __init__(self, periods: _Optional[_Iterable[_Union[BrokerStatsPeriod, _Mapping]]] = ...) -> None: ...
+    __slots__ = ("period", "start_ts_sec", "points", "as_of_ts_sec", "asset_ids", "series")
+    PERIOD_FIELD_NUMBER: _ClassVar[int]
+    START_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    POINTS_FIELD_NUMBER: _ClassVar[int]
+    AS_OF_TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    ASSET_IDS_FIELD_NUMBER: _ClassVar[int]
+    SERIES_FIELD_NUMBER: _ClassVar[int]
+    period: StatsPeriod
+    start_ts_sec: int
+    points: int
+    as_of_ts_sec: int
+    asset_ids: _containers.RepeatedScalarFieldContainer[int]
+    series: _containers.RepeatedCompositeFieldContainer[BrokerStatsSeries]
+    def __init__(self, period: _Optional[_Union[StatsPeriod, str]] = ..., start_ts_sec: _Optional[int] = ..., points: _Optional[int] = ..., as_of_ts_sec: _Optional[int] = ..., asset_ids: _Optional[_Iterable[int]] = ..., series: _Optional[_Iterable[_Union[BrokerStatsSeries, _Mapping]]] = ...) -> None: ...
 
 class ListVaultBalancesRequest(_message.Message):
     __slots__ = ("broker", "vault_account_id", "limit", "page_token")

@@ -70,6 +70,8 @@ class SubaccountPermission(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SUBACCOUNT_PERMISSION_READ_STATEMENTS: _ClassVar[SubaccountPermission]
     SUBACCOUNT_PERMISSION_CONVERT_DUST: _ClassVar[SubaccountPermission]
     SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_READ_PNL: _ClassVar[SubaccountPermission]
+    SUBACCOUNT_PERMISSION_STOP_STRATEGIES: _ClassVar[SubaccountPermission]
 
 class SubaccountInviteStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -173,6 +175,8 @@ SUBACCOUNT_PERMISSION_SWAP: SubaccountPermission
 SUBACCOUNT_PERMISSION_READ_STATEMENTS: SubaccountPermission
 SUBACCOUNT_PERMISSION_CONVERT_DUST: SubaccountPermission
 SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS: SubaccountPermission
+SUBACCOUNT_PERMISSION_READ_PNL: SubaccountPermission
+SUBACCOUNT_PERMISSION_STOP_STRATEGIES: SubaccountPermission
 SUBACCOUNT_INVITE_STATUS_UNSPECIFIED: SubaccountInviteStatus
 SUBACCOUNT_INVITE_STATUS_PENDING: SubaccountInviteStatus
 SUBACCOUNT_INVITE_STATUS_ACCEPTED: SubaccountInviteStatus

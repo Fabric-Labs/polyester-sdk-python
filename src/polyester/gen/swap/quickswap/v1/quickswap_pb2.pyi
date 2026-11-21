@@ -28,6 +28,8 @@ class FeeKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DEPOSIT_NETWORK: _ClassVar[FeeKind]
     WITHDRAWAL_NETWORK: _ClassVar[FeeKind]
     REFERRAL: _ClassVar[FeeKind]
+    RETURN_NETWORK: _ClassVar[FeeKind]
+    REFUND_NETWORK: _ClassVar[FeeKind]
 
 class DepositAddressState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -43,7 +45,6 @@ class DepositDisposition(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ELIGIBLE: _ClassVar[DepositDisposition]
     RETURN_ONLY: _ClassVar[DepositDisposition]
     ON_HOLD: _ClassVar[DepositDisposition]
-    MANUAL_RECOVERY: _ClassVar[DepositDisposition]
 
 class QuickSwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -182,6 +183,8 @@ AFFILIATE: FeeKind
 DEPOSIT_NETWORK: FeeKind
 WITHDRAWAL_NETWORK: FeeKind
 REFERRAL: FeeKind
+RETURN_NETWORK: FeeKind
+REFUND_NETWORK: FeeKind
 ADDRESS_UNSPECIFIED: DepositAddressState
 ACTIVE: DepositAddressState
 REFUND_MODE: DepositAddressState
@@ -191,7 +194,6 @@ EVALUATING: DepositDisposition
 ELIGIBLE: DepositDisposition
 RETURN_ONLY: DepositDisposition
 ON_HOLD: DepositDisposition
-MANUAL_RECOVERY: DepositDisposition
 REASON_UNSPECIFIED: QuickSwapReason
 SOURCE_SCREENING_FAILED: QuickSwapReason
 CAPACITY_UNAVAILABLE: QuickSwapReason
@@ -380,7 +382,7 @@ class ReferralPricing(_message.Message):
     def __init__(self, base_broker_bps: _Optional[int] = ..., discount_bps: _Optional[int] = ..., commission_bps: _Optional[int] = ...) -> None: ...
 
 class QuickSwapQuote(_message.Message):
-    __slots__ = ("deposit_amount", "expected_amount_out", "min_amount_out", "min_rate", "min_deposit_amount", "max_deposit_amount", "intermediate_asset_id", "fees", "quoted_at", "expires_at", "referral")
+    __slots__ = ("deposit_amount", "expected_amount_out", "min_amount_out", "min_rate", "min_deposit_amount", "max_deposit_amount", "intermediate_asset_id", "fees", "quoted_at", "expires_at", "referral", "contingent_fees")
     DEPOSIT_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     EXPECTED_AMOUNT_OUT_FIELD_NUMBER: _ClassVar[int]
     MIN_AMOUNT_OUT_FIELD_NUMBER: _ClassVar[int]
@@ -392,6 +394,7 @@ class QuickSwapQuote(_message.Message):
     QUOTED_AT_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     REFERRAL_FIELD_NUMBER: _ClassVar[int]
+    CONTINGENT_FEES_FIELD_NUMBER: _ClassVar[int]
     deposit_amount: TokenAmount
     expected_amount_out: TokenAmount
     min_amount_out: TokenAmount
@@ -403,7 +406,8 @@ class QuickSwapQuote(_message.Message):
     quoted_at: _timestamp_pb2.Timestamp
     expires_at: _timestamp_pb2.Timestamp
     referral: ReferralPricing
-    def __init__(self, deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., expected_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_rate: _Optional[str] = ..., min_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., max_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., fees: _Optional[_Iterable[_Union[QuoteFee, _Mapping]]] = ..., quoted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., referral: _Optional[_Union[ReferralPricing, _Mapping]] = ...) -> None: ...
+    contingent_fees: _containers.RepeatedCompositeFieldContainer[QuoteFee]
+    def __init__(self, deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., expected_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_amount_out: _Optional[_Union[TokenAmount, _Mapping]] = ..., min_rate: _Optional[str] = ..., min_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., max_deposit_amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., fees: _Optional[_Iterable[_Union[QuoteFee, _Mapping]]] = ..., quoted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., referral: _Optional[_Union[ReferralPricing, _Mapping]] = ..., contingent_fees: _Optional[_Iterable[_Union[QuoteFee, _Mapping]]] = ...) -> None: ...
 
 class Screening(_message.Message):
     __slots__ = ("source_wallet",)
@@ -705,18 +709,20 @@ class ChargedFee(_message.Message):
     def __init__(self, kind: _Optional[_Union[FeeKind, str]] = ..., account_id: _Optional[int] = ..., asset_id: _Optional[int] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
 
 class QuoteQuickSwapRequest(_message.Message):
-    __slots__ = ("terms", "broker_bps", "affiliates", "referral_code", "source_wallet")
+    __slots__ = ("terms", "broker_bps", "affiliates", "referral_code", "source_wallet", "refund_zipped_asset_id")
     TERMS_FIELD_NUMBER: _ClassVar[int]
     BROKER_BPS_FIELD_NUMBER: _ClassVar[int]
     AFFILIATES_FIELD_NUMBER: _ClassVar[int]
     REFERRAL_CODE_FIELD_NUMBER: _ClassVar[int]
     SOURCE_WALLET_FIELD_NUMBER: _ClassVar[int]
+    REFUND_ZIPPED_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     terms: QuickSwapTerms
     broker_bps: int
     affiliates: _containers.RepeatedCompositeFieldContainer[AffiliateShare]
     referral_code: str
     source_wallet: str
-    def __init__(self, terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., referral_code: _Optional[str] = ..., source_wallet: _Optional[str] = ...) -> None: ...
+    refund_zipped_asset_id: int
+    def __init__(self, terms: _Optional[_Union[QuickSwapTerms, _Mapping]] = ..., broker_bps: _Optional[int] = ..., affiliates: _Optional[_Iterable[_Union[AffiliateShare, _Mapping]]] = ..., referral_code: _Optional[str] = ..., source_wallet: _Optional[str] = ..., refund_zipped_asset_id: _Optional[int] = ...) -> None: ...
 
 class QuoteQuickSwapResponse(_message.Message):
     __slots__ = ("quote",)

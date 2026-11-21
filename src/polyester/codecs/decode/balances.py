@@ -44,13 +44,17 @@ def asset_balance_from_proto(msg: ledger_read_pb2.AssetBalance) -> AssetBalance:
         funding=u128_from_proto(msg.funding),
         reserved=u128_from_proto(msg.reserved),
         available=u128_from_proto(msg.available),
-        trading_revision=int(msg.trading_revision),
         funding_revision=int(msg.funding_revision),
     )
 
 
 def balances_list_from_proto(msg: ledger_read_pb2.GetBalancesResponse) -> BalancesList:
-    return BalancesList(balances=[asset_balance_from_proto(item) for item in msg.balances])
+    return BalancesList(
+        balances=[asset_balance_from_proto(item) for item in msg.balances],
+        trading_epoch=int(msg.trading_epoch),
+        trading_sequence=int(msg.trading_sequence),
+        trading_applied_through_ts_ns=int(msg.trading_applied_through_ts_ns),
+    )
 
 
 def ledger_amount(scaled: int, asset_id: int | None) -> AssetAmount:

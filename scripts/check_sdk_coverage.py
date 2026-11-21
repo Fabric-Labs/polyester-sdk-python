@@ -46,7 +46,9 @@ CAPABILITIES_PATH = "sdk-capabilities.json"
 README_PATH = "README.md"
 README_CAP_START = "<!-- sdk-capabilities:start -->"
 README_CAP_END = "<!-- sdk-capabilities:end -->"
-MATRIX_URL = "https://polyester.com/docs/developer-docs/getting-started/sdk-capability-matrix"
+MATRIX_URL = (
+    "https://polyester.com/docs/developer-docs/getting-started/sdk-capability-matrix"
+)
 
 
 def _parse_toml_subset(text: str) -> dict[str, Any]:
@@ -322,10 +324,11 @@ def extract_gen_rust(gen_root: Path) -> tuple[set[str], dict[str, set[str]]]:
 def extract_wrapped_go(services_root: Path, service_names: dict[str, str]) -> set[str]:
     covered: set[str] = set()
     call_re = re.compile(
-        r"s\.(?P<acc>client|readClient|writeClient|viewClient)\(\)\.(?P<meth>[A-Za-z0-9_]+)"
+        r"s\.(?P<acc>client|readClient|writeClient|viewClient|signedClient|exportsClient)\(\)\.(?P<meth>[A-Za-z0-9_]+)"
     )
     def_re = re.compile(
-        r"func \(s \*\w+\) (?P<acc>client|readClient|writeClient|viewClient)\(\)"
+        r"func \(s \*\w+\) "
+        r"(?P<acc>client|readClient|writeClient|viewClient|signedClient|exportsClient)\(\)"
         r"[^{]*?(?P<svc>\w+)Client\b"
     )
     if not services_root.is_dir():
@@ -632,7 +635,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     {
         "id": "profile",
         "label": "Profile (identity subscribe)",
-        "kind": "always_yes",
+        "kind": "profile_subscribe",
     },
     {
         "id": "api_keys",
@@ -650,13 +653,13 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "address_book",
-        "label": "Address book (list/view/create/update/subscribe)",
+        "label": "Address book (list/view/subscribe/create/update)",
         "any_services": ["auth.v1.AddressBookService"],
     },
     {
         "id": "policies",
         "label": "Policies (realtime subscribe)",
-        "kind": "always_yes",
+        "kind": "policies_subscribe",
     },
     {
         "id": "guard_signer",
@@ -677,6 +680,11 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "id": "trading_rate_limits",
         "label": "Trading rate limits",
         "any_services": ["ratelimit.v1.RateLimitService"],
+    },
+    {
+        "id": "profit_and_loss",
+        "label": "Profit and loss + trading statistics",
+        "any_services": ["pnl.v1.ProfitAndLossService"],
     },
     {
         "id": "changelog",
@@ -793,7 +801,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "id": "resolve",
         "label": "Account resolve / lookup",
         "kind": "always_no",
-        "note": "Requires interactive JWT/session; not exposed on API-key SDKs.",
+        "note": "JWT/session only; not available with API-key auth.",
     },
 ]
 
@@ -844,6 +852,26 @@ def _detect_realtime(root: Path, sdk: str) -> bool:
     return False
 
 
+def _detect_policies_subscribe(root: Path, sdk: str) -> bool:
+    if sdk == "go":
+        return (root / "services" / "policies.go").is_file()
+    if sdk == "python":
+        return (root / "src" / "polyester" / "services" / "policies.py").is_file()
+    if sdk == "rust":
+        return (root / "src" / "services" / "policies.rs").is_file()
+    return False
+
+
+def _detect_profile_subscribe(root: Path, sdk: str) -> bool:
+    if sdk == "go":
+        return (root / "services" / "profile.go").is_file()
+    if sdk == "python":
+        return (root / "src" / "polyester" / "services" / "profile.py").is_file()
+    if sdk == "rust":
+        return (root / "src" / "services" / "profile.rs").is_file()
+    return False
+
+
 def build_capabilities(result: CoverageResult, root: Path) -> dict[str, Any]:
     """Public product capability snapshot derived from wrappers + heuristics."""
     rows: list[dict[str, Any]] = []
@@ -864,6 +892,10 @@ def build_capabilities(result: CoverageResult, root: Path) -> dict[str, Any]:
             supported = _detect_catalogs(root, result.sdk)
         elif kind == "realtime":
             supported = _detect_realtime(root, result.sdk)
+        elif kind == "policies_subscribe":
+            supported = _detect_policies_subscribe(root, result.sdk)
+        elif kind == "profile_subscribe":
+            supported = _detect_profile_subscribe(root, result.sdk)
         elif cap.get("any_procedures"):
             supported = any(
                 _procedure_wrapped(result, p) for p in cap["any_procedures"]

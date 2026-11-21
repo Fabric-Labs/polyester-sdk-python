@@ -148,12 +148,12 @@ def candles_from_proto(
 def _newest_row_open(
     ts_secs: Sequence[int], *, include_incomplete: bool, page_token: str
 ) -> int | None:
-    """The primary row whose ``is_closed`` reads ``False`` in a columnar page, if any.
+    """The primary row whose ``is_closed`` reads ``False`` in a columnar page
+    from a server that sends no ``is_closed`` column, if any.
 
-    The columns carry no closed flag. Only a first page (no ``page_token``)
-    asked with ``include_incomplete`` can end with the open candle, so its
-    newest row is not known to be closed. A continuation cursor pages only
-    older closed candles.
+    Only a first page (no ``page_token``) asked with ``include_incomplete``
+    can end with the open candle, so its newest row is not known to be closed.
+    A continuation cursor pages only older closed candles.
     """
     if not include_incomplete or page_token or not ts_secs:
         return None
@@ -170,13 +170,14 @@ def candles_columns_from_proto(
 ) -> CandlesResult:
     """Decode a ``GetCandlesColumns`` page into rows, oldest-first.
 
-    The response has no closed column, so ``is_closed`` follows the request
-    the page answers (its ``include_incomplete`` and ``page_token``). Every row
-    reads ``True`` except the newest primary row of a first page (no
-    ``page_token``) asked with ``include_incomplete``, which reads ``False``:
-    not known to be closed, as it is the open candle when one was available.
-    Rows of a continuation page, which holds only older closed candles, and
-    every reference row, always a closed bucket, read ``True``.
+    Each primary row's ``is_closed`` is the server's ``is_closed[i]``, a
+    column aligned with ``ts_sec``. Every reference row, always a closed
+    bucket, reads ``True``. A server that predates the column sends it empty;
+    then ``is_closed`` follows the request the page answers (its
+    ``include_incomplete`` and ``page_token``): every row reads ``True``
+    except the newest primary row of a first page (no ``page_token``) asked
+    with ``include_incomplete``, which reads ``False``, not known to be
+    closed. A column of another length is a contract violation.
     """
     row_count = len(msg.ts_sec)
     lengths = {
@@ -189,6 +190,9 @@ def candles_columns_from_proto(
     quote_volumes = list(msg.quote_volume)
     if quote_volumes and len(quote_volumes) != row_count:
         lengths["quote_volume"] = len(quote_volumes)
+    closed_flags = list(msg.is_closed)
+    if closed_flags and len(closed_flags) != row_count:
+        lengths["is_closed"] = len(closed_flags)
     if any(length != row_count for length in lengths.values()):
         rendered = ", ".join(
             [f"ts_sec={row_count}", *(f"{name}={length}" for name, length in lengths.items())]
@@ -212,7 +216,7 @@ def candles_columns_from_proto(
                     scale=volume_scale,
                 ),
                 quote_volume=str(quote_volumes[index]) if index < len(quote_volumes) else "",
-                is_closed=index != open_index,
+                is_closed=bool(closed_flags[index]) if closed_flags else index != open_index,
             )
         )
     reference = _reference_candles_from_columns(

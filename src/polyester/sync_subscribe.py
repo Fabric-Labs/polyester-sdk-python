@@ -60,6 +60,27 @@ class SyncSubscription:
         age = getattr(sub, "since_last_publication", None)
         return age() if callable(age) else None
 
+    @property
+    def resubscribed(self) -> int:
+        """Successful reconnects after the first connect, as the async
+        subscription's ``resubscribed`` counts them; 0 before it is set up.
+        A non-zero or increasing value means publications may have been
+        missed while disconnected."""
+        sub = None if self._holder is None else self._holder.get("sub")
+        count = getattr(sub, "resubscribed", 0)
+        return count if isinstance(count, int) else 0
+
+    def take_resubscribed(self) -> bool:
+        """True once per reconnect since the previous take, as the async
+        subscription's ``take_resubscribed()`` reports it; False before the
+        subscription is set up and for a stream with no such signal. Callable
+        from any thread, a client callback included. ``on_event`` is not
+        called for a reconnect, so check this on a timer of its own: an idle
+        stream may deliver nothing after the reconnect."""
+        sub = None if self._holder is None else self._holder.get("sub")
+        take = getattr(sub, "take_resubscribed", None)
+        return bool(take()) if callable(take) else False
+
     def unsubscribe(self) -> None:
         self.close()
 

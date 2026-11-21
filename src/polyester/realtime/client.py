@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import secrets
+import threading
 import time
 from collections import deque
 from collections.abc import AsyncIterator, Callable, Sequence
@@ -130,6 +131,9 @@ class AsyncSubscription(Generic[T]):
         # the consumer must treat prior stream continuity as lost (possible gap).
         self._resubscribed = 0
         self._resubscribed_pending = False
+        # The sync client takes the signal from its caller's thread while the
+        # loop marks it: one lock, so a reconnect is never taken twice or lost.
+        self._resubscribed_lock = threading.Lock()
         self._on_closed: Callable[[AsyncSubscription[Any]], None] | None = None
 
     @property
@@ -157,14 +161,16 @@ class AsyncSubscription(Generic[T]):
 
     def take_resubscribed(self) -> bool:
         """Return True once per reconnect gap since the previous take."""
-        if not self._resubscribed_pending:
-            return False
-        self._resubscribed_pending = False
-        return True
+        with self._resubscribed_lock:
+            if not self._resubscribed_pending:
+                return False
+            self._resubscribed_pending = False
+            return True
 
     def _mark_resubscribed(self) -> None:
-        self._resubscribed += 1
-        self._resubscribed_pending = True
+        with self._resubscribed_lock:
+            self._resubscribed += 1
+            self._resubscribed_pending = True
 
     def _set_error(self, exc: BaseException) -> None:
         if self._error is None:

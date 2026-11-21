@@ -641,8 +641,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
     ) -> StopAllTradingResult:
         """Cancel every live trigger, then every open order.
 
-        Cancel-all and the dead-man switch cancel open orders only, never
-        triggers: an armed stop still fires later. This lists the live
+        Without ``include_triggers``, cancel-all and the dead-man switch cancel
+        open orders only: an armed stop still fires later. One
+        :meth:`cancel_all` with ``include_triggers=True`` stops both in one
+        request, and ``triggers.cancel_all`` cancels triggers alone. This lists
+        the live
         triggers (``created``, ``armed``, ``running``, ``paused``; attached legs
         included) page by page, cancels each, and only then calls
         :meth:`cancel_all`, so an order a trigger places before its cancel is

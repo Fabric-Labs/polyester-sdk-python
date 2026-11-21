@@ -56,7 +56,7 @@
     },
     {
       "id": "address_book",
-      "label": "Address book (list/view/create/update/subscribe)",
+      "label": "Address book (list/view/subscribe/create/update)",
       "supported": true
     },
     {
@@ -82,6 +82,11 @@
     {
       "id": "trading_rate_limits",
       "label": "Trading rate limits",
+      "supported": true
+    },
+    {
+      "id": "profit_and_loss",
+      "label": "Profit and loss + trading statistics",
       "supported": true
     },
     {
@@ -188,7 +193,7 @@
       "id": "resolve",
       "label": "Account resolve / lookup",
       "supported": false,
-      "note": "Requires interactive JWT/session; not exposed on API-key SDKs."
+      "note": "JWT/session only; not available with API-key auth."
     }
   ],
   "unmappedWrappedServices": []

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.triggers import (
     batch_cancel_triggers_from_proto,
+    cancel_all_triggers_from_proto,
     cancel_oco_from_proto,
     create_oco_from_proto,
     get_trigger_from_proto,
@@ -26,6 +27,8 @@ from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigge
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
     batch_cancel_triggers_to_proto,
+    cancel_all_trigger_symbol_ids,
+    cancel_all_triggers_to_proto,
     create_trigger_to_proto,
     modify_trigger_to_proto,
     trigger_type_to_proto,
@@ -44,6 +47,7 @@ from polyester.gen.triggers.v1.triggers_pb2 import (
 )
 from polyester.models import (
     BatchCancelTriggersResult,
+    CancelAllTriggersResult,
     CancelOcoResult,
     CreateOcoResult,
     RiskLeg,
@@ -67,11 +71,33 @@ from polyester.services._retry import (
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import (
     display_symbol_for_id,
+    resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
     resolve_symbol_id,
 )
 from polyester.services._validation import validate_limit
 from polyester.types.money import Price
+
+
+def _cancel_all_symbols(symbols: object) -> list[str] | None:
+    """``triggers.cancel_all``'s ``symbols`` as a list of pair names, or refused."""
+    if symbols is None:
+        return None
+    if isinstance(symbols, str | bytes | bytearray | memoryview | Mapping) or not isinstance(
+        symbols, Iterable
+    ):
+        raise PolyesterValidationError(
+            "triggers.cancel_all symbols must be a list of pair names, "
+            f"not {type(symbols).__name__}"
+        )
+    names = list(symbols)
+    for index, item in enumerate(names):
+        if not isinstance(item, str) or not item.strip():
+            raise PolyesterValidationError(
+                f"triggers.cancel_all symbols[{index}] must not be blank; "
+                "leave symbols out to match every pair"
+            )
+    return names
 
 
 class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
@@ -583,6 +609,97 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.batch_cancel_triggers(req),
             request,
             batch_cancel_triggers_from_proto,
+        )
+
+    async def cancel_all(
+        self,
+        *,
+        account: AccountScope | None = None,
+        sub_account_id: str | int | None = None,
+        symbol: str | None = None,
+        symbols: Sequence[str] | None = None,
+        symbol_ids: Sequence[int] | None = None,
+        side: str | None = None,
+        trigger_types: Sequence[str] | None = None,
+        dry_run: bool = False,
+        request_id: str | None = None,
+    ) -> CancelAllTriggersResult:
+        """Cancel every trigger of the account that matches, in one request.
+
+        It cancels triggers only, never an order: a TWAP's working slice, a
+        ladder's open levels and an attached leg's working exit end with their
+        trigger, but an order a stop already placed stays open. Each matching
+        trigger ends canceled (reason ``cancel_all``), releases its reserved
+        funds and places no order after the answer. An order's attached
+        take-profit, stop-loss and trailing legs end together, and so do an
+        OCO's two legs: when one matches, all are canceled and counted in
+        ``matched_triggers``. A ``dry_run`` counts the matches and cancels
+        nothing. The answer lists no trigger IDs: read the triggers again.
+
+        ``symbol``, ``symbols`` or ``symbol_ids`` select up to 100 pairs (none
+        matches every pair). A supplied symbol must name a pair: a blank
+        ``symbol``, or a blank entry in ``symbols``, raises
+        ``PolyesterValidationError`` instead of matching every pair; leave them
+        out to cancel on every pair. ``side`` is ``buy`` or ``sell`` (none matches
+        both: a trigger matches the side its orders trade on);
+        ``trigger_types`` takes up to 5 of ``stop_loss``, ``take_profit``,
+        ``trailing_stop``, ``twap`` and ``ladder``, as :meth:`list` reports
+        them (none matches every type).
+
+        What it cancels is fixed when its ``request_id`` is first accepted:
+        triggers created later keep running. A retry with the same
+        ``request_id`` and criteria within two minutes returns the original
+        count and cancels nothing again, so retry a request that timed out or
+        answered ``ORDER_CANCEL_OUTCOME_UNKNOWN`` unchanged; the same
+        ``request_id`` with other criteria is refused
+        ``CONFLICT_IDEMPOTENCY_KEY_REUSE``. Generate it once per user action
+        and keep it: a retry needs the same key and criteria. It is sent
+        exactly as given: one that is empty, padded or otherwise malformed is
+        refused, never replaced. Left out (``None``), the SDK generates one but
+        does not return it, so such a request cannot be retried safely; supply
+        your own whenever a retry may follow.
+        Every
+        request, a dry run or a retry included, counts 10 against the
+        account's cancel rate limit. While it is ending an order's attached
+        legs, a modify of that order that adds or changes an attached leg is
+        refused with the retryable ``ORDER_MODIFY_IN_PROGRESS``: retry the
+        modify once the legs have ended.
+        """
+        # A malformed filter must never read as "every pair": a blank name, or
+        # a str, raw bytes or mapping where a list belongs, is refused before
+        # anything is sent. An empty list is a deliberate "every pair".
+        if symbol is not None and not isinstance(symbol, str):
+            raise PolyesterValidationError(
+                f"triggers.cancel_all symbol must be a pair name, not {type(symbol).__name__}"
+            )
+        if symbol is not None and not symbol.strip():
+            raise PolyesterValidationError(
+                "triggers.cancel_all symbol must not be blank; leave it out to match every pair"
+            )
+        symbol_list = _cancel_all_symbols(symbols)
+        id_list = None if symbol_ids is None else cancel_all_trigger_symbol_ids(symbol_ids)
+        if symbol or symbol_list:
+            await self._ensure_catalogs()
+        request = cancel_all_triggers_to_proto(
+            sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
+            symbol_ids=resolve_cancel_all_symbol_ids(
+                self._catalogs,
+                symbol=symbol,
+                symbols=symbol_list,
+                symbol_ids=id_list,
+                label="triggers.cancel_all",
+            ),
+            side=side,
+            trigger_types=trigger_types,
+            dry_run=dry_run,
+            request_id=request_id,
+        )
+        return await unary_auth_decoded(
+            self._transport,
+            TriggersServiceClient,
+            lambda client, req: client.cancel_all_triggers(req),
+            request,
+            cancel_all_triggers_from_proto,
         )
 
     async def modify(

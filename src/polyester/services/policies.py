@@ -29,6 +29,11 @@ class AsyncPoliciesService(BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[SubaccountPolicy]:
+        """Updates of the account's own sub-account policies. An API key needs
+        ``READ_SUBACCOUNT_POLICIES``; a token refusal raises with the read's
+        own error code. Records reached through a delegated sub-account role stream on a separate
+        channel for signed-in sessions only; an API key cannot subscribe to it.
+        """
         return await subscribe_account_proto(
             self._realtime,
             channel_template="private:auth:subaccount-policies:{account_id}:proto",
@@ -42,6 +47,11 @@ class AsyncPoliciesService(BaseService):
         *,
         account_id: str | int | None = None,
     ) -> AsyncSubscription[ApiPolicy]:
+        """Updates of the account's own API-key policies. An API key needs
+        ``READ_API_POLICIES``; a token refusal raises with the read's own
+        error code. Records reached through a delegated sub-account role stream on a separate
+        channel for signed-in sessions only; an API key cannot subscribe to it.
+        """
         return await subscribe_account_proto(
             self._realtime,
             channel_template="private:auth:api-policies:{account_id}:proto",

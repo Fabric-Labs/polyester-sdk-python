@@ -10,7 +10,8 @@ from polyester.codecs.decode.balances import (
 )
 from polyester.codecs.ledger import resolve_balance_range, resolve_equity_group_by
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.realtime_decode import decode_asset_balance_bytes
+from polyester.codecs.realtime_decode import decode_balance_update_bytes
+from polyester.gen.ledger.read.v1 import ledger_read_pb2
 from polyester.gen.ledger.read.v1.ledger_read_connect import LedgerReadServiceClient
 from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetBalanceHistoryRequest,
@@ -18,7 +19,6 @@ from polyester.gen.ledger.read.v1.ledger_read_pb2 import (
     GetEquityHistorySeriesRequest,
 )
 from polyester.models import (
-    AssetBalance,
     BalanceHistory,
     BalancesList,
     EquityHistory,
@@ -27,7 +27,12 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
+from polyester.services._retry import UnavailableRetry, unary_auth_decoded_retry_unavailable
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
+
+# GetBalances answers UNAVAILABLE while it cannot yet reflect every balance
+# update published before the call; the contract says to retry with a backoff.
+BALANCES_READ_RETRY = UnavailableRetry()
 
 
 class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
@@ -52,18 +57,28 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         account: AccountScope | None = None,
         sub_account_id: str | int | None = None,
     ) -> BalancesList:
+        """Every asset's balances, and the position their Trading values are at.
+
+        The Trading values of every asset are one cut at
+        ``(trading_epoch, trading_sequence)``, and reflect every balance update
+        published before the call began. When the server cannot answer that
+        yet it answers ``unavailable``: the SDK retries for about 2 seconds,
+        then raises a retryable ``PolyesterServerError``; retry it with a
+        backoff. An API key needs ``READ_BALANCES``.
+        """
         request = GetBalancesRequest()
         resolved = parse_optional_subaccount_id(
             self._resolve_sub_account_id(sub_account_id, account=account)
         )
         if resolved is not None:
             request.subaccount_id = resolved
-        return await unary_auth_decoded(
+        return await unary_auth_decoded_retry_unavailable(
             self._transport,
             LedgerReadServiceClient,
             lambda client, req: client.get_balances(req),
             request,
             balances_list_from_proto,
+            policy=BALANCES_READ_RETRY,
         )
 
     async def get_balance_history(
@@ -126,11 +141,38 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         self,
         *,
         account_id: str | int | None = None,
-    ) -> AsyncSubscription[AssetBalance]:
+    ) -> AsyncSubscription[ledger_read_pb2.BalanceUpdate]:
+        """The account's balance stream: each publication as the generated
+        ``ledger.read.v1.BalanceUpdate``, exactly as published and in the order
+        received. Field presence and unknown fields are kept.
+
+        ``account`` is ``AccountCode.TRADING`` for one numbered step of the
+        Trading balances at ``(trading_epoch, trading_sequence)``, whose
+        ``balances`` set only the Trading fields of the assets it changed, and
+        ``AccountCode.FUNDING`` for one asset's Funding balance and
+        ``funding_revision``, with no position. Amounts are 18-decimal ``U128``
+        messages (``(hi << 64) | lo``). The SDK does not
+        buffer, reorder or merge them, and a reconnect can miss or repeat
+        updates: ``take_resubscribed()`` on the subscription reports each
+        reconnect. Check it on a timer of its own, not only when an update
+        arrives: an idle account may publish nothing more after a reconnect.
+        Keep exact balances with the loop in the README's "Keeping exact
+        balances": buffer, :meth:`list`, apply in sequence order, and reload on
+        an epoch change, a gap, a stalled incomplete update or a reconnect.
+
+        Read the stream and :meth:`list` for the same account. An unset
+        ``account_id`` here is the client's ``default_account_id``, while
+        :meth:`list` with no account reads the client's
+        ``default_sub_account_id`` or the main account, so name the account in
+        both: ``subscribe(account_id=main_account_id)`` with
+        ``list(account="main")`` for the main account, and
+        ``subscribe(account_id=sub_id)`` with ``list(sub_account_id=sub_id)``
+        for a sub-account.
+        """
         return await subscribe_account_proto(
             self._realtime,
             channel_template="private:ledger:balances:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode=decode_asset_balance_bytes,
+            decode=decode_balance_update_bytes,
         )

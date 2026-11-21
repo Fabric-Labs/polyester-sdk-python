@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.invariants import ts_ns_string_from_response
-from polyester.codecs.proto_helpers import has_field
+from polyester.codecs.proto_helpers import has_field, proto_enum_name
 from polyester.codecs.scalars import format_qty_scaled
+from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
+from polyester.models.common import PriceBand
 from polyester.models.market import (
     CurrencyConversionConfig,
     CurrencyConversionRates,
     CurrencyMetadata,
     FiatConversionRate,
     FiatConversionSnapshot,
+    LivePriceBand,
     MarketOverviewEntry,
     MarketOverviewList,
     MarketOverviewSparkline,
@@ -72,6 +75,46 @@ def market_overview_sparkline_from_proto(
     )
 
 
+def _optional_ticks_price(msg, field_name: str, symbol: str | None) -> Price | None:
+    if not has_field(msg, field_name):
+        return None
+    return Price.from_ticks(int(getattr(msg, field_name)), symbol=symbol)
+
+
+def live_price_band_from_proto(
+    msg: marketdata_pb2.LivePriceBand, symbol: str | None = None
+) -> LivePriceBand:
+    parameters = None
+    if msg.HasField("parameters"):
+        parameters = PriceBand(
+            lower_bps=int(msg.parameters.lower_bps),
+            upper_bps=int(msg.parameters.upper_bps),
+            reference_window_ms=int(msg.parameters.reference_window_ms),
+        )
+    return LivePriceBand(
+        symbol_id=int(msg.symbol_id),
+        state=proto_enum_name(marketdata_pb2.PriceBandState, int(msg.state)),
+        reference_price=_optional_ticks_price(msg, "reference_price_ticks", symbol),
+        reference_source=proto_enum_name(
+            marketdata_pb2.PriceBandReferenceSource, int(msg.reference_source)
+        ),
+        max_buy_price=_optional_ticks_price(msg, "max_buy_price_ticks", symbol),
+        min_sell_price=_optional_ticks_price(msg, "min_sell_price_ticks", symbol),
+        min_buy_price=_optional_ticks_price(msg, "min_buy_price_ticks", symbol),
+        max_sell_price=_optional_ticks_price(msg, "max_sell_price_ticks", symbol),
+        updated_ts_ns=int(msg.updated_ts_ns),
+        reanchor_eligible_ts_ns=(
+            int(msg.reanchor_eligible_ts_ns) if msg.HasField("reanchor_eligible_ts_ns") else None
+        ),
+        reanchor_pending=bool(msg.reanchor_pending),
+        parameters=parameters,
+        epoch=int(msg.epoch),
+        update_id=int(msg.update_id),
+        as_of_ts_ns=int(msg.as_of_ts_ns),
+        valid_until_ts_ns=int(msg.valid_until_ts_ns),
+    )
+
+
 def market_overview_entry_from_proto(
     msg: marketoverview_pb2.MarketOverview,
     catalogs: CatalogManager | None = None,
@@ -130,6 +173,11 @@ def market_overview_entry_from_proto(
             context="MarketOverview",
             field_name="listed_ts_ns",
             empty_when_zero=True,
+        ),
+        price_band=(
+            live_price_band_from_proto(msg.price_band, symbol or None)
+            if msg.HasField("price_band")
+            else None
         ),
     )
 

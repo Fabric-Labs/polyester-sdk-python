@@ -753,6 +753,20 @@ def batch_cancel_triggers_to_proto(
     return proto
 
 
+def cancel_all_trigger_symbol_ids(values: object) -> list[int]:
+    """``triggers.cancel_all``'s ``symbol_ids`` as pair IDs, or refused.
+
+    A str, raw bytes (``memoryview`` included) or mapping is refused, never
+    iterated, so ``b"\\x01"`` is not pair 1 and an empty buffer never widens
+    the cancel to every pair.
+    """
+    if isinstance(values, memoryview):
+        raise PolyesterValidationError(
+            "triggers.cancel_all symbol_ids must be a list of integer market IDs, not memoryview"
+        )
+    return market_ids(values, "triggers.cancel_all symbol_ids")
+
+
 # The contract's bounds on a CancelAllTriggers request.
 CANCEL_ALL_TRIGGERS_MAX_SYMBOLS = 100
 CANCEL_ALL_TRIGGERS_MAX_TYPES = 5
@@ -788,8 +802,8 @@ def cancel_all_triggers_to_proto(
     proto = triggers_pb2.CancelAllTriggersRequest(request_id=key, dry_run=dry_run)
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
-    # A str, bytes or mapping is refused, never iterated: b"\x01" is not pair 1.
-    unique_ids = list(dict.fromkeys(market_ids(symbol_ids, "triggers.cancel_all symbol_ids")))
+    # A str, raw bytes or mapping is refused, never iterated: b"\x01" is not pair 1.
+    unique_ids = list(dict.fromkeys(cancel_all_trigger_symbol_ids(symbol_ids)))
     if any(value <= 0 for value in unique_ids):
         raise PolyesterValidationError("triggers.cancel_all symbol_ids must be positive")
     if len(unique_ids) > CANCEL_ALL_TRIGGERS_MAX_SYMBOLS:
@@ -803,9 +817,9 @@ def cancel_all_triggers_to_proto(
             raise PolyesterValidationError("side must be buy or sell")
         proto.side = orders_pb2.BUY if key == "buy" else orders_pb2.SELL
     if trigger_types is not None:
-        if isinstance(trigger_types, str | bytes | bytearray | Mapping) or not isinstance(
-            trigger_types, Iterable
-        ):
+        if isinstance(
+            trigger_types, str | bytes | bytearray | memoryview | Mapping
+        ) or not isinstance(trigger_types, Iterable):
             raise PolyesterValidationError("trigger_types must be a list of trigger types")
         types = list(dict.fromkeys(trigger_type_to_proto(value) for value in trigger_types))
         if len(types) > CANCEL_ALL_TRIGGERS_MAX_TYPES:

@@ -24,9 +24,10 @@ from polyester.codecs.orders import (
     resolve_quantity_scale,
 )
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
-from polyester.codecs.scalars import id_to_int, market_ids
+from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
     batch_cancel_triggers_to_proto,
+    cancel_all_trigger_symbol_ids,
     cancel_all_triggers_to_proto,
     create_trigger_to_proto,
     modify_trigger_to_proto,
@@ -82,7 +83,9 @@ def _cancel_all_symbols(symbols: object) -> list[str] | None:
     """``triggers.cancel_all``'s ``symbols`` as a list of pair names, or refused."""
     if symbols is None:
         return None
-    if isinstance(symbols, str | bytes | bytearray | Mapping) or not isinstance(symbols, Iterable):
+    if isinstance(symbols, str | bytes | bytearray | memoryview | Mapping) or not isinstance(
+        symbols, Iterable
+    ):
         raise PolyesterValidationError(
             "triggers.cancel_all symbols must be a list of pair names, "
             f"not {type(symbols).__name__}"
@@ -663,7 +666,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         modify once the legs have ended.
         """
         # A malformed filter must never read as "every pair": a blank name, or
-        # a str, bytes or mapping where a list belongs, is refused before
+        # a str, raw bytes or mapping where a list belongs, is refused before
         # anything is sent. An empty list is a deliberate "every pair".
         if symbol is not None and not isinstance(symbol, str):
             raise PolyesterValidationError(
@@ -674,9 +677,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
                 "triggers.cancel_all symbol must not be blank; leave it out to match every pair"
             )
         symbol_list = _cancel_all_symbols(symbols)
-        id_list = (
-            None if symbol_ids is None else market_ids(symbol_ids, "triggers.cancel_all symbol_ids")
-        )
+        id_list = None if symbol_ids is None else cancel_all_trigger_symbol_ids(symbol_ids)
         if symbol or symbol_list:
             await self._ensure_catalogs()
         request = cancel_all_triggers_to_proto(

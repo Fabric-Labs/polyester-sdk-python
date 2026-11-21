@@ -847,6 +847,41 @@ async def test_triggers_cancel_all_refuses_malformed_filters_before_sending(kwar
     assert requests == []
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"symbol": b"BTC-USDT"},
+        {"symbol": bytearray(b"BTC-USDT")},
+        {"symbol": memoryview(b"BTC-USDT")},
+        {"symbol": 1},
+        {"symbol": ""},
+        {"symbol": " \t"},
+        {"symbols": [b"BTC-USDT"]},
+        {"symbols": [bytearray(b"BTC-USDT")]},
+        {"symbols": [memoryview(b"BTC-USDT")]},
+        {"symbols": [None]},
+        {"symbols": [1]},
+        {"symbols": ["BTC-USDT", ""]},
+        {"symbols": ["   "]},
+        {"symbols": memoryview(b"")},
+        {"symbols": memoryview(b"BTC")},
+        {"symbol_ids": memoryview(b"")},
+        {"symbol_ids": memoryview(b"\x01")},
+        {"trigger_types": memoryview(b"")},
+    ],
+    ids=repr,
+)
+async def test_triggers_cancel_all_accepts_only_non_blank_str_pair_names(kwargs) -> None:
+    # Only a non-blank str names a pair. Raw bytes would select a pair from a
+    # byte or, empty, widen the cancel to every pair; none is ever sent. The
+    # refusal comes before dry_run is read. Leaving the filters out (the
+    # no-filter call) is still valid.
+    async with _client(lambda _req: HttpScript.not_found()) as (client, requests):
+        with pytest.raises(PolyesterValidationError):
+            await client.triggers.cancel_all(dry_run=True, request_id="guard-1", **kwargs)
+    assert requests == []
+
+
 async def test_triggers_cancel_all_empty_lists_match_every_pair() -> None:
     reply = triggers_pb2.CancelAllTriggersResponse(
         status=triggers_pb2.CancelAllTriggersResponse.DRY_RUN, matched_triggers=2

@@ -9,7 +9,7 @@ from polyester.models import Candle, CandlesResult
 from polyester.services.market_data import AsyncMarketDataService
 
 
-@pytest.mark.parametrize("timeframe", ["1m", "MIN_1", "min1"])
+@pytest.mark.parametrize("timeframe", ["1m", "MIN_1"])
 @pytest.mark.asyncio
 async def test_subscribe_candles_normalizes_channel_timeframe(timeframe: str) -> None:
     realtime = MagicMock()

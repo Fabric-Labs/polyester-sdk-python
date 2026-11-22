@@ -65,13 +65,15 @@ _TRADE_SIDE_FILTERS: dict[str, marketdata_pb2.SideFilter] = {
     "buy": marketdata_pb2.BUY,
     "sell": marketdata_pb2.SELL,
 }
-# Live Centrifugo channels use human labels (`1m`), not REST enum names (`MIN_1`).
-_CHANNEL_TIMEFRAME_ALIASES: dict[str, str] = {}
-for _label, _enum_name in TIMEFRAME_ALIASES.items():
-    _CHANNEL_TIMEFRAME_ALIASES[_label] = _label
-    _CHANNEL_TIMEFRAME_ALIASES[_enum_name] = _label
-    _CHANNEL_TIMEFRAME_ALIASES[_enum_name.lower()] = _label
-    _CHANNEL_TIMEFRAME_ALIASES[_enum_name.replace("_", "").lower()] = _label
+# Every accepted candle timeframe, exactly as written, with its live channel
+# label: a documented label ("1s", "1m", "3m", ... "1w", "1mo") or a
+# ``Timeframe`` enum name ("SEC_1", "MIN_1", ... "MONTH_1"). No other case or
+# spelling is read, so "1M" is never taken for "1m" (one minute) nor for "1mo"
+# (one month). Live Centrifugo channels use the label (`1m`), not the enum name.
+_CANDLE_TIMEFRAMES: dict[str, str] = {
+    **{label: label for label in TIMEFRAME_ALIASES},
+    **{enum_name: label for label, enum_name in TIMEFRAME_ALIASES.items()},
+}
 
 
 class AsyncMarketDataService(BaseService):
@@ -239,6 +241,8 @@ class AsyncMarketDataService(BaseService):
         include_reference: bool = False,
         page_token: str = "",
     ) -> CandlesResult:
+        # An unknown timeframe is refused before the catalog wait or any request.
+        _candle_timeframe(timeframe)
         # Candles are decoded with the pair's catalog volume scale.
         await self._ensure_catalogs()
         request = _build_candles_request(
@@ -293,6 +297,8 @@ class AsyncMarketDataService(BaseService):
         ``page_token``) with ``include_incomplete`` the newest primary row
         reads ``False`` (not known to be closed), and every other row ``True``.
         """
+        # An unknown timeframe is refused before the catalog wait or any request.
+        _candle_timeframe(timeframe)
         # Candles are decoded with the pair's catalog volume scale.
         await self._ensure_catalogs()
         request = _build_candles_request(
@@ -368,6 +374,8 @@ class AsyncMarketDataService(BaseService):
         symbol_id: int | None = None,
         timeframe: str = "1m",
     ) -> AsyncSubscription[Candle]:
+        # An unknown timeframe is refused before the catalog wait or subscribing.
+        channel_timeframe = _resolve_candle_channel_timeframe(timeframe)
         # Candles are decoded with the pair's catalog volume scale.
         await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
@@ -376,7 +384,6 @@ class AsyncMarketDataService(BaseService):
             symbol_id=symbol_id,
             label="subscribe_candles",
         )
-        channel_timeframe = _resolve_candle_channel_timeframe(timeframe)
         channel = f"public:spot:market:candles:{channel_timeframe}:{resolved_symbol_id}:proto"
         volume_scale = _volume_scale_for_symbol_id(self._catalogs, resolved_symbol_id)
         return await subscribe_public_proto(
@@ -390,18 +397,26 @@ class AsyncMarketDataService(BaseService):
         )
 
 
-def _resolve_candle_channel_timeframe(timeframe: str) -> str:
-    """Normalize user timeframe aliases to the live channel label (e.g. MIN_1 → 1m)."""
-    label = _CHANNEL_TIMEFRAME_ALIASES.get(timeframe)
-    if label is None:
-        label = _CHANNEL_TIMEFRAME_ALIASES.get(timeframe.upper())
-    if label is None:
-        label = _CHANNEL_TIMEFRAME_ALIASES.get(timeframe.lower().replace("_", ""))
+def _resolve_candle_channel_timeframe(timeframe: object) -> str:
+    """A candle timeframe's live channel label (``MIN_1`` reads as ``1m``).
+
+    Only a label or enum name exactly as written is accepted (see
+    ``_CANDLE_TIMEFRAMES``); anything else raises ``PolyesterValidationError``.
+    """
+    label = _CANDLE_TIMEFRAMES.get(timeframe) if isinstance(timeframe, str) else None
     if label is None:
         raise PolyesterValidationError(
-            f"Unknown candle timeframe {timeframe!r}; use aliases like '1m', '1h', '1d'"
+            f"Unknown candle timeframe {timeframe!r}; use a label such as '1m', '1h', "
+            "'1d' or '1mo' (one month), or an enum name such as 'MIN_1'"
         )
     return label
+
+
+def _candle_timeframe(timeframe: object) -> marketdata_pb2.Timeframe:
+    """A candle timeframe's ``Timeframe`` value, read as
+    :func:`_resolve_candle_channel_timeframe` reads it."""
+    label = _resolve_candle_channel_timeframe(timeframe)
+    return marketdata_pb2.Timeframe.Value(TIMEFRAME_ALIASES[label])
 
 
 def _build_candles_request(
@@ -417,8 +432,6 @@ def _build_candles_request(
     include_reference: bool = False,
     page_token: str = "",
 ) -> GetCandlesRequest:
-    from polyester.gen.marketdata.v1 import marketdata_pb2
-
     resolved_symbol_id = resolve_symbol_id(
         catalogs,
         symbol=symbol,
@@ -426,12 +439,7 @@ def _build_candles_request(
         label="get_candles",
     )
     validated_limit = validate_limit(limit, GetCandlesRequest)
-    timeframe_name = TIMEFRAME_ALIASES.get(timeframe, timeframe.upper())
-    timeframe_enum = getattr(marketdata_pb2, timeframe_name, None)
-    if timeframe_enum is None:
-        raise PolyesterValidationError(
-            f"Unknown candle timeframe {timeframe!r}; use aliases like '1m', '1h', '1d'"
-        )
+    timeframe_enum = _candle_timeframe(timeframe)
 
     request = GetCandlesRequest(
         symbol_id=resolved_symbol_id,

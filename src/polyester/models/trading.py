@@ -777,6 +777,10 @@ class CancelAllOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     truncated: bool = False
     listing_status: str = ""
     matched_triggers: int = 0
+    # When the server answered, in nanoseconds since the Unix epoch; None when
+    # it sent no time. A retry with the same request_id returns the original
+    # cancel-all's time.
+    ts_ns: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1489,6 +1493,9 @@ class BatchCancelOrdersResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     results: list[BatchCancelResultItem]
     accepted_count: int = 0
     rejected_count: int = 0
+    # When the server answered the batch cancel, in nanoseconds since the Unix
+    # epoch; None when it sent no time.
+    ts_ns: int | None = None
 
 
 class DeadManSwitchScope(msgspec.Struct, kw_only=True, omit_defaults=True):
@@ -1509,6 +1516,9 @@ class CancelAllAfterResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     expires_at_ts_ns: str = "0"
     # Scope the armed switch covers; None when the switch is disabled.
     effective_scope: DeadManSwitchScope | None = None
+    # When the server answered, in nanoseconds since the Unix epoch; None when
+    # it sent no time. Not the switch's expiry, which is expires_at_ts_ns.
+    ts_ns: int | None = None
 
 
 class WithdrawIntentResult(msgspec.Struct, kw_only=True, omit_defaults=True):

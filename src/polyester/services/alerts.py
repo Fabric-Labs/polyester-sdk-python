@@ -22,7 +22,11 @@ from polyester.gen.alerts.v1.price_alerts_connect import PriceAlertServiceClient
 from polyester.models.alerts import PriceAlert, PriceAlertsPage, PriceAlertUpdate
 from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_auth_decoded
-from polyester.services._symbols import resolve_optional_symbol_id, resolve_symbol_id
+from polyester.services._symbols import (
+    check_optional_symbol,
+    resolve_optional_symbol_id,
+    resolve_symbol_id,
+)
 from polyester.services._validation import validate_limit
 from polyester.types.money import Price, resolve_price_ticks
 
@@ -221,7 +225,8 @@ class AsyncAlertsService(BaseService):
             if len(set(status_values)) != len(status_values):
                 raise PolyesterValidationError("statuses must not repeat a status")
         validated_limit = validate_limit(limit, pb.ListAlertsRequest, allow_none=True)
-        if symbol:
+        # A blank symbol would match every market: refused before any wait.
+        if check_optional_symbol(symbol, label="alerts.list symbol") is not None:
             await self._ensure_catalogs()
         resolved_id = resolve_optional_symbol_id(
             self._catalogs, symbol=symbol, symbol_id=symbol_id, label="alerts.list"

@@ -77,10 +77,12 @@ def resolve_optional_symbol_id(
 ) -> int | None:
     """Resolve an optional Connect symbol filter.
 
-    Empty/omitted filters stay omitted (the server treats zero as all symbols).
-    A supplied display symbol is resolved through the catalog and fails closed.
+    An omitted (``None``) filter stays omitted (the server treats zero as all
+    symbols). A supplied display symbol is resolved through the catalog and
+    fails closed; a blank one is refused (see :func:`check_optional_symbol`),
+    never read as every market.
     """
-    normalized = normalize_raw_symbol_filter(symbol, label=label)
+    normalized = check_optional_symbol(symbol, label=label)
     if symbol_id is None and normalized is None:
         return None
     return resolve_symbol_id(
@@ -89,6 +91,26 @@ def resolve_optional_symbol_id(
         symbol_id=symbol_id,
         label=label,
     )
+
+
+def check_optional_symbol(symbol: object, *, label: str = "symbol filter") -> str | None:
+    """An optional market filter's name, trimmed, or ``None`` when left out.
+
+    A supplied name that is blank (empty or whitespace-only) or not a ``str``
+    raises ``PolyesterValidationError``: it would resolve to no market and so
+    match every market. It needs no catalogs, so a call checks it before
+    awaiting them.
+    """
+    if symbol is None:
+        return None
+    if not isinstance(symbol, str):
+        raise PolyesterValidationError(f"{label} must be a symbol string")
+    normalized = symbol.strip()
+    if not normalized:
+        raise PolyesterValidationError(
+            f"{label} must not be blank; leave it out to match every market"
+        )
+    return normalized
 
 
 def resolve_symbol_ids(

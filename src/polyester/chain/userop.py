@@ -98,24 +98,41 @@ class UserOperationOutcomeUnknownError(PolyesterTransportError):
         self.__cause__ = cause
 
 
-# JSON-RPC error codes that do not prove the bundler refused an operation: an
-# internal error and the implementation-defined server error range.
-_JSONRPC_INTERNAL_ERROR = -32603
-_JSONRPC_SERVER_ERRORS = range(-32099, -32000 + 1)
+# The JSON-RPC error codes that prove a call was refused: the JSON-RPC 2.0
+# request errors (parse error, invalid request, method not found, invalid
+# params) and the ERC-7769 eth_sendUserOperation rejections. Any other code,
+# such as an internal error (-32603), a server error (-32000 to -32099) or an
+# application code, proves nothing about the call's outcome.
+_JSONRPC_REFUSAL_CODES = frozenset(
+    {
+        -32700,
+        -32600,
+        -32601,
+        -32602,
+        -32500,
+        -32501,
+        -32502,
+        -32503,
+        -32504,
+        -32505,
+        -32507,
+        -32508,
+    }
+)
 
 
 def _is_jsonrpc_refusal(error: BaseException) -> bool:
-    """Whether ``error`` is an answered JSON-RPC error object that refuses the call.
+    """Whether ``error`` is a JSON-RPC error answer whose code proves a refusal.
 
-    An HTTP error, a timeout, a malformed answer, an internal error or a server
-    error (-32000 to -32099) proves nothing about the call's outcome.
+    An HTTP error, a timeout, a malformed answer, or an error object whose code
+    is missing or not one of the refusal codes proves nothing about the call's
+    outcome.
     """
     return (
         isinstance(error, JsonRpcError)
         and not isinstance(error, JsonRpcHttpError)
-        and error.code is not None
-        and error.code != _JSONRPC_INTERNAL_ERROR
-        and error.code not in _JSONRPC_SERVER_ERRORS
+        and type(error.code) is int
+        and error.code in _JSONRPC_REFUSAL_CODES
     )
 
 
@@ -349,8 +366,11 @@ class PolyesterSmartAccount:
         With ``wait`` (the default) it returns the receipt, polling for up to
         ``receipt_timeout_s`` seconds; without it, the operation's hash.
 
-        A bundler's JSON-RPC refusal of the send raises ``JsonRpcError``:
-        nothing was accepted. Any other failure from the send on raises
+        The operation's hash is computed before sending, and is the hash
+        returned or waited on. A JSON-RPC refusal of the send whose code proves
+        it (an invalid request or parameters, or an ERC-7769 rejection) raises
+        ``JsonRpcError``: nothing was accepted. Any other failure from the send
+        on, an answer that does not name that hash included, raises
         :class:`UserOperationOutcomeUnknownError` with the operation's
         ``user_operation_hash``: the bundler may hold the operation, so wait on
         that hash with :meth:`wait_for_receipt` instead of sending again.
@@ -502,17 +522,22 @@ class PolyesterSmartAccount:
             if _is_jsonrpc_refusal(exc):
                 raise  # The bundler refused it: nothing was accepted.
             raise UserOperationOutcomeUnknownError(user_op_hash, exc) from exc
-        if not isinstance(accepted, str):
+        # The computed hash is the operation's identity: an answer that names
+        # another one (or none) does not say what the bundler holds.
+        if not isinstance(accepted, str) or accepted.lower() != user_op_hash.lower():
             raise UserOperationOutcomeUnknownError(
                 user_op_hash,
-                JsonRpcError(f"eth_sendUserOperation returned {type(accepted).__name__}"),
+                JsonRpcError(
+                    "eth_sendUserOperation answered "
+                    f"{accepted!r:.80}, not the operation's hash {user_op_hash}"
+                ),
             )
         if not wait:
-            return accepted
+            return user_op_hash
         try:
-            return self.wait_for_receipt(accepted, timeout_s=receipt_timeout_s)
+            return self.wait_for_receipt(user_op_hash, timeout_s=receipt_timeout_s)
         except Exception as exc:
-            raise UserOperationOutcomeUnknownError(accepted, exc) from exc
+            raise UserOperationOutcomeUnknownError(user_op_hash, exc) from exc
 
     def wait_for_receipt(
         self,
@@ -523,24 +548,35 @@ class PolyesterSmartAccount:
     ) -> UserOperationReceipt:
         """Poll the bundler for a UserOperation's receipt until ``timeout_s`` passes.
 
-        A poll that fails without a JSON-RPC refusal (an HTTP error such as 503,
-        a timeout or a transport error) is retried until the deadline. Raises
-        ``TimeoutError`` at the deadline, from the last failed poll if any, and
-        ``RuntimeError`` when the bundler reports the operation rejected.
+        ``timeout_s`` bounds the whole wait: every request and every pause ends
+        by then. A poll that fails without a JSON-RPC refusal (an HTTP error
+        such as 503, a timeout or a transport error) is retried until the
+        deadline. Raises ``TimeoutError`` at the deadline, from the last failed
+        poll if any, and ``RuntimeError`` when the bundler reports the operation
+        rejected. A failed wait means no receipt was read in time, not that the
+        operation will not execute.
         """
-        deadline = time.time() + timeout_s
+        deadline = time.monotonic() + timeout_s
         last_error: Exception | None = None
-        while time.time() < deadline:
+
+        def remaining() -> float:
+            return deadline - time.monotonic()
+
+        def pause() -> None:
+            time.sleep(max(0.0, min(poll_interval_s, remaining())))
+
+        while remaining() > 0:
             try:
                 raw = self._bundler.request(
                     "eth_getUserOperationReceipt",
                     [user_operation_hash],
+                    timeout=remaining(),
                 )
             except Exception as exc:
                 if _is_jsonrpc_refusal(exc):
                     raise
                 last_error = exc
-                time.sleep(max(0.0, min(poll_interval_s, deadline - time.time())))
+                pause()
                 continue
             last_error = None
             if raw:
@@ -553,10 +589,13 @@ class PolyesterSmartAccount:
                     success=success,
                     raw=raw,
                 )
+            if remaining() <= 0:
+                break
             try:
                 status = self._bundler.request(
                     "pimlico_getUserOperationStatus",
                     [user_operation_hash],
+                    timeout=remaining(),
                 )
             except Exception:
                 status = None
@@ -564,7 +603,7 @@ class PolyesterSmartAccount:
                 raise RuntimeError(
                     f"bundler rejected UserOperation {user_operation_hash}: {status}"
                 )
-            time.sleep(poll_interval_s)
+            pause()
         raise TimeoutError(
             f"timed out waiting for UserOperation receipt {user_operation_hash}"
         ) from last_error

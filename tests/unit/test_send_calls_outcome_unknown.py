@@ -82,6 +82,9 @@ def _mock_user_operation_hash(op: dict[str, Any], entry_point: str, chain_id: in
     )
 
 
+_NO_REPLY = object()
+
+
 @dataclass
 class _Bundler:
     """Mock chain RPC + bundler + paymaster state and failure switches."""
@@ -98,6 +101,15 @@ class _Bundler:
     send_status: int | None = None
     # A definite refusal: the send is answered with this JSON-RPC error, not stored.
     send_error: dict[str, Any] | None = None
+    # The send is stored, then answered with this JSON-RPC error (HTTP 200).
+    stored_send_error: dict[str, Any] | None = None
+    # The send is stored, then answered with this result instead of its hash.
+    send_reply: Any = _NO_REPLY
+    # Receipt reads answer null while False.
+    receipt_available: bool = True
+    # Receipt and status reads are answered this many seconds late.
+    receipt_delay_s: float = 0.0
+    status_delay_s: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def handle(self, method: str, params: list[Any]) -> tuple[int, Any, float]:
@@ -136,23 +148,28 @@ class _Bundler:
                 self.operations[user_op_hash] = op
             if self.send_status is not None:
                 return self.send_status, None, 0.0
+            if self.stored_send_error is not None:
+                return 200, {"error": self.stored_send_error}, 0.0
+            if self.send_reply is not _NO_REPLY:
+                return 200, {"result": self.send_reply}, 0.0
             return 200, {"result": user_op_hash}, self.send_delay_s
         if method == "eth_getUserOperationReceipt":
             with self.lock:
                 if self.receipt_503s > 0:
                     self.receipt_503s -= 1
                     return 503, None, 0.0
-                known = params[0] in self.operations
+                known = self.receipt_available and params[0] in self.operations
             if not known:
-                return 200, {"result": None}, 0.0
+                return 200, {"result": None}, self.receipt_delay_s
             receipt = {
                 "userOpHash": params[0],
                 "success": True,
                 "receipt": {"transactionHash": "0x" + "ab" * 32, "status": "0x1"},
             }
-            return 200, {"result": receipt}, 0.0
+            return 200, {"result": receipt}, self.receipt_delay_s
         if method == "pimlico_getUserOperationStatus":
-            return 200, {"result": {"status": "not_found", "transactionHash": None}}, 0.0
+            status = {"status": "not_found", "transactionHash": None}
+            return 200, {"result": status}, self.status_delay_s
         return 200, {"error": {"code": -32601, "message": f"method {method} not found"}}, 0.0
 
 
@@ -211,7 +228,7 @@ def _account(url: str, *, timeout: float = 2.0) -> PolyesterSmartAccount:
 
 
 def _send(account: PolyesterSmartAccount) -> UserOperationReceipt:
-    result = account.send_calls([_WITHDRAW], receipt_timeout_s=3.0)
+    result = account.send_calls([_WITHDRAW], receipt_timeout_s=10.0)
     assert isinstance(result, UserOperationReceipt)
     return result
 
@@ -296,6 +313,8 @@ def test_without_wait_returns_the_hash_the_bundler_holds(bundler: tuple[_Bundler
     [
         {"code": -32602, "message": "invalid UserOperation"},
         {"code": -32500, "message": "AA23 reverted"},
+        {"code": -32507, "message": "invalid signature"},
+        {"code": -32601, "message": "method not found"},
     ],
 )
 def test_definite_refusal_of_the_send_is_not_outcome_unknown(
@@ -319,6 +338,69 @@ def test_internal_error_answer_to_the_send_keeps_the_hash(bundler: tuple[_Bundle
     assert mutation_outcome_unknown(raised.value)
     assert isinstance(raised.value.__cause__, JsonRpcError)
     assert getattr(raised.value, "user_operation_hash", "").startswith("0x")
+
+
+@pytest.mark.parametrize("code", [504, 1, -32000, -32099, -32506, -32603])
+def test_unrecognized_error_code_after_storing_keeps_the_hash(
+    bundler: tuple[_Bundler, str], code: int
+) -> None:
+    # An HTTP 200 JSON-RPC error whose code is not a defined refusal proves
+    # nothing: here the bundler stored the operation before answering it.
+    state, url = bundler
+    state.stored_send_error = {"code": code, "message": "gateway timeout"}
+    account = _account(url)
+    with pytest.raises(Exception) as raised:
+        account.send_calls([_WITHDRAW], receipt_timeout_s=3.0)
+    user_op_hash = _assert_unknown_with_hash(raised.value, state)
+    assert isinstance(raised.value.__cause__, JsonRpcError)
+    assert raised.value.__cause__.code == code
+    _recover(account, state, user_op_hash)
+
+
+@pytest.mark.parametrize("wait", [True, False])
+@pytest.mark.parametrize("reply", ["0x" + "cd" * 32, "", 7, None])
+def test_send_answer_naming_another_hash_keeps_the_computed_hash(
+    bundler: tuple[_Bundler, str], wait: bool, reply: Any
+) -> None:
+    state, url = bundler
+    state.send_reply = reply  # None is a JSON null result
+    account = _account(url)
+    with pytest.raises(Exception) as raised:
+        account.send_calls([_WITHDRAW], wait=wait, receipt_timeout_s=3.0)
+    user_op_hash = _assert_unknown_with_hash(raised.value, state)
+    assert user_op_hash != reply
+    _recover(account, state, user_op_hash)
+
+
+def test_a_receipt_answered_after_the_deadline_is_not_returned(
+    bundler: tuple[_Bundler, str],
+) -> None:
+    state, url = bundler
+    state.receipt_delay_s = 1.5
+    account = _account(url, timeout=5.0)
+    started = time.monotonic()
+    with pytest.raises(Exception) as raised:
+        account.send_calls([_WITHDRAW], receipt_timeout_s=0.4)
+    assert time.monotonic() - started < 1.2
+    user_op_hash = _assert_unknown_with_hash(raised.value, state)
+    assert isinstance(raised.value.__cause__, TimeoutError)
+    state.receipt_delay_s = 0.0
+    _recover(account, state, user_op_hash)
+
+
+def test_a_stalled_status_read_ends_with_the_wait(bundler: tuple[_Bundler, str]) -> None:
+    state, url = bundler
+    user_op_hash = _account(url).send_calls([_WITHDRAW], wait=False)
+    state.receipt_available = False
+    state.status_delay_s = 3.0
+    account = _account(url, timeout=5.0)
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        account.wait_for_receipt(user_op_hash, timeout_s=0.4, poll_interval_s=0.05)
+    assert time.monotonic() - started < 1.2
+    state.status_delay_s = 0.0
+    state.receipt_available = True
+    _recover(account, state, user_op_hash)
 
 
 @pytest.mark.parametrize(

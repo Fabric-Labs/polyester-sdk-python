@@ -70,7 +70,14 @@ class JsonRpcClient:
         # for concurrent request()/arequest() callers sharing one client).
         self._ids = itertools.count(1)
 
-    def request(self, method: str, params: list[Any] | None = None) -> Any:
+    def request(
+        self, method: str, params: list[Any] | None = None, *, timeout: float | None = None
+    ) -> Any:
+        """Call ``method`` and return its result.
+
+        The call ends within the client's timeout, or within ``timeout``
+        seconds when that is shorter; past it, it raises ``JsonRpcError``.
+        """
         req_id = next(self._ids)
         payload = {
             "jsonrpc": "2.0",
@@ -78,13 +85,14 @@ class JsonRpcClient:
             "method": method,
             "params": params or [],
         }
-        deadline = time.monotonic() + self._timeout
+        budget = self._timeout if timeout is None else min(timeout, self._timeout)
+        deadline = time.monotonic() + budget
         # httpx Timeout is per-phase, not a total wall clock. Enforce an absolute
         # deadline via a closer that aborts the client at ``deadline`` plus
         # between-chunk checks (covers stall and slow-drip without worker threads).
         with (
             httpx.Client(
-                timeout=httpx.Timeout(self._timeout),
+                timeout=httpx.Timeout(max(budget, 0.0)),
                 headers=_HTTP_HEADERS,
                 event_hooks={"response": [_raise_for_status]},
             ) as client,

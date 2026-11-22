@@ -65,6 +65,23 @@ def test_requirement_without_lower_bound_fails(tmp_path: Path, requirement: str)
     ]
 
 
+@pytest.mark.parametrize(
+    "requirement",
+    [
+        "protobuf>=7.35.1; python_version >= '3.12'",
+        "protobuf>=7.35.1; sys_platform == 'linux'",
+    ],
+)
+def test_requirement_with_environment_marker_fails(tmp_path: Path, requirement: str) -> None:
+    gen = tmp_path / "gen"
+    _gen_module(gen, "a/v1/a", 7, 35, 1)
+    pyproject = _pyproject(tmp_path, requirement)
+    errors = floor_check.check(gen, pyproject)
+    assert len(errors) == 1
+    assert errors[0].startswith(f"{pyproject}: protobuf requirement protobuf>=7.35.1; ")
+    assert errors[0].endswith("has an environment marker; the floor must apply on every install")
+
+
 def test_missing_protobuf_dependency_fails(tmp_path: Path) -> None:
     gen = tmp_path / "gen"
     _gen_module(gen, "a/v1/a", 7, 35, 1)

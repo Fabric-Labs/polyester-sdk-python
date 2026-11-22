@@ -55,13 +55,22 @@ def gencode_version(gen_root: Path = GEN_ROOT) -> tuple[Version | None, list[str
 
 
 def protobuf_floor(pyproject: Path = PYPROJECT) -> tuple[Version | None, list[str]]:
-    """Return the lowest protobuf version the package dependencies allow."""
+    """Return the lowest protobuf version the package dependencies allow.
+
+    The requirement must apply on every install: an environment marker would let
+    an excluded environment resolve any protobuf another dependency accepts.
+    """
     with pyproject.open("rb") as handle:
         dependencies = tomllib.load(handle)["project"].get("dependencies", [])
     requirements = [Requirement(item) for item in dependencies]
     protobuf = [req for req in requirements if req.name.lower() == "protobuf"]
     if len(protobuf) != 1:
         return None, [f"{pyproject}: expected one protobuf dependency, found {len(protobuf)}"]
+    if protobuf[0].marker is not None:
+        return None, [
+            f"{pyproject}: protobuf requirement {protobuf[0]} has an environment marker; "
+            "the floor must apply on every install"
+        ]
     floors = [
         Version(spec.version.removesuffix(".*"))
         for spec in protobuf[0].specifier

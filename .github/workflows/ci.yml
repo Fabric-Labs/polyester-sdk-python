@@ -32,6 +32,11 @@ jobs:
       - name: Reject proto-relative Connect imports
         run: python scripts/check_connect_imports.py
 
+      # Generated *_pb2.py modules refuse to import on an older protobuf
+      # runtime, so the dependency floor must cover their gencode version.
+      - name: Protobuf floor covers generated code
+        run: python scripts/check_protobuf_floor.py
+
       - name: Reject private ledger.write gen
         run: |
           if [ -d src/polyester/gen/ledger/write ] || grep -Rql 'ledger\.write\.v1' src/polyester/gen; then

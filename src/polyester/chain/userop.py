@@ -98,41 +98,33 @@ class UserOperationOutcomeUnknownError(PolyesterTransportError):
         self.__cause__ = cause
 
 
-# The JSON-RPC error codes that prove a call was refused: the JSON-RPC 2.0
-# request errors (parse error, invalid request, method not found, invalid
-# params) and the ERC-7769 eth_sendUserOperation rejections. Any other code,
-# such as an internal error (-32603), a server error (-32000 to -32099) or an
-# application code, proves nothing about the call's outcome.
-_JSONRPC_REFUSAL_CODES = frozenset(
-    {
-        -32700,
-        -32600,
-        -32601,
-        -32602,
-        -32500,
-        -32501,
-        -32502,
-        -32503,
-        -32504,
-        -32505,
-        -32507,
-        -32508,
-    }
+# The JSON-RPC 2.0 request errors (parse error, invalid request, method not
+# found, invalid params) prove any call was refused.
+_JSONRPC_REQUEST_REFUSAL_CODES = frozenset({-32700, -32600, -32601, -32602})
+# The ERC-7769 rejections prove a refusal of eth_sendUserOperation, the method
+# that defines them, only.
+_SEND_USER_OPERATION_REFUSAL_CODES = frozenset(
+    {-32500, -32501, -32502, -32503, -32504, -32505, -32507, -32508}
 )
 
 
-def _is_jsonrpc_refusal(error: BaseException) -> bool:
-    """Whether ``error`` is a JSON-RPC error answer whose code proves a refusal.
+def _is_jsonrpc_refusal(error: BaseException, method: str) -> bool:
+    """Whether ``error`` is a JSON-RPC error answer that proves ``method`` was refused.
 
-    An HTTP error, a timeout, a malformed answer, or an error object whose code
-    is missing or not one of the refusal codes proves nothing about the call's
-    outcome.
+    That is a request error for any method, or an ERC-7769 rejection for
+    eth_sendUserOperation. An HTTP error, a timeout, a malformed answer, or an
+    error object with any other code, such as an internal error (-32603), a
+    server error (-32000 to -32099) or an application code, proves nothing
+    about the call's outcome.
     """
-    return (
+    if not (
         isinstance(error, JsonRpcError)
         and not isinstance(error, JsonRpcHttpError)
         and type(error.code) is int
-        and error.code in _JSONRPC_REFUSAL_CODES
+    ):
+        return False
+    return error.code in _JSONRPC_REQUEST_REFUSAL_CODES or (
+        method == "eth_sendUserOperation" and error.code in _SEND_USER_OPERATION_REFUSAL_CODES
     )
 
 
@@ -519,7 +511,7 @@ class PolyesterSmartAccount:
                 [final_op, entry_point],
             )
         except Exception as exc:
-            if _is_jsonrpc_refusal(exc):
+            if _is_jsonrpc_refusal(exc, "eth_sendUserOperation"):
                 raise  # The bundler refused it: nothing was accepted.
             raise UserOperationOutcomeUnknownError(user_op_hash, exc) from exc
         # The computed hash is the operation's identity: an answer that names
@@ -573,7 +565,7 @@ class PolyesterSmartAccount:
                     timeout=remaining(),
                 )
             except Exception as exc:
-                if _is_jsonrpc_refusal(exc):
+                if _is_jsonrpc_refusal(exc, "eth_getUserOperationReceipt"):
                     raise
                 last_error = exc
                 pause()

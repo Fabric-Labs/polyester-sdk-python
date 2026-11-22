@@ -29,7 +29,11 @@ from polyester.chain import (
     UserOperationReceipt,
 )
 from polyester.chain.rpc import JsonRpcError
-from polyester.chain.userop import _user_operation_hash, pack_paymaster_and_data
+from polyester.chain.userop import (
+    _is_jsonrpc_refusal,
+    _user_operation_hash,
+    pack_paymaster_and_data,
+)
 from polyester.errors import is_retryable_error, mutation_outcome_unknown
 
 _OWNER_KEY = "0x" + "4f" * 32  # throwaway test key
@@ -112,8 +116,12 @@ class _Bundler:
     status_delay_s: float = 0.0
     # Receipt reads send their headers this many seconds late, then no body.
     receipt_headers_then_stall_s: float | None = None
+    # ...and without the blank line that ends the headers, when True.
+    receipt_headers_unterminated: bool = False
     # When the last eth_sendUserOperation arrived (time.monotonic()).
     send_at: float = 0.0
+    # Receipt reads answer these JSON-RPC errors (HTTP 200), one per read.
+    receipt_errors: list[dict[str, Any]] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def handle(self, method: str, params: list[Any]) -> tuple[int, Any, float]:
@@ -163,6 +171,8 @@ class _Bundler:
                 if self.receipt_503s > 0:
                     self.receipt_503s -= 1
                     return 503, None, 0.0
+                if self.receipt_errors:
+                    return 200, {"error": self.receipt_errors.pop(0)}, 0.0
                 known = self.receipt_available and params[0] in self.operations
             if not known:
                 return 200, {"result": None}, self.receipt_delay_s
@@ -192,11 +202,12 @@ def bundler() -> Iterator[tuple[_Bundler, str]]:
             stall = state.receipt_headers_then_stall_s
             if body["method"] == "eth_getUserOperationReceipt" and stall is not None:
                 time.sleep(stall)
+                head = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                head += b"Content-Length: 100\r\n"
+                if not state.receipt_headers_unterminated:
+                    head += b"\r\n"
                 try:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", "100")
-                    self.end_headers()
+                    self.wfile.write(head)
                     self.wfile.flush()
                 except OSError:
                     return
@@ -231,7 +242,8 @@ def bundler() -> Iterator[tuple[_Bundler, str]]:
         server.server_close()
 
 
-def _account(url: str, *, timeout: float = 2.0) -> PolyesterSmartAccount:
+def _account(url: str, *, timeout: float = 10.0) -> PolyesterSmartAccount:
+    # A generous per-request timeout: only the tests that pass one test timeouts.
     environment = POLYESTER_DEVNET_ENVIRONMENT
     environment = replace(
         environment,
@@ -402,6 +414,46 @@ def test_malformed_error_object_with_a_refusal_code_keeps_the_hash(
     _recover(account, state, user_op_hash)
 
 
+def test_an_erc_7769_code_on_a_receipt_read_is_retried(bundler: tuple[_Bundler, str]) -> None:
+    # The ERC-7769 codes are eth_sendUserOperation's: answered to a receipt
+    # read they prove nothing, so the read is retried and the receipt returned.
+    state, url = bundler
+    state.receipt_errors = [{"code": -32500, "message": "rejected"}]
+    receipt = _send(_account(url))
+    assert list(state.operations) == [receipt.user_operation_hash]
+    assert state.receipt_errors == []
+
+
+def test_a_request_refusal_of_a_receipt_read_keeps_the_hash(
+    bundler: tuple[_Bundler, str],
+) -> None:
+    # A JSON-RPC request error refuses the read itself, for any method: the wait
+    # ends, and send_calls still names the operation it sent.
+    state, url = bundler
+    state.receipt_errors = [{"code": -32602, "message": "invalid params"}]
+    account = _account(url)
+    with pytest.raises(Exception) as raised:
+        account.send_calls([_WITHDRAW], receipt_timeout_s=3.0)
+    user_op_hash = _assert_unknown_with_hash(raised.value, state)
+    assert isinstance(raised.value.__cause__, JsonRpcError)
+    assert raised.value.__cause__.code == -32602
+    _recover(account, state, user_op_hash)
+
+
+def test_erc_7769_refusal_codes_prove_a_refusal_of_the_send_only() -> None:
+    for code in (-32500, -32501, -32505, -32507, -32508):
+        answer = JsonRpcError("rejected", code=code)
+        assert _is_jsonrpc_refusal(answer, "eth_sendUserOperation")
+        assert not _is_jsonrpc_refusal(answer, "eth_sendRawTransaction")
+        assert not _is_jsonrpc_refusal(answer, "eth_getUserOperationReceipt")
+    for code in (-32700, -32600, -32601, -32602):
+        answer = JsonRpcError("refused", code=code)
+        assert _is_jsonrpc_refusal(answer, "eth_sendUserOperation")
+        assert _is_jsonrpc_refusal(answer, "eth_sendRawTransaction")
+    for code in (504, -32506, -32603, -32000):
+        assert not _is_jsonrpc_refusal(JsonRpcError("x", code=code), "eth_sendUserOperation")
+
+
 @pytest.mark.parametrize("wait", [True, False])
 @pytest.mark.parametrize("reply", ["0x" + "cd" * 32, "", 7, None])
 def test_send_answer_naming_another_hash_keeps_the_computed_hash(
@@ -433,13 +485,16 @@ def test_a_receipt_answered_after_the_deadline_is_not_returned(
     _recover(account, state, user_op_hash)
 
 
-def test_a_receipt_body_withheld_after_its_headers_ends_with_the_wait(
-    bundler: tuple[_Bundler, str],
+@pytest.mark.parametrize("unterminated", [False, True], ids=["complete", "partial"])
+def test_a_receipt_answer_stalled_after_its_headers_ends_with_the_wait(
+    bundler: tuple[_Bundler, str], unterminated: bool
 ) -> None:
-    # The receipt read's headers arrive before the deadline and its body never
-    # does: the read still ends by the deadline, not a timeout later.
+    # The receipt read's headers arrive before the deadline, complete or without
+    # the blank line that ends them, and nothing more comes: the read still ends
+    # by the deadline, not a read timeout later.
     state, url = bundler
     state.receipt_headers_then_stall_s = 0.35
+    state.receipt_headers_unterminated = unterminated
     account = _account(url, timeout=5.0)
     with pytest.raises(Exception) as raised:
         account.send_calls([_WITHDRAW], receipt_timeout_s=0.65)

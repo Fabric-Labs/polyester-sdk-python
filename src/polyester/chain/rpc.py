@@ -89,9 +89,12 @@ class JsonRpcClient:
         budget = self._timeout if timeout is None else min(timeout, self._timeout)
         deadline = time.monotonic() + budget
         # httpx Timeout is per-phase, not a total wall clock. Enforce an absolute
-        # deadline via a guard that, at ``deadline``, closes the client and shuts
-        # down the response's socket, plus between-chunk checks (covers a stall
-        # before or after the headers and a slow drip, without worker threads).
+        # deadline via a guard that, at ``deadline``, shuts down the connection's
+        # socket and closes the client, plus between-chunk checks. The socket is
+        # taken from httpcore's trace as soon as the connection is made, so the
+        # guard cuts a stall in any phase after connecting: sending the request,
+        # partial or complete headers, the body, or a slow drip. Connecting is
+        # bounded by the connect timeout, which is the budget.
         with (
             httpx.Client(
                 timeout=httpx.Timeout(max(budget, 0.0)),
@@ -101,8 +104,9 @@ class JsonRpcClient:
             _deadline_guard(client, deadline) as guard,
         ):
             try:
-                with client.stream("POST", self._url, json=payload) as response:
-                    guard.watch(response)
+                with client.stream(
+                    "POST", self._url, json=payload, extensions={"trace": guard.trace}
+                ) as response:
                     raw = _read_limited_sync(
                         response,
                         MAX_JSONRPC_RESPONSE_BYTES,
@@ -145,10 +149,10 @@ class JsonRpcClient:
 class _DeadlineGuard:
     """Aborts a sync request at its deadline.
 
-    Closing the client ends a request still waiting for its answer. A response
-    already being read is ended by shutting down its socket: a read blocked on
-    the socket, between the headers and the body or within the body, returns at
-    once, which closing the client does not ensure.
+    It shuts down the connection's socket, which httpcore's ``trace`` request
+    extension hands it once the TCP connection (and TLS, for HTTPS) is made: a
+    send or read blocked on the socket, in any phase of the request, returns at
+    once, which closing the client does not ensure. It then closes the client.
     """
 
     def __init__(self, client: httpx.Client) -> None:
@@ -157,9 +161,11 @@ class _DeadlineGuard:
         self._socket: socket.socket | None = None
         self._expired = False
 
-    def watch(self, response: httpx.Response) -> None:
-        """Shut down ``response``'s socket at the deadline (now, if it passed)."""
-        stream = response.extensions.get("network_stream")
+    def trace(self, event: str, info: dict[str, Any]) -> None:
+        """httpcore trace callback: take the socket of each connection made."""
+        if event not in _CONNECTED_EVENTS:
+            return
+        stream = info.get("return_value")
         sock = stream.get_extra_info("socket") if stream is not None else None
         if not isinstance(sock, socket.socket):
             return
@@ -177,6 +183,11 @@ class _DeadlineGuard:
         if sock is not None:
             _shutdown(sock)
         self._client.close()
+
+
+# httpcore trace events that carry a new network stream: the TCP connection,
+# then, for HTTPS, the TLS stream that replaces it.
+_CONNECTED_EVENTS = frozenset({"connection.connect_tcp.complete", "connection.start_tls.complete"})
 
 
 def _shutdown(sock: socket.socket) -> None:

@@ -4,8 +4,14 @@ from datetime import UTC, datetime
 
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
-from polyester.codecs.scalars import format_id, timestamp_parts_to_datetime
+from polyester.codecs.scalars import (
+    aware_datetime,
+    datetime_to_timestamp_dict,
+    format_id,
+    timestamp_parts_to_datetime,
+)
 
 _ENUM_PREFIXES = (
     "SIDE_",
@@ -99,6 +105,23 @@ def optional_timestamp(message: Message, field_name: str) -> datetime | None:
     value = getattr(message, field_name)
     result: datetime = value.ToDatetime(tzinfo=UTC)
     return result
+
+
+def datetime_to_timestamp(value: object, field_name: str) -> Timestamp:
+    """The protobuf ``Timestamp`` of a caller's time parameter ``field_name``.
+
+    Every public time parameter is converted here: ``value`` must be a
+    timezone-aware :class:`~datetime.datetime`, and anything else raises
+    :class:`~polyester.errors.PolyesterValidationError` naming the parameter
+    (see :func:`~polyester.codecs.scalars.aware_datetime`). Exact to the
+    microsecond.
+    """
+    return Timestamp(**datetime_to_timestamp_dict(aware_datetime(value, field_name), field_name))
+
+
+def optional_datetime_to_timestamp(value: object, field_name: str) -> Timestamp | None:
+    """:func:`datetime_to_timestamp`, or ``None`` (not sent) for ``None``."""
+    return None if value is None else datetime_to_timestamp(value, field_name)
 
 
 def timestamp_to_ms(msg: Message | None) -> int:

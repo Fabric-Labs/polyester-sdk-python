@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from google.protobuf.timestamp_pb2 import Timestamp
-
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.heatmap import heatmap_from_proto
 from polyester.codecs.heatmap import (
@@ -13,7 +11,16 @@ from polyester.codecs.heatmap import (
     resolve_heatmap_quantity_mode,
 )
 from polyester.codecs.orderbook import depth_tier_value
+from polyester.codecs.proto_helpers import datetime_to_timestamp
 from polyester.codecs.realtime_decode import decode_heatmap_live_bucket_bytes
+from polyester.codecs.scalars import (
+    TIMESTAMP_MAX_SECONDS,
+    TIMESTAMP_MIN_SECONDS,
+    aware_datetime,
+    exact_integer,
+    timestamp_parts_to_datetime,
+)
+from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1.heatmap_connect import HeatmapServiceClient
 from polyester.gen.marketdata.v1.heatmap_pb2 import (
     GetOrderbookHeatmapRequest,
@@ -61,7 +68,10 @@ class AsyncHeatmapService(BaseService):
         A continuation omits the default time window. If a range is supplied
         with a token, only its explicit bounds are sent; repeat the original range.
         The first page runs from ``from_ts_sec`` (or ``start_time``, else 5 minutes
-        before the end) to ``end_time``, or to now without one.
+        before the end) to ``end_time``, or to now without one. ``from_ts_sec`` is
+        an integer of Unix seconds (negative before 1970); ``start_time`` and ``end_time`` are
+        timezone-aware ``datetime`` objects. Any other type, or a naive datetime,
+        raises :class:`~polyester.errors.PolyesterValidationError` before any request.
 
         ``interval`` is ``"1s"``, ``"1m"``, ``"5m"`` or ``"1h"`` (or ``"INTERVAL_1M"``),
         ``quantity_mode`` is ``"close"`` or ``"peak"``. ``depth`` is requested as itself
@@ -82,6 +92,8 @@ class AsyncHeatmapService(BaseService):
         render it.
         """
         validated_limit = validate_limit(limit, GetOrderbookHeatmapRequest)
+        # A malformed time is refused before the catalog wait or any request.
+        time_range = _time_range(from_ts_sec, start_time, end_time, continuation=bool(page_token))
         if symbol:
             await self._ensure_catalogs()
         resolved_symbol_id = resolve_symbol_id(
@@ -103,27 +115,7 @@ class AsyncHeatmapService(BaseService):
             quantity_mode=qty_enum,
             page_token=page_token,
         )
-        if page_token:
-            if from_ts_sec is not None or start_time is not None or end_time is not None:
-                time_range = HeatmapTimeRange()
-                if from_ts_sec is not None:
-                    time_range.start_time.CopyFrom(
-                        _datetime_to_timestamp(datetime.fromtimestamp(from_ts_sec, tz=UTC))
-                    )
-                elif start_time is not None:
-                    time_range.start_time.CopyFrom(_datetime_to_timestamp(start_time))
-                if end_time is not None:
-                    time_range.end_time.CopyFrom(_datetime_to_timestamp(end_time))
-                request.time_range.CopyFrom(time_range)
-        else:
-            end = end_time or datetime.now(UTC)
-            if from_ts_sec is not None:
-                start = datetime.fromtimestamp(from_ts_sec, tz=UTC)
-            else:
-                start = start_time or (end - timedelta(minutes=5))
-            time_range = HeatmapTimeRange()
-            time_range.start_time.CopyFrom(_datetime_to_timestamp(start))
-            time_range.end_time.CopyFrom(_datetime_to_timestamp(end))
+        if time_range is not None:
             request.time_range.CopyFrom(time_range)
 
         return await unary_public_decoded(
@@ -173,7 +165,43 @@ class AsyncHeatmapService(BaseService):
         )
 
 
-def _datetime_to_timestamp(value: datetime) -> Timestamp:
-    ts = Timestamp()
-    ts.FromDatetime(value)
-    return ts
+def _time_range(
+    from_ts_sec: object,
+    start_time: object,
+    end_time: object,
+    *,
+    continuation: bool,
+) -> HeatmapTimeRange | None:
+    """The request's time range, every bound checked. A continuation sends
+    only the bounds given (none: no range); a first page defaults the end to
+    now and the start to 5 minutes before the end. ``from_ts_sec`` wins over
+    ``start_time``."""
+    start = None if start_time is None else aware_datetime(start_time, "start_time")
+    end = None if end_time is None else aware_datetime(end_time, "end_time")
+    start_name = "start_time"
+    if from_ts_sec is not None:
+        seconds = exact_integer(
+            from_ts_sec,
+            "from_ts_sec",
+            min_value=TIMESTAMP_MIN_SECONDS,
+            max_value=TIMESTAMP_MAX_SECONDS,
+        )
+        start, start_name = timestamp_parts_to_datetime(seconds, 0), "from_ts_sec"
+    if not continuation:
+        if end is None:
+            end = datetime.now(UTC)
+        if start is None:
+            try:
+                start = end - timedelta(minutes=5)
+            except OverflowError:
+                raise PolyesterValidationError(
+                    "end_time is outside the supported range (years 1 to 9999 in UTC)"
+                ) from None
+    if start is None and end is None:
+        return None
+    time_range = HeatmapTimeRange()
+    if start is not None:
+        time_range.start_time.CopyFrom(datetime_to_timestamp(start, start_name))
+    if end is not None:
+        time_range.end_time.CopyFrom(datetime_to_timestamp(end, "end_time"))
+    return time_range

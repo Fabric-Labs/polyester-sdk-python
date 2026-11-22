@@ -23,6 +23,7 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
+from polyester.codecs.proto_helpers import datetime_to_timestamp
 from polyester.codecs.refusal_codes import (
     BAD_PRICE,
     FEE_ASSET_NOT_ALLOWED,
@@ -35,6 +36,7 @@ from polyester.codecs.refusal_codes import (
 from polyester.codecs.scalars import (
     UINT32_MAX,
     FractionalDigitsError,
+    aware_datetime,
     exact_integer,
     id_to_int,
     market_id,
@@ -137,13 +139,24 @@ def _limit_price_path(tif: str | None) -> str:
     return f"order.{execution}.price_ticks"
 
 
+def gtd_expires_at_text(value: object) -> str | None:
+    """A caller's ``expires_at``: ``None`` or an RFC3339 string. Any other
+    type (an int of seconds or milliseconds, a ``datetime``) is refused by
+    name rather than read."""
+    if value is None or isinstance(value, str):
+        return value
+    raise PolyesterValidationError(
+        f"expires_at must be an RFC3339 UTC timestamp string, not {type(value).__name__}"
+    )
+
+
 def parse_gtd_expire_at(
-    value: str,
+    value: object,
     *,
     now: datetime | None = None,
 ) -> Timestamp:
     """Parse a UTC RFC3339 ``expires_at`` and enforce the 1s–30d GTD window."""
-    text = value.strip()
+    text = (gtd_expires_at_text(value) or "").strip()
     if not text:
         raise PolyesterValidationError("tif='gtd' requires expires_at")
     if text.endswith("Z"):
@@ -154,16 +167,15 @@ def parse_gtd_expire_at(
         raise PolyesterValidationError("expires_at must be an RFC3339 UTC timestamp") from exc
     if parsed.tzinfo is None:
         raise PolyesterValidationError("expires_at must be timezone-aware UTC")
-    parsed = parsed.astimezone(UTC)
+    # An offset that moves the time outside years 1 to 9999 in UTC is refused.
+    parsed = aware_datetime(parsed, "expires_at").astimezone(UTC)
     current = (now or datetime.now(UTC)).astimezone(UTC)
     delta = parsed - current
     if delta < _GTD_MIN_OFFSET or delta > _GTD_MAX_OFFSET:
         raise PolyesterValidationError(
             "expires_at must be between 1 second and 30 days after validation"
         )
-    ts = Timestamp()
-    ts.FromDatetime(parsed)
-    return ts
+    return datetime_to_timestamp(parsed, "expires_at")
 
 
 def validate_batch_size(operation: str, length: int) -> None:
@@ -223,10 +235,13 @@ def normalize_create_order_request(
             raise PolyesterValidationError(
                 "unsupported create order argument(s): " + ", ".join(unknown)
             )
+        # Named here: the conversion below would only say the request is invalid.
+        gtd_expires_at_text(data.get("expires_at"))
     try:
         normalized = msgspec.convert(data, type=CreateOrderRequest)
     except (msgspec.ValidationError, TypeError) as exc:
         raise PolyesterValidationError("Invalid orders.create request") from exc
+    gtd_expires_at_text(normalized.expires_at)
     # Reject floats even when qty is typed as Any for dual-path inputs.
     for field_name in (
         "qty",
@@ -277,7 +292,9 @@ def create_order_to_wire(
         "side": ORDER_SIDE_TO_PROTO[request.side],
         "order_type": ORDER_TYPE_TO_PROTO[request.order_type],
         "timeInForce": TIF_TO_PROTO.get(request.tif) if request.tif else None,
-        "expireAt": request.expires_at if (request.tif or "gtc") == "gtd" else None,
+        "expireAt": (
+            gtd_expires_at_text(request.expires_at) if (request.tif or "gtc") == "gtd" else None
+        ),
         "qty_scaled": resolve_qty_scaled(
             cast(Any, request.qty),
             _codec_quantity_scale(request.qty, quantity_scale),
@@ -391,6 +408,7 @@ def order_intent_from_request(
             else None
         )
     tif = request.tif or "gtc"
+    gtd_expires_at_text(request.expires_at)
     if request.expires_at and tif != "gtd":
         raise PolyesterValidationError("expires_at is only valid for limit GTD orders")
     display_qty_scaled = _display_qty_scaled(request, tif=tif, quantity_scale=quantity_scale)

@@ -237,6 +237,10 @@ together. `POLYESTER_DEVNET_ENVIRONMENT` is the constructor default.
 `POLYESTER_TESTNET_ENVIRONMENT` targets public testnet (`api.testnet.polyester.com`,
 chain `888169`). Custom / VPC endpoints use `create_polyester_environment` or
 `environment.with_urls(...)`. `api_url` / `ws_url` remain as transport overrides.
+A remote `http://` or `ws://` URL is refused unless you pass
+`allow_insecure=True` to either helper, for a private endpoint whose TLS
+terminates elsewhere; the environment keeps that opt-in, so the client
+accepts it. Loopback hosts never need it.
 
 Pass all credentials as **constructor parameters**. The SDK does not read
 environment variables unless you pass them in yourself (or use `from_env()` in
@@ -438,7 +442,7 @@ async with AsyncPolyester(
     api_key_id="ak_...",
     api_private_key="...",
     default_account_id="YOUR_ACCOUNT_ID",
-    default_sub_account_id="",  # main account; omit subaccount scoping
+    # No default_sub_account_id: calls act on the main account.
 ) as client:
     result = await client.orders.create(
         symbol="BTC-USDT",
@@ -1646,9 +1650,11 @@ order placed. `triggers.create` returns before that, so read the trigger with
 run at once.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
-`max_slippage_bps` to preserve the current values. Send an explicit zero
-(`Price.from_ticks(0)` or `0`) to clear an existing activation price or
-maximum-slippage cap. Modify `max_slippage_bps` is 1–10000, as at creation,
+`max_slippage_bps` to preserve the current values. Send an explicit zero to
+clear one: `activation_price="0"` (or `Price.from_ticks(0)`) clears an existing
+activation price, and an int `0` is refused there like any int price;
+`max_slippage_ticks=0` or `max_slippage_bps=0` clears a maximum-slippage cap.
+Modify `max_slippage_bps` is 1–10000, as at creation,
 and `0` clears it: the patch does not say what it modifies, so the server
 decides by side and type. A buy stop-loss or take-profit with a market child
 accepts 10000; a sell stop-loss or take-profit and a trailing stop refuse it

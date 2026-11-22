@@ -10,7 +10,7 @@ async def main() -> None:
         api_key_id=os.environ["POLYESTER_API_KEY_ID"],
         api_private_key=os.environ["POLYESTER_API_PRIVATE_KEY"],
         default_account_id=os.environ["POLYESTER_ACCOUNT_ID"],  # Profile → Account ID
-        default_sub_account_id="",
+        # No default_sub_account_id: calls act on the main account.
     ) as client:
         overview = await client.market_overview.list(limit=3)
         for row in overview.markets:

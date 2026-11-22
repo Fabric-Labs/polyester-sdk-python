@@ -55,7 +55,13 @@ class ContractsEnvironment:
 
 @dataclass(frozen=True, slots=True)
 class PolyesterEnvironment:
-    """Complete SDK environment: API, realtime, RPC, AA, and contract pins."""
+    """Complete SDK environment: API, realtime, RPC, AA, and contract pins.
+
+    ``allow_insecure`` records the explicit opt-in to plaintext (``http://`` or
+    ``ws://``) URLs on remote hosts the environment was created with, so a
+    client constructor re-validates it with the same opt-in. Loopback hosts
+    never need it.
+    """
 
     name: str
     api_url: str
@@ -66,6 +72,7 @@ class PolyesterEnvironment:
     contracts: ContractsEnvironment
     chain_name: str = ""
     explorer_url: str = ""
+    allow_insecure: bool = False
 
     def with_urls(
         self,
@@ -77,7 +84,13 @@ class PolyesterEnvironment:
         paymaster_url: str | None = None,
         allow_insecure: bool = False,
     ) -> PolyesterEnvironment:
-        """Copy this environment with endpoint overrides (market-maker / VPC case)."""
+        """Copy this environment with endpoint overrides (market-maker / VPC case).
+
+        ``allow_insecure=True`` accepts plaintext (``http://`` or ``ws://``)
+        URLs on remote hosts, for a private endpoint whose TLS terminates
+        elsewhere. The copy keeps that opt-in, and the opt-in of this
+        environment.
+        """
         aa = self.account_abstraction
         if bundler_url is not None or paymaster_url is not None:
             aa = replace(
@@ -95,7 +108,7 @@ class PolyesterEnvironment:
             contracts=self.contracts,
             chain_name=self.chain_name,
             explorer_url=self.explorer_url,
-            allow_insecure=allow_insecure,
+            allow_insecure=allow_insecure or self.allow_insecure,
         )
 
 
@@ -208,7 +221,11 @@ def create_polyester_environment(
     explorer_url: str = "",
     allow_insecure: bool = False,
 ) -> PolyesterEnvironment:
-    """Validate and freeze a complete environment (presets and custom / VPC URLs)."""
+    """Validate and freeze a complete environment (presets and custom / VPC URLs).
+
+    ``allow_insecure=True`` accepts plaintext (``http://`` or ``ws://``) URLs on
+    remote hosts; the environment keeps the opt-in.
+    """
     if not isinstance(name, str) or not name.strip():
         raise PolyesterValidationError("name must be a non-empty string")
     if not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id <= 0:
@@ -260,6 +277,7 @@ def create_polyester_environment(
         contracts=contracts,
         chain_name=chain_name.strip(),
         explorer_url=explorer_url.strip(),
+        allow_insecure=allow_insecure,
     )
 
 
@@ -268,7 +286,11 @@ def parse_polyester_environment(
     *,
     allow_insecure: bool = False,
 ) -> PolyesterEnvironment:
-    """Re-validate an environment supplied to a client constructor."""
+    """Re-validate an environment supplied to a client constructor.
+
+    The environment's own plaintext opt-in (``allow_insecure``) applies, as
+    does ``allow_insecure=True`` here.
+    """
     if not isinstance(environment, PolyesterEnvironment):
         raise PolyesterValidationError("environment must be a PolyesterEnvironment")
     return create_polyester_environment(
@@ -281,7 +303,7 @@ def parse_polyester_environment(
         contracts=environment.contracts,
         chain_name=environment.chain_name,
         explorer_url=environment.explorer_url,
-        allow_insecure=allow_insecure,
+        allow_insecure=allow_insecure or environment.allow_insecure,
     )
 
 

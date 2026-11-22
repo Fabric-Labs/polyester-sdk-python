@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from polyester import (
     POLYESTER_DEVNET_ENVIRONMENT,
     POLYESTER_TESTNET_ENVIRONMENT,
     AsyncPolyester,
+    Polyester,
     create_polyester_environment,
     environment_from_name,
 )
@@ -163,3 +166,70 @@ async def test_from_env_reads_polyester_env(
         assert client.environment.chain_id == 888169
     finally:
         await client.aclose()
+
+
+# A private endpoint whose TLS terminates elsewhere: plaintext on a remote host.
+_VPC_API_URL = "http://10.0.0.5:8080"
+_VPC_WS_URL = "ws://10.0.0.5:8080"
+
+
+def test_environment_keeps_the_plaintext_opt_in() -> None:
+    env = POLYESTER_DEVNET_ENVIRONMENT.with_urls(
+        api_url=_VPC_API_URL, websocket_url=_VPC_WS_URL, allow_insecure=True
+    )
+    assert env.api_url == _VPC_API_URL
+    assert env.allow_insecure is True
+    assert POLYESTER_DEVNET_ENVIRONMENT.allow_insecure is False
+    # A copy keeps the opt-in of the environment it copies.
+    moved = env.with_urls(api_url="http://10.0.0.6:8080")
+    assert moved.allow_insecure is True
+    assert moved.api_url == "http://10.0.0.6:8080"
+
+
+@pytest.mark.asyncio
+async def test_async_client_accepts_environment_built_with_allow_insecure() -> None:
+    env = POLYESTER_DEVNET_ENVIRONMENT.with_urls(
+        api_url=_VPC_API_URL, websocket_url=_VPC_WS_URL, allow_insecure=True
+    )
+    client = AsyncPolyester(environment=env, hydrate_catalogs=False)
+    try:
+        assert client.api_url == _VPC_API_URL
+        assert client.ws_url == _VPC_WS_URL
+        assert client.environment.allow_insecure is True
+    finally:
+        await client.aclose()
+
+
+def test_sync_client_accepts_environment_built_with_allow_insecure() -> None:
+    env = create_polyester_environment(
+        name=POLYESTER_DEVNET_ENVIRONMENT.name,
+        api_url=_VPC_API_URL,
+        websocket_url=_VPC_WS_URL,
+        rpc_url=POLYESTER_DEVNET_ENVIRONMENT.rpc_url,
+        chain_id=POLYESTER_DEVNET_ENVIRONMENT.chain_id,
+        account_abstraction=POLYESTER_DEVNET_ENVIRONMENT.account_abstraction,
+        contracts=POLYESTER_DEVNET_ENVIRONMENT.contracts,
+        allow_insecure=True,
+    )
+    client = Polyester(environment=env, hydrate_catalogs=False)
+    try:
+        assert client._client.api_url == _VPC_API_URL
+        assert client._client.ws_url == _VPC_WS_URL
+    finally:
+        client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_refuses_remote_plaintext_environment_without_opt_in() -> None:
+    with pytest.raises(PolyesterValidationError, match="secure protocol"):
+        POLYESTER_DEVNET_ENVIRONMENT.with_urls(
+            api_url=_VPC_API_URL, websocket_url=_VPC_WS_URL
+        )
+    # Built without the opt-in, by replacing the URLs on the frozen dataclass.
+    env = dataclasses.replace(
+        POLYESTER_DEVNET_ENVIRONMENT, api_url=_VPC_API_URL, websocket_url=_VPC_WS_URL
+    )
+    with pytest.raises(PolyesterValidationError, match="api_url must use a secure protocol"):
+        AsyncPolyester(environment=env, hydrate_catalogs=False)
+    with pytest.raises(PolyesterValidationError, match="api_url must use a secure protocol"):
+        Polyester(environment=env, hydrate_catalogs=False)

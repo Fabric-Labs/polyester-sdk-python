@@ -110,6 +110,10 @@ class _Bundler:
     # Receipt and status reads are answered this many seconds late.
     receipt_delay_s: float = 0.0
     status_delay_s: float = 0.0
+    # Receipt reads send their headers this many seconds late, then no body.
+    receipt_headers_then_stall_s: float | None = None
+    # When the last eth_sendUserOperation arrived (time.monotonic()).
+    send_at: float = 0.0
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def handle(self, method: str, params: list[Any]) -> tuple[int, Any, float]:
@@ -140,6 +144,7 @@ class _Bundler:
                 0.0,
             )
         if method == "eth_sendUserOperation":
+            self.send_at = time.monotonic()
             if self.send_error is not None:
                 return 200, {"error": self.send_error}, 0.0
             op, entry_point = params
@@ -184,6 +189,19 @@ def bundler() -> Iterator[tuple[_Bundler, str]]:
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            stall = state.receipt_headers_then_stall_s
+            if body["method"] == "eth_getUserOperationReceipt" and stall is not None:
+                time.sleep(stall)
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", "100")
+                    self.end_headers()
+                    self.wfile.flush()
+                except OSError:
+                    return
+                time.sleep(3.0)  # the body never comes
+                return
             status, answer, delay = state.handle(body["method"], body["params"])
             if delay:
                 time.sleep(delay)
@@ -412,6 +430,29 @@ def test_a_receipt_answered_after_the_deadline_is_not_returned(
     user_op_hash = _assert_unknown_with_hash(raised.value, state)
     assert isinstance(raised.value.__cause__, TimeoutError)
     state.receipt_delay_s = 0.0
+    _recover(account, state, user_op_hash)
+
+
+def test_a_receipt_body_withheld_after_its_headers_ends_with_the_wait(
+    bundler: tuple[_Bundler, str],
+) -> None:
+    # The receipt read's headers arrive before the deadline and its body never
+    # does: the read still ends by the deadline, not a timeout later.
+    state, url = bundler
+    state.receipt_headers_then_stall_s = 0.35
+    account = _account(url, timeout=5.0)
+    with pytest.raises(Exception) as raised:
+        account.send_calls([_WITHDRAW], receipt_timeout_s=0.65)
+    # The receipt wait starts once the send is answered.
+    assert time.monotonic() - state.send_at < 0.9
+    user_op_hash = _assert_unknown_with_hash(raised.value, state)
+
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        account.wait_for_receipt(user_op_hash, timeout_s=0.65, poll_interval_s=0.05)
+    assert time.monotonic() - started < 0.9
+
+    state.receipt_headers_then_stall_s = None
     _recover(account, state, user_op_hash)
 
 

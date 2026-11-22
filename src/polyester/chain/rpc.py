@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import itertools
 import json
+import socket
 import threading
 import time
 from collections.abc import Iterator
@@ -88,18 +89,20 @@ class JsonRpcClient:
         budget = self._timeout if timeout is None else min(timeout, self._timeout)
         deadline = time.monotonic() + budget
         # httpx Timeout is per-phase, not a total wall clock. Enforce an absolute
-        # deadline via a closer that aborts the client at ``deadline`` plus
-        # between-chunk checks (covers stall and slow-drip without worker threads).
+        # deadline via a guard that, at ``deadline``, closes the client and shuts
+        # down the response's socket, plus between-chunk checks (covers a stall
+        # before or after the headers and a slow drip, without worker threads).
         with (
             httpx.Client(
                 timeout=httpx.Timeout(max(budget, 0.0)),
                 headers=_HTTP_HEADERS,
                 event_hooks={"response": [_raise_for_status]},
             ) as client,
-            _deadline_client_close(client, deadline),
+            _deadline_guard(client, deadline) as guard,
         ):
             try:
                 with client.stream("POST", self._url, json=payload) as response:
+                    guard.watch(response)
                     raw = _read_limited_sync(
                         response,
                         MAX_JSONRPC_RESPONSE_BYTES,
@@ -139,22 +142,63 @@ class JsonRpcClient:
         return _decode_jsonrpc_envelope(raw, expected_id=req_id)
 
 
+class _DeadlineGuard:
+    """Aborts a sync request at its deadline.
+
+    Closing the client ends a request still waiting for its answer. A response
+    already being read is ended by shutting down its socket: a read blocked on
+    the socket, between the headers and the body or within the body, returns at
+    once, which closing the client does not ensure.
+    """
+
+    def __init__(self, client: httpx.Client) -> None:
+        self._client = client
+        self._lock = threading.Lock()
+        self._socket: socket.socket | None = None
+        self._expired = False
+
+    def watch(self, response: httpx.Response) -> None:
+        """Shut down ``response``'s socket at the deadline (now, if it passed)."""
+        stream = response.extensions.get("network_stream")
+        sock = stream.get_extra_info("socket") if stream is not None else None
+        if not isinstance(sock, socket.socket):
+            return
+        with self._lock:
+            self._socket = sock
+            expired = self._expired
+        if expired:
+            _shutdown(sock)
+
+    def expire(self) -> None:
+        with self._lock:
+            self._expired = True
+            sock = self._socket
+        # The socket first: closing the client can wait on the read it ends.
+        if sock is not None:
+            _shutdown(sock)
+        self._client.close()
+
+
+def _shutdown(sock: socket.socket) -> None:
+    with contextlib.suppress(OSError):
+        sock.shutdown(socket.SHUT_RDWR)
+
+
 @contextlib.contextmanager
-def _deadline_client_close(client: httpx.Client, deadline: float) -> Iterator[None]:
-    """Close ``client`` at ``deadline`` so a blocked sync read cannot outlive it.
+def _deadline_guard(client: httpx.Client, deadline: float) -> Iterator[_DeadlineGuard]:
+    """A :class:`_DeadlineGuard` for ``client`` that expires at ``deadline``.
 
     The timer is cancelled on exit, so successful calls leave no worker threads.
-    Closing the client unblocks in-flight stream reads without a dedicated worker
-    pool or leaked connections.
     """
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise JsonRpcError("json-rpc timed out")
-    timer = threading.Timer(remaining, client.close)
+    guard = _DeadlineGuard(client)
+    timer = threading.Timer(remaining, guard.expire)
     timer.daemon = True
     timer.start()
     try:
-        yield
+        yield guard
     finally:
         timer.cancel()
 

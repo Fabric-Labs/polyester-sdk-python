@@ -357,6 +357,33 @@ def test_unrecognized_error_code_after_storing_keeps_the_hash(
     _recover(account, state, user_op_hash)
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        {"code": -32602},
+        {"code": -32602, "message": None},
+        {"code": -32500, "message": 7},
+        {"code": "-32602", "message": "invalid UserOperation"},
+        {"code": -32602.0, "message": "invalid UserOperation"},
+        {"code": True, "message": "invalid UserOperation"},
+    ],
+)
+def test_malformed_error_object_with_a_refusal_code_keeps_the_hash(
+    bundler: tuple[_Bundler, str], error: dict[str, Any]
+) -> None:
+    # A refusal code proves a refusal only in a well-formed error object: an
+    # integer code and a string message. Here the bundler stored the operation.
+    state, url = bundler
+    state.stored_send_error = error
+    account = _account(url)
+    with pytest.raises(Exception) as raised:
+        account.send_calls([_WITHDRAW], receipt_timeout_s=3.0)
+    user_op_hash = _assert_unknown_with_hash(raised.value, state)
+    assert isinstance(raised.value.__cause__, JsonRpcError)
+    assert raised.value.__cause__.code is None
+    _recover(account, state, user_op_hash)
+
+
 @pytest.mark.parametrize("wait", [True, False])
 @pytest.mark.parametrize("reply", ["0x" + "cd" * 32, "", 7, None])
 def test_send_answer_naming_another_hash_keeps_the_computed_hash(

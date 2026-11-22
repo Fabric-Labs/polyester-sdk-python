@@ -227,10 +227,14 @@ def _decode_jsonrpc_envelope(raw: bytes, *, expected_id: int) -> Any:
         err = body["error"]
         if not isinstance(err, dict):
             raise JsonRpcError("json-rpc error must be an object")
-        raise JsonRpcError(
-            str(err.get("message", err)),
-            code=err.get("code") if isinstance(err.get("code"), int) else None,
-            data=err.get("data"),
-        )
+        message = err.get("message")
+        code = err.get("code")
+        if not isinstance(message, str) or type(code) is not int:
+            # Not a JSON-RPC error object: its code, if any, proves nothing.
+            raise JsonRpcError(
+                "json-rpc malformed error object: want an integer code and a string message",
+                data=err.get("data"),
+            )
+        raise JsonRpcError(message, code=code, data=err.get("data"))
     # ``result: null`` is a valid JSON-RPC success (has_result True).
     return body["result"]

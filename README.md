@@ -2085,8 +2085,9 @@ read in time: the operation may still be pending and may still execute. Wait on
 the same hash again later; do not send the calls again.
 
 Only a JSON-RPC refusal of the send (`JsonRpcError`) whose code proves the
-bundler refused the operation means nothing was accepted, and the calls can be
-sent again: an invalid request or parameters (-32700, -32600, -32601, -32602) or
+bundler refused the operation, in a well-formed error object (an integer code
+and a string message), means nothing was accepted, and the calls can be sent
+again: an invalid request or parameters (-32700, -32600, -32601, -32602) or
 an ERC-7769 rejection (-32500 to -32505, -32507, -32508). Any other code is an
 unknown outcome. Receipt polls that fail with an HTTP error such as 503 or a
 timeout are retried, and every request and pause ends by the wait's deadline.

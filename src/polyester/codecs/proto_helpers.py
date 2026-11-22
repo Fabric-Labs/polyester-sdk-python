@@ -7,6 +7,7 @@ from google.protobuf.message import Message
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs.scalars import (
+    aware_datetime,
     datetime_to_timestamp_dict,
     format_id,
     timestamp_parts_to_datetime,
@@ -115,7 +116,7 @@ def datetime_to_timestamp(value: object, field_name: str) -> Timestamp:
     (see :func:`~polyester.codecs.scalars.aware_datetime`). Exact to the
     microsecond.
     """
-    return Timestamp(**datetime_to_timestamp_dict(value, field_name))
+    return Timestamp(**datetime_to_timestamp_dict(aware_datetime(value, field_name), field_name))
 
 
 def optional_datetime_to_timestamp(value: object, field_name: str) -> Timestamp | None:

@@ -13,7 +13,13 @@ from polyester.codecs.heatmap import (
 from polyester.codecs.orderbook import depth_tier_value
 from polyester.codecs.proto_helpers import datetime_to_timestamp
 from polyester.codecs.realtime_decode import decode_heatmap_live_bucket_bytes
-from polyester.codecs.scalars import aware_datetime, exact_integer
+from polyester.codecs.scalars import (
+    TIMESTAMP_MAX_SECONDS,
+    TIMESTAMP_MIN_SECONDS,
+    aware_datetime,
+    exact_integer,
+    timestamp_parts_to_datetime,
+)
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketdata.v1.heatmap_connect import HeatmapServiceClient
 from polyester.gen.marketdata.v1.heatmap_pb2 import (
@@ -27,9 +33,6 @@ from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_id
 from polyester.services._validation import validate_limit
-
-# 9999-12-31T23:59:59Z, the last second a datetime (and a Timestamp) holds.
-_MAX_TS_SEC = 253_402_300_799
 
 
 class AsyncHeatmapService(BaseService):
@@ -66,7 +69,7 @@ class AsyncHeatmapService(BaseService):
         with a token, only its explicit bounds are sent; repeat the original range.
         The first page runs from ``from_ts_sec`` (or ``start_time``, else 5 minutes
         before the end) to ``end_time``, or to now without one. ``from_ts_sec`` is
-        an integer of Unix seconds; ``start_time`` and ``end_time`` are
+        an integer of Unix seconds (negative before 1970); ``start_time`` and ``end_time`` are
         timezone-aware ``datetime`` objects. Any other type, or a naive datetime,
         raises :class:`~polyester.errors.PolyesterValidationError` before any request.
 
@@ -177,8 +180,13 @@ def _time_range(
     end = None if end_time is None else aware_datetime(end_time, "end_time")
     start_name = "start_time"
     if from_ts_sec is not None:
-        seconds = exact_integer(from_ts_sec, "from_ts_sec", min_value=0, max_value=_MAX_TS_SEC)
-        start, start_name = datetime.fromtimestamp(seconds, tz=UTC), "from_ts_sec"
+        seconds = exact_integer(
+            from_ts_sec,
+            "from_ts_sec",
+            min_value=TIMESTAMP_MIN_SECONDS,
+            max_value=TIMESTAMP_MAX_SECONDS,
+        )
+        start, start_name = timestamp_parts_to_datetime(seconds, 0), "from_ts_sec"
     if not continuation:
         if end is None:
             end = datetime.now(UTC)

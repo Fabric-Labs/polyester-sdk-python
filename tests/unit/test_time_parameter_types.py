@@ -21,8 +21,10 @@ from werkzeug import Request, Response
 
 from polyester import AsyncPolyester, Polyester
 from polyester.codecs import proto_helpers, scalars
-from polyester.errors import PolyesterValidationError
-from polyester.gen.marketdata.v1 import marketdata_pb2
+from polyester.errors import PolyesterServerError, PolyesterValidationError
+from polyester.gen.marketdata.v1 import heatmap_pb2, marketdata_pb2
+from polyester.gen.orders.v1 import orders_pb2
+from polyester.models import CreateOrderRequest
 from tests.hardening_support import make_test_credentials
 
 _CREDS = make_test_credentials()
@@ -319,30 +321,43 @@ def _analytics(method: str, name: str, **fixed: Any) -> Callable[[Any, Any], Any
     return call
 
 
-_INTEGER_TIME_PARAMETERS: dict[str, tuple[Callable[[Any, Any], Any], str]] = {
-    "heatmap.get:from_ts_sec": (_from_ts_sec, "from_ts_sec"),
+# Signed Unix seconds of years 1 to 9999, as a protobuf Timestamp holds them.
+_HEATMAP_OUT_OF_RANGE = [-62_135_596_801, 253_402_300_800]
+_UINT32_OUT_OF_RANGE = [-1, 2**32]
+
+# (call, parameter, out-of-range values)
+_INTEGER_TIME_PARAMETERS: dict[str, tuple[Callable[[Any, Any], Any], str, list[int]]] = {
+    "heatmap.get:from_ts_sec": (_from_ts_sec, "from_ts_sec", _HEATMAP_OUT_OF_RANGE),
 }
 for _name in ("start_ts_sec", "end_ts_sec"):
     _INTEGER_TIME_PARAMETERS[f"get_zipped_asset_supply:{_name}"] = (
         _analytics("get_zipped_asset_supply", _name, zipped_asset_id=1),
         _name,
+        _UINT32_OUT_OF_RANGE,
     )
     _INTEGER_TIME_PARAMETERS[f"get_zipped_asset_supply_group:{_name}"] = (
         _analytics("get_zipped_asset_supply_group", _name, group_id="g"),
         _name,
+        _UINT32_OUT_OF_RANGE,
     )
     _INTEGER_TIME_PARAMETERS[f"get_unified_asset_balances:{_name}"] = (
         _analytics("get_unified_asset_balances", _name, asset_id=1),
         _name,
+        _UINT32_OUT_OF_RANGE,
     )
 
+_INTEGER_REFUSALS = [
+    pytest.param(key, value, shown, id=f"{key}-{value!r}")
+    for key, (_, _, out_of_range) in _INTEGER_TIME_PARAMETERS.items()
+    for value, shown in _NOT_INTEGERS + [(bound, None) for bound in out_of_range]
+]
 
-@pytest.mark.parametrize(("value", "shown"), _NOT_INTEGERS + [(-1, None), (2**64, None)], ids=repr)
-@pytest.mark.parametrize("key", list(_INTEGER_TIME_PARAMETERS))
+
+@pytest.mark.parametrize(("key", "value", "shown"), _INTEGER_REFUSALS)
 async def test_integer_time_parameters_refuse_other_values_before_sending(
     httpserver: HTTPServer, key: str, value: Any, shown: str | None
 ) -> None:
-    call, name = _INTEGER_TIME_PARAMETERS[key]
+    call, name, _ = _INTEGER_TIME_PARAMETERS[key]
     seen = _recording(httpserver)
     waits: list[str] = []
     expected = rf"^{name} must be an integer, not {shown}$" if shown else rf"^{name} .*outside"
@@ -354,3 +369,167 @@ async def test_integer_time_parameters_refuse_other_values_before_sending(
             await asyncio.wait_for(call(client, value), 5)
     assert waits == []
     assert seen == []
+
+
+@pytest.mark.parametrize(
+    ("seconds", "start"),
+    [
+        (-1, datetime(1969, 12, 31, 23, 59, 59, tzinfo=UTC)),
+        (-62_135_596_800, datetime(1, 1, 1, tzinfo=UTC)),
+        (int(_AWARE.timestamp()), _AWARE),
+    ],
+    ids=["before 1970", "year 1", "after 1970"],
+)
+async def test_heatmap_from_ts_sec_sends_signed_unix_seconds(
+    httpserver: HTTPServer, seconds: int, start: datetime
+) -> None:
+    sent: list[heatmap_pb2.GetOrderbookHeatmapRequest] = []
+
+    def handler(request: Request) -> Response:
+        message = heatmap_pb2.GetOrderbookHeatmapRequest.FromString(request.get_data())
+        sent.append(message)
+        reply = heatmap_pb2.GetOrderbookHeatmapResponse(symbol_id=1, depth=message.depth)
+        return Response(reply.SerializeToString(), status=200, content_type="application/proto")
+
+    httpserver.expect_request(
+        "/marketdata.v1.HeatmapService/GetOrderbookHeatmap", method="POST"
+    ).respond_with_handler(handler)
+    async with AsyncPolyester(
+        api_url=httpserver.url_for("").rstrip("/"), hydrate_catalogs=False
+    ) as client:
+        for kwargs in ({"from_ts_sec": seconds}, {"start_time": start}):
+            await client.heatmap.get(symbol_id=1, end_time=_LATER, **kwargs)
+    assert [(m.time_range.start_time.seconds, m.time_range.start_time.nanos) for m in sent] == [
+        (seconds, 0),
+        (seconds, 0),
+    ]
+    assert all(m.time_range.end_time.seconds == int(_LATER.timestamp()) for m in sent)
+
+
+@pytest.mark.parametrize("method", ["breaking_changes_since", "action_required_since"])
+def test_changelog_since_range_refusal_names_since(method: str) -> None:
+    early = datetime.min.replace(tzinfo=timezone(timedelta(hours=1)))
+    with (
+        Polyester(api_url="http://127.0.0.1:9", hydrate_catalogs=False) as client,
+        pytest.raises(PolyesterValidationError, match="^since is outside the supported range"),
+    ):
+        getattr(client.changelog, method)(early)
+
+
+# --- GTD order expiry: an RFC3339 string ----------------------------------------------------------
+
+_ORDER = {
+    "symbol": "BTC-USDT",
+    "side": "buy",
+    "order_type": "limit",
+    "tif": "gtd",
+    "qty": "0.01",
+    "price": "60000",
+}
+
+# (expires_at, the refusal)
+_BAD_EXPIRIES: list[tuple[Any, str]] = [
+    (1, r"^expires_at must be an RFC3339 UTC timestamp string, not int$"),
+    (1_763_805_600_000, r"^expires_at must be an RFC3339 UTC timestamp string, not int$"),
+    (1.5, r"^expires_at must be an RFC3339 UTC timestamp string, not float$"),
+    (_AWARE, r"^expires_at must be an RFC3339 UTC timestamp string, not datetime$"),
+    (b"2099-01-01T00:00:00Z", r"^expires_at must be an RFC3339 UTC timestamp string, not bytes$"),
+    ("0001-01-01T00:00:00+01:00", r"^expires_at is outside the supported range"),
+    ("9999-12-31T23:59:59-01:00", r"^expires_at is outside the supported range"),
+    ("1763805600", r"^expires_at must be an RFC3339 UTC timestamp$"),
+    ("2099-01-01T00:00:00", r"^expires_at must be timezone-aware UTC$"),
+]
+
+OrderCall = Callable[[Any, Any], Any]
+
+
+def _create_keywords(client: Any, expires_at: Any) -> Any:
+    return client.orders.create(**_ORDER, expires_at=expires_at)
+
+
+def _create_typed(client: Any, expires_at: Any) -> Any:
+    return client.orders.create(CreateOrderRequest(**_ORDER, expires_at=expires_at))
+
+
+def _create_mapping(client: Any, expires_at: Any) -> Any:
+    return client.orders.create({**_ORDER, "expires_at": expires_at})
+
+
+def _batch_typed(client: Any, expires_at: Any) -> Any:
+    return client.orders.batch_create(
+        items=[CreateOrderRequest(**_ORDER, expires_at=expires_at)], request_id="batch-1"
+    )
+
+
+def _batch_mapping(client: Any, expires_at: Any) -> Any:
+    return client.orders.batch_create(
+        items=[{**_ORDER, "expires_at": expires_at}], request_id="batch-1"
+    )
+
+
+_ORDER_CALLS: dict[str, OrderCall] = {
+    "create keywords": _create_keywords,
+    "create CreateOrderRequest": _create_typed,
+    "create dict": _create_mapping,
+    "batch_create CreateOrderRequest": _batch_typed,
+    "batch_create dict": _batch_mapping,
+}
+
+
+def _async_orders_client(httpserver: HTTPServer) -> AsyncPolyester:
+    client = AsyncPolyester(
+        api_url=httpserver.url_for("").rstrip("/"),
+        api_key_id=_CREDS.key_id,
+        api_private_key=_CREDS.private_key,
+        hydrate_catalogs=False,
+    )
+    client.catalogs.hydrate_spot_config(_SPOT_CONFIG)
+    return client
+
+
+@pytest.mark.parametrize(("expires_at", "refusal"), _BAD_EXPIRIES, ids=repr)
+@pytest.mark.parametrize("call", list(_ORDER_CALLS))
+async def test_gtd_expiry_refuses_other_values_before_sending(
+    httpserver: HTTPServer, call: str, expires_at: Any, refusal: str
+) -> None:
+    seen = _recording(httpserver)
+    async with _async_orders_client(httpserver) as client:
+        with pytest.raises(PolyesterValidationError, match=refusal):
+            await _ORDER_CALLS[call](client, expires_at)
+    assert seen == []
+
+
+@pytest.mark.parametrize(("expires_at", "refusal"), _BAD_EXPIRIES[:5], ids=repr)
+def test_sync_gtd_expiry_refuses_other_types_before_sending(
+    httpserver: HTTPServer, expires_at: Any, refusal: str
+) -> None:
+    seen = _recording(httpserver)
+    with Polyester(
+        api_url=httpserver.url_for("").rstrip("/"),
+        api_key_id=_CREDS.key_id,
+        api_private_key=_CREDS.private_key,
+        hydrate_catalogs=False,
+    ) as client:
+        client.catalogs.hydrate_spot_config(_SPOT_CONFIG)
+        with pytest.raises(PolyesterValidationError, match=refusal):
+            client.orders.create(**_ORDER, expires_at=expires_at)
+    assert seen == []
+
+
+@pytest.mark.parametrize("call", ["create keywords", "create CreateOrderRequest", "create dict"])
+async def test_gtd_expiry_string_is_sent_exactly(httpserver: HTTPServer, call: str) -> None:
+    sent: list[orders_pb2.CreateOrderRequest] = []
+
+    def handler(request: Request) -> Response:
+        sent.append(orders_pb2.CreateOrderRequest.FromString(request.get_data()))
+        return Response("{}", status=500, content_type="application/json")
+
+    httpserver.expect_request("").respond_with_handler(handler)
+    expiry = (datetime.now(UTC) + timedelta(days=1)).replace(microsecond=250_000)
+    text = expiry.astimezone(_PLUS_TWO).isoformat()
+    async with _async_orders_client(httpserver) as client:
+        with pytest.raises(PolyesterServerError):
+            await _ORDER_CALLS[call](client, text)
+    assert len(sent) == 1
+    expire_at = sent[0].order.limit_gtd.expire_at
+    assert (expire_at.seconds, expire_at.nanos) == (int(expiry.timestamp()), 250_000_000)

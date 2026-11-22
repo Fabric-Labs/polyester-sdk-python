@@ -479,16 +479,31 @@ def unix_ms_to_datetime(value: int) -> datetime | None:
         return None
 
 
+# The seconds a protobuf ``Timestamp`` holds: 0001-01-01T00:00:00Z to
+# 9999-12-31T23:59:59Z, as a datetime does.
+TIMESTAMP_MIN_SECONDS = -62_135_596_800
+TIMESTAMP_MAX_SECONDS = 253_402_300_799
+
+
 def aware_datetime(value: object, field_name: str) -> datetime:
-    """``value`` if it is a timezone-aware :class:`~datetime.datetime`, else refused.
+    """``value`` if it is a timezone-aware :class:`~datetime.datetime` that
+    names an instant from year 1 to 9999 in UTC, else refused.
 
     A time parameter takes nothing else: an int or float (seconds or
     milliseconds?), a string, a ``date`` and a naive datetime (local time or
     UTC?) are each refused with :class:`PolyesterValidationError` naming
     ``field_name``, the expected type and the type received, never guessed.
+    An offset that moves the time before year 1 or after year 9999 in UTC is
+    refused under the same name.
     """
     if isinstance(value, datetime):
         if value.tzinfo is not None and value.utcoffset() is not None:
+            try:
+                value.astimezone(UTC)
+            except OverflowError:
+                raise PolyesterValidationError(
+                    f"{field_name} is outside the supported range (years 1 to 9999 in UTC)"
+                ) from None
             return value
         received = "a naive datetime"
     else:
@@ -498,22 +513,17 @@ def aware_datetime(value: object, field_name: str) -> datetime:
     )
 
 
-def datetime_to_timestamp_dict(value: object, field_name: str = "value") -> dict[str, int]:
+def datetime_to_timestamp_dict(value: datetime, field_name: str = "value") -> dict[str, int]:
     """Exact protobuf ``Timestamp`` fields for an aware datetime.
 
-    ``value`` is checked with :func:`aware_datetime`; a time that falls before
-    year 1 or after year 9999 once moved to UTC is refused too. Integer
+    ``value`` is checked with :func:`aware_datetime` at run time, so any other
+    value, a naive datetime or a time outside years 1 to 9999 in UTC raises
+    :class:`PolyesterValidationError` naming ``field_name``. Integer
     arithmetic, as protobuf's ``FromDatetime``: ``seconds`` rounds toward
     negative infinity and ``nanos`` is never negative, for every datetime
     from year 1 to 9999.
     """
-    value = aware_datetime(value, field_name)
-    try:
-        utc = value.astimezone(UTC)
-    except OverflowError:
-        raise PolyesterValidationError(
-            f"{field_name} is outside the supported range (years 1 to 9999 in UTC)"
-        ) from None
+    utc = aware_datetime(value, field_name).astimezone(UTC)
     since_epoch = utc.replace(tzinfo=None) - _UNIX_EPOCH
     seconds = since_epoch.days * 86_400 + since_epoch.seconds
     return {"seconds": seconds, "nanos": since_epoch.microseconds * 1000}

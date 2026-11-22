@@ -8,13 +8,16 @@ POLY-8961: a sell TWAP market slice takes at most 9999 bps; a buy, 10000.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import msgspec
 import pytest
 
+from polyester import Polyester
 from polyester.catalogs import CatalogManager
+from polyester.codecs.orders import batch_create_orders_to_proto
 from polyester.codecs.realtime_decode import decode_trigger_event_batch_bytes
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterValidationError
@@ -109,7 +112,7 @@ async def test_batch_create_keeps_each_rejections_field_violations() -> None:
         for cid in ("passive", "off-tick", "tiny", "plain")
     ]
     with patch("polyester.services.orders.unary_auth_decoded", capture):
-        result = await service.batch_create(items=items, allow_partial=True)
+        result = await service.batch_create(items=items)
 
     assert capture.calls == 1
     assert (result.accepted_count, result.rejected_count) == (1, 3)
@@ -129,6 +132,49 @@ async def test_batch_create_keeps_each_rejections_field_violations() -> None:
         },
         {"status": "rejected", "client_order_id": "plain", "code": "error_code_bad_price"},
     ]
+
+
+_BATCH_ITEM: dict[str, Any] = {
+    "symbol": "BTC-USDT",
+    "side": "buy",
+    "order_type": "limit",
+    "qty": "0.001",
+    "price": "100",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_partial", [False, True])
+async def test_batch_create_refuses_allow_partial_as_an_unexpected_keyword(
+    allow_partial: bool,
+) -> None:
+    # A batch is always per item; no keyword may suggest an all-or-nothing mode.
+    capture = CaptureUnary(orders_pb2.BatchCreateOrdersResponse())
+    service = AsyncOrdersService(MagicMock(), _catalogs(), None)
+    with (
+        patch("polyester.services.orders.unary_auth_decoded", capture),
+        pytest.raises(TypeError, match="unexpected keyword argument 'allow_partial'"),
+    ):
+        await service.batch_create(
+            items=[_BATCH_ITEM],
+            allow_partial=allow_partial,  # type: ignore[call-arg]
+        )
+    assert capture.calls == 0
+    assert "allow_partial" not in inspect.signature(AsyncOrdersService.batch_create).parameters
+    with pytest.raises(TypeError, match="unexpected keyword argument 'allow_partial'"):
+        batch_create_orders_to_proto(
+            items=[_BATCH_ITEM],
+            quantity_scale=8,
+            allow_partial=allow_partial,  # type: ignore[call-arg]
+        )
+
+
+def test_sync_batch_create_refuses_allow_partial_as_an_unexpected_keyword() -> None:
+    with (
+        Polyester(api_url="http://127.0.0.1:9", hydrate_catalogs=False) as client,
+        pytest.raises(TypeError, match="unexpected keyword argument 'allow_partial'"),
+    ):
+        client.orders.batch_create(items=[_BATCH_ITEM], allow_partial=False)  # type: ignore[call-arg]
 
 
 @pytest.mark.asyncio

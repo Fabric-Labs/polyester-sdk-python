@@ -1311,12 +1311,9 @@ def batch_create_orders_to_proto(
     items: Sequence[CreateOrderRequest | Mapping[str, Any]],
     sub_account_id: str | int | None = None,
     request_id: str | None = None,
-    allow_partial: bool = False,
     quantity_scale: int | None = None,
     item_scales: Sequence[tuple[int, int]] | None = None,
 ) -> orders_pb2.BatchCreateOrdersRequest:
-    # ``allow_partial`` was removed from the wire in POLY-3701; it is accepted
-    # for backwards compatibility but ignored.
     validate_batch_size("batch_create", len(items))
     proto = orders_pb2.BatchCreateOrdersRequest(
         request_id=optional_request_id(request_id) or f"batch-create-{uuid.uuid4().hex[:12]}",

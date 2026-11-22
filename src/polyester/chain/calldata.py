@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from polyester.chain._deps import require_eth_abi
 from polyester.codecs.scalars import exact_integer
 from polyester.errors import PolyesterValidationError
 
@@ -79,7 +78,6 @@ def _parse_bytes(value: bytes | str, *, field: str) -> bytes:
 
 
 def _encode(signature: str, types: list[str], args: list[object]) -> bytes:
-    require_eth_abi()
     from eth_abi import encode
     from eth_utils import function_signature_to_4byte_selector
 

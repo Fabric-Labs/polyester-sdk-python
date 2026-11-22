@@ -8,7 +8,6 @@ from eth_abi import encode
 from eth_hash.auto import keccak
 from eth_utils import to_canonical_address, to_checksum_address
 
-from polyester.chain._deps import require_eth_abi
 from polyester.chain.environment import (
     POLYESTER_DEVNET_ENVIRONMENT,
     PolyesterChainEnvironment,
@@ -148,7 +147,6 @@ def predict_safe_address_with_data(
     zero address; any other owner raises ``PolyesterValidationError`` naming it,
     such as ``owners[1]``.
     """
-    require_eth_abi()
     if not owners:
         raise ValueError("owners must be non-empty")
     # The salt picks the Safe's address: it is used exactly as given.

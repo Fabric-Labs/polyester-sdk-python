@@ -54,12 +54,9 @@ def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
         items=[dict_item, struct_item],
         sub_account_id="23",
         request_id="req-create-1",
-        allow_partial=True,
         quantity_scale=8,
     )
     assert proto.request_id == "req-create-1"
-    # allow_partial was removed from the wire (POLY-3701); the arg is ignored.
-    assert "allow_partial" not in {f.name for f in proto.DESCRIPTOR.fields}
     assert proto.subaccount_id == id_to_int("23")
     assert len(proto.items) == 2
     assert proto.items[0].symbol_id == 1

@@ -1016,8 +1016,20 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         sub_account_id: str | int | None = None,
         symbol: str | None = None,
         request_id: str | None = None,
-        allow_partial: bool = False,
     ) -> BatchCreateOrdersResult:
+        """Create up to 20 orders in one request, each admitted or rejected on its own.
+
+        A batch is never all-or-nothing: an item the server rejects does not
+        stop the others, so a batch with one bad item still places the valid
+        ones. Read each item's outcome from ``results``, in the order of
+        ``items``: ``status`` is ``"accepted"`` (with ``order_id``) or
+        ``"rejected"`` (with ``code`` and any ``violations``), and
+        ``accepted_count`` and ``rejected_count`` total them. There is no
+        option to make a batch all-or-nothing.
+
+        ``request_id`` is the batch's idempotency key; the SDK generates a
+        ``batch-create-*`` one when it is omitted.
+        """
         await self._ensure_catalogs()
         resolved_items: list[CreateOrderRequest] = []
         item_scales: list[tuple[int, int]] = []
@@ -1062,7 +1074,6 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             items=resolved_items,
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),
             request_id=request_id,
-            allow_partial=allow_partial,
             item_scales=item_scales,
         )
         return await unary_auth_decoded(

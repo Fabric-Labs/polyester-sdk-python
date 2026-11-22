@@ -25,6 +25,7 @@ async def misspelt_keywords(client: AsyncPolyester) -> None:
     await client.orders.batch_create(  # E: CreateOrderItem
         items=[{"symbol": "BTC-USDT", "side": "buy", "order_type": "market", "qyt": "0.01"}]
     )
+    await client.orders.batch_create(items=[order()], allow_partial=False)  # E: "allow_partial"
     await client.triggers.create(  # E: "trigger_prcie"
         symbol="BTC-USDT",
         trigger_type="stop_loss",

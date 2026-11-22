@@ -474,6 +474,10 @@ whose new client order ID is held (empty otherwise).
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create accepts at most 20 items; batch cancel and replace accept at
 most 50, and refuse an item field they don't support. `batch_create`
+admits or rejects each item on its own: a batch is never all-or-nothing, so
+one rejected item does not stop the others from being placed. Read each item's
+outcome in `results` (`status` `"accepted"` with `order_id`, or `"rejected"`
+with `code`). `batch_create`
 always sends `request_id` (caller value or a generated `batch-create-*` key);
 that batch-level id is the idempotency boundary, so per-item `client_order_id`
 may be omitted. Treat a cancel

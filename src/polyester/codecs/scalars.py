@@ -479,16 +479,42 @@ def unix_ms_to_datetime(value: int) -> datetime | None:
         return None
 
 
-def datetime_to_timestamp_dict(value: datetime) -> dict[str, int]:
+def aware_datetime(value: object, field_name: str) -> datetime:
+    """``value`` if it is a timezone-aware :class:`~datetime.datetime`, else refused.
+
+    A time parameter takes nothing else: an int or float (seconds or
+    milliseconds?), a string, a ``date`` and a naive datetime (local time or
+    UTC?) are each refused with :class:`PolyesterValidationError` naming
+    ``field_name``, the expected type and the type received, never guessed.
+    """
+    if isinstance(value, datetime):
+        if value.tzinfo is not None and value.utcoffset() is not None:
+            return value
+        received = "a naive datetime"
+    else:
+        received = "None" if value is None else type(value).__name__
+    raise PolyesterValidationError(
+        f"{field_name} must be a timezone-aware datetime, not {received}"
+    )
+
+
+def datetime_to_timestamp_dict(value: object, field_name: str = "value") -> dict[str, int]:
     """Exact protobuf ``Timestamp`` fields for an aware datetime.
 
-    Integer arithmetic, as protobuf's ``FromDatetime``: ``seconds`` rounds
-    toward negative infinity and ``nanos`` is never negative, for every
-    datetime from year 1 to 9999.
+    ``value`` is checked with :func:`aware_datetime`; a time that falls before
+    year 1 or after year 9999 once moved to UTC is refused too. Integer
+    arithmetic, as protobuf's ``FromDatetime``: ``seconds`` rounds toward
+    negative infinity and ``nanos`` is never negative, for every datetime
+    from year 1 to 9999.
     """
-    if value.tzinfo is None:
-        raise PolyesterValidationError("datetime values must be timezone-aware")
-    since_epoch = value.astimezone(UTC).replace(tzinfo=None) - _UNIX_EPOCH
+    value = aware_datetime(value, field_name)
+    try:
+        utc = value.astimezone(UTC)
+    except OverflowError:
+        raise PolyesterValidationError(
+            f"{field_name} is outside the supported range (years 1 to 9999 in UTC)"
+        ) from None
+    since_epoch = utc.replace(tzinfo=None) - _UNIX_EPOCH
     seconds = since_epoch.days * 86_400 + since_epoch.seconds
     return {"seconds": seconds, "nanos": since_epoch.microseconds * 1000}
 

@@ -17,6 +17,7 @@ from polyester.codecs.decode.statements import (
     statement_exports_page_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.proto_helpers import datetime_to_timestamp
 from polyester.codecs.scalars import UINT32_MAX, exact_integer, id_to_int
 from polyester.errors import (
     PolyesterResponseContractError,
@@ -33,7 +34,6 @@ from polyester.services._base import BaseService
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._poll import poll_until_final
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services.changelog import _timestamp
 
 # Statement export request limits, from the contract's validation rules.
 EXPORT_IDEMPOTENCY_KEY_MIN_LEN, EXPORT_IDEMPOTENCY_KEY_MAX_LEN = contract_string_length(
@@ -87,11 +87,13 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         (``StatementExportService/CreateStatementExport``).
 
         The period must be non-empty and at most ``EXPORT_MAX_PERIOD`` (366
-        days); both times are timezone-aware and sent exact to the
-        microsecond. A period still open at create time ends then: the
-        export's ``complete_through`` says where. ``asset_id`` keeps one asset;
-        ``None`` or 0 covers every asset. The account resolves as described on
-        the class. Signed; an API key needs ``READ_STATEMENTS``.
+        days); both times are timezone-aware ``datetime`` objects, sent exact
+        to the microsecond (``None``, any other type or a naive datetime raises
+        :class:`PolyesterValidationError` before sending). A period still open
+        at create time ends then: the export's ``complete_through`` says where.
+        ``asset_id`` keeps one asset; ``None`` or 0 covers every asset. The
+        account resolves as described on the class. Signed; an API key needs
+        ``READ_STATEMENTS``.
 
         ``idempotency_key`` is 1 to 64 letters, digits, ``.``, ``_``, ``:`` or
         ``-``, unique per root account, sent exactly as given: repeating the
@@ -104,10 +106,10 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         is final; the file is downloaded over REST (see
         :class:`~polyester.models.StatementExport`).
         """
-        for name, value in (("start_time", start_time), ("end_time", end_time)):
-            if not isinstance(value, datetime) or value.tzinfo is None:
-                raise PolyesterValidationError(f"{name} is required (a timezone-aware datetime)")
-        if not start_time < end_time <= start_time + EXPORT_MAX_PERIOD:
+        start_ts = datetime_to_timestamp(start_time, "start_time")
+        end_ts = datetime_to_timestamp(end_time, "end_time")
+        # The span, never start_time + 366 days: that overflows near year 9999.
+        if not timedelta(0) < end_time - start_time <= EXPORT_MAX_PERIOD:
             raise PolyesterValidationError(
                 "end_time must be after start_time and at most 366 days after it"
             )
@@ -124,8 +126,8 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
                 "or '-'"
             )
         request = export_pb2.CreateStatementExportRequest(idempotency_key=idempotency_key)
-        request.start_time.CopyFrom(_timestamp(start_time))
-        request.end_time.CopyFrom(_timestamp(end_time))
+        request.start_time.CopyFrom(start_ts)
+        request.end_time.CopyFrom(end_ts)
         if asset_id is not None:
             request.asset_id = exact_integer(
                 asset_id, "asset_id", min_value=0, max_value=UINT32_MAX

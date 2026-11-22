@@ -13,6 +13,7 @@ from polyester.codecs.decode.sub_accounts import (
     subaccounts_list_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
+from polyester.codecs.proto_helpers import optional_datetime_to_timestamp
 from polyester.codecs.realtime_decode import decode_api_key_bytes, decode_subaccount_bytes
 from polyester.codecs.scalars import parse_account_id
 from polyester.codecs.sub_accounts import invite_direction_from_label
@@ -47,7 +48,7 @@ from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._validation import validate_limit
-from polyester.services.changelog import _paginate, _timestamp
+from polyester.services.changelog import _paginate
 
 # ListAccountActivity filter limits, from the contract's validation rules.
 _ACTIVITY_MAX_SUBACCOUNTS = contract_repeated_items(ListAccountActivityRequest, "subaccount_ids")[1]
@@ -217,8 +218,8 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         ``sources`` (at most 8) take the labels events carry, such as
         ``"session"``, ``"created"`` and ``"api"``, each once; ``api_key_id``
         keeps the events performed with that key; ``start_time`` (inclusive)
-        and ``end_time`` (exclusive) are timezone-aware, ``end_time`` after
-        ``start_time``. ``limit`` is 1 to 200; ``None`` takes the server's 50.
+        and ``end_time`` (exclusive) are timezone-aware ``datetime`` objects,
+        ``end_time`` after ``start_time``. ``limit`` is 1 to 200; ``None`` takes the server's 50.
         Reuse ``next_page_token`` only with the same filters. A filter the
         contract refuses raises :class:`PolyesterValidationError` before
         sending. An API key needs ``READ_ACCOUNT_ACTIVITY``
@@ -267,15 +268,14 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             request.subaccount_ids.extend(ids)
         if api_key_id is not None:
             request.api_key_id = parse_account_id(api_key_id, "api_key_id")
-        for name, value in (("start_time", start_time), ("end_time", end_time)):
-            if value is not None and (not isinstance(value, datetime) or value.tzinfo is None):
-                raise PolyesterValidationError(f"{name} must be a timezone-aware datetime")
+        start_ts = optional_datetime_to_timestamp(start_time, "start_time")
+        end_ts = optional_datetime_to_timestamp(end_time, "end_time")
         if start_time is not None and end_time is not None and not end_time > start_time:
             raise PolyesterValidationError("end_time must be after start_time")
-        if start_time is not None:
-            request.start_time.CopyFrom(_timestamp(start_time))
-        if end_time is not None:
-            request.end_time.CopyFrom(_timestamp(end_time))
+        if start_ts is not None:
+            request.start_time.CopyFrom(start_ts)
+        if end_ts is not None:
+            request.end_time.CopyFrom(end_ts)
         checked_limit = validate_limit(limit, ListAccountActivityRequest, allow_none=True)
         if checked_limit is not None:
             if checked_limit == 0:

@@ -25,7 +25,11 @@ from polyester.models.pnl import (
 from polyester.services._base import BaseService, CatalogWait
 from polyester.services._retry import UnavailableRetry, unary_auth_decoded_retry_unavailable
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import display_symbol_for_id, resolve_optional_symbol_id
+from polyester.services._symbols import (
+    check_optional_symbol,
+    display_symbol_for_id,
+    resolve_optional_symbol_id,
+)
 
 # Profit and loss reads answer UNAVAILABLE while their figures cannot be read;
 # the contract says to retry the same request.
@@ -123,7 +127,8 @@ class AsyncProfitAndLossService(ScopedSubAccountMixin, BaseService):
         )
 
     async def _symbol_id(self, symbol: str | None, symbol_id: int | None, label: str) -> int:
-        if symbol is not None:
+        # A blank symbol would read every market: refused before any wait.
+        if check_optional_symbol(symbol, label=f"{label} symbol") is not None:
             await self._ensure_catalogs()
         return (
             resolve_optional_symbol_id(

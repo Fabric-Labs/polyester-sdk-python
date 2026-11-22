@@ -70,6 +70,7 @@ from polyester.services._retry import (
 )
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import (
+    check_optional_symbol,
     display_symbol_for_id,
     resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
@@ -140,8 +141,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
     async def _optional_control_symbol_id(
         self, *, symbol: str | None, symbol_id: int | None, label: str
     ) -> int:
-        """Symbol ID for modify/resume; ``0`` targets the trigger's own market."""
-        if symbol is not None:
+        """Symbol ID for modify/resume; ``0`` targets the trigger's own market.
+
+        A blank ``symbol`` is refused before the catalogs are awaited."""
+        if check_optional_symbol(symbol, label=f"{label} symbol") is not None:
             await self._ensure_catalogs()
         return (
             resolve_optional_symbol_id(
@@ -202,7 +205,8 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        if symbol:
+        # A blank symbol would list every market: refused, never dropped.
+        if check_optional_symbol(symbol, label="triggers.list symbol") is not None:
             await self._ensure_catalogs()
             request.symbol_id = (
                 resolve_optional_symbol_id(

@@ -89,12 +89,12 @@ class JsonRpcClient:
         budget = self._timeout if timeout is None else min(timeout, self._timeout)
         deadline = time.monotonic() + budget
         # httpx Timeout is per-phase, not a total wall clock. Enforce an absolute
-        # deadline via a guard that, at ``deadline``, shuts down the connection's
-        # socket and closes the client, plus between-chunk checks. The socket is
-        # taken from httpcore's trace as soon as the connection is made, so the
-        # guard cuts a stall in any phase after connecting: sending the request,
-        # partial or complete headers, the body, or a slow drip. Connecting is
-        # bounded by the connect timeout, which is the budget.
+        # deadline via a guard that, at ``deadline``, shuts down the connection
+        # and closes the client, plus between-chunk checks. The guard takes the
+        # connection from httpcore's trace as soon as TCP connects, so it cuts a
+        # stall in any later phase, through a proxy tunnel and TLS included (see
+        # _DeadlineGuard). Connecting is bounded by the connect timeout, which is
+        # the budget.
         with (
             httpx.Client(
                 timeout=httpx.Timeout(max(budget, 0.0)),
@@ -149,45 +149,64 @@ class JsonRpcClient:
 class _DeadlineGuard:
     """Aborts a sync request at its deadline.
 
-    It shuts down the connection's socket, which httpcore's ``trace`` request
-    extension hands it once the TCP connection (and TLS, for HTTPS) is made: a
-    send or read blocked on the socket, in any phase of the request, returns at
-    once, which closing the client does not ensure. It then closes the client.
+    httpcore's ``trace`` request extension reports each TCP connection as soon
+    as it is made, before anything is sent on it: the API's, or a proxy's. The
+    guard keeps a duplicate of each connection's socket descriptor. A proxy
+    tunnel and TLS wrap the same connection, so at the deadline shutting the
+    duplicates down cuts every later phase at once: a CONNECT answer, a TLS
+    handshake, sending the request, partial or complete headers and the body.
+    Closing the client alone does not interrupt a blocked send or read. A
+    connection still being made ends at the connect timeout, which is the
+    budget.
     """
 
     def __init__(self, client: httpx.Client) -> None:
         self._client = client
         self._lock = threading.Lock()
-        self._socket: socket.socket | None = None
+        self._sockets: list[socket.socket] = []
         self._expired = False
+        self._closed = False
 
     def trace(self, event: str, info: dict[str, Any]) -> None:
-        """httpcore trace callback: take the socket of each connection made."""
-        if event not in _CONNECTED_EVENTS:
+        """httpcore trace callback: keep each new TCP connection's socket."""
+        if not event.endswith(".connect_tcp.complete"):
             return
         stream = info.get("return_value")
         sock = stream.get_extra_info("socket") if stream is not None else None
         if not isinstance(sock, socket.socket):
             return
+        try:
+            # A duplicate descriptor of the same connection: it stays valid when
+            # TLS replaces the socket object httpcore reads through.
+            duplicate = sock.dup()
+        except OSError:
+            return
+        # Under the lock, shutting down and closing never race, so a closed
+        # descriptor's number, reused by another socket, is never shut down.
         with self._lock:
-            self._socket = sock
-            expired = self._expired
-        if expired:
-            _shutdown(sock)
+            if self._closed:
+                duplicate.close()
+                return
+            self._sockets.append(duplicate)
+            if self._expired:
+                _shutdown(duplicate)
 
     def expire(self) -> None:
         with self._lock:
             self._expired = True
-            sock = self._socket
-        # The socket first: closing the client can wait on the read it ends.
-        if sock is not None:
-            _shutdown(sock)
+            # The connections first: closing the client can wait on the read
+            # it ends.
+            for sock in self._sockets:
+                _shutdown(sock)
         self._client.close()
 
-
-# httpcore trace events that carry a new network stream: the TCP connection,
-# then, for HTTPS, the TLS stream that replaces it.
-_CONNECTED_EVENTS = frozenset({"connection.connect_tcp.complete", "connection.start_tls.complete"})
+    def close(self) -> None:
+        """Release the duplicate descriptors; the guard then cuts nothing more."""
+        with self._lock:
+            self._closed = True
+            for sock in self._sockets:
+                sock.close()
+            self._sockets.clear()
 
 
 def _shutdown(sock: socket.socket) -> None:
@@ -212,6 +231,7 @@ def _deadline_guard(client: httpx.Client, deadline: float) -> Iterator[_Deadline
         yield guard
     finally:
         timer.cancel()
+        guard.close()
 
 
 def _content_length_exceeds(response: httpx.Response, max_bytes: int) -> bool:

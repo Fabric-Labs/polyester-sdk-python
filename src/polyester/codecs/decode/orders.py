@@ -722,6 +722,7 @@ def cancel_all_from_proto(msg: orders_pb2.CancelAllOrdersResponse) -> CancelAllO
         truncated=bool(msg.truncated),
         listing_status=_cancel_all_listing_status(msg.listing_status),
         matched_triggers=int(msg.matched_triggers),
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 
@@ -1050,6 +1051,7 @@ def batch_cancel_from_proto(msg: orders_pb2.BatchCancelOrdersResponse) -> BatchC
         results=results,
         accepted_count=accepted_count,
         rejected_count=rejected_count,
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 
@@ -1073,6 +1075,7 @@ def cancel_all_after_from_proto(msg: orders_pb2.CancelAllAfterResponse) -> Cance
             if msg.HasField("effective_scope")
             else None
         ),
+        ts_ns=paired_ts_ns(msg, "ts_ns", "ts"),
     )
 
 

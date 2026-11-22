@@ -385,6 +385,13 @@ def _auth_status(exc: ConnectError) -> int | None:
     return {"unauthenticated": 401, "permission_denied": 403}.get(exc.code.value)
 
 
+def _is_policy_permission_refusal(code_name: str, exc: ConnectError) -> bool:
+    """A sub-account policy code refuses the caller's credentials or scope only
+    when its status does (``permission_denied`` or ``unauthenticated``, such as
+    ``POLICY_SPOT_TRADE_DENY``). Decided by status, never by the name alone."""
+    return "POLICY" in code_name and exc.code.value in ("permission_denied", "unauthenticated")
+
+
 def _map_connect_error(exc: ConnectError):
     if isinstance(exc, SignedRedirectRefused):
         return exc.refusal
@@ -549,9 +556,12 @@ def _map_connect_error(exc: ConnectError):
             if full_name == "orders.v1.ErrorDetail":
                 code_name = error_code_name(orders_pb2.ErrorCode, unpacked.code)
                 # A permission refusal raises the same error as its REST
-                # problem (HTTP 403), code included.
+                # problem (HTTP 403), code included. A sub-account policy
+                # code is one only when its status says so: a policy cap
+                # (POLICY_MAX_NOTIONAL, POLICY_MAX_OPEN_ORDERS) is
+                # invalid_argument, an order refusal like any other.
                 if (
-                    "POLICY" in code_name
+                    _is_policy_permission_refusal(code_name, exc)
                     or "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
                     or code_name in ORDER_PERMISSION_REFUSAL_CODES
@@ -616,7 +626,7 @@ def _map_connect_error(exc: ConnectError):
                 if (
                     "UNAUTHENTICATED" in code_name
                     or "PERMISSION" in code_name
-                    or "POLICY" in code_name
+                    or _is_policy_permission_refusal(code_name, exc)
                 ):
                     return PolyesterAuthError(
                         error_message, code=code_name, status_code=_auth_status(exc)

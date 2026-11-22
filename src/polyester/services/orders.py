@@ -90,6 +90,7 @@ from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import require_realtime
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resolve_account_id
 from polyester.services._symbols import (
+    check_optional_symbol,
     resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
     resolve_order_identity,
@@ -286,7 +287,8 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         )
         if parsed_sub is not None:
             request.subaccount_id = parsed_sub
-        if symbol:
+        # A blank symbol would list every market: refused before any wait.
+        if check_optional_symbol(symbol, label="orders.list_history symbol") is not None:
             await self._ensure_catalogs()
         resolved = resolve_optional_symbol_id(
             self._catalogs, symbol=symbol, symbol_id=symbol_id, label="orders.list_history"
@@ -1114,8 +1116,15 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         trigger created at or after that time is not stopped.
 
         ``timeout_sec`` is an ``int``, 10 to 120, or 0 to disarm the switch;
-        any other value raises ``PolyesterValidationError`` before sending."""
-        if symbol:
+        any other value raises ``PolyesterValidationError`` before sending.
+
+        ``symbol`` limits the switch to one market; left out (``None``) it
+        covers every market. A blank ``symbol`` (empty or whitespace-only)
+        raises ``PolyesterValidationError`` instead of arming the switch for
+        every market, and nothing is sent or awaited."""
+        # A blank symbol would arm the switch for every market (and, with
+        # include_triggers, stop every trigger on every pair when it fires).
+        if check_optional_symbol(symbol, label="orders.cancel_all_after symbol") is not None:
             await self._ensure_catalogs()
         proto_request = cancel_all_after_to_proto(
             sub_account_id=self._resolve_sub_account_id(sub_account_id, account=account),

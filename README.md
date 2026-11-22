@@ -2192,6 +2192,16 @@ contract. A protobuf `Timestamp` field the server leaves unset reads as
 `None`, never as 1970-01-01, on every model field typed `datetime | None`;
 integer `*_ms` fields read `0` when unset.
 
+Time parameters typed `datetime` (`start_time`, `end_time`, and `since` of
+the changelog helpers) take a timezone-aware `datetime`. An int, a float, a
+string or a naive `datetime` raises `PolyesterValidationError` naming the
+parameter before anything is sent: an int could be seconds or milliseconds
+and a naive time local time or UTC, so the SDK does not guess. For Unix
+seconds, pass `datetime.fromtimestamp(seconds, tz=UTC)`. Parameters named for
+a unit, such as `from_ts_sec` or `start_ts_ns`, take an integer in that unit,
+`transfers.list(since=...)` an integer of microseconds, and an order's
+`expires_at` an RFC3339 string.
+
 `get_trades()` lists trades newest first. Narrow it with `start_time` /
 `end_time` (inclusive), `side` (`"buy"` or `"sell"` aggressor), and page with
 `page_token=result.next_page_token`.

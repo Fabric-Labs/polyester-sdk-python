@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, time, timedelta
 
-from google.protobuf.timestamp_pb2 import Timestamp
-
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.pnl import (
     daily_profit_and_loss_page_from_proto,
@@ -12,7 +10,8 @@ from polyester.codecs.decode.pnl import (
     trading_statistics_from_proto,
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
-from polyester.codecs.scalars import datetime_to_timestamp_dict, exact_integer
+from polyester.codecs.proto_helpers import datetime_to_timestamp
+from polyester.codecs.scalars import exact_integer
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.pnl.v1 import pnl_pb2
 from polyester.gen.pnl.v1.pnl_connect import ProfitAndLossServiceClient
@@ -71,8 +70,10 @@ def _utc_day(value: object, name: str) -> datetime:
     """``value`` as 00:00 UTC of a day: a ``date``, or an aware ``datetime``
     at 00:00 UTC."""
     if isinstance(value, datetime):
-        if value.tzinfo is None:
-            raise PolyesterValidationError(f"{name} must be a timezone-aware datetime or a date")
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise PolyesterValidationError(
+                f"{name} must be a date or a timezone-aware datetime, not a naive datetime"
+            )
         try:
             moment = value.astimezone(UTC)
         except OverflowError:
@@ -83,12 +84,10 @@ def _utc_day(value: object, name: str) -> datetime:
         return moment
     if isinstance(value, date):
         return datetime.combine(value, time(0), tzinfo=UTC)
-    raise PolyesterValidationError(f"{name} must be a date or a timezone-aware datetime")
-
-
-def _timestamp(value: datetime) -> Timestamp:
-    parts = datetime_to_timestamp_dict(value)
-    return Timestamp(seconds=parts["seconds"], nanos=parts["nanos"])
+    received = "None" if value is None else type(value).__name__
+    raise PolyesterValidationError(
+        f"{name} must be a date or a timezone-aware datetime, not {received}"
+    )
 
 
 class AsyncProfitAndLossService(ScopedSubAccountMixin, BaseService):
@@ -237,8 +236,8 @@ class AsyncProfitAndLossService(ScopedSubAccountMixin, BaseService):
                 f"page_token must be a string of at most {_PAGE_TOKEN_MAX_LEN} characters"
             )
         request = pnl_pb2.ListDailyProfitAndLossRequest(
-            start_time=_timestamp(start_day),
-            end_time=_timestamp(end_day),
+            start_time=datetime_to_timestamp(start_day, "start"),
+            end_time=datetime_to_timestamp(end_day, "end"),
             limit=exact_integer(limit, "limit", min_value=0, max_value=DAILY_MAX_LIMIT),
             page_token=token,
         )

@@ -14,6 +14,7 @@ from polyester.codecs.decode.market_data import (
     candles_from_proto,
     market_trades_from_proto,
 )
+from polyester.codecs.proto_helpers import optional_datetime_to_timestamp
 from polyester.codecs.realtime_decode import decode_candle_point_bytes
 from polyester.codecs.scalars import UINT64_MAX
 from polyester.codecs.spot_config import spot_config_from_dict
@@ -154,7 +155,9 @@ class AsyncMarketDataService(BaseService):
         By default trades come newest first; ``start_time`` / ``end_time``
         (inclusive), ``side`` (``"buy"`` or ``"sell"`` aggressor) and
         ``page_token`` (the previous result's ``next_page_token``) narrow and
-        page them.
+        page them. ``start_time`` and ``end_time`` are timezone-aware
+        ``datetime`` objects: an int, float, string or naive datetime raises
+        :class:`~polyester.errors.PolyesterValidationError` before any request.
 
         With ``after_trade_id`` the call instead walks the market's trades by
         trade ID, oldest first and gap-free, to backfill trades a live stream
@@ -166,6 +169,8 @@ class AsyncMarketDataService(BaseService):
         page token.
         """
         validated_limit = validate_limit(limit, GetTradesRequest)
+        start_ts = optional_datetime_to_timestamp(start_time, "start_time")
+        end_ts = optional_datetime_to_timestamp(end_time, "end_time")
         if after_trade_id is not None:
             if isinstance(after_trade_id, bool) or not isinstance(after_trade_id, int):
                 raise PolyesterValidationError("get_trades after_trade_id must be an integer")
@@ -188,10 +193,10 @@ class AsyncMarketDataService(BaseService):
             self._catalogs, resolved_symbol_id, label="get_trades"
         )
         request = GetTradesRequest(symbol_id=resolved_symbol_id, limit=validated_limit)
-        if start_time is not None:
-            request.start_time.CopyFrom(_datetime_to_timestamp(start_time))
-        if end_time is not None:
-            request.end_time.CopyFrom(_datetime_to_timestamp(end_time))
+        if start_ts is not None:
+            request.start_time.CopyFrom(start_ts)
+        if end_ts is not None:
+            request.end_time.CopyFrom(end_ts)
         if side:
             side_key = side.lower()
             if side_key not in _TRADE_SIDE_FILTERS:
@@ -241,8 +246,17 @@ class AsyncMarketDataService(BaseService):
         include_reference: bool = False,
         page_token: str = "",
     ) -> CandlesResult:
-        # An unknown timeframe is refused before the catalog wait or any request.
+        """One page of candles, newest-first (an incomplete open candle, when
+        requested, comes first).
+
+        ``start_time`` and ``end_time`` bound the page and are timezone-aware
+        ``datetime`` objects: an int, float, string or naive datetime raises
+        :class:`~polyester.errors.PolyesterValidationError` before any request.
+        """
+        # An unknown timeframe or time is refused before the catalog wait or any request.
         _candle_timeframe(timeframe)
+        start_ts = optional_datetime_to_timestamp(start_time, "start_time")
+        end_ts = optional_datetime_to_timestamp(end_time, "end_time")
         # Candles are decoded with the pair's catalog volume scale.
         await self._ensure_catalogs()
         request = _build_candles_request(
@@ -251,8 +265,8 @@ class AsyncMarketDataService(BaseService):
             symbol_id=symbol_id,
             timeframe=timeframe,
             limit=limit,
-            start_time=start_time,
-            end_time=end_time,
+            start_time=start_ts,
+            end_time=end_ts,
             include_incomplete=include_incomplete,
             include_reference=include_reference,
             page_token=page_token,
@@ -296,9 +310,15 @@ class AsyncMarketDataService(BaseService):
         the flag, ``is_closed`` follows the request: on a first page (no
         ``page_token``) with ``include_incomplete`` the newest primary row
         reads ``False`` (not known to be closed), and every other row ``True``.
+
+        ``start_time`` and ``end_time`` bound the page and are timezone-aware
+        ``datetime`` objects: an int, float, string or naive datetime raises
+        :class:`~polyester.errors.PolyesterValidationError` before any request.
         """
-        # An unknown timeframe is refused before the catalog wait or any request.
+        # An unknown timeframe or time is refused before the catalog wait or any request.
         _candle_timeframe(timeframe)
+        start_ts = optional_datetime_to_timestamp(start_time, "start_time")
+        end_ts = optional_datetime_to_timestamp(end_time, "end_time")
         # Candles are decoded with the pair's catalog volume scale.
         await self._ensure_catalogs()
         request = _build_candles_request(
@@ -307,8 +327,8 @@ class AsyncMarketDataService(BaseService):
             symbol_id=symbol_id,
             timeframe=timeframe,
             limit=limit,
-            start_time=start_time,
-            end_time=end_time,
+            start_time=start_ts,
+            end_time=end_ts,
             include_incomplete=include_incomplete,
             include_reference=include_reference,
             page_token=page_token,
@@ -426,8 +446,8 @@ def _build_candles_request(
     symbol_id: int | None,
     timeframe: str,
     limit: int,
-    start_time: datetime | None,
-    end_time: datetime | None,
+    start_time: Timestamp | None,
+    end_time: Timestamp | None,
     include_incomplete: bool,
     include_reference: bool = False,
     page_token: str = "",
@@ -450,16 +470,10 @@ def _build_candles_request(
         page_token=page_token,
     )
     if start_time is not None:
-        request.start_time.CopyFrom(_datetime_to_timestamp(start_time))
+        request.start_time.CopyFrom(start_time)
     if end_time is not None:
-        request.end_time.CopyFrom(_datetime_to_timestamp(end_time))
+        request.end_time.CopyFrom(end_time)
     return request
-
-
-def _datetime_to_timestamp(value: datetime) -> Timestamp:
-    ts = Timestamp()
-    ts.FromDatetime(value)
-    return ts
 
 
 def _volume_scale_for_symbol_id(catalogs: CatalogManager | None, symbol_id: int) -> int:

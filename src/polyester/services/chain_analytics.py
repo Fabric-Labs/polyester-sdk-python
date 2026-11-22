@@ -4,6 +4,7 @@ from typing import Any
 
 from polyester.codecs.decode.common import api_data_from_proto, require_id
 from polyester.codecs.enums import resolve_proto_enum
+from polyester.codecs.scalars import UINT32_MAX, exact_integer
 from polyester.errors import PolyesterValidationError
 from polyester.gen.chain.analytics.v1 import analytics_read_pb2
 from polyester.gen.chain.analytics.v1.analytics_read_connect import ChainAnalyticsServiceClient
@@ -30,6 +31,12 @@ def _analytics_range(value: str) -> Any:
     )
 
 
+def _ts_sec(value: object, name: str) -> int:
+    """A window bound: an integer of Unix seconds (0, the default, leaves it to
+    ``range``). Any other type is refused before sending, never converted."""
+    return exact_integer(value, name, min_value=0, max_value=UINT32_MAX)
+
+
 def zipped_asset_supply_group_from_proto(
     msg: analytics_read_pb2.GetZippedAssetSupplyGroupResponse,
 ) -> ApiData:
@@ -51,8 +58,8 @@ class AsyncChainAnalyticsService(BaseService):
             zipped_asset_id=zipped_asset_id,
             range=_analytics_range(range),
             bucket=bucket,
-            start_ts_sec=start_ts_sec,
-            end_ts_sec=end_ts_sec,
+            start_ts_sec=_ts_sec(start_ts_sec, "start_ts_sec"),
+            end_ts_sec=_ts_sec(end_ts_sec, "end_ts_sec"),
         )
         return await unary_public_decoded(
             self._transport,
@@ -75,8 +82,8 @@ class AsyncChainAnalyticsService(BaseService):
             group_id=group_id,
             range=_analytics_range(range),
             bucket=bucket,
-            start_ts_sec=start_ts_sec,
-            end_ts_sec=end_ts_sec,
+            start_ts_sec=_ts_sec(start_ts_sec, "start_ts_sec"),
+            end_ts_sec=_ts_sec(end_ts_sec, "end_ts_sec"),
         )
         return await unary_public_decoded(
             self._transport,
@@ -101,8 +108,8 @@ class AsyncChainAnalyticsService(BaseService):
             asset_id=asset_id,
             range=_analytics_range(range),
             bucket=bucket,
-            start_ts_sec=start_ts_sec,
-            end_ts_sec=end_ts_sec,
+            start_ts_sec=_ts_sec(start_ts_sec, "start_ts_sec"),
+            end_ts_sec=_ts_sec(end_ts_sec, "end_ts_sec"),
         )
         return await unary_public_decoded(
             self._transport,

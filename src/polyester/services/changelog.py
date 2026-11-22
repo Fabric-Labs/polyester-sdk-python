@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Any, Literal, TypeVar
 
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
-from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.codecs.decode.changelog import (
     changelog_changes_page_from_proto,
@@ -14,7 +13,8 @@ from polyester.codecs.decode.changelog import (
     changelog_post_from_proto,
     changelog_posts_page_from_proto,
 )
-from polyester.codecs.scalars import datetime_to_timestamp_dict
+from polyester.codecs.proto_helpers import datetime_to_timestamp
+from polyester.codecs.scalars import aware_datetime
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.changelog.v1 import changelog_pb2
 from polyester.gen.changelog.v1.changelog_connect import ChangelogServiceClient
@@ -156,9 +156,12 @@ class AsyncChangelogService(BaseService):
         Filters on different fields combine with AND; values within one field
         combine with OR. Changes addressed to all users match any audience.
         ``start_time`` is inclusive and ``end_time`` exclusive, both on post
-        publication time. ``sort`` orders posts (default ``"desc"``, newest
-        first); changes keep publication order inside each post. ``limit``
-        defaults to 100 on the server (maximum 500). Reuse ``page_token`` only
+        publication time and both timezone-aware ``datetime`` objects (any
+        other type, or a naive datetime, raises
+        :class:`~polyester.errors.PolyesterValidationError` before sending).
+        ``sort`` orders posts (default ``"desc"``, newest first); changes keep
+        publication order inside each post. ``limit`` defaults to 100 on the
+        server (maximum 500). Reuse ``page_token`` only
         with the same filters, time bounds and sort.
         """
         request = changelog_pb2.ListChangesRequest(
@@ -175,9 +178,9 @@ class AsyncChangelogService(BaseService):
                 raise PolyesterValidationError("action_required must be a bool")
             request.action_required = action_required
         if start_time is not None:
-            request.start_time.CopyFrom(_timestamp(start_time))
+            request.start_time.CopyFrom(datetime_to_timestamp(start_time, "start_time"))
         if end_time is not None:
-            request.end_time.CopyFrom(_timestamp(end_time))
+            request.end_time.CopyFrom(datetime_to_timestamp(end_time, "end_time"))
         return await unary_public_decoded(
             self._transport,
             ChangelogServiceClient,
@@ -277,8 +280,10 @@ class AsyncChangelogService(BaseService):
             yield change
 
     async def breaking_changes_since(self, since: datetime) -> list[ChangelogChangeEntry]:
-        """Every breaking change published at or after ``since``, newest post
-        first.
+        """Every breaking change published at or after ``since`` (a
+        timezone-aware ``datetime``; ``None``, any other type or a naive
+        datetime raises :class:`~polyester.errors.PolyesterValidationError`
+        before sending), newest post first.
 
         It filters on the post's ``published_at``, which a republication does
         not move, so an edit to an older post is not reported: compare the
@@ -290,6 +295,7 @@ class AsyncChangelogService(BaseService):
         republished during the call is returned once, at its first position,
         with the wording last received.
         """
+        since = aware_datetime(since, "since")
         return await _collect_changes(
             self._walk_changes(
                 categories=[CHANGELOG_CATEGORY_BREAKING_CHANGE],
@@ -300,8 +306,9 @@ class AsyncChangelogService(BaseService):
 
     async def action_required_since(self, since: datetime) -> list[ChangelogChangeEntry]:
         """Every change that requires integrator action published at or after
-        ``since``, newest post first. Republished posts are handled as in
-        ``breaking_changes_since``."""
+        ``since``, newest post first. ``since`` is checked and republished
+        posts are handled as in ``breaking_changes_since``."""
+        since = aware_datetime(since, "since")
         return await _collect_changes(
             self._walk_changes(
                 action_required=True,
@@ -378,8 +385,3 @@ def _sort(sort: str | None) -> Any:
     if value is None:
         raise PolyesterValidationError(f'sort must be "asc" or "desc", got {sort!r}')
     return value
-
-
-def _timestamp(value: datetime) -> Timestamp:
-    parts = datetime_to_timestamp_dict(value)
-    return Timestamp(seconds=parts["seconds"], nanos=parts["nanos"])

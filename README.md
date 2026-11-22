@@ -2053,6 +2053,45 @@ withdraw = encode_funding_withdraw_to_chain(
 account.send_calls([withdraw])
 ```
 
+A UserOperation can execute even when `send_calls` raises: the bundler may
+have accepted it before the error. The SDK computes the operation's hash before
+sending it. Once it has attempted the send, any failure (a timeout, an HTTP
+error such as 504, an answer that does not name that hash, or no receipt by
+`receipt_timeout_s`) raises `UserOperationOutcomeUnknownError`, which carries the
+hash and reads as an unknown outcome. Never call `send_calls` again for the same
+calls: that signs a second operation, and both execute. Wait on the hash
+instead:
+
+<!-- readme-setup
+from polyester.chain import ChainCall, PolyesterSmartAccount
+account: PolyesterSmartAccount
+withdraw: ChainCall
+-->
+
+```python
+from polyester.chain import UserOperationOutcomeUnknownError
+from polyester.errors import mutation_outcome_unknown
+
+try:
+    receipt = account.send_calls([withdraw])
+except UserOperationOutcomeUnknownError as error:
+    assert mutation_outcome_unknown(error)
+    # Same operation, no second signature.
+    receipt = account.wait_for_receipt(error.user_operation_hash, timeout_s=120)
+```
+
+If that wait fails too (`TimeoutError`, or a transport error), no receipt was
+read in time: the operation may still be pending and may still execute. Wait on
+the same hash again later; do not send the calls again.
+
+Only a JSON-RPC refusal of the send (`JsonRpcError`) whose code proves the
+bundler refused the operation, in a well-formed error object (an integer code
+and a string message), means nothing was accepted, and the calls can be sent
+again: an invalid request or parameters (-32700, -32600, -32601, -32602) or
+an ERC-7769 rejection (-32500 to -32505, -32507, -32508). Any other code is an
+unknown outcome. Receipt polls that fail with an HTTP error such as 503 or a
+timeout are retried, and every request and pause ends by the wait's deadline.
+
 Whitelist toggles / destination entries / GuardRegistry signer setup are also encoded under
 `polyester.chain` (`encode_add_allowed_external_destinations`, …).
 

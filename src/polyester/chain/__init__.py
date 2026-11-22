@@ -47,7 +47,11 @@ from polyester.chain.safe import (
     predict_safe_address,
     predict_safe_address_with_data,
 )
-from polyester.chain.userop import PolyesterSmartAccount, UserOperationReceipt
+from polyester.chain.userop import (
+    PolyesterSmartAccount,
+    UserOperationOutcomeUnknownError,
+    UserOperationReceipt,
+)
 
 __all__ = [
     "AccountAbstractionEnvironment",
@@ -64,6 +68,7 @@ __all__ = [
     "PolyesterSmartAccount",
     "PredictedSafe",
     "SafeDeploymentConfig",
+    "UserOperationOutcomeUnknownError",
     "UserOperationReceipt",
     "ZipperFeeQuote",
     "encode_add_allowed_external_destinations",

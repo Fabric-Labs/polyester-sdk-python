@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import itertools
 import json
+import socket
 import threading
 import time
 from collections.abc import Iterator
@@ -70,7 +71,14 @@ class JsonRpcClient:
         # for concurrent request()/arequest() callers sharing one client).
         self._ids = itertools.count(1)
 
-    def request(self, method: str, params: list[Any] | None = None) -> Any:
+    def request(
+        self, method: str, params: list[Any] | None = None, *, timeout: float | None = None
+    ) -> Any:
+        """Call ``method`` and return its result.
+
+        The call ends within the client's timeout, or within ``timeout``
+        seconds when that is shorter; past it, it raises ``JsonRpcError``.
+        """
         req_id = next(self._ids)
         payload = {
             "jsonrpc": "2.0",
@@ -78,20 +86,27 @@ class JsonRpcClient:
             "method": method,
             "params": params or [],
         }
-        deadline = time.monotonic() + self._timeout
+        budget = self._timeout if timeout is None else min(timeout, self._timeout)
+        deadline = time.monotonic() + budget
         # httpx Timeout is per-phase, not a total wall clock. Enforce an absolute
-        # deadline via a closer that aborts the client at ``deadline`` plus
-        # between-chunk checks (covers stall and slow-drip without worker threads).
+        # deadline via a guard that, at ``deadline``, shuts down the connection
+        # and closes the client, plus between-chunk checks. The guard takes the
+        # connection from httpcore's trace as soon as TCP connects, so it cuts a
+        # stall in any later phase, through a proxy tunnel and TLS included (see
+        # _DeadlineGuard). Connecting is bounded by the connect timeout, which is
+        # the budget.
         with (
             httpx.Client(
-                timeout=httpx.Timeout(self._timeout),
+                timeout=httpx.Timeout(max(budget, 0.0)),
                 headers=_HTTP_HEADERS,
                 event_hooks={"response": [_raise_for_status]},
             ) as client,
-            _deadline_client_close(client, deadline),
+            _deadline_guard(client, deadline) as guard,
         ):
             try:
-                with client.stream("POST", self._url, json=payload) as response:
+                with client.stream(
+                    "POST", self._url, json=payload, extensions={"trace": guard.trace}
+                ) as response:
                     raw = _read_limited_sync(
                         response,
                         MAX_JSONRPC_RESPONSE_BYTES,
@@ -131,24 +146,92 @@ class JsonRpcClient:
         return _decode_jsonrpc_envelope(raw, expected_id=req_id)
 
 
+class _DeadlineGuard:
+    """Aborts a sync request at its deadline.
+
+    httpcore's ``trace`` request extension reports each TCP connection as soon
+    as it is made, before anything is sent on it: the API's, or a proxy's. The
+    guard keeps a duplicate of each connection's socket descriptor. A proxy
+    tunnel and TLS wrap the same connection, so at the deadline shutting the
+    duplicates down cuts every later phase at once: a CONNECT answer, a TLS
+    handshake, sending the request, partial or complete headers and the body.
+    Closing the client alone does not interrupt a blocked send or read. A
+    connection still being made ends at the connect timeout, which is the
+    budget.
+    """
+
+    def __init__(self, client: httpx.Client) -> None:
+        self._client = client
+        self._lock = threading.Lock()
+        self._sockets: list[socket.socket] = []
+        self._expired = False
+        self._closed = False
+
+    def trace(self, event: str, info: dict[str, Any]) -> None:
+        """httpcore trace callback: keep each new TCP connection's socket."""
+        if not event.endswith(".connect_tcp.complete"):
+            return
+        stream = info.get("return_value")
+        sock = stream.get_extra_info("socket") if stream is not None else None
+        if not isinstance(sock, socket.socket):
+            return
+        try:
+            # A duplicate descriptor of the same connection: it stays valid when
+            # TLS replaces the socket object httpcore reads through.
+            duplicate = sock.dup()
+        except OSError:
+            return
+        # Under the lock, shutting down and closing never race, so a closed
+        # descriptor's number, reused by another socket, is never shut down.
+        with self._lock:
+            if self._closed:
+                duplicate.close()
+                return
+            self._sockets.append(duplicate)
+            if self._expired:
+                _shutdown(duplicate)
+
+    def expire(self) -> None:
+        with self._lock:
+            self._expired = True
+            # The connections first: closing the client can wait on the read
+            # it ends.
+            for sock in self._sockets:
+                _shutdown(sock)
+        self._client.close()
+
+    def close(self) -> None:
+        """Release the duplicate descriptors; the guard then cuts nothing more."""
+        with self._lock:
+            self._closed = True
+            for sock in self._sockets:
+                sock.close()
+            self._sockets.clear()
+
+
+def _shutdown(sock: socket.socket) -> None:
+    with contextlib.suppress(OSError):
+        sock.shutdown(socket.SHUT_RDWR)
+
+
 @contextlib.contextmanager
-def _deadline_client_close(client: httpx.Client, deadline: float) -> Iterator[None]:
-    """Close ``client`` at ``deadline`` so a blocked sync read cannot outlive it.
+def _deadline_guard(client: httpx.Client, deadline: float) -> Iterator[_DeadlineGuard]:
+    """A :class:`_DeadlineGuard` for ``client`` that expires at ``deadline``.
 
     The timer is cancelled on exit, so successful calls leave no worker threads.
-    Closing the client unblocks in-flight stream reads without a dedicated worker
-    pool or leaked connections.
     """
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise JsonRpcError("json-rpc timed out")
-    timer = threading.Timer(remaining, client.close)
+    guard = _DeadlineGuard(client)
+    timer = threading.Timer(remaining, guard.expire)
     timer.daemon = True
     timer.start()
     try:
-        yield
+        yield guard
     finally:
         timer.cancel()
+        guard.close()
 
 
 def _content_length_exceeds(response: httpx.Response, max_bytes: int) -> bool:
@@ -219,10 +302,14 @@ def _decode_jsonrpc_envelope(raw: bytes, *, expected_id: int) -> Any:
         err = body["error"]
         if not isinstance(err, dict):
             raise JsonRpcError("json-rpc error must be an object")
-        raise JsonRpcError(
-            str(err.get("message", err)),
-            code=err.get("code") if isinstance(err.get("code"), int) else None,
-            data=err.get("data"),
-        )
+        message = err.get("message")
+        code = err.get("code")
+        if not isinstance(message, str) or type(code) is not int:
+            # Not a JSON-RPC error object: its code, if any, proves nothing.
+            raise JsonRpcError(
+                "json-rpc malformed error object: want an integer code and a string message",
+                data=err.get("data"),
+            )
+        raise JsonRpcError(message, code=code, data=err.get("data"))
     # ``result: null`` is a valid JSON-RPC success (has_result True).
     return body["result"]

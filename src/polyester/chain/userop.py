@@ -9,13 +9,15 @@ from typing import Any
 from eth_abi import encode
 from eth_account import Account
 from eth_account.messages import encode_typed_data
+from eth_hash.auto import keccak
 from eth_utils import to_checksum_address, to_hex
 
 from polyester.chain.calldata import ChainCall
 from polyester.chain.environment import POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment
-from polyester.chain.rpc import JsonRpcClient
+from polyester.chain.rpc import JsonRpcClient, JsonRpcError, JsonRpcHttpError
 from polyester.chain.safe import predict_safe_address_with_data
 from polyester.codecs.scalars import exact_integer
+from polyester.errors import PolyesterTransportError
 
 USER_OPERATION_GAS_BUFFER_BPS = 2_000
 USER_OPERATION_MIN_GAS_BUFFER = 50_000
@@ -65,6 +67,104 @@ class UserOperationReceipt:
     transaction_hash: str
     success: bool
     raw: dict[str, Any]
+
+
+class UserOperationOutcomeUnknownError(PolyesterTransportError):
+    """A UserOperation was handed to the bundler, but its outcome is unknown.
+
+    ``send_calls`` raises it for any failure once ``eth_sendUserOperation`` was
+    attempted: a transport error, a timeout or an HTTP error on the send, or a
+    receipt wait that did not end with a receipt. The bundler may hold the
+    operation, and it may still execute. :func:`polyester.errors.mutation_outcome_unknown`
+    is true and :func:`polyester.errors.is_retryable_error` false.
+
+    ``user_operation_hash`` is the operation's hash. Recover with
+    ``wait_for_receipt(error.user_operation_hash)``; never call ``send_calls``
+    again for the same calls, which signs a second operation that executes too.
+    ``status_code`` and ``retry_after`` are those of the failed answer, when
+    there was one, and ``__cause__`` is the underlying failure.
+    """
+
+    _outcome_known = False
+
+    def __init__(self, user_operation_hash: str, cause: BaseException) -> None:
+        super().__init__(
+            f"UserOperation {user_operation_hash} outcome unknown: {cause}; "
+            "wait for its receipt instead of sending it again"
+        )
+        self.user_operation_hash = user_operation_hash
+        self.status_code = getattr(cause, "status_code", None)
+        self.retry_after = getattr(cause, "retry_after", None)
+        self.__cause__ = cause
+
+
+# The JSON-RPC 2.0 request errors (parse error, invalid request, method not
+# found, invalid params) prove any call was refused.
+_JSONRPC_REQUEST_REFUSAL_CODES = frozenset({-32700, -32600, -32601, -32602})
+# The ERC-7769 rejections prove a refusal of eth_sendUserOperation, the method
+# that defines them, only.
+_SEND_USER_OPERATION_REFUSAL_CODES = frozenset(
+    {-32500, -32501, -32502, -32503, -32504, -32505, -32507, -32508}
+)
+
+
+def _is_jsonrpc_refusal(error: BaseException, method: str) -> bool:
+    """Whether ``error`` is a JSON-RPC error answer that proves ``method`` was refused.
+
+    That is a request error for any method, or an ERC-7769 rejection for
+    eth_sendUserOperation. An HTTP error, a timeout, a malformed answer, or an
+    error object with any other code, such as an internal error (-32603), a
+    server error (-32000 to -32099) or an application code, proves nothing
+    about the call's outcome.
+    """
+    if not (
+        isinstance(error, JsonRpcError)
+        and not isinstance(error, JsonRpcHttpError)
+        and type(error.code) is int
+    ):
+        return False
+    return error.code in _JSONRPC_REQUEST_REFUSAL_CODES or (
+        method == "eth_sendUserOperation" and error.code in _SEND_USER_OPERATION_REFUSAL_CODES
+    )
+
+
+def _user_operation_hash(
+    *,
+    environment: PolyesterChainEnvironment,
+    sender: str,
+    nonce: int,
+    init_code: bytes,
+    call_data: bytes,
+    call_gas_limit: int,
+    verification_gas_limit: int,
+    pre_verification_gas: int,
+    max_fee_per_gas: int,
+    max_priority_fee_per_gas: int,
+    paymaster_and_data: bytes,
+) -> str:
+    """EntryPoint v0.7 ``getUserOpHash`` of a UserOperation, as a 0x hex string."""
+    packed = encode(
+        ["address", "uint256", "bytes32", "bytes32", "bytes32", "uint256", "bytes32", "bytes32"],
+        [
+            to_checksum_address(sender),
+            nonce,
+            keccak(init_code),
+            keccak(call_data),
+            ((verification_gas_limit << 128) | call_gas_limit).to_bytes(32, "big"),
+            pre_verification_gas,
+            ((max_priority_fee_per_gas << 128) | max_fee_per_gas).to_bytes(32, "big"),
+            keccak(paymaster_and_data),
+        ],
+    )
+    entry_point = to_checksum_address(environment.account_abstraction.entry_point.address)
+    return to_hex(
+        keccak(
+            encode(
+                ["bytes32", "address", "uint256"],
+                [keccak(packed), entry_point, environment.chain_id],
+            )
+        )
+    )
 
 
 def add_user_operation_gas_buffer(gas: int) -> int:
@@ -253,6 +353,20 @@ class PolyesterSmartAccount:
         wait: bool = True,
         receipt_timeout_s: float = 30.0,
     ) -> UserOperationReceipt | str:
+        """Build, sponsor, sign and submit a UserOperation for ``calls``.
+
+        With ``wait`` (the default) it returns the receipt, polling for up to
+        ``receipt_timeout_s`` seconds; without it, the operation's hash.
+
+        The operation's hash is computed before sending, and is the hash
+        returned or waited on. A JSON-RPC refusal of the send whose code proves
+        it (an invalid request or parameters, or an ERC-7769 rejection) raises
+        ``JsonRpcError``: nothing was accepted. Any other failure from the send
+        on, an answer that does not name that hash included, raises
+        :class:`UserOperationOutcomeUnknownError` with the operation's
+        ``user_operation_hash``: the bundler may hold the operation, so wait on
+        that hash with :meth:`wait_for_receipt` instead of sending again.
+        """
         if not calls:
             raise ValueError("at least one call is required")
         if len(calls) != 1:
@@ -376,13 +490,46 @@ class PolyesterSmartAccount:
             final_op["paymasterPostOpGasLimit"] = _hex_int(pm_post)
             final_op["paymasterData"] = to_hex(pm_data_bytes)
 
-        user_op_hash = self._bundler.request(
-            "eth_sendUserOperation",
-            [final_op, entry_point],
+        # The hash is known before sending: once the send is attempted, every
+        # failure names it, so the caller waits on it instead of signing again.
+        user_op_hash = _user_operation_hash(
+            environment=self.environment,
+            sender=self.address,
+            nonce=nonce,
+            init_code=init_code,
+            call_data=call_data,
+            call_gas_limit=call_gas,
+            verification_gas_limit=verification_gas,
+            pre_verification_gas=pre_verification,
+            max_fee_per_gas=max_fee,
+            max_priority_fee_per_gas=max_prio,
+            paymaster_and_data=paymaster_and_data,
         )
+        try:
+            accepted = self._bundler.request(
+                "eth_sendUserOperation",
+                [final_op, entry_point],
+            )
+        except Exception as exc:
+            if _is_jsonrpc_refusal(exc, "eth_sendUserOperation"):
+                raise  # The bundler refused it: nothing was accepted.
+            raise UserOperationOutcomeUnknownError(user_op_hash, exc) from exc
+        # The computed hash is the operation's identity: an answer that names
+        # another one (or none) does not say what the bundler holds.
+        if not isinstance(accepted, str) or accepted.lower() != user_op_hash.lower():
+            raise UserOperationOutcomeUnknownError(
+                user_op_hash,
+                JsonRpcError(
+                    "eth_sendUserOperation answered "
+                    f"{accepted!r:.80}, not the operation's hash {user_op_hash}"
+                ),
+            )
         if not wait:
-            return str(user_op_hash)
-        return self.wait_for_receipt(str(user_op_hash), timeout_s=receipt_timeout_s)
+            return user_op_hash
+        try:
+            return self.wait_for_receipt(user_op_hash, timeout_s=receipt_timeout_s)
+        except Exception as exc:
+            raise UserOperationOutcomeUnknownError(user_op_hash, exc) from exc
 
     def wait_for_receipt(
         self,
@@ -391,12 +538,39 @@ class PolyesterSmartAccount:
         timeout_s: float = 30.0,
         poll_interval_s: float = 1.0,
     ) -> UserOperationReceipt:
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            raw = self._bundler.request(
-                "eth_getUserOperationReceipt",
-                [user_operation_hash],
-            )
+        """Poll the bundler for a UserOperation's receipt until ``timeout_s`` passes.
+
+        ``timeout_s`` bounds the whole wait: every request and every pause ends
+        by then. A poll that fails without a JSON-RPC refusal (an HTTP error
+        such as 503, a timeout or a transport error) is retried until the
+        deadline. Raises ``TimeoutError`` at the deadline, from the last failed
+        poll if any, and ``RuntimeError`` when the bundler reports the operation
+        rejected. A failed wait means no receipt was read in time, not that the
+        operation will not execute.
+        """
+        deadline = time.monotonic() + timeout_s
+        last_error: Exception | None = None
+
+        def remaining() -> float:
+            return deadline - time.monotonic()
+
+        def pause() -> None:
+            time.sleep(max(0.0, min(poll_interval_s, remaining())))
+
+        while remaining() > 0:
+            try:
+                raw = self._bundler.request(
+                    "eth_getUserOperationReceipt",
+                    [user_operation_hash],
+                    timeout=remaining(),
+                )
+            except Exception as exc:
+                if _is_jsonrpc_refusal(exc, "eth_getUserOperationReceipt"):
+                    raise
+                last_error = exc
+                pause()
+                continue
+            last_error = None
             if raw:
                 receipt = raw.get("receipt") or {}
                 success = bool(raw.get("success", receipt.get("status") in (1, "0x1", "0x01")))
@@ -407,10 +581,13 @@ class PolyesterSmartAccount:
                     success=success,
                     raw=raw,
                 )
+            if remaining() <= 0:
+                break
             try:
                 status = self._bundler.request(
                     "pimlico_getUserOperationStatus",
                     [user_operation_hash],
+                    timeout=remaining(),
                 )
             except Exception:
                 status = None
@@ -418,5 +595,7 @@ class PolyesterSmartAccount:
                 raise RuntimeError(
                     f"bundler rejected UserOperation {user_operation_hash}: {status}"
                 )
-            time.sleep(poll_interval_s)
-        raise TimeoutError(f"timed out waiting for UserOperation receipt {user_operation_hash}")
+            pause()
+        raise TimeoutError(
+            f"timed out waiting for UserOperation receipt {user_operation_hash}"
+        ) from last_error

@@ -24,6 +24,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
+from tests.unit.support import batch_create_answer
 
 PAIRS = [
     {"symbol": "WIDE-USDT", "symbol_id": 7, "base_quantity_scale": 18, "quote_quantity_scale": 6},
@@ -53,6 +54,7 @@ async def _sent_quantities(json_wire: bool, method: str, symbol_id: int, qty) ->
         )
         if name == "BatchCreateOrders":
             seen.extend(item.base_qty_scaled for item in request.items)
+            response = batch_create_answer(request)
         else:
             seen.append(request.order.base_qty_scaled)
         if json_wire:

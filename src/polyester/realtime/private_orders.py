@@ -21,7 +21,7 @@ from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
 from polyester._answer import refused_upgrade
-from polyester.codecs.decode.orders import OrderScales
+from polyester.codecs.decode.orders import OrderScales, PairSymbols
 from polyester.codecs.decode.private_orders import (
     private_orders_from_proto,
     private_orders_unit_from_proto,
@@ -201,9 +201,12 @@ class PrivateOrderStream:
         fetch_subscribe_token: Callable[[str], Awaitable[str]],
         max_queue_size: int = 1000,
         order_scales: OrderScales | None = None,
+        order_symbols: PairSymbols | None = None,
     ) -> None:
         # A pair's (base, quote) quantity scales by symbol_id, to decode with.
         self.order_scales = order_scales
+        # A pair's name by symbol_id, which quantities and prices are bound to.
+        self.order_symbols = order_symbols
         self._url = url
         self._fetch_connect_token = fetch_connect_token
         self._fetch_subscribe_token = fetch_subscribe_token
@@ -311,7 +314,9 @@ class PrivateOrderStream:
         events: list[PrivateOrdersEvent] = []
         if s.orders is not None:
             # Each order decoded when it arrived, so this decode cannot fail.
-            orders = private_orders_from_proto(s.orders.values(), scales=self.order_scales)
+            orders = private_orders_from_proto(
+                s.orders.values(), scales=self.order_scales, symbols=self.order_symbols
+            )
             events.append(PrivateOrdersSnapshot(orders=orders))
         if s.ready:
             events.append(PrivateOrdersReady())
@@ -978,7 +983,9 @@ class PrivateOrderStream:
             self._resubscribe(ws, s)
             return
         try:
-            orders = private_orders_from_proto(staged, scales=self.order_scales)
+            orders = private_orders_from_proto(
+                staged, scales=self.order_scales, symbols=self.order_symbols
+            )
         except DECODE_ERRORS as exc:
             # A malformed snapshot: take a fresh one. Any other failure is the
             # stream's own and keeps the last applied cursor.
@@ -998,7 +1005,9 @@ class PrivateOrderStream:
 
     def _on_unit(self, ws: ClientConnection, s: _Subscription, unit: pb.Unit) -> None:
         try:
-            event = private_orders_unit_from_proto(unit, scales=self.order_scales)
+            event = private_orders_unit_from_proto(
+                unit, scales=self.order_scales, symbols=self.order_symbols
+            )
         except DECODE_ERRORS as exc:
             # A malformed unit is not applied: resume from the cursor before it.
             self._report(s, "decode", exc)

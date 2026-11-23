@@ -26,6 +26,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
+from tests.unit.support import batch_create_answer
 
 METHODS = ("create", "preview", "batch_create")
 RESPONSES = {
@@ -51,7 +52,7 @@ async def _client(json_wire: bool, seen: list[object]) -> tuple[AsyncPolyester, 
             else REQUESTS[rpc].FromString(req.body)
         )
         seen.append(request)
-        response = RESPONSES[rpc]
+        response = batch_create_answer(request) if rpc == "BatchCreateOrders" else RESPONSES[rpc]
         if json_wire:
             return HttpScript.json(200, MessageToDict(response))
         return connect_proto_response(response.SerializeToString())

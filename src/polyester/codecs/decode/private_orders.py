@@ -6,8 +6,10 @@ from collections.abc import Iterable
 
 from polyester.codecs.decode.orders import (
     OrderScales,
+    PairSymbols,
     cancel_reason_label,
     pair_scales,
+    pair_symbol,
     reject_reason_label,
     scaled_order_from_proto,
 )
@@ -25,10 +27,13 @@ from polyester.types.money import Price, Quantity
 
 
 def private_orders_from_proto(
-    orders: Iterable[OrderPb], *, scales: OrderScales | None = None
+    orders: Iterable[OrderPb],
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
 ) -> list[Order]:
     """Decode stream orders with the same decoder as the order reads."""
-    return [scaled_order_from_proto(item, scales) for item in orders]
+    return [scaled_order_from_proto(item, scales, symbols) for item in orders]
 
 
 def stale_order_ids_from_proto(msg: private_ws_pb2.Unavailable) -> list[str]:
@@ -38,19 +43,29 @@ def stale_order_ids_from_proto(msg: private_ws_pb2.Unavailable) -> list[str]:
 
 
 def _fill_from_proto(
-    msg: private_ws_pb2.Fill, *, quantity_scale: int | None = None
+    msg: private_ws_pb2.Fill,
+    *,
+    quantity_scale: int | None = None,
+    symbol: str | None = None,
+    symbol_id: int | None = None,
 ) -> PrivateOrderFill:
     return PrivateOrderFill(
         match_id=str(msg.match_id),
         ordinal=int(msg.ordinal),
         role=proto_enum_name(private_ws_pb2.Fill.Role, msg.role),
-        qty=Quantity.from_scaled(int(msg.qty_scaled), scale=quantity_scale),
-        price=Price.from_ticks(int(msg.price_ticks)) if msg.price_ticks else None,
+        qty=Quantity.from_scaled(
+            int(msg.qty_scaled), scale=quantity_scale, symbol=symbol, symbol_id=symbol_id or None
+        ),
+        price=Price.from_ticks(int(msg.price_ticks), symbol=symbol) if msg.price_ticks else None,
     )
 
 
 def _order_event_from_proto(
-    msg: private_ws_pb2.OrderEvent, *, quantity_scale: int | None = None
+    msg: private_ws_pb2.OrderEvent,
+    *,
+    quantity_scale: int | None = None,
+    symbol: str | None = None,
+    symbol_id: int | None = None,
 ) -> PrivateOrderEvent:
     return PrivateOrderEvent(
         order_id=format_uint64_id(msg.order_id),
@@ -62,7 +77,9 @@ def _order_event_from_proto(
             format_uint64_id(msg.replacement_order_id) if msg.replacement_order_id else ""
         ),
         fill=(
-            _fill_from_proto(msg.fill, quantity_scale=quantity_scale)
+            _fill_from_proto(
+                msg.fill, quantity_scale=quantity_scale, symbol=symbol, symbol_id=symbol_id
+            )
             if msg.HasField("fill")
             else None
         ),
@@ -80,7 +97,10 @@ def _command_outcome_from_proto(msg: private_ws_pb2.CommandOutcome) -> PrivateOr
 
 
 def private_orders_unit_from_proto(
-    msg: private_ws_pb2.Unit, *, scales: OrderScales | None = None
+    msg: private_ws_pb2.Unit,
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
 ) -> PrivateOrdersUnit:
     # A fill names its order, not its pair: the unit carries the order it changed.
     symbol_ids = {int(order.order_id): int(order.symbol_id) for order in msg.orders}
@@ -90,12 +110,19 @@ def private_orders_unit_from_proto(
         if kind == "order":
             symbol_id = symbol_ids.get(int(event.order.order_id))
             base = pair_scales(scales, symbol_id)[0] if symbol_id is not None else None
-            events.append(_order_event_from_proto(event.order, quantity_scale=base))
+            events.append(
+                _order_event_from_proto(
+                    event.order,
+                    quantity_scale=base,
+                    symbol=pair_symbol(symbols, symbol_id) if symbol_id is not None else None,
+                    symbol_id=symbol_id,
+                )
+            )
         elif kind == "outcome":
             events.append(_command_outcome_from_proto(event.outcome))
         # An event kind this SDK does not know is skipped (forward compatibility).
     return PrivateOrdersUnit(
-        orders=private_orders_from_proto(msg.orders, scales=scales),
+        orders=private_orders_from_proto(msg.orders, scales=scales, symbols=symbols),
         removed_order_ids=[format_uint64_id(order_id) for order_id in msg.removed_order_ids],
         events=events,
     )

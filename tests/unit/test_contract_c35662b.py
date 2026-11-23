@@ -72,6 +72,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
+from tests.unit.support import btc_market
 
 _CREDS = make_test_credentials()
 Answer = Callable[[ParsedRequest], HttpScript]
@@ -660,13 +661,15 @@ def test_refused_preview_names_the_price_band_limit() -> None:
         ),
         evaluated_at=_ts(_OBSERVED),
     )
-    preview = preview_order_from_proto(reply)
+    preview = preview_order_from_proto(reply, market=btc_market())
     assert preview.rejection is not None
     assert preview.rejection.code == "PRICE_BAND_VIOLATION"
     assert preview.rejection.price_band_limit is not None
     assert preview.rejection.price_band_limit.ticks == 1_837_500_000_000
     reply.rejection.ClearField("price_band_limit_ticks")
-    assert preview_order_from_proto(reply).rejection.price_band_limit is None  # type: ignore[union-attr]
+    cleared = preview_order_from_proto(reply, market=btc_market())
+    assert cleared.rejection is not None
+    assert cleared.rejection.price_band_limit is None
 
 
 # --- asset market datapoints and account activity ------------------------------------------------

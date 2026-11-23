@@ -10,6 +10,7 @@ from polyester.codecs.decode.market_data import candle_point_from_proto
 from polyester.codecs.decode.market_overview import market_overview_entry_from_proto
 from polyester.codecs.decode.orders import (
     OrderScales,
+    PairSymbols,
     scaled_user_trade_from_proto,
     user_trade_from_proto,
 )
@@ -85,13 +86,16 @@ def decode_user_trade_bytes(payload: bytes) -> UserTrade:
 
 
 def decode_user_trade_batch_bytes(
-    payload: bytes, *, scales: OrderScales | None = None
+    payload: bytes,
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
 ) -> list[UserTrade | PolyesterRealtimeError]:
     from polyester.gen.orders.v1.orders_read_pb2 import UserTradeBatch
 
     batch = _parse_proto(payload, UserTradeBatch)
     return _decode_batch_members(
-        batch.events, lambda event: scaled_user_trade_from_proto(event, scales)
+        batch.events, lambda event: scaled_user_trade_from_proto(event, scales, symbols)
     )
 
 
@@ -128,16 +132,18 @@ def decode_trigger_event_bytes(payload: bytes) -> TriggerEvent:
 
 
 def decode_trigger_event_batch_bytes(
-    payload: bytes,
+    payload: bytes, *, symbols: TriggerSymbols | None = None
 ) -> list[TriggerEvent | PolyesterRealtimeError]:
     from polyester.gen.triggers.v1.triggers_pb2 import TriggerEventBatch
 
     batch = _parse_proto(payload, TriggerEventBatch)
-    return _decode_batch_members(batch.events, trigger_event_from_proto)
+    return _decode_batch_members(
+        batch.events, lambda event: trigger_event_from_proto(event, symbols=symbols)
+    )
 
 
 def decode_market_trade_batch_bytes(
-    payload: bytes, *, quantity_scale: int
+    payload: bytes, *, quantity_scale: int, symbol: str | None = None
 ) -> list[MarketTrade | PolyesterRealtimeError]:
     from polyester._wire import protobuf_to_public_dict
     from polyester.codecs.wire_decode import decode_market_trade
@@ -147,7 +153,7 @@ def decode_market_trade_batch_bytes(
     return _decode_batch_members(
         batch.events,
         lambda event: decode_market_trade(
-            protobuf_to_public_dict(event), quantity_scale=quantity_scale
+            protobuf_to_public_dict(event), quantity_scale=quantity_scale, symbol=symbol
         ),
     )
 

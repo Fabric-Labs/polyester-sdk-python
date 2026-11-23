@@ -20,6 +20,7 @@ from polyester.codecs import wire_decode
 from polyester.codecs.decode import orders as proto_decode
 from polyester.gen.orders.v1 import orders_pb2, orders_read_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
+from tests.unit.support import btc_market
 
 TS = Timestamp(seconds=1_763_164_740, nanos=987_654_321)
 TS_NS = 1_763_164_740_123_456_789
@@ -353,16 +354,16 @@ CASES: list[tuple[str, Callable[[], Message], Callable[[Any], Any], Callable[[An
     (
         "create",
         _create,
-        lambda m: proto_decode.order_mutation_from_proto(m, quantity_scale=8),
-        lambda d: wire_decode.decode_order_mutation(d, quantity_scale=8),
+        lambda m: proto_decode.order_mutation_from_proto(m, market=btc_market(8)),
+        lambda d: wire_decode.decode_order_mutation(d, market=btc_market(8)),
     ),
     (
         "cancel",
         lambda: orders_pb2.CancelOrderResponse(
             status=orders_pb2.CancelOrderResponse.ACCEPTED, order_id=42, ts=TS, ts_ns=TS_NS
         ),
-        proto_decode.order_mutation_from_proto,
-        lambda d: wire_decode.decode_order_mutation(d),
+        lambda m: proto_decode.order_mutation_from_proto(m, market=None),
+        lambda d: wire_decode.decode_order_mutation(d, market=None),
     ),
     (
         "modify",
@@ -380,8 +381,12 @@ CASES: list[tuple[str, Callable[[], Message], Callable[[Any], Any], Callable[[An
     (
         "batch create",
         _batch_create,
-        lambda m: proto_decode.batch_create_from_proto(m, quantity_scales=[8, 5, 8]),
-        lambda d: wire_decode.decode_batch_create_result(d, quantity_scales=[8, 5, 8]),
+        lambda m: proto_decode.batch_create_from_proto(
+            m, markets=[btc_market(8), btc_market(5), btc_market(8)]
+        ),
+        lambda d: wire_decode.decode_batch_create_result(
+            d, markets=[btc_market(8), btc_market(5), btc_market(8)]
+        ),
     ),
     (
         "batch cancel",
@@ -436,7 +441,8 @@ def test_json_order_reasons_use_the_lowercase_labels() -> None:
 
 def test_json_batch_create_keeps_resolved_quantity_and_time() -> None:
     result = wire_decode.decode_batch_create_result(
-        MessageToDict(_batch_create()), quantity_scales=[8, 5, 8]
+        MessageToDict(_batch_create()),
+        markets=[btc_market(8), btc_market(5), btc_market(8)],
     )
     assert [item.resolved_base_qty_scaled for item in result.results] == ["1000000", "77607", ""]
     assert result.results[1].resolved_base_qty.format() == "0.77607"

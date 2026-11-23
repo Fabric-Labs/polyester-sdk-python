@@ -16,6 +16,7 @@ from polyester.gen.chain.lifecycle.v1 import lifecycle_read_pb2, types_pb2
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
+from tests.unit.support import btc_market
 
 
 def test_deposit_source_not_confirmed_lifecycle_reason() -> None:
@@ -113,7 +114,8 @@ def test_order_error_codes(code: str) -> None:
             admissible=False,
             rejection=orders_pb2.ErrorDetail(code=value),
             evaluated_at={"seconds": 1},
-        )
+        ),
+        market=btc_market(),
     )
     assert preview.rejection is not None
     assert preview.rejection.code == code.removeprefix("ERROR_CODE_")

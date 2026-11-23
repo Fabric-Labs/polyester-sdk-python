@@ -15,6 +15,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
+from tests.unit.support import batch_create_answer
 
 
 @pytest_asyncio.fixture(loop_scope="function")
@@ -29,7 +30,7 @@ async def order_client():
             )
         elif req.path.endswith("/BatchCreateOrders"):
             request = orders.BatchCreateOrdersRequest.FromString(req.body)
-            response = orders.BatchCreateOrdersResponse()
+            response = batch_create_answer(request)
         elif req.path.endswith("/ModifyOrder"):
             request = orders.ModifyOrderRequest.FromString(req.body)
             response = orders.ModifyOrderResponse(

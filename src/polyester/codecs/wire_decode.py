@@ -73,7 +73,7 @@ from polyester.models.trading import (
 )
 
 if TYPE_CHECKING:
-    from polyester.codecs.decode.orders import OrderScales
+    from polyester.codecs.decode.orders import OrderMarket, OrderScales, PairSymbols
 
 _M = TypeVar("_M", bound=Message)
 
@@ -153,6 +153,7 @@ def decode_order(
     *,
     quantity_scale: int | None = None,
     quote_quantity_scale: int | None = None,
+    symbol: str | None = None,
 ) -> Order:
     """Decode an ``orders.v1.Order`` in its protobuf JSON form, exactly as
     ``order_from_proto`` decodes the binary message."""
@@ -163,25 +164,32 @@ def decode_order(
         _contract_message(data, orders_read_pb2.Order(), "Order"),
         quantity_scale=quantity_scale,
         quote_quantity_scale=quote_quantity_scale,
+        symbol=symbol,
     )
 
 
-def decode_orders_list(data: dict[str, Any], *, scales: OrderScales | None = None) -> OrdersList:
+def decode_orders_list(
+    data: dict[str, Any],
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
+) -> OrdersList:
     """Decode an open-orders or order-history page in its protobuf JSON form,
     exactly as ``orders_list_from_proto`` decodes the binary response."""
     from polyester.codecs.decode.orders import orders_list_from_proto
     from polyester.gen.orders.v1 import orders_read_pb2
 
     message = _contract_message(data, orders_read_pb2.GetOpenOrdersResponse(), "ListOrders")
-    return orders_list_from_proto(message, scales=scales)
+    return orders_list_from_proto(message, scales=scales, symbols=symbols)
 
 
 def decode_order_mutation(
-    data: dict[str, Any], *, quantity_scale: int | None = None
+    data: dict[str, Any], *, market: OrderMarket | None
 ) -> OrderMutationResult:
     """Decode a create or cancel answer in its protobuf JSON form, exactly as
     ``order_mutation_from_proto`` decodes the binary response. A cancel answer
-    carries ``status``; a create answer does not."""
+    carries ``status``; a create answer does not, and needs ``market``, the
+    market the order was sent to."""
     from polyester.codecs.decode.orders import order_mutation_from_proto
     from polyester.gen.orders.v1 import orders_pb2
 
@@ -190,31 +198,41 @@ def decode_order_mutation(
         message = _contract_message(data, orders_pb2.CancelOrderResponse(), "CancelOrder")
     else:
         message = _contract_message(data, orders_pb2.CreateOrderResponse(), "CreateOrder")
-    return order_mutation_from_proto(message, quantity_scale=quantity_scale)
+    return order_mutation_from_proto(message, market=market)
 
 
-def decode_get_order(data: dict[str, Any], *, scales: OrderScales | None = None) -> GetOrderResult:
+def decode_get_order(
+    data: dict[str, Any],
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
+) -> GetOrderResult:
     """Decode an order read in its protobuf JSON form, exactly as
     ``get_order_from_proto`` decodes the binary response."""
     from polyester.codecs.decode.orders import get_order_from_proto
     from polyester.gen.orders.v1 import orders_read_pb2
 
     message = _contract_message(data, orders_read_pb2.GetOrderResponse(), "GetOrder")
-    return get_order_from_proto(message, scales=scales)
+    return get_order_from_proto(message, scales=scales, symbols=symbols)
 
 
-def decode_user_trade(data: dict[str, Any], *, quantity_scale: int | None = None) -> UserTrade:
+def decode_user_trade(
+    data: dict[str, Any], *, quantity_scale: int | None = None, symbol: str | None = None
+) -> UserTrade:
     """Decode an ``orders.v1.UserTrade`` in its protobuf JSON form, exactly as
     ``user_trade_from_proto`` decodes the binary message."""
     from polyester.codecs.decode.orders import user_trade_from_proto
     from polyester.gen.orders.v1 import orders_read_pb2
 
     message = _contract_message(data, orders_read_pb2.UserTrade(), "UserTrade")
-    return user_trade_from_proto(message, quantity_scale=quantity_scale)
+    return user_trade_from_proto(message, quantity_scale=quantity_scale, symbol=symbol)
 
 
 def decode_user_trades_list(
-    data: dict[str, Any], *, scales: OrderScales | None = None
+    data: dict[str, Any],
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
 ) -> UserTradesList:
     """Decode a user trades page in its protobuf JSON form, exactly as
     ``user_trades_list_from_proto`` decodes the binary response."""
@@ -222,12 +240,17 @@ def decode_user_trades_list(
     from polyester.gen.orders.v1 import orders_read_pb2
 
     message = _contract_message(data, orders_read_pb2.GetUserTradesResponse(), "GetUserTrades")
-    return user_trades_list_from_proto(message, scales=scales)
+    return user_trades_list_from_proto(message, scales=scales, symbols=symbols)
 
 
-def decode_market_trade(data: dict[str, Any], *, quantity_scale: int) -> MarketTrade:
+def decode_market_trade(
+    data: dict[str, Any], *, quantity_scale: int, symbol: str | None = None
+) -> MarketTrade:
+    """Decode a public trade; its price and quantity are bound to ``symbol``,
+    the pair's name, when given."""
     from polyester.types.money import Price, Quantity
 
+    symbol = symbol or None
     symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
     qty_raw = _field(data, "qtyScaled", "qty_scaled", default=0) or 0
     price_raw = _field(data, "priceTicks", "price_ticks", default=0) or 0
@@ -235,8 +258,10 @@ def decode_market_trade(data: dict[str, Any], *, quantity_scale: int) -> MarketT
         symbol_id=symbol_id,
         match_id=str(_field(data, "matchId", "match_id", default="") or ""),
         is_buy=bool(_field(data, "isBuy", "is_buy", default=False)),
-        price=Price.from_ticks(int(price_raw)) if int(price_raw) else None,
-        qty=Quantity.from_scaled(int(qty_raw), scale=quantity_scale, symbol_id=symbol_id),
+        price=Price.from_ticks(int(price_raw), symbol=symbol) if int(price_raw) else None,
+        qty=Quantity.from_scaled(
+            int(qty_raw), scale=quantity_scale, symbol=symbol, symbol_id=symbol_id
+        ),
         ts_ns=ts_ns_string_from_response(
             _field(data, "tsNs", "ts_ns", default=0) or 0,
             context="MarketTrade",
@@ -718,16 +743,16 @@ def decode_cancel_all_after_result(data: dict[str, Any]) -> CancelAllAfterResult
 
 
 def decode_batch_create_result(
-    data: dict[str, Any], *, quantity_scales: Sequence[int | None] | None = None
+    data: dict[str, Any], *, markets: Sequence[OrderMarket]
 ) -> BatchCreateOrdersResult:
     """Decode a batch create answer in its protobuf JSON form, exactly as
-    ``batch_create_from_proto`` decodes the binary response. ``quantity_scales``
-    are the requested items' base quantity scales, in request order."""
+    ``batch_create_from_proto`` decodes the binary response. ``markets`` are
+    the requested items' markets, in request order."""
     from polyester.codecs.decode.orders import batch_create_from_proto
     from polyester.gen.orders.v1 import orders_pb2
 
     message = _contract_message(data, orders_pb2.BatchCreateOrdersResponse(), "BatchCreateOrders")
-    return batch_create_from_proto(message, quantity_scales=quantity_scales)
+    return batch_create_from_proto(message, markets=markets)
 
 
 def decode_batch_cancel_result(data: dict[str, Any]) -> BatchCancelOrdersResult:
@@ -1068,13 +1093,17 @@ def decode_bucket_transfer_result(data: dict[str, Any]) -> BucketTransferResult:
     )
 
 
-def decode_market_trade_bytes(payload: bytes, *, quantity_scale: int) -> MarketTrade:
+def decode_market_trade_bytes(
+    payload: bytes, *, quantity_scale: int, symbol: str | None = None
+) -> MarketTrade:
     from polyester._wire import protobuf_to_public_dict
     from polyester.gen.marketdata.v1.marketdata_pb2 import MarketTrade as MarketTradePb
 
     message = MarketTradePb()
     message.ParseFromString(payload)
-    return decode_market_trade(protobuf_to_public_dict(message), quantity_scale=quantity_scale)
+    return decode_market_trade(
+        protobuf_to_public_dict(message), quantity_scale=quantity_scale, symbol=symbol
+    )
 
 
 def decode_api_key(data: dict[str, Any]) -> ApiKeySummary:

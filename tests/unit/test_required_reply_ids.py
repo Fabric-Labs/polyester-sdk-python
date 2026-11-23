@@ -37,7 +37,6 @@ from polyester.codecs.decode.lifecycle import (
     flows_list_from_proto,
 )
 from polyester.codecs.decode.orders import (
-    batch_create_from_proto,
     cancel_all_from_proto,
     get_order_from_proto,
     orders_list_from_proto,
@@ -80,6 +79,7 @@ from polyester.gen.orders.v1 import orders_read_pb2 as orders_read
 from polyester.gen.system.v1 import system_pb2 as system
 from polyester.gen.triggers.v1 import triggers_pb2 as triggers
 from polyester.services.chain_analytics import zipped_asset_supply_group_from_proto
+from tests.unit.support import decode_btc_batch
 
 ARMED = triggers.TriggerStatus.STATUS_ARMED
 
@@ -144,7 +144,7 @@ ZERO_REPLIES: dict[str, Callable[[], Any]] = {
     "CreateOco stop_loss_trigger_id": lambda: create_oco_from_proto(_create_oco(1, 2, 0)),
     "CancelOco": lambda: cancel_oco_from_proto(triggers.CancelOcoResponse()),
     "BatchCancelTriggers item": lambda: batch_cancel_triggers_from_proto(_batch_cancel_triggers(0)),
-    "BatchCreateOrders accepted item": lambda: batch_create_from_proto(_batch_create(0)),
+    "BatchCreateOrders accepted item": lambda: decode_btc_batch(_batch_create(0)),
     "CancelAllOrders cancelled order": lambda: cancel_all_from_proto(_cancel_all_reply(0)),
     "CreateAddressBookEntry": lambda: entry_from_create_proto(
         ab.CreateAddressBookEntryResponse(entry=ab.AddressBookEntry())
@@ -181,7 +181,7 @@ def test_reply_with_real_required_id_decodes() -> None:
     assert batch_cancel_triggers_from_proto(_batch_cancel_triggers(7)).results[0].trigger_id == (
         format_id(7)
     )
-    assert batch_create_from_proto(_batch_create(9)).results[0].order_id == format_id(9)
+    assert decode_btc_batch(_batch_create(9)).results[0].order_id == format_id(9)
     assert cancel_all_from_proto(_cancel_all_reply(9)).cancelled_orders[0].order_id == format_id(9)
     entry = entry_from_create_proto(
         ab.CreateAddressBookEntryResponse(entry=ab.AddressBookEntry(address_book_entry_id=4))

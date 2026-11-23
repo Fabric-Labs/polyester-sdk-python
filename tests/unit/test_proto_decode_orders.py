@@ -24,6 +24,7 @@ from polyester.gen.orders.v1.orders_read_pb2 import (
     OrderTransfer,
     UserTrade,
 )
+from tests.unit.support import btc_market
 
 
 def test_order_from_proto_maps_enums_and_ids() -> None:
@@ -296,7 +297,7 @@ def test_order_mutation_from_proto_create_includes_client_order_id() -> None:
         order_id=42,
         client_order_id="coid-1",
     )
-    result = order_mutation_from_proto(msg)
+    result = order_mutation_from_proto(msg, market=btc_market())
     assert result.status == "accepted"
     assert result.order_id == format_id(42)
     assert result.client_order_id == "coid-1"
@@ -309,7 +310,7 @@ def test_order_mutation_exposes_explicit_sizing() -> None:
             resolved_base_qty_scaled=100,
             submitted_max_quote_debit_scaled=500,
         ),
-        quantity_scale=2,
+        market=btc_market(2),
     )
     assert create.resolved_base_qty is not None
     assert create.resolved_base_qty.scaled == 100
@@ -326,9 +327,7 @@ def test_preview_order_admissible_with_protected_bound() -> None:
             protected_price_bound_ticks=42_000,
             evaluated_at=evaluated_at,
         ),
-        quantity_scale=8,
-        symbol="BTC-USDT",
-        symbol_id=1,
+        market=btc_market(8),
     )
     assert preview.admissible is True
     assert preview.rejection is None
@@ -355,7 +354,8 @@ def test_preview_order_rejection_with_violations() -> None:
                 ],
             ),
             evaluated_at=Timestamp(seconds=1),
-        )
+        ),
+        market=btc_market(),
     )
     assert preview.admissible is False
     assert preview.rejection is not None
@@ -376,7 +376,8 @@ def test_preview_order_unknown_rejection_code() -> None:
             admissible=False,
             rejection=orders_pb2.ErrorDetail(code=99_999),
             evaluated_at=Timestamp(seconds=1),
-        )
+        ),
+        market=btc_market(),
     )
     assert preview.rejection is not None
     assert preview.rejection.code == "UNKNOWN_ERROR_CODE(99999)"
@@ -387,7 +388,8 @@ def test_preview_order_without_scale_keeps_scaled_string() -> None:
         orders_pb2.PreviewOrderResponse(
             resolved_base_qty_scaled=250,
             evaluated_at=Timestamp(seconds=1),
-        )
+        ),
+        market=btc_market(None),
     )
     assert preview.resolved_base_qty_scaled == "250"
     assert preview.resolved_base_qty is None
@@ -395,14 +397,16 @@ def test_preview_order_without_scale_keeps_scaled_string() -> None:
 
 def test_preview_order_rejects_missing_evaluated_at() -> None:
     with pytest.raises(PolyesterResponseContractError, match="missing evaluated_at"):
-        preview_order_from_proto(orders_pb2.PreviewOrderResponse(admissible=True))
+        preview_order_from_proto(
+            orders_pb2.PreviewOrderResponse(admissible=True), market=btc_market()
+        )
 
 
 def test_order_mutation_from_proto_cancel_omits_client_order_id() -> None:
     msg = orders_pb2.CancelOrderResponse(
         status=orders_pb2.CancelOrderResponse.ACCEPTED, order_id=42
     )
-    result = order_mutation_from_proto(msg)
+    result = order_mutation_from_proto(msg, market=btc_market())
     assert result.status == "accepted"
     assert result.order_id == format_id(42)
     assert result.client_order_id == ""

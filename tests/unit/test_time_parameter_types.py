@@ -38,6 +38,7 @@ _SPOT_CONFIG = {
             "base_asset": "BTC",
             "base_quantity_scale": 8,
             "quote_quantity_scale": 6,
+            "reference_price_scale": 2,
         }
     ],
     "assets": [{"asset": "BTC", "market_data_volume_scale": 8}],
@@ -90,7 +91,7 @@ def _since(method: str) -> Call:
 
 # (call, parameter, None allowed)
 _TIME_PARAMETERS: dict[str, tuple[Call, str, bool]] = {}
-for _method in ("get_candles", "get_candles_columns", "get_trades"):
+for _method in ("get_candles", "get_candles_columns", "get_index_price_candles", "get_trades"):
     for _name in ("start_time", "end_time"):
         _TIME_PARAMETERS[f"market_data.{_method}:{_name}"] = (_market(_method), _name, True)
 for _name in ("start_time", "end_time"):
@@ -178,13 +179,17 @@ def test_sync_time_parameters_refuse_other_types_before_sending(
 
 
 def _serve_market(httpserver: HTTPServer) -> list[Any]:
-    """Answer the three market-data calls with empty pages, keeping each request."""
+    """Answer the four market-data calls with empty pages, keeping each request."""
     sent: list[Any] = []
     routes = {
         "GetCandles": (marketdata_pb2.GetCandlesRequest, marketdata_pb2.GetCandlesResponse),
         "GetCandlesColumns": (
             marketdata_pb2.GetCandlesRequest,
             marketdata_pb2.GetCandlesColumnsResponse,
+        ),
+        "GetIndexPriceCandles": (
+            marketdata_pb2.GetIndexPriceCandlesRequest,
+            marketdata_pb2.GetIndexPriceCandlesResponse,
         ),
         "GetTrades": (marketdata_pb2.GetTradesRequest, marketdata_pb2.GetTradesResponse),
     }
@@ -205,10 +210,11 @@ def _serve_market(httpserver: HTTPServer) -> list[Any]:
 
 
 _PLUS_TWO = timezone(timedelta(hours=2))
+_MARKET_METHODS = ("get_candles", "get_candles_columns", "get_index_price_candles", "get_trades")
 
 
 def _check_sent(sent: list[Any]) -> None:
-    assert len(sent) == 3
+    assert len(sent) == len(_MARKET_METHODS)
     for request in sent:
         assert request.symbol_id == 1
         assert request.start_time.seconds == int(_AWARE.timestamp())
@@ -226,7 +232,7 @@ async def test_async_market_data_sends_aware_datetimes(httpserver: HTTPServer) -
         api_url=httpserver.url_for("").rstrip("/"), hydrate_catalogs=False
     ) as client:
         client.catalogs.hydrate_spot_config(_SPOT_CONFIG)
-        for method in ("get_candles", "get_candles_columns", "get_trades"):
+        for method in _MARKET_METHODS:
             await getattr(client.market_data, method)(
                 symbol="BTC-USDT", start_time=_AWARE, end_time=_LATER_AT_PLUS_TWO
             )
@@ -237,7 +243,7 @@ def test_sync_market_data_sends_aware_datetimes(httpserver: HTTPServer) -> None:
     sent = _serve_market(httpserver)
     with Polyester(api_url=httpserver.url_for("").rstrip("/"), hydrate_catalogs=False) as client:
         client.catalogs.hydrate_spot_config(_SPOT_CONFIG)
-        for method in ("get_candles", "get_candles_columns", "get_trades"):
+        for method in _MARKET_METHODS:
             getattr(client.market_data, method)(
                 symbol="BTC-USDT", start_time=_AWARE, end_time=_LATER_AT_PLUS_TWO
             )

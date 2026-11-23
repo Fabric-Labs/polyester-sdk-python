@@ -333,6 +333,9 @@ _CANDLE_CALLS: dict[str, Callable[[AsyncPolyester, str], Awaitable[Any]]] = {
     "get_candles_columns": lambda c, tf: c.market_data.get_candles_columns(
         symbol="BTC-USDT", timeframe=tf
     ),
+    "get_index_price_candles": lambda c, tf: c.market_data.get_index_price_candles(
+        symbol="BTC-USDT", timeframe=tf
+    ),
     "get_current_candle": lambda c, tf: c.market_data.get_current_candle(
         symbol="BTC-USDT", timeframe=tf
     ),

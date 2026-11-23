@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 import msgspec
 
@@ -80,19 +81,73 @@ class SubAccountInvitesList(msgspec.Struct, kw_only=True, omit_defaults=True):
     invites: list[SubAccountInvite]
 
 
+class ActivityActor(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """Who acted on an activity event.
+
+    ``kind`` is ``"user"`` (a signed-in account), ``"api_key"`` (a request
+    signed with an API key), ``"system"`` (Polyester acting by itself, see
+    ``system_reason``) or ``"unauthenticated"`` (a request nobody
+    authenticated, such as a refused sign-in); a value this SDK does not know
+    reads as its number. ``account_id`` (a public ID) and ``username`` name
+    the account for a user or an API key, "" otherwise. ``api_key_id`` is the
+    key's ``ak_…`` ID, and ``api_key_kind`` (``"standard"``, ``"assistant"``,
+    ``"admin"``, ``"strategy_bot"`` or ``"broker"``) and ``api_key_label`` are
+    the key's when the event was recorded; all three are set for an API key
+    actor only.
+    """
+
+    kind: str = ""
+    account_id: str = ""
+    username: str = ""
+    api_key_id: str = ""
+    api_key_kind: str = ""
+    api_key_label: str = ""
+    system_reason: str = ""
+
+
+class ActivityItem(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """The item an activity event affected.
+
+    ``kind`` names the ID that is set, which says what the item is:
+    ``"account_id"``, ``"subaccount_id"``, ``"invite_id"``,
+    ``"subaccount_policy_id"``, ``"api_policy_id"``,
+    ``"address_book_entry_id"``, ``"broker_allowlist_change_id"`` or
+    ``"connected_app_id"`` (``id`` is a public ID), or ``"api_key_id"`` or
+    ``"mfa_factor_id"`` (``id`` is the string ID those APIs use). Both are ""
+    for an item with no ID (a sign-in session, a failed sign-in, the recovery
+    codes). ``name`` is the item's display name when the event was recorded.
+    """
+
+    kind: str = ""
+    id: str = ""
+    name: str = ""
+
+
 class SubAccountActivityEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One account activity event.
+
+    ``actor`` says who acted, ``item`` which item changed and ``details``
+    what changed. ``details`` is the change in its REST JSON form: one key
+    naming the kind of item (``"account"``, ``"session"``, ``"apiKey"``,
+    ``"policy"``, ``"subaccount"``, ``"member"``, ``"invite"``,
+    ``"destination"``, ``"brokerAllowlist"`` or ``"security"``) holding only
+    the fields the event changed, each a ``{"from": ..., "to": ...}`` pair or
+    a value, with camelCase keys, enum names, RFC 3339 times and public IDs.
+    It is ``None`` when the event carries no details.
+    """
+
     created_at: datetime | None = None
     entity_kind: str = ""
     event_action: str = ""
     source: str = ""
     ip: str = ""
     user_agent: str = ""
-    actor_account_id: str = ""
-    payload_json: str = ""
-    # The sub-account the event belongs to, "" for the main account's own
-    # events; and the API key the actor used, "" for a session. Public IDs.
+    # The sub-account the event belongs to (a public ID), "" for the main
+    # account's own events.
     subaccount_id: str = ""
-    actor_api_key_id: str = ""
+    actor: ActivityActor | None = None
+    item: ActivityItem | None = None
+    details: dict[str, Any] | None = None
 
 
 class SubAccountActivityList(msgspec.Struct, kw_only=True, omit_defaults=True):

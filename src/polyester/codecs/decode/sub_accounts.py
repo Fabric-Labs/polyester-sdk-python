@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
+from google.protobuf.descriptor import FieldDescriptor
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.message import Message
+
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.balances import balances_list_from_proto
 from polyester.codecs.decode.common import require_id
@@ -11,9 +17,12 @@ from polyester.codecs.proto_helpers import (
     optional_timestamp,
     proto_enum_name,
 )
+from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.models.sub_accounts import (
+    ActivityActor,
+    ActivityItem,
     GetSubaccountResult,
     SubAccount,
     SubAccountActivityEvent,
@@ -147,11 +156,69 @@ def subaccount_activity_event_from_proto(
         ),
         ip=msg.ip,
         user_agent=msg.user_agent,
-        actor_account_id=format_uint64_id(msg.actor_account_id),
-        payload_json=msg.payload_json,
         subaccount_id=format_optional_uint64_id(int(msg.subaccount_id)),
-        actor_api_key_id=format_optional_uint64_id(int(msg.actor_api_key_id)),
+        actor=_activity_actor(msg.actor) if has_field(msg, "actor") else None,
+        item=_activity_item(msg.item) if has_field(msg, "item") else None,
+        details=_activity_details(msg.details) if has_field(msg, "details") else None,
     )
+
+
+def _activity_actor(msg: subaccounts_pb2.ActivityActor) -> ActivityActor:
+    return ActivityActor(
+        kind=proto_enum_name(subaccounts_pb2.ActivityActorKind, msg.kind).removeprefix(
+            "activity_actor_"
+        ),
+        account_id=format_optional_uint64_id(int(msg.account_id)),
+        username=msg.username,
+        api_key_id=msg.api_key_id,
+        api_key_kind=proto_enum_name(
+            subaccounts_pb2.ActivityApiKeyKind, msg.api_key_kind
+        ).removeprefix("activity_key_"),
+        api_key_label=msg.api_key_label,
+        system_reason=proto_enum_name(
+            subaccounts_pb2.ActivitySystemReason, msg.system_reason
+        ).removeprefix("activity_system_"),
+    )
+
+
+def _activity_item(msg: subaccounts_pb2.ActivityItem) -> ActivityItem:
+    kind = msg.WhichOneof("id") or ""
+    if not kind:
+        item_id = ""
+    elif msg.DESCRIPTOR.fields_by_name[kind].type == FieldDescriptor.TYPE_FIXED64:
+        item_id = format_uint64_id(int(getattr(msg, kind)))
+    else:
+        item_id = str(getattr(msg, kind))
+    return ActivityItem(kind=kind, id=item_id, name=msg.name)
+
+
+def _activity_details(msg: subaccounts_pb2.ActivityDetails) -> dict[str, Any]:
+    """``details`` as REST JSON shows it: camelCase keys, enum names, RFC 3339
+    times, and every fixed64 field (an opaque ID) as its public ID rather than
+    protobuf JSON's decimal string."""
+    rendered = MessageToDict(msg)
+    _public_ids(msg, rendered)
+    return rendered
+
+
+def _public_ids(msg: Message, rendered: dict[str, Any]) -> None:
+    for field, value in msg.ListFields():
+        if field.json_name not in rendered:
+            continue
+        if field.type == FieldDescriptor.TYPE_FIXED64:
+            if field.is_repeated:
+                rendered[field.json_name] = [format_id(int(item)) for item in value]
+            else:
+                rendered[field.json_name] = format_id(int(value))
+        elif (
+            field.type == FieldDescriptor.TYPE_MESSAGE
+            and not field.message_type.GetOptions().map_entry
+        ):
+            if field.is_repeated:
+                for item, item_rendered in zip(value, rendered[field.json_name], strict=True):
+                    _public_ids(item, item_rendered)
+            elif isinstance(rendered[field.json_name], dict):
+                _public_ids(value, rendered[field.json_name])
 
 
 def subaccount_activity_list_from_proto(

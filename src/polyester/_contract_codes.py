@@ -41,6 +41,7 @@ _REST_ONLY_CODES = frozenset(
         "INVALID_TRIGGER_ID",
         "INVALID_TRIGGER_STATUS",
         "ORDER_ID_REQUIRED",
+        "PAGE_TOKEN_INVALID",
         "REQUEST_TOO_LARGE",
         "ROLE_SPOT_TRADE_DENY",
         "SERVER_ERROR",

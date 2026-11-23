@@ -12,6 +12,7 @@ from polyester.codecs.decode.asset_info import asset_info_list_from_proto
 from polyester.codecs.decode.market_data import (
     candles_columns_from_proto,
     candles_from_proto,
+    index_price_candles_from_proto,
     market_trades_from_proto,
 )
 from polyester.codecs.proto_helpers import optional_datetime_to_timestamp
@@ -23,10 +24,17 @@ from polyester.gen.marketdata.v1 import asset_info_pb2, marketdata_pb2
 from polyester.gen.marketdata.v1.marketdata_connect import MarketDataServiceClient
 from polyester.gen.marketdata.v1.marketdata_pb2 import (
     GetCandlesRequest,
+    GetIndexPriceCandlesRequest,
     GetSpotConfigRequest,
     GetTradesRequest,
 )
-from polyester.models import Candle, CandlesResult, MarketTradesResult, SpotConfig
+from polyester.models import (
+    Candle,
+    CandlesResult,
+    IndexPriceCandlesResult,
+    MarketTradesResult,
+    SpotConfig,
+)
 from polyester.models.asset_info import AssetInfo
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService, CatalogWait
@@ -351,6 +359,66 @@ class AsyncMarketDataService(BaseService):
             ),
         )
 
+    async def get_index_price_candles(
+        self,
+        *,
+        symbol: str | None = None,
+        symbol_id: int | None = None,
+        timeframe: str = "1m",
+        limit: int = 100,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        page_token: str = "",
+    ) -> IndexPriceCandlesResult:
+        """One page of a spot market's index price candles, closed only,
+        newest first (``MarketDataService/GetIndexPriceCandles``).
+
+        The series is continuous: composite reference candles before the
+        bucket containing the market's listing time (``source="reference"``),
+        index price candles from that bucket on (``source="index"``). Prices
+        are decoded with the pair's ``reference_price_scale``; there is no
+        volume. A missing bucket is a gap, never filled. ``timeframe`` is any
+        candle timeframe except ``"1s"``, which the server refuses.
+
+        ``start_time`` and ``end_time`` are inclusive bounds and
+        timezone-aware ``datetime`` objects: an int, float, string or naive
+        datetime raises :class:`~polyester.errors.PolyesterValidationError`
+        before any request. Pass ``next_page_token`` back as ``page_token``
+        with the same symbol, timeframe and bounds to read older candles; a
+        token from :meth:`get_candles` is not accepted here.
+        """
+        # An unknown timeframe or time is refused before the catalog wait or any request.
+        timeframe_enum = _candle_timeframe(timeframe)
+        start_ts = optional_datetime_to_timestamp(start_time, "start_time")
+        end_ts = optional_datetime_to_timestamp(end_time, "end_time")
+        # Prices are decoded with the pair's catalog reference price scale.
+        await self._ensure_catalogs()
+        request = GetIndexPriceCandlesRequest(
+            symbol_id=resolve_symbol_id(
+                self._catalogs,
+                symbol=symbol,
+                symbol_id=symbol_id,
+                label="get_index_price_candles",
+            ),
+            timeframe=timeframe_enum,
+            limit=validate_limit(limit, GetIndexPriceCandlesRequest),
+            page_token=page_token,
+        )
+        if start_ts is not None:
+            request.start_time.CopyFrom(start_ts)
+        if end_ts is not None:
+            request.end_time.CopyFrom(end_ts)
+        reference_price_scale = _index_price_scale_for_symbol_id(self._catalogs, request.symbol_id)
+        return await unary_public_decoded(
+            self._transport,
+            MarketDataServiceClient,
+            lambda client, req: client.get_index_price_candles(req),
+            request,
+            lambda msg: index_price_candles_from_proto(
+                msg, reference_price_scale=reference_price_scale
+            ),
+        )
+
     def subscribe_trades(
         self,
         *,
@@ -496,6 +564,17 @@ def _reference_price_scale_for_symbol_id(
     if scale is None and required:
         raise PolyesterValidationError(
             f"candle reference prices require reference_price_scale for symbol_id {symbol_id}"
+        )
+    return scale
+
+
+def _index_price_scale_for_symbol_id(catalogs: CatalogManager | None, symbol_id: int) -> int:
+    scale = (
+        catalogs.reference_price_scale_for_symbol_id(symbol_id) if catalogs is not None else None
+    )
+    if scale is None:
+        raise PolyesterValidationError(
+            f"index price candles require reference_price_scale for symbol_id {symbol_id}"
         )
     return scale
 

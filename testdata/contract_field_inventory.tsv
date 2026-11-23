@@ -1,5 +1,5 @@
 # Every field of the request and reply messages public contracts 1945423c,
-# 5c2119f, c35662b and 6c18dd0 added or changed, and of the messages nested in their new replies,
+# 5c2119f, c35662b, 6c18dd0 and ebfc83b added or changed, and of the messages nested in their new replies,
 # and of the lifecycle flow views every flow read and update decodes. A guard
 # test walks these messages and fails when a field is missing here or listed
 # but gone, or when a covered name is not an attribute of the named model, so
@@ -9,11 +9,39 @@
 # omitted: not exposed, with the reason.
 #
 # field	class	SDK name or reason
+auth.v1.ActivityActor.account_id	covered	ActivityActor.account_id (a public ID, "" when none)
+auth.v1.ActivityActor.api_key_id	covered	ActivityActor.api_key_id
+auth.v1.ActivityActor.api_key_kind	covered	ActivityActor.api_key_kind
+auth.v1.ActivityActor.api_key_label	covered	ActivityActor.api_key_label
+auth.v1.ActivityActor.kind	covered	ActivityActor.kind
+auth.v1.ActivityActor.system_reason	covered	ActivityActor.system_reason
+auth.v1.ActivityActor.username	covered	ActivityActor.username
+auth.v1.ActivityEvent.actor	covered	SubAccountActivityEvent.actor
+auth.v1.ActivityEvent.created_at	covered	SubAccountActivityEvent.created_at
+auth.v1.ActivityEvent.details	covered	SubAccountActivityEvent.details (its REST JSON form)
+auth.v1.ActivityEvent.entity_kind	covered	SubAccountActivityEvent.entity_kind
+auth.v1.ActivityEvent.event_action	covered	SubAccountActivityEvent.event_action
+auth.v1.ActivityEvent.ip	covered	SubAccountActivityEvent.ip
+auth.v1.ActivityEvent.item	covered	SubAccountActivityEvent.item
+auth.v1.ActivityEvent.source	covered	SubAccountActivityEvent.source
+auth.v1.ActivityEvent.subaccount_id	covered	SubAccountActivityEvent.subaccount_id
+auth.v1.ActivityEvent.user_agent	covered	SubAccountActivityEvent.user_agent
+auth.v1.ActivityItem.account_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.address_book_entry_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.api_key_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.api_policy_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.broker_allowlist_change_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.connected_app_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.invite_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.mfa_factor_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.name	covered	ActivityItem.name
+auth.v1.ActivityItem.subaccount_id	covered	ActivityItem.kind (the field's name), id
+auth.v1.ActivityItem.subaccount_policy_id	covered	ActivityItem.kind (the field's name), id
 auth.v1.AuthErrorDetail.code	covered	PolyesterApiError.code
 auth.v1.AuthErrorDetail.message	covered	PolyesterApiError.message
 auth.v1.AuthErrorDetail.retry_after	covered	PolyesterApiError.retry_at
 auth.v1.AuthErrorDetail.timestamp_window	covered	PolyesterTimestampSkewError.timestamp_window
-auth.v1.ListAccountActivityRequest.api_key_id	covered	sub_accounts.list_account_activity api_key_id
+auth.v1.ListAccountActivityRequest.api_key_id	covered	sub_accounts.list_account_activity api_key_id (the key's ak_ ID)
 auth.v1.ListAccountActivityRequest.end_time	covered	sub_accounts.list_account_activity end_time
 auth.v1.ListAccountActivityRequest.entity_kinds	covered	sub_accounts.list_account_activity entity_kinds
 auth.v1.ListAccountActivityRequest.event_actions	covered	sub_accounts.list_account_activity event_actions
@@ -182,6 +210,21 @@ marketdata.v1.AssetMarketStats.total_supply	covered	AssetMarketStats.total_suppl
 marketdata.v1.AssetMarketValue.as_of	covered	AssetMarketValue.as_of
 marketdata.v1.AssetMarketValue.source	covered	AssetMarketValue.source
 marketdata.v1.AssetMarketValue.value	covered	AssetMarketValue.value
+marketdata.v1.GetIndexPriceCandlesRequest.end_time	covered	market_data.get_index_price_candles end_time
+marketdata.v1.GetIndexPriceCandlesRequest.limit	covered	market_data.get_index_price_candles limit
+marketdata.v1.GetIndexPriceCandlesRequest.page_token	covered	market_data.get_index_price_candles page_token
+marketdata.v1.GetIndexPriceCandlesRequest.start_time	covered	market_data.get_index_price_candles start_time
+marketdata.v1.GetIndexPriceCandlesRequest.symbol_id	covered	market_data.get_index_price_candles symbol, symbol_id
+marketdata.v1.GetIndexPriceCandlesRequest.timeframe	covered	market_data.get_index_price_candles timeframe
+marketdata.v1.GetIndexPriceCandlesResponse.close	covered	IndexPriceCandle.close
+marketdata.v1.GetIndexPriceCandlesResponse.high	covered	IndexPriceCandle.high
+marketdata.v1.GetIndexPriceCandlesResponse.low	covered	IndexPriceCandle.low
+marketdata.v1.GetIndexPriceCandlesResponse.next_page_token	covered	IndexPriceCandlesResult.next_page_token
+marketdata.v1.GetIndexPriceCandlesResponse.open	covered	IndexPriceCandle.open
+marketdata.v1.GetIndexPriceCandlesResponse.source	covered	IndexPriceCandle.source
+marketdata.v1.GetIndexPriceCandlesResponse.symbol_id	covered	IndexPriceCandlesResult.symbol_id
+marketdata.v1.GetIndexPriceCandlesResponse.timeframe	covered	IndexPriceCandlesResult.timeframe
+marketdata.v1.GetIndexPriceCandlesResponse.ts_sec	covered	IndexPriceCandle.ts_sec
 orderbook.v1.GetOrderBookRequest.depth	covered	orderbook.get depth (a tier's level count, sent as that DepthTier; 0 is the default 50)
 orderbook.v1.GetOrderBookRequest.symbol_id	covered	orderbook.get symbol (resolved to its ID from the spot catalog)
 orderbook.v1.GetOrderBookResponse.asks	covered	OrderbookData.asks

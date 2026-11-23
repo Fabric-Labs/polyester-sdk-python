@@ -13,6 +13,7 @@ from polyester.models import (
     CreateOrderParams,
     CreateOrderRequest,
     GetOrderResult,
+    IndexPriceCandlesResult,
     OrderId,
     OrderMutationResult,
     OrderPeg,
@@ -164,7 +165,10 @@ def sync_calls(client: Polyester) -> None:
     client.withdraw.create_api_key_to_funding(asset_id=1, quantity="1", idempotency_key="k")
     posts: list[ChangelogPostSummary] = list(client.changelog.iter_posts(limit=5))
     keypair_hex: str = client.api_keys.generate_keypair().public_key_hex
-    print(found, listed, balances, created, posts, keypair_hex)
+    index: IndexPriceCandlesResult = client.market_data.get_index_price_candles(
+        symbol="BTC-USDT", timeframe="1h", limit=500
+    )
+    print(found, listed, balances, created, posts, keypair_hex, index)
 
 
 def sync_subscriptions(client: Polyester) -> None:

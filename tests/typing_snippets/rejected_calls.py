@@ -103,4 +103,6 @@ def sync_wrong_types(client: Polyester) -> None:
     client.orders.subscribe_sync(on_event=_on_int)  # E: "on_event"
     client.orders.subscribe_sync(account_id=42)  # E: "on_event"
     Polyester(timeout="10")  # E: "timeout"
+    client.sub_accounts.list_account_activity(api_key_id=34)  # E: "api_key_id"
+    client.market_data.get_index_price_candles(symbol="BTC-USDT", start_time=0)  # E: "start_time"
     print(found, PrivateOrdersEvent)

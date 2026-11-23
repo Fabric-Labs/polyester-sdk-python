@@ -132,9 +132,14 @@ ID, as `key_id` shows it. Each event names its `subaccount_id`, who acted in
 the account, the API key's `ak_…` ID, kind and label, or the system reason),
 the item it changed in `item` (`kind` names the ID that is set, `id` and
 `name`), and what changed in `details`: the change in its REST JSON form, one
-key naming the kind of item, holding only the changed fields as
-`{"from": ..., "to": ...}` pairs, with public IDs. A wallet sign-in is a
-`"session"` event, `"created"` or `"failed"`. An API key needs
+key naming the kind of item and holding only the fields the event set. A value
+that changed is a `{"from": ..., "to": ...}` pair (text, flags, numbers, times
+and statuses), an ID that changed a `{"fromId": ..., "toId": ...}` pair, and a
+list that changed an `{"added": [...], "removed": [...]}` or
+`{"addedIds": [...], "removedIds": [...]}` change; other fields are plain
+values, such as a sign-in `method` or a policy's `sourceTemplateId`. Keys are
+camelCase, enums their names, times RFC 3339, and IDs public IDs. A wallet
+sign-in is a `"session"` event, `"created"` or `"failed"`. An API key needs
 `READ_ACCOUNT_ACTIVITY`.
 
 Private streams require an Account ID and the corresponding API-key permission.

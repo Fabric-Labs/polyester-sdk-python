@@ -131,8 +131,12 @@ class SubAccountActivityEvent(msgspec.Struct, kw_only=True, omit_defaults=True):
     naming the kind of item (``"account"``, ``"session"``, ``"apiKey"``,
     ``"policy"``, ``"subaccount"``, ``"member"``, ``"invite"``,
     ``"destination"``, ``"brokerAllowlist"`` or ``"security"``) holding only
-    the fields the event changed, each a ``{"from": ..., "to": ...}`` pair or
-    a value, with camelCase keys, enum names, RFC 3339 times and public IDs.
+    the fields the event set: a ``{"from": ..., "to": ...}`` pair for a changed
+    value, ``{"fromId": ..., "toId": ...}`` for a changed ID,
+    ``{"added": [...], "removed": [...]}`` or
+    ``{"addedIds": [...], "removedIds": [...]}`` for a changed list, or a
+    plain value, with camelCase keys, enum names, RFC 3339 times and public
+    IDs.
     It is ``None`` when the event carries no details.
     """
 

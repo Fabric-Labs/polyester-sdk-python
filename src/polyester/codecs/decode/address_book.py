@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.sub_accounts import _subaccount_role_from_proto
-from polyester.codecs.proto_helpers import format_uint64_id, proto_enum_name, timestamp_to_ms
+from polyester.codecs.proto_helpers import (
+    format_optional_uint64_id,
+    format_uint64_id,
+    proto_enum_name,
+    timestamp_to_ms,
+)
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.auth.v1 import account_scope_pb2, address_book_pb2
 from polyester.models.address_book import (
@@ -34,10 +39,12 @@ from polyester.models.address_book import (
 
 
 def account_scope_from_proto(msg: address_book_pb2.AccountScopeRef) -> AccountScope:
+    # A root scope sends sub-account 0, which is not an ID: name none (""), on
+    # every read and on the change event alike, so their scopes compare equal.
     return AccountScope(
         scope_type=proto_enum_name(account_scope_pb2.AccountScopeType, msg.scope_type),
         root_account_id=format_uint64_id(msg.root_account_id),
-        sub_account_id=format_uint64_id(msg.subaccount_id),
+        sub_account_id=format_optional_uint64_id(msg.subaccount_id),
     )
 
 

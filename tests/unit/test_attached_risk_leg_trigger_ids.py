@@ -8,14 +8,13 @@ import pytest
 
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import (
-    batch_create_from_proto,
     modify_order_from_proto,
     order_mutation_from_proto,
 )
 from polyester.codecs.scalars import format_id
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.services.orders import AsyncOrdersService
-from tests.unit.support import BTC_MARKETS, CaptureUnary, btc_market
+from tests.unit.support import CaptureUnary, btc_market, decode_btc_batch
 
 TP_ID = 9_000_000_000_000_001
 SL_ID = 9_000_000_000_000_002
@@ -68,7 +67,7 @@ def test_modify_result_carries_configured_leg_trigger_ids_only() -> None:
 
 
 def test_batch_create_accepted_items_carry_configured_leg_trigger_ids() -> None:
-    result = batch_create_from_proto(
+    result = decode_btc_batch(
         orders_pb2.BatchCreateOrdersResponse(
             results=[
                 orders_pb2.BatchCreateResultItem(
@@ -83,8 +82,7 @@ def test_batch_create_accepted_items_carry_configured_leg_trigger_ids() -> None:
                 ),
             ],
             accepted_count=2,
-        ),
-        markets=BTC_MARKETS,
+        )
     )
     first, second = result.results
     assert first.take_profit_trigger_id == ""

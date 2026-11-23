@@ -6,11 +6,10 @@ from connectrpc.code import Code
 from connectrpc.errors import ConnectError
 
 from polyester._wire import map_connect_error
-from polyester.codecs.decode.orders import batch_create_from_proto
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterApiError
 from polyester.gen.orders.v1 import orders_pb2
-from tests.unit.support import BTC_MARKETS
+from tests.unit.support import decode_btc_batch
 
 
 def _order_error(**detail: object) -> PolyesterApiError:
@@ -42,7 +41,7 @@ def test_rejection_without_known_existing_order_leaves_it_unset() -> None:
 
 
 def test_batch_create_rejection_exposes_existing_order_id() -> None:
-    result = batch_create_from_proto(
+    result = decode_btc_batch(
         orders_pb2.BatchCreateOrdersResponse(
             results=[
                 orders_pb2.BatchCreateResultItem(
@@ -64,8 +63,7 @@ def test_batch_create_rejection_exposes_existing_order_id() -> None:
                 ),
             ],
             rejected_count=2,
-        ),
-        markets=BTC_MARKETS,
+        )
     )
 
     duplicate, capacity = result.results

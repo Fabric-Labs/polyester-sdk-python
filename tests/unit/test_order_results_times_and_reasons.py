@@ -34,7 +34,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
-from tests.unit.support import BTC_MARKETS, btc_market
+from tests.unit.support import btc_market, decode_btc_batch
 
 TS_NS = 1_763_164_740_123_456_789
 TS = Timestamp(seconds=1_763_164_740, nanos=987_654_321)
@@ -175,11 +175,8 @@ def test_cancel_result_has_no_acceptance_time() -> None:
 def test_batch_create_and_modify_results_carry_response_time(
     fields: dict, want: int | None
 ) -> None:
-    batch = batch_create_from_proto(
-        orders_pb2.BatchCreateOrdersResponse(
-            results=[_accepted(11, 1)], accepted_count=1, **fields
-        ),
-        markets=BTC_MARKETS,
+    batch = decode_btc_batch(
+        orders_pb2.BatchCreateOrdersResponse(results=[_accepted(11, 1)], accepted_count=1, **fields)
     )
     assert batch.ts_ns == want
     modify = modify_order_from_proto(

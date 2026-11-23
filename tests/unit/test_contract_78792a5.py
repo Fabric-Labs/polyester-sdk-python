@@ -28,7 +28,6 @@ from polyester._wire import map_connect_error, protobuf_to_public_dict
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.changelog import changelog_change_from_proto, changelog_post_from_proto
 from polyester.codecs.decode.orders import (
-    batch_create_from_proto,
     order_from_proto,
     order_mutation_from_proto,
     preview_order_from_proto,
@@ -64,7 +63,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
-from tests.unit.support import BTC_MARKETS, btc_market
+from tests.unit.support import btc_market, decode_btc_batch
 from tests.unit.test_auth_error_codes import _rest_error
 
 BASE_SCALE = 8
@@ -550,7 +549,7 @@ async def test_batch_create_reads_both_quote_echoes(order_client) -> None:
 
 
 def test_batch_create_rejection_has_no_quote_echo() -> None:
-    result = batch_create_from_proto(
+    result = decode_btc_batch(
         orders_pb2.BatchCreateOrdersResponse(
             rejected_count=1,
             results=[
@@ -562,8 +561,7 @@ def test_batch_create_rejection_has_no_quote_echo() -> None:
                     )
                 )
             ],
-        ),
-        markets=BTC_MARKETS,
+        )
     )
     item = result.results[0]
     assert item.code == "error_code_quote_size_too_small"
@@ -979,7 +977,7 @@ def test_attached_risk_leg_violation_reads_on_preview_and_batch_items() -> None:
     assert decoded.rejection is not None
     assert decoded.rejection.violations[0].field_path == "order.attached_risk.stop_loss"
 
-    batch = batch_create_from_proto(
+    batch = decode_btc_batch(
         orders_pb2.BatchCreateOrdersResponse(
             rejected_count=1,
             results=[
@@ -992,8 +990,7 @@ def test_attached_risk_leg_violation_reads_on_preview_and_batch_items() -> None:
                     )
                 )
             ],
-        ),
-        markets=BTC_MARKETS,
+        )
     )
     assert batch.results[0].violations[0].field_path == "order.attached_risk.stop_loss"
 

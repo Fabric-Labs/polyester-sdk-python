@@ -12,12 +12,14 @@ def orderbook_level_from_proto(
     *,
     quantity_scale: int,
     symbol: str | None = None,
+    symbol_id: int | None = None,
 ) -> OrderbookLevel:
     return format_orderbook_level(
         price_ticks=int(msg.price_ticks),
         qty_scaled=int(msg.qty_scaled),
         quantity_scale=quantity_scale,
         symbol=symbol,
+        symbol_id=symbol_id,
     )
 
 
@@ -27,22 +29,30 @@ def orderbook_from_proto(
     symbol: str,
     depth: int,
     quantity_scale: int,
+    symbol_id: int | None = None,
 ) -> OrderbookData:
     """Decode a snapshot requested at ``depth`` levels per side. The response
     names the tier it served in every answer: one without it, or with another
     tier than the one requested, breaks the contract. Its ``ts`` is the
-    snapshot's time, ``None`` when the response has none."""
+    snapshot's time, ``None`` when the response has none. Level quantities
+    carry ``symbol_id``, the requested market's ID, or the response's when
+    none is given."""
     served = require_served_tier("GetOrderBook", int(msg.depth), depth)
+    market_id = symbol_id or int(msg.symbol_id) or None
     return OrderbookData(
         symbol=symbol,
         depth=served,
         book_seq=str(msg.book_seq),
         bids=[
-            orderbook_level_from_proto(item, quantity_scale=quantity_scale, symbol=symbol)
+            orderbook_level_from_proto(
+                item, quantity_scale=quantity_scale, symbol=symbol, symbol_id=market_id
+            )
             for item in msg.bids
         ],
         asks=[
-            orderbook_level_from_proto(item, quantity_scale=quantity_scale, symbol=symbol)
+            orderbook_level_from_proto(
+                item, quantity_scale=quantity_scale, symbol=symbol, symbol_id=market_id
+            )
             for item in msg.asks
         ],
         available=bool(msg.available),

@@ -1012,15 +1012,11 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
     )
 
 
-def _batch_create_result_item(item, market: OrderMarket | None) -> BatchCreateResultItem:
+def _batch_create_result_item(item, market: OrderMarket) -> BatchCreateResultItem:
     # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
         require_id("BatchCreateOrders", "order_id", item.accepted.order_id)
         resolved = int(item.accepted.resolved_base_qty_scaled)
-        if resolved and market is None:
-            raise PolyesterResponseContractError(
-                "BatchCreateOrders", "an accepted result has no requested item"
-            )
         return BatchCreateResultItem(
             status="accepted",
             order_id=format_uint64_id(item.accepted.order_id),
@@ -1036,7 +1032,7 @@ def _batch_create_result_item(item, market: OrderMarket | None) -> BatchCreateRe
             ),
             resolved_base_qty_scaled=str(resolved) if resolved else "",
             resolved_base_qty=(
-                _resolved_base_qty(resolved, market) if resolved and market is not None else None
+                _resolved_base_qty(resolved, market) if resolved else None
             ),
         )
     if item.HasField("rejected"):
@@ -1077,10 +1073,21 @@ def batch_create_from_proto(
     """Decode a batch create answer. ``markets`` are the requested items'
     markets in request order, the order of the results: an accepted item's
     ``resolved_base_qty`` is bound to its own item's market and scale, so a
-    batch over several pairs binds each to its own."""
+    batch over several pairs binds each to its own.
+
+    The answer has one result per requested item. One with another number
+    of results raises ``PolyesterResponseContractError``: a result could not
+    be matched to its item, so its quantity could be bound to another pair.
+    """
+    if len(msg.results) != len(markets):
+        raise PolyesterResponseContractError(
+            "BatchCreateOrders",
+            "batch create response has a result count that does not match the request: "
+            f"results={len(msg.results)} items={len(markets)}",
+        )
     results = [
-        _batch_create_result_item(item, markets[index] if index < len(markets) else None)
-        for index, item in enumerate(msg.results)
+        _batch_create_result_item(item, market)
+        for item, market in zip(msg.results, markets, strict=True)
     ]
     accepted_count = int(msg.accepted_count)
     rejected_count = int(msg.rejected_count)

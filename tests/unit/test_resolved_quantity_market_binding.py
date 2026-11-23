@@ -20,7 +20,8 @@ from pytest_httpserver import HTTPServer
 from werkzeug import Request, Response
 
 from polyester import AsyncPolyester, Polyester, Quantity
-from polyester.errors import PolyesterValidationError
+from polyester.codecs.decode.orders import OrderMarket, batch_create_from_proto
+from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import CreateOrderRequest
 from polyester.types.money import QuantityDomain
@@ -182,3 +183,55 @@ def test_mixed_symbol_batch_binds_each_item_to_its_own_market(writes: Writes) ->
     assert [item.resolved_base_qty for item in batch.results] == [BTC, SOL]
     with pytest.raises(PolyesterValidationError, match="quantity symbol mismatch"):
         batch.results[1].resolved_base_qty.compatible_with(symbol="BTC-USDT")
+
+
+def _accepted(order_id: int, qty: int) -> orders_pb2.BatchCreateResultItem:
+    return orders_pb2.BatchCreateResultItem(
+        accepted=orders_pb2.BatchCreateAccepted(order_id=order_id, resolved_base_qty_scaled=qty)
+    )
+
+
+# Replies to the BTC + SOL batch with a result missing or one too many: the
+# results cannot be matched to their items by position.
+MISMATCHED_BATCHES = {
+    "missing_result": orders_pb2.BatchCreateOrdersResponse(
+        results=[_accepted(9, SOL_QTY)], accepted_count=1
+    ),
+    "extra_result": orders_pb2.BatchCreateOrdersResponse(
+        results=[_accepted(8, BTC_QTY), _accepted(9, SOL_QTY), _accepted(10, BTC_QTY)],
+        accepted_count=3,
+    ),
+}
+
+
+@pytest.mark.parametrize("reply", sorted(MISMATCHED_BATCHES))
+def test_batch_decoder_refuses_a_result_count_other_than_the_items(reply: str) -> None:
+    markets = [OrderMarket("BTC-USDT", 1, 8), OrderMarket("SOL-USDT", 2, 4)]
+    with pytest.raises(PolyesterResponseContractError, match="results=.* items=2"):
+        batch_create_from_proto(MISMATCHED_BATCHES[reply], markets=markets)
+
+
+@pytest.mark.parametrize("client_kind", ["async", "sync"])
+@pytest.mark.parametrize("reply", sorted(MISMATCHED_BATCHES))
+def test_batch_create_refuses_a_reply_that_does_not_match_its_items(
+    httpserver: HTTPServer, client_kind: str, reply: str
+) -> None:
+    httpserver.expect_request(ORDERS + "BatchCreateOrders", method="POST").respond_with_data(
+        MISMATCHED_BATCHES[reply].SerializeToString(), content_type="application/proto"
+    )
+    options = _client_options(httpserver.url_for("").rstrip("/"))
+    if client_kind == "async":
+        import asyncio
+
+        async def batch() -> None:
+            async with AsyncPolyester(**options) as client:
+                client.catalogs.hydrate_spot_config(PAIRS)
+                await client.orders.batch_create(items=[BTC_ORDER, SOL_ORDER])
+
+        with pytest.raises(PolyesterResponseContractError, match="results=.* items=2"):
+            asyncio.run(batch())
+    else:
+        with Polyester(**options) as client:
+            client.catalogs.hydrate_spot_config(PAIRS)
+            with pytest.raises(PolyesterResponseContractError, match="results=.* items=2"):
+                client.orders.batch_create(items=[BTC_ORDER, SOL_ORDER])

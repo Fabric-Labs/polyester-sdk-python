@@ -5,7 +5,7 @@ from typing import Any, TypeVar
 
 from google.protobuf.message import Message
 
-from polyester.codecs.decode.orders import OrderMarket
+from polyester.codecs.decode.orders import OrderMarket, batch_create_from_proto
 
 T = TypeVar("T")
 
@@ -37,5 +37,6 @@ def btc_market(quantity_scale: int | None = 8) -> OrderMarket:
     return OrderMarket("BTC-USDT", 1, quantity_scale)
 
 
-BTC_MARKETS = [btc_market()] * 20
-"""A batch's item markets, one BTC-USDT market per requested item."""
+def decode_btc_batch(msg: Any) -> Any:
+    """Decode a batch create answer to a batch of BTC-USDT items, one per result."""
+    return batch_create_from_proto(msg, markets=[btc_market()] * len(msg.results))

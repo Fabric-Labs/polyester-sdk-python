@@ -11,15 +11,19 @@ same message, code and violations.
 from __future__ import annotations
 
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any, TypeVar
 
 from google.protobuf import json_format
 from google.protobuf.message import Message
 
-from polyester import pure as _pure
+from polyester import pure as _module
 from polyester.errors import PolyesterValidationError
 
-pure: Any = _pure
+# The rules: every name defined inside polyester.pure, which keeps them out
+# of the namespace a restricted runtime shares with other code.
+_namespace: Any = _module.polyester
+pure: Any = SimpleNamespace(**_namespace._sdk)
 M = TypeVar("M", bound=Message)
 R = TypeVar("R")
 

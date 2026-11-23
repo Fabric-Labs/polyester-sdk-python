@@ -10,6 +10,7 @@ Builders are deterministic: frozen clocks and entropy seeds change nothing.
 
 from __future__ import annotations
 
+import ast
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -230,3 +231,59 @@ def test_builders_are_deterministic(monty: Monty) -> None:
     second = _in_monty(monty, cases, NOW, datetime=datetime(2049, 6, 6), random_start={"seed": 2})
     assert first == second
     assert _cpython(cases, NOW) == _cpython(cases, NOW)
+
+
+def _factory_names() -> list[str]:
+    """Every name ``polyester.pure`` defines inside its factory."""
+    factory = next(node for node in ast.parse(SOURCE).body if isinstance(node, ast.FunctionDef))
+    names: set[str] = set()
+    for node in factory.body:
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            names.update(n.id for t in node.targets for n in ast.walk(t) if isinstance(n, ast.Name))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            names.update(alias.asname or alias.name for alias in node.names)
+    return sorted(names)
+
+
+def _shadowing_code() -> str:
+    """Code a bot or a host prelude might run after loading the file: its own
+    definitions of every name the file uses inside."""
+    lines = [f"{name} = None" for name in _factory_names()]
+    lines += [
+        "class _Market:",
+        "  pass",
+        "class Market:",
+        "  pass",
+        "def _err(*args, **kwargs):",
+        "  raise RuntimeError('a bot helper')",
+        "def _int(value):",
+        "  return 1",
+        "def _market(spec):",
+        "  return _Market()",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def test_names_defined_after_loading_do_not_change_the_builders(monty: Monty) -> None:
+    cases = matrix()
+    assert len(_factory_names()) > 100
+    expected = _cpython(cases, NOW)
+    with monty.checkout() as session:
+        session.feed_run(SOURCE)
+        session.feed_run(_shadowing_code())
+        got = session.feed_run(
+            RUNNER,
+            inputs={"rt_cases": cases, "rt_now": NOW.isoformat(), "rt_market": MARKET},
+        )
+    assert [list(result) for result in got] == expected
+    # One shared namespace in CPython too: the file, then the shadowing code.
+    namespace: dict[str, Any] = {}
+    exec(compile(SOURCE + "\n" + _shadowing_code(), "shared", "exec"), namespace)  # noqa: S102
+    namespace.update(
+        rt_cases=json.loads(json.dumps(cases)), rt_now=NOW.isoformat(), rt_market=MARKET
+    )
+    body, _, last = RUNNER.rstrip().rpartition("\n")
+    exec(compile(body, "runner", "exec"), namespace)  # noqa: S102
+    assert eval(last, namespace) == expected  # noqa: S307

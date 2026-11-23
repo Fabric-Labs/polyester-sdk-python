@@ -2565,8 +2565,9 @@ a bot that uses it and the SDK refuse and send alike.
 A host copies the file from the installed wheel, where it is
 `polyester/pure.py` (`importlib.resources.files("polyester") / "pure.py"`), or
 from `src/polyester/pure.py` at a release tag, and runs it in the bot's
-namespace. Its only public name is `polyester`; every other name starts with
-`_`. `polyester.VERSION` is the SDK version it ships with.
+namespace. Its one top-level name is `polyester`: everything else is defined
+inside it, so names the host or the bot define afterwards do not change the
+builders. `polyester.VERSION` is the SDK version it ships with.
 
 Each builder takes the pair as `GetSpotConfig` serves it (or
 `polyester.market(pair)`) and the SDK method's keyword arguments, and returns

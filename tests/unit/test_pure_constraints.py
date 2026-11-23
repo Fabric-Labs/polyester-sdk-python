@@ -51,7 +51,6 @@ BANNED_NAMES = {
     "exec",
     "globals",
     "input",
-    "locals",
     "memoryview",
     "open",
     "os",
@@ -93,7 +92,6 @@ BANNED_NODES = (
     ast.Yield,
     ast.YieldFrom,
 )
-DUNDER_METHODS = {"__repr__"}
 BUILTIN_TYPES = {"int", "str", "bool", "dict", "list", "tuple", "set", "None"}
 
 
@@ -115,6 +113,8 @@ def _static(node: ast.AST) -> bool:
         return _static(node.left) and _static(node.right)
     if isinstance(node, ast.UnaryOp):
         return _static(node.operand)
+    if isinstance(node, ast.Subscript):
+        return _static(node.value) and isinstance(node.slice, ast.Constant)
     if isinstance(node, ast.Call):
         func = node.func
         if ast.unparse(func) == "_re.compile":
@@ -141,40 +141,50 @@ def _annotation_ok(node: ast.AST) -> bool:
     return False
 
 
-def _public_names(tree: ast.Module) -> list[str]:
-    names: list[str] = []
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-            names.append(node.name)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            names.extend(n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name))
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            names.extend(alias.asname or alias.name for alias in node.names)
-    return [name for name in names if not name.startswith("_")]
+def _factory(tree: ast.Module) -> ast.FunctionDef | None:
+    """``def polyester(): ...`` then ``polyester = polyester()``, and nothing else."""
+    body = tree.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+        body = body[1:]
+    if (
+        len(body) == 2
+        and isinstance(body[0], ast.FunctionDef)
+        and body[0].name == "polyester"
+        and not body[0].decorator_list
+        and not (body[0].args.args or body[0].args.kwonlyargs or body[0].args.vararg)
+        and ast.unparse(body[1]) == "polyester = polyester()"
+    ):
+        return body[0]
+    return None
+
+
+def _builds_scope(node: ast.stmt) -> bool:
+    # ``_scope = locals()``: the factory hands its rules to the SDK.
+    return ast.unparse(node) == "_scope = locals()"
 
 
 def problems(source: str) -> list[str]:
-    """Every construct in ``source`` the restricted runtime does not take."""
+    """Every construct in ``source`` the restricted runtime does not take, and
+    every top-level name but ``polyester``."""
     tree = ast.parse(source)
     found: list[str] = []
-    if _public_names(tree) != ["polyester"]:
-        found.append(f"public names {_public_names(tree)}")
-    top = {id(node) for node in tree.body}
-    for node in ast.walk(tree):
+    factory = _factory(tree)
+    if factory is None:
+        found.append("top level is not one polyester() factory and its call")
+        return found
+    direct = {id(node) for node in factory.body}
+    for node in ast.walk(factory):
         if isinstance(node, BANNED_NODES):
             found.append(f"{type(node).__name__} at {_at(node)}")
         elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            if id(node) not in top:
-                found.append(f"import inside a function: {_at(node)}")
+            if id(node) not in direct:
+                found.append(f"import inside a nested function: {_at(node)}")
             if isinstance(node, ast.ImportFrom) and (node.level or node.module == "__future__"):
                 found.append(f"relative or __future__ import: {_at(node)}")
             for alias in node.names:
                 module = node.module if isinstance(node, ast.ImportFrom) else alias.name
                 if (module or "").split(".")[0] not in ALLOWED_MODULES:
                     found.append(f"import of {module}: {_at(node)}")
-                if not (alias.asname or "").startswith("_"):
-                    found.append(f"import not bound to a private name: {_at(node)}")
         elif isinstance(node, ast.ClassDef):
             if node.bases or node.keywords:
                 found.append(f"inheritance or metaclass: class {node.name}")
@@ -191,7 +201,7 @@ def problems(source: str) -> list[str]:
             if isinstance(node, ast.FunctionDef):
                 if node.decorator_list:
                     found.append(f"decorated function {node.name}")
-                if node.name.startswith("__") and node.name not in DUNDER_METHODS:
+                if node.name.startswith("__"):
                     found.append(f"dunder method {node.name}")
                 if node.returns is not None:
                     found.append(f"return annotation on {node.name}")
@@ -226,17 +236,32 @@ def problems(source: str) -> list[str]:
             and (node.func.id == "float" or (node.func.id == "setattr" and not _tags(node)))
         ):
             found.append(f"{node.func.id}() at {_at(node)}")
-    for index, node in enumerate(tree.body):
-        if index == 0 and isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-            continue
+    # The factory only defines, as a module would: no work when it runs.
+    for node in factory.body:
         if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef)):
             continue
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Name):
+            continue
+        if _builds_scope(node):
+            continue
         if not (isinstance(node, ast.Assign) and _static(node.value)):
-            found.append(f"module-level work: {_at(node)}")
-    for cls in [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]:
+            found.append(f"work at load: {_at(node)}")
+    for node in ast.walk(factory):
+        if isinstance(node, ast.Name) and node.id == "locals":
+            parent_ok = any(
+                _builds_scope(stmt) for stmt in factory.body if stmt.lineno == node.lineno
+            )
+            if not parent_ok:
+                found.append(f"locals() beyond the factory's scope: {_at(node)}")
+    for cls in [node for node in ast.walk(factory) if isinstance(node, ast.ClassDef)]:
         for index, node in enumerate(cls.body):
             if index == 0 and isinstance(node, ast.Expr) or isinstance(node, ast.FunctionDef):
                 continue
+            if isinstance(node, ast.Assign) and not all(
+                isinstance(target, ast.Name) for target in node.targets
+            ):
+                # The runtime takes only ``name = <expr>`` in a class body.
+                found.append(f"class-level unpacking in {cls.name}: {_at(node)}")
             value = node.value if isinstance(node, (ast.Assign, ast.AnnAssign)) else node
             if value is not None and not (
                 isinstance(node, (ast.Assign, ast.AnnAssign)) and _static(value)
@@ -258,8 +283,30 @@ def _tags(node: ast.Call) -> bool:
     )
 
 
+def _inside(snippet: str) -> str:
+    """``SOURCE`` with ``snippet`` among the factory's definitions."""
+    marker = "  _types = ("
+    assert SOURCE.count(marker) == 1
+    indented = "".join(f"  {line}\n" for line in snippet.splitlines())
+    return SOURCE.replace(marker, indented + marker)
+
+
 def test_pure_uses_only_what_the_restricted_runtime_runs() -> None:
     assert problems(SOURCE) == []
+
+
+def test_polyester_is_the_only_top_level_name() -> None:
+    tree = ast.parse(SOURCE)
+    names = [
+        node.name if isinstance(node, ast.FunctionDef) else ast.unparse(node.targets[0])
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.Assign))
+    ]
+    assert names == ["polyester", "polyester"]
+    assert len(tree.body) == 3  # docstring, factory, its call
+    namespace: dict[str, Any] = {}
+    exec(compile(SOURCE, "pure.py", "exec"), namespace)  # noqa: S102 - the file under test
+    assert [name for name in namespace if not name.startswith("__")] == ["polyester"]
 
 
 @pytest.mark.parametrize(
@@ -267,12 +314,9 @@ def test_pure_uses_only_what_the_restricted_runtime_runs() -> None:
     [
         "import typing as _typing",
         "import os as _os",
-        "from decimal import Decimal",
         "from .scalars import x as _x",
         "from __future__ import annotations",
         "def _f():\n    import re as _r",
-        "public = 1",
-        "def helper(): pass",
         "class _E(ValueError): pass",
         "class _M(metaclass=type): pass",
         "class _A:\n    @property\n    def x(self): return 1",
@@ -288,7 +332,7 @@ def test_pure_uses_only_what_the_restricted_runtime_runs() -> None:
         "def _f(x):\n    return x.__class__",
         "def _f(x):\n    return x.__dict__",
         "def _f(x):\n    return getattr(x, '__dict__')",
-        "class _A:\n    def __getattr__(self, name): return 1",
+        "class _A:\n    def __repr__(self): return ''",
         "def _f(x):\n    return x.bit_length()",
         "def _f():\n    return _datetime.now()",
         "def _f():\n    return float('1.5')",
@@ -300,14 +344,26 @@ def test_pure_uses_only_what_the_restricted_runtime_runs() -> None:
         "def _f(x):\n    return bytearray(x)",
         "def _f(x):\n    with x: pass",
         "def _f(x):\n    assert x",
+        "def _f():\n    return locals()",
         "_TABLE = [n for n in range(10)]",
         "_PAIRS = dict(a=1)",
         "_PATTERN = _re.compile(_SOMETHING + 'x')",
+        "_run_now()",
         "class _A:\n    x = [n for n in range(3)]",
+        "class _A:\n    x, y = _types",
     ],
 )
 def test_each_rule_catches_what_it_bans(snippet: str) -> None:
+    assert problems(_inside(snippet)) != []
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    ["_helper = 1", "import re as _re", "def _f(): pass", "class _A: pass", "public = 1"],
+)
+def test_a_second_top_level_name_is_refused(snippet: str) -> None:
     assert problems(SOURCE + "\n\n" + snippet + "\n") != []
+    assert problems(snippet + "\n\n" + SOURCE) != []
 
 
 def test_size_budget() -> None:
@@ -321,9 +377,9 @@ def test_contract_limits_are_the_contracts() -> None:
     import msgspec
 
     from polyester.codecs import oco, triggers
+    from polyester.codecs.pure_bridge import pure as impl
     from polyester.models import CreateOrderRequest
 
-    impl: Any = pure
     assert impl._TWAP_DURATION_MS == (triggers.TWAP_DURATION_MS_MIN, triggers.TWAP_DURATION_MS_MAX)
     assert impl._TWAP_SLICE_INTERVAL_MS == (
         triggers.TWAP_SLICE_INTERVAL_MS_MIN,
@@ -337,4 +393,5 @@ def test_contract_limits_are_the_contracts() -> None:
 
 
 def test_version_is_the_sdk_version() -> None:
-    assert polyester.__version__ == pure.polyester.VERSION
+    namespace: Any = pure.polyester
+    assert polyester.__version__ == namespace.VERSION

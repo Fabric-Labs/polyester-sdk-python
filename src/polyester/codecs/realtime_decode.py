@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
 
-import msgspec
-
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.api_keys import api_key_from_proto
 from polyester.codecs.decode.lifecycle import flow_detail_from_proto, flow_summary_from_proto
@@ -220,9 +218,6 @@ def decode_address_book_invalidation_bytes(payload: bytes) -> AddressBookViewInv
     scope = None
     if msg.HasField("scope"):
         scope = account_scope_from_proto(msg.scope)
-        if not msg.scope.subaccount_id:
-            # A root scope sends sub-account 0, which is not an ID: name none.
-            scope = msgspec.structs.replace(scope, sub_account_id="")
     invalidated_at = ""
     if msg.HasField("invalidated_at"):
         invalidated_at = msg.invalidated_at.ToJsonString()

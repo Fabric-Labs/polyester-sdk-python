@@ -6,6 +6,8 @@ import msgspec
 class AccountScope(msgspec.Struct, kw_only=True, omit_defaults=True):
     scope_type: str = ""
     root_account_id: str = ""
+    # The sub-account's public ID; "" for a root (main account) book, on every
+    # read and on the change event alike.
     sub_account_id: str = ""
 
 

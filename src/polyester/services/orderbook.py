@@ -82,12 +82,10 @@ class AsyncOrderbookService(BaseService):
         depth = orderbook_snapshot_depth(depth)
         # Levels are decoded with the pair's catalog quantity scale.
         await self._ensure_catalogs()
-        request = GetOrderBookRequest(
-            symbol_id=resolve_symbol_id(
-                self._catalogs, symbol=symbol, symbol_id=None, label="orderbook.get"
-            ),
-            depth=tier,
+        symbol_id = resolve_symbol_id(
+            self._catalogs, symbol=symbol, symbol_id=None, label="orderbook.get"
         )
+        request = GetOrderBookRequest(symbol_id=symbol_id, depth=tier)
         return await unary_public_decoded(
             self._transport,
             OrderbookServiceClient,
@@ -98,6 +96,7 @@ class AsyncOrderbookService(BaseService):
                 symbol=symbol,
                 depth=depth,
                 quantity_scale=self._require_quantity_scale(symbol),
+                symbol_id=symbol_id,
             ),
         )
 
@@ -220,6 +219,7 @@ class AsyncOrderbookService(BaseService):
                 quantity_scale=self._require_quantity_scale(symbol),
                 available=available,
                 ts=book_ts,
+                symbol_id=resolved_symbol_id,
             )
             if on_event is not None:
                 on_event(data)

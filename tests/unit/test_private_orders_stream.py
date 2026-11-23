@@ -812,8 +812,8 @@ ACCOUNT_C = 44
 def short_decoder(decode: Any) -> Any:
     """Wrap ``decode`` to drop the last decoded order."""
 
-    def short(value: Any, *, scales: Any = None) -> Any:
-        decoded = decode(value, scales=scales)
+    def short(value: Any, *, scales: Any = None, symbols: Any = None) -> Any:
+        decoded = decode(value, scales=scales, symbols=symbols)
         if isinstance(decoded, list):
             return decoded[:-1]
         return dataclasses.replace(decoded, orders=decoded.orders[:-1])
@@ -1175,8 +1175,8 @@ async def test_unit_failing_after_its_first_removal_applies_none_of_it(
 
     decode_unit = private_orders.private_orders_unit_from_proto
 
-    def failing_removals(unit: Any, *, scales: Any = None) -> Any:
-        decoded = decode_unit(unit, scales=scales)
+    def failing_removals(unit: Any, *, scales: Any = None, symbols: Any = None) -> Any:
+        decoded = decode_unit(unit, scales=scales, symbols=symbols)
         return dataclasses.replace(decoded, removed_order_ids=FailingIds(decoded.removed_order_ids))
 
     monkeypatch.setattr(private_orders, "private_orders_unit_from_proto", failing_removals)
@@ -1355,12 +1355,12 @@ async def test_a_joiner_waiting_through_a_failed_replay_still_gets_the_view(
     decode_orders = private_orders.private_orders_from_proto
     calls = 0
 
-    def fails_once(orders: Any, *, scales: Any = None) -> Any:
+    def fails_once(orders: Any, *, scales: Any = None, symbols: Any = None) -> Any:
         nonlocal calls
         calls += 1
         if calls == 1:
             raise RuntimeError("injected replay failure")
-        return decode_orders(orders, scales=scales)
+        return decode_orders(orders, scales=scales, symbols=symbols)
 
     monkeypatch.setattr(private_orders, "private_orders_from_proto", fails_once)
     await reconnect(server, "s2")
@@ -1392,7 +1392,7 @@ async def test_a_joiner_whose_replay_fails_ends_alone(
     await conn.snapshot("s1", "c1", [order(1)])
     assert isinstance(await next_event(sub), PrivateOrdersSnapshot)
 
-    def broken(orders: Any, *, scales: Any = None) -> Any:
+    def broken(orders: Any, *, scales: Any = None, symbols: Any = None) -> Any:
         raise RuntimeError("injected replay failure")
 
     monkeypatch.setattr(private_orders, "private_orders_from_proto", broken)
@@ -1426,8 +1426,8 @@ async def test_unit_whose_commit_would_fail_is_refused_before_anything_applies(
 
     decode_unit = private_orders.private_orders_unit_from_proto
 
-    def odd_ids(unit: Any, *, scales: Any = None) -> Any:
-        decoded = decode_unit(unit, scales=scales)
+    def odd_ids(unit: Any, *, scales: Any = None, symbols: Any = None) -> Any:
+        decoded = decode_unit(unit, scales=scales, symbols=symbols)
         return dataclasses.replace(
             decoded, removed_order_ids=[SecondHashFails(i) for i in decoded.removed_order_ids]
         )
@@ -1457,7 +1457,7 @@ async def test_decode_errors_and_internal_failures_take_different_paths(
     decode_unit = private_orders.private_orders_unit_from_proto
 
     # A malformed unit is a decode error: the same connection subscribes again.
-    def malformed(unit: Any, *, scales: Any = None) -> Any:
+    def malformed(unit: Any, *, scales: Any = None, symbols: Any = None) -> Any:
         raise PolyesterValidationError("ticks must be non-negative")
 
     monkeypatch.setattr(private_orders, "private_orders_unit_from_proto", malformed)

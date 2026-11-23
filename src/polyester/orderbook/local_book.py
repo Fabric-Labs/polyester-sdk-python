@@ -86,8 +86,11 @@ def format_orderbook_level(
     qty_scaled: int,
     quantity_scale: int,
     symbol: str | None = None,
+    symbol_id: int | None = None,
     allow_zero_price: bool = False,
 ) -> OrderbookLevel:
+    """One book level; its price is bound to ``symbol`` and its quantity to
+    ``symbol`` and ``symbol_id``, the book's market, when given."""
     from polyester.types.money import Price, Quantity
 
     if price_ticks < 0 or (price_ticks == 0 and not allow_zero_price):
@@ -96,7 +99,9 @@ def format_orderbook_level(
         raise PolyesterValidationError("orderbook level has invalid or missing quantity")
     return OrderbookLevel(
         price=Price.from_ticks(price_ticks, symbol=symbol),
-        qty=Quantity.from_scaled(qty_scaled, scale=quantity_scale, symbol=symbol),
+        qty=Quantity.from_scaled(
+            qty_scaled, scale=quantity_scale, symbol=symbol, symbol_id=symbol_id or None
+        ),
     )
 
 
@@ -108,6 +113,7 @@ def side_to_levels(
     quantity_scale: int,
     bucket_ticks: int | None = None,
     symbol: str | None = None,
+    symbol_id: int | None = None,
 ) -> list[OrderbookLevel]:
     view = bucket_side(book, bucket_ticks, asks=side == "asks")
     entries = list(view.items())
@@ -123,6 +129,7 @@ def side_to_levels(
             allow_zero_price=side == "bids" and bucket_ticks is not None and bucket_ticks > 0,
             quantity_scale=quantity_scale,
             symbol=symbol,
+            symbol_id=symbol_id,
         )
         for price, qty in entries[:limit]
     ]
@@ -139,9 +146,11 @@ def build_orderbook_data(
     bucket_ticks: int | None = None,
     available: bool = True,
     ts: datetime | None = None,
+    symbol_id: int | None = None,
 ) -> OrderbookData:
     """Render the book with up to ``depth`` levels per side; 0 renders none.
-    ``ts`` is the server time of the book's state, ``None`` for none."""
+    ``ts`` is the server time of the book's state, ``None`` for none. Level
+    quantities carry ``symbol_id``, the book's market ID, when given."""
     if depth < 0:
         raise PolyesterValidationError(f"orderbook depth must not be negative, got {depth}")
     return OrderbookData(
@@ -157,6 +166,7 @@ def build_orderbook_data(
             bucket_ticks=bucket_ticks,
             quantity_scale=quantity_scale,
             symbol=symbol,
+            symbol_id=symbol_id,
         ),
         asks=side_to_levels(
             asks,
@@ -165,6 +175,7 @@ def build_orderbook_data(
             bucket_ticks=bucket_ticks,
             quantity_scale=quantity_scale,
             symbol=symbol,
+            symbol_id=symbol_id,
         ),
     )
 

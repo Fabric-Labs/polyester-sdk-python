@@ -47,16 +47,22 @@ def market_trade_from_proto(
     msg: marketdata_pb2.MarketTrade,
     *,
     quantity_scale: int | None = None,
+    symbol: str | None = None,
 ) -> MarketTrade:
+    """Decode a public trade; its price and quantity are bound to ``symbol``,
+    the pair's name, when given."""
     from polyester.types.money import Price, Quantity
 
+    symbol = symbol or None
     symbol_id = int(msg.symbol_id)
     return MarketTrade(
         symbol_id=symbol_id,
         match_id=str(msg.match_id),
         is_buy=bool(msg.is_buy),
-        price=Price.from_ticks(int(msg.price_ticks)),
-        qty=Quantity.from_scaled(int(msg.qty_scaled), scale=quantity_scale, symbol_id=symbol_id),
+        price=Price.from_ticks(int(msg.price_ticks), symbol=symbol),
+        qty=Quantity.from_scaled(
+            int(msg.qty_scaled), scale=quantity_scale, symbol=symbol, symbol_id=symbol_id
+        ),
         ts_ns=ts_ns_string_from_response(
             msg.ts_ns,
             context="MarketTrade",
@@ -66,11 +72,12 @@ def market_trade_from_proto(
 
 
 def market_trades_from_proto(
-    msg: marketdata_pb2.GetTradesResponse, *, quantity_scale: int
+    msg: marketdata_pb2.GetTradesResponse, *, quantity_scale: int, symbol: str | None = None
 ) -> MarketTradesResult:
     return MarketTradesResult(
         trades=[
-            market_trade_from_proto(item, quantity_scale=quantity_scale) for item in msg.trades
+            market_trade_from_proto(item, quantity_scale=quantity_scale, symbol=symbol)
+            for item in msg.trades
         ],
         next_page_token=msg.next_page_token,
         complete_through_trade_id=int(msg.complete_through_trade_id),

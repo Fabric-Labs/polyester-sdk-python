@@ -9,6 +9,7 @@ from polyester.codecs.decode.orders import preview_order_from_proto
 from polyester.errors import PolyesterRateLimitError
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.polyester.ratelimit.v1 import types_pb2 as ratelimit_pb2
+from tests.unit.support import btc_market
 
 
 def _rate_limit_detail(**overrides) -> ratelimit_pb2.RateLimitDetail:
@@ -97,9 +98,7 @@ def test_preview_rejection_surfaces_rate_limit_detail() -> None:
             ),
             evaluated_at=Timestamp(seconds=1),
         ),
-        quantity_scale=8,
-        symbol="BTC-USDT",
-        symbol_id=1,
+        market=btc_market(8),
     )
     assert result.rejection is not None
     assert result.rejection.code == "RATE_LIMIT_EXCEEDED"

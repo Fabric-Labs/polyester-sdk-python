@@ -24,6 +24,7 @@ from polyester.codecs.wire_decode import (
 )
 from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_pb2
+from tests.unit.support import btc_market
 
 EXACT_TS_NS = 1_763_164_740_123_456_789
 TIMESTAMP = Timestamp(seconds=1_763_164_740, nanos=987_654_321)
@@ -64,8 +65,11 @@ def _replace(**fields) -> orders_pb2.BatchReplaceOrdersResponse:
 )
 def test_json_create_result_keeps_acceptance_time(snake_case, fields, expected) -> None:
     msg = _create(**fields)
-    assert order_mutation_from_proto(msg).accepted_ts_ns == expected
-    assert decode_order_mutation(_json(msg, snake_case)).accepted_ts_ns == expected
+    assert order_mutation_from_proto(msg, market=btc_market()).accepted_ts_ns == expected
+    assert (
+        decode_order_mutation(_json(msg, snake_case), market=btc_market()).accepted_ts_ns
+        == expected
+    )
 
 
 @KEY_STYLES
@@ -102,7 +106,7 @@ def test_json_batch_replace_keeps_acceptance_time(snake_case, fields, expected) 
 
 def test_json_cancel_result_has_no_acceptance_time() -> None:
     cancel = {"status": "ACCEPTED", "orderId": "1", "tsNs": "5"}
-    assert decode_order_mutation(cancel).accepted_ts_ns is None
+    assert decode_order_mutation(cancel, market=None).accepted_ts_ns is None
 
 
 @pytest.mark.parametrize("bad", ["not-a-time", {"seconds": "x"}, 7])

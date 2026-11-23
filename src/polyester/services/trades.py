@@ -16,7 +16,7 @@ from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto_batch
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
-from polyester.services._symbols import resolve_symbol_id
+from polyester.services._symbols import display_symbol_for_id, resolve_symbol_id
 from polyester.services._validation import validate_limit, validate_time_range
 
 
@@ -41,6 +41,11 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
     def _order_scales(self, symbol_id: int) -> tuple[int | None, int | None]:
         """The pair's (base, quote) quantity scales the loaded catalogs know."""
         return catalog_order_scales(self._catalogs, symbol_id)
+
+    def _symbol(self, symbol_id: int) -> str:
+        """The pair's name the loaded catalogs know, which a trade's quantity
+        and price are bound to; ``""`` where unknown."""
+        return display_symbol_for_id(self._catalogs, symbol_id)
 
     async def list(
         self,
@@ -149,7 +154,9 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
             OrdersReadServiceClient,
             lambda client, req: client.get_user_trades(req),
             request,
-            functools.partial(user_trades_list_from_proto, scales=self._order_scales),
+            functools.partial(
+                user_trades_list_from_proto, scales=self._order_scales, symbols=self._symbol
+            ),
         )
 
     async def subscribe(
@@ -163,6 +170,6 @@ class AsyncTradesService(ScopedSubAccountMixin, BaseService):
             account_id=account_id,
             default_account_id=self._default_account_id,
             decode_batch=functools.partial(
-                decode_user_trade_batch_bytes, scales=self._order_scales
+                decode_user_trade_batch_bytes, scales=self._order_scales, symbols=self._symbol
             ),
         )

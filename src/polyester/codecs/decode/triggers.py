@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.invariants import paired_ts_ns, ts_ns_string_from_response
-from polyester.codecs.decode.orders import OrderScales, _field_violations_from_proto, pair_scales
+from polyester.codecs.decode.orders import (
+    OrderScales,
+    PairSymbols,
+    _field_violations_from_proto,
+    pair_scales,
+    pair_symbol,
+)
 from polyester.codecs.decode.ratelimit import rate_limit_detail_from_proto
 from polyester.codecs.proto_helpers import format_uint64_id, has_field, proto_enum_name
 from polyester.codecs.proto_helpers import timestamp_to_datetime as _timestamp
@@ -133,11 +137,12 @@ def _trigger_price_source_label(value: int) -> str:
 
 
 def _trigger_details(
-    msg: triggers_pb2.Trigger, *, quantity_scale: int | None = None
+    msg: triggers_pb2.Trigger, *, quantity_scale: int | None = None, symbol: str | None
 ) -> TriggerDetails | None:
     """Project runtime execution state (``stop``/``trailing``/``twap_state``/
-    ``ladder_state``) onto the discriminated ``TriggerDetails`` payload."""
-    symbol = None
+    ``ladder_state``) onto the discriminated ``TriggerDetails`` payload, its
+    prices and quantities bound to ``symbol``, the trigger's pair."""
+    symbol = symbol or None
     symbol_id = int(msg.symbol_id)
     if has_field(msg, "stop"):
         stop = msg.stop
@@ -288,9 +293,10 @@ def _child_execution_projection(child, cfg: _TriggerConfig, *, symbol: str | Non
         cfg.limit_price = _price(child.limit_fok.price_ticks, symbol=symbol)
 
 
-def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
-    """Derive the thick trigger projection from the configuration oneof."""
-    symbol = None
+def _trigger_config(msg: triggers_pb2.Trigger, *, symbol: str | None) -> _TriggerConfig:
+    """Derive the thick trigger projection from the configuration oneof, its
+    prices bound to ``symbol``, the trigger's pair."""
+    symbol = symbol or None
     cfg = _TriggerConfig()
     if has_field(msg, "stop_loss") or has_field(msg, "take_profit"):
         conditional = msg.stop_loss if has_field(msg, "stop_loss") else msg.take_profit
@@ -345,7 +351,7 @@ def _trigger_config(msg: triggers_pb2.Trigger) -> _TriggerConfig:
     return cfg
 
 
-TriggerSymbols = Callable[[int], str]
+TriggerSymbols = PairSymbols
 """A pair's name by ``symbol_id`` from loaded catalogs; ``""`` where unknown."""
 
 
@@ -355,8 +361,8 @@ def trigger_from_proto(
     quantity_scale: int | None = None,
     symbol: str = "",
 ) -> Trigger:
-    details = _trigger_details(msg, quantity_scale=quantity_scale)
-    cfg = _trigger_config(msg)
+    details = _trigger_details(msg, quantity_scale=quantity_scale, symbol=symbol)
+    cfg = _trigger_config(msg, symbol=symbol)
     trigger_price = cfg.trigger_price
     if trigger_price is None and details is not None and details.case == "stop" and details.stop:
         trigger_price = details.stop.trigger_price
@@ -382,7 +388,7 @@ def trigger_from_proto(
         qty=Quantity.from_scaled(
             int(msg.qty_scaled),
             scale=quantity_scale,
-            symbol=None,
+            symbol=symbol or None,
             symbol_id=int(msg.symbol_id),
         ),
         limit_price=cfg.limit_price,
@@ -563,7 +569,11 @@ def cancel_all_triggers_from_proto(
     )
 
 
-def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
+def trigger_event_from_proto(
+    msg: triggers_pb2.TriggerEvent, *, symbols: TriggerSymbols | None = None
+) -> TriggerEvent:
+    """Decode a trigger event; ``fire_price`` is bound to the pair name
+    ``symbols`` knows for its ``symbol_id``."""
     return TriggerEvent(
         trigger_id=format_uint64_id(msg.trigger_id),
         subaccount_id=format_uint64_id(msg.subaccount_id) if msg.subaccount_id else "",
@@ -578,7 +588,7 @@ def trigger_event_from_proto(msg: triggers_pb2.TriggerEvent) -> TriggerEvent:
         child_seq=int(msg.child_seq),
         child_order_id=format_uint64_id(msg.child_order_id) if msg.child_order_id else "",
         fire_price=(
-            Price.from_ticks(int(msg.fire_price_ticks))
+            Price.from_ticks(int(msg.fire_price_ticks), symbol=pair_symbol(symbols, msg.symbol_id))
             if msg.HasField("fire_price_ticks")
             else None
         ),
@@ -602,11 +612,13 @@ def _terminal_reason_label(enum_cls: object, msg: object, field: str) -> str:
 
 def trigger_events_list_from_proto(
     msg: triggers_pb2.ListTriggerEventsResponse,
+    *,
+    symbols: TriggerSymbols | None = None,
 ) -> TriggerEventsList:
     for item in msg.events:
         require_id("ListTriggerEvents", "trigger_id", item.trigger_id)
     return TriggerEventsList(
-        events=[trigger_event_from_proto(item) for item in msg.events],
+        events=[trigger_event_from_proto(item, symbols=symbols) for item in msg.events],
         next_page_token=msg.next_page_token,
     )
 

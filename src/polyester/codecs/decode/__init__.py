@@ -42,6 +42,7 @@ from polyester.codecs.decode.market_overview import (
 )
 from polyester.codecs.decode.orderbook import orderbook_from_proto
 from polyester.codecs.decode.orders import (
+    OrderMarket,
     batch_replace_from_proto,
     batch_replace_status_from_proto,
     cancel_all_from_proto,
@@ -70,6 +71,7 @@ from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
 from polyester.codecs.decode.zipper import deposit_withdraw_config_from_proto
 
 __all__ = [
+    "OrderMarket",
     "changelog_change_from_proto",
     "changelog_changes_page_from_proto",
     "changelog_post_from_proto",

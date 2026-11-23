@@ -895,7 +895,7 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             TriggersServiceClient,
             lambda client, req: client.list_trigger_events(req),
             request,
-            trigger_events_list_from_proto,
+            functools.partial(trigger_events_list_from_proto, symbols=self._symbol),
             policy=TRIGGER_READ_RETRY,
         )
 
@@ -922,5 +922,5 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             channel_template="private:spot:triggers:events:{account_id}:proto",
             account_id=account_id,
             default_account_id=self._default_account_id,
-            decode_batch=decode_trigger_event_batch_bytes,
+            decode_batch=functools.partial(decode_trigger_event_batch_bytes, symbols=self._symbol),
         )

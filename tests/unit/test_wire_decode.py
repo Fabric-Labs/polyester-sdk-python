@@ -5,6 +5,7 @@ from polyester.codecs.wire_decode import (
     decode_order_mutation,
     decode_orders_list,
 )
+from tests.unit.support import btc_market
 
 
 def test_decode_order_from_connect_json_shape() -> None:
@@ -42,11 +43,11 @@ def test_decode_orders_list() -> None:
 
 
 def test_decode_order_mutation() -> None:
-    result = decode_order_mutation({"orderId": "99", "clientOrderId": "cid"})
+    result = decode_order_mutation({"orderId": "99", "clientOrderId": "cid"}, market=btc_market())
     assert result.status == "accepted"
     assert result.order_id == format_id(99)
     assert result.client_order_id == "cid"
-    canceled = decode_order_mutation({"status": "ACCEPTED", "orderId": "99"})
+    canceled = decode_order_mutation({"status": "ACCEPTED", "orderId": "99"}, market=None)
     assert canceled.status == "accepted"
     assert canceled.order_id == format_id(99)
 

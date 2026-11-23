@@ -40,7 +40,7 @@ from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService, CatalogWait
 from polyester.services._generated import unary_public, unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_public_proto
-from polyester.services._symbols import resolve_symbol_id
+from polyester.services._symbols import display_symbol_for_id, resolve_symbol_id
 from polyester.services._validation import validate_limit
 
 # Each asset ID ``list_asset_info`` takes (1 to 2147483647) and how many it
@@ -219,7 +219,11 @@ class AsyncMarketDataService(BaseService):
             MarketDataServiceClient,
             lambda client, req: client.get_trades(req),
             request,
-            lambda msg: market_trades_from_proto(msg, quantity_scale=quantity_scale),
+            lambda msg: market_trades_from_proto(
+                msg,
+                quantity_scale=quantity_scale,
+                symbol=display_symbol_for_id(self._catalogs, resolved_symbol_id),
+            ),
         )
 
     async def get_current_candle(
@@ -452,7 +456,9 @@ class AsyncMarketDataService(BaseService):
             self._catalogs, resolved_symbol_id, label="subscribe_trades"
         )
         return await realtime.subscribe_market_trades(
-            resolved_symbol_id, quantity_scale=quantity_scale
+            resolved_symbol_id,
+            quantity_scale=quantity_scale,
+            symbol=display_symbol_for_id(self._catalogs, resolved_symbol_id) or None,
         )
 
     async def subscribe_candles(

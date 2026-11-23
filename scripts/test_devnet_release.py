@@ -354,6 +354,24 @@ class StampTest(unittest.TestCase):
             '__version__ = "0.35.0.dev20261117093000"', (package / "_version.py").read_text()
         )
 
+    @unittest.skipUnless(ECOSYSTEM == "python", "Python package manifest")
+    def test_stamp_python_stamps_the_single_file_builders_when_present(self) -> None:
+        shutil.copy(ROOT / "pyproject.toml", self.dir)
+        package = self.dir / dr.python_package_dir(ROOT)
+        package.mkdir(parents=True)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "_version.py", package)
+        self.assertEqual(len(dr.stamp_python(self.dir, "0.35.0.dev1")), 2)
+        (package / "pure.py").write_text('"""Doc."""\n\n_VERSION = "0.1.0"\n_OTHER = "0.1.0"\n')
+        stamped = dr.stamp_python(self.dir, "0.35.0.dev20261117093000")
+        self.assertEqual(stamped[-1], package / "pure.py")
+        self.assertEqual(
+            (package / "pure.py").read_text(),
+            '"""Doc."""\n\n_VERSION = "0.35.0.dev20261117093000"\n_OTHER = "0.1.0"\n',
+        )
+        (package / "pure.py").write_text("_OTHER = 1\n")
+        with self.assertRaisesRegex(dr.ReleaseError, "expected one _VERSION"):
+            dr.stamp_python(self.dir, "0.35.0.dev1")
+
     @unittest.skipUnless(ECOSYSTEM == "rust", "Rust package manifest")
     def test_stamp_rust_changes_manifest_and_own_lock_entry(self) -> None:
         shutil.copy(ROOT / "Cargo.toml", self.dir)

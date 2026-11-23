@@ -223,7 +223,7 @@ async def test_orders_subscribe_decodes_with_the_catalog_scales() -> None:
     )
     assert await service.subscribe() == "subscription"
     realtime.subscribe_private_orders.assert_awaited_once_with(
-        "j", order_scales=service._order_scales
+        "j", order_scales=service._order_scales, order_symbols=service._symbol
     )
 
 

@@ -44,7 +44,7 @@ from polyester.realtime.resubscribe import (
 )
 
 if TYPE_CHECKING:
-    from polyester.codecs.decode.orders import OrderScales
+    from polyester.codecs.decode.orders import OrderScales, PairSymbols
     from polyester.models.private_orders import PrivateOrdersEvent
     from polyester.realtime.private_orders import PrivateOrderStream
 
@@ -268,7 +268,11 @@ class AsyncRealtimeClient:
             self._private_orders = None
 
     async def subscribe_private_orders(
-        self, account_id: str | int, *, order_scales: OrderScales | None = None
+        self,
+        account_id: str | int,
+        *,
+        order_scales: OrderScales | None = None,
+        order_symbols: PairSymbols | None = None,
     ) -> AsyncSubscription[PrivateOrdersEvent]:
         """Stream an account's orders over the private WebSocket (``/v1/ws/private``).
 
@@ -276,8 +280,9 @@ class AsyncRealtimeClient:
         subscription. Returns once the server confirmed the subscription.
         ``order_scales`` maps a pair's ``symbol_id`` to its ``(base, quote)``
         quantity scales, which the stream's orders and fills are decoded with
-        (``orders.subscribe`` passes the catalogs'); the stream keeps the
-        latest one given.
+        (``orders.subscribe`` passes the catalogs'). ``order_symbols`` maps a
+        ``symbol_id`` to its pair's name, which their quantities and prices
+        are bound to. The stream keeps the latest of each given.
         """
         from polyester.realtime.private_orders import (
             PrivateOrderStream,
@@ -309,6 +314,8 @@ class AsyncRealtimeClient:
             )
         if order_scales is not None:
             self._private_orders.order_scales = order_scales
+        if order_symbols is not None:
+            self._private_orders.order_symbols = order_symbols
         return await self._private_orders.subscribe(account_id)
 
     def _track_sub(self, sub: AsyncSubscription[Any]) -> None:
@@ -320,16 +327,18 @@ class AsyncRealtimeClient:
         sub._on_closed = _untrack
 
     async def subscribe_market_trades(
-        self, symbol_id: int, *, quantity_scale: int
+        self, symbol_id: int, *, quantity_scale: int, symbol: str | None = None
     ) -> AsyncSubscription[Any]:
-        """Stream public trades; each batched publication is emitted trade by trade."""
+        """Stream public trades; each batched publication is emitted trade by
+        trade. Their prices and quantities are bound to ``symbol``, the pair's
+        name, when given."""
         from polyester.codecs.realtime_decode import decode_market_trade_batch_bytes
 
         channel = f"public:spot:market:trades:{symbol_id}:proto"
         return await self.subscribe_proto_batch(
             channel,
             decode_batch=lambda payload: decode_market_trade_batch_bytes(
-                payload, quantity_scale=quantity_scale
+                payload, quantity_scale=quantity_scale, symbol=symbol
             ),
         )
 

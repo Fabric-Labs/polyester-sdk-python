@@ -34,6 +34,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
+from tests.unit.support import BTC_MARKETS, btc_market
 
 TS_NS = 1_763_164_740_123_456_789
 TS = Timestamp(seconds=1_763_164_740, nanos=987_654_321)
@@ -126,7 +127,8 @@ async def test_batch_create_accepted_items_carry_resolved_base_qty(batch_client)
 
 def test_batch_create_resolved_base_qty_without_catalog_scales() -> None:
     result = batch_create_from_proto(
-        orders_pb2.BatchCreateOrdersResponse(results=[_accepted(11, 776_079)], accepted_count=1)
+        orders_pb2.BatchCreateOrdersResponse(results=[_accepted(11, 776_079)], accepted_count=1),
+        markets=[btc_market(None)],
     )
     item = result.results[0]
     assert item.resolved_base_qty_scaled == "776079"
@@ -145,7 +147,9 @@ def test_batch_create_resolved_base_qty_without_catalog_scales() -> None:
     ids=["ts_ns", "timestamp_fallback", "unset"],
 )
 def test_create_result_carries_acceptance_time(fields: dict, want: int | None) -> None:
-    result = order_mutation_from_proto(orders_pb2.CreateOrderResponse(order_id=42, **fields))
+    result = order_mutation_from_proto(
+        orders_pb2.CreateOrderResponse(order_id=42, **fields), market=btc_market()
+    )
     assert result.accepted_ts_ns == want
 
 
@@ -153,7 +157,8 @@ def test_cancel_result_has_no_acceptance_time() -> None:
     result = order_mutation_from_proto(
         orders_pb2.CancelOrderResponse(
             order_id=42, status=orders_pb2.CancelOrderResponse.ACCEPTED, ts_ns=TS_NS
-        )
+        ),
+        market=None,
     )
     assert result.accepted_ts_ns is None
 
@@ -171,7 +176,10 @@ def test_batch_create_and_modify_results_carry_response_time(
     fields: dict, want: int | None
 ) -> None:
     batch = batch_create_from_proto(
-        orders_pb2.BatchCreateOrdersResponse(results=[_accepted(11, 1)], accepted_count=1, **fields)
+        orders_pb2.BatchCreateOrdersResponse(
+            results=[_accepted(11, 1)], accepted_count=1, **fields
+        ),
+        markets=BTC_MARKETS,
     )
     assert batch.ts_ns == want
     modify = modify_order_from_proto(

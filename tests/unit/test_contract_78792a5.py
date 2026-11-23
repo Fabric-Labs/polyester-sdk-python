@@ -64,6 +64,7 @@ from tests.hardening_support import (
     connect_proto_response,
     make_test_credentials,
 )
+from tests.unit.support import BTC_MARKETS, btc_market
 from tests.unit.test_auth_error_codes import _rest_error
 
 BASE_SCALE = 8
@@ -561,7 +562,8 @@ def test_batch_create_rejection_has_no_quote_echo() -> None:
                     )
                 )
             ],
-        )
+        ),
+        markets=BTC_MARKETS,
     )
     item = result.results[0]
     assert item.code == "error_code_quote_size_too_small"
@@ -569,7 +571,9 @@ def test_batch_create_rejection_has_no_quote_echo() -> None:
 
 
 def test_create_response_echo_is_empty_when_absent() -> None:
-    result = order_mutation_from_proto(orders_pb2.CreateOrderResponse(order_id=1))
+    result = order_mutation_from_proto(
+        orders_pb2.CreateOrderResponse(order_id=1), market=btc_market()
+    )
     assert result.submitted_quote_proceeds_scaled == ""
 
 
@@ -971,7 +975,7 @@ def test_attached_risk_leg_violation_reads_on_preview_and_batch_items() -> None:
         ),
     )
     preview.evaluated_at.seconds = 1_700_000_000
-    decoded = preview_order_from_proto(preview)
+    decoded = preview_order_from_proto(preview, market=btc_market())
     assert decoded.rejection is not None
     assert decoded.rejection.violations[0].field_path == "order.attached_risk.stop_loss"
 
@@ -988,7 +992,8 @@ def test_attached_risk_leg_violation_reads_on_preview_and_batch_items() -> None:
                     )
                 )
             ],
-        )
+        ),
+        markets=BTC_MARKETS,
     )
     assert batch.results[0].violations[0].field_path == "order.attached_risk.stop_loss"
 

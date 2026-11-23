@@ -74,7 +74,7 @@ def test_trigger_read_decodes_ticks_as_the_price_distance() -> None:
     msg = triggers_pb2.Trigger(
         trailing=triggers_pb2.TrailingDetails(trailing_distance_ticks=50_000_000_000)
     )
-    details = _trigger_details(msg)
+    details = _trigger_details(msg, symbol=None)
     assert details is not None and details.trailing is not None
     distance = details.trailing.trailing_distance
     assert distance is not None and distance.as_decimal() == Decimal("50")

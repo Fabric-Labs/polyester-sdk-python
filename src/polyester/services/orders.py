@@ -11,6 +11,7 @@ import msgspec
 from polyester._wire import retry_delay
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.orders import (
+    OrderMarket,
     batch_cancel_from_proto,
     batch_create_from_proto,
     batch_replace_from_proto,
@@ -91,6 +92,7 @@ from polyester.services._realtime_subscribe import require_realtime
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resolve_account_id
 from polyester.services._symbols import (
     check_optional_symbol,
+    display_symbol_for_id,
     resolve_cancel_all_symbol_ids,
     resolve_optional_symbol_id,
     resolve_order_identity,
@@ -203,6 +205,12 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         """
         return catalog_order_scales(self._catalogs, symbol_id)
 
+    def _symbol(self, symbol_id: int) -> str:
+        """The pair's name the loaded catalogs know; ``""`` before they load
+        or for a pair they do not list. Order reads and the order stream bind
+        their quantities and prices to it."""
+        return display_symbol_for_id(self._catalogs, symbol_id)
+
     async def list_open(
         self,
         *,
@@ -243,7 +251,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersReadServiceClient,
             lambda client, req: client.get_open_orders(req),
             request,
-            functools.partial(orders_list_from_proto, scales=self._order_scales),
+            functools.partial(
+                orders_list_from_proto, scales=self._order_scales, symbols=self._symbol
+            ),
         )
 
     async def list_history(
@@ -305,7 +315,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersReadServiceClient,
             lambda client, req: client.get_order_history(req),
             request,
-            functools.partial(orders_list_from_proto, scales=self._order_scales),
+            functools.partial(
+                orders_list_from_proto, scales=self._order_scales, symbols=self._symbol
+            ),
         )
 
     async def get(
@@ -357,7 +369,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersReadServiceClient,
             lambda client, req: client.get_order(req),
             request,
-            functools.partial(get_order_from_proto, scales=self._order_scales),
+            functools.partial(
+                get_order_from_proto, scales=self._order_scales, symbols=self._symbol
+            ),
         )
 
     @overload
@@ -417,6 +431,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         normalized = msgspec.structs.replace(
             normalized, symbol_id=symbol_id, symbol=canonical_symbol
         )
+        market = OrderMarket(canonical_symbol, symbol_id, quantity_scale)
         proto_request = create_order_to_proto(
             normalized,
             quantity_scale=quantity_scale,
@@ -427,7 +442,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersServiceClient,
             lambda client, req: client.create_order(req),
             proto_request,
-            lambda response: order_mutation_from_proto(response, quantity_scale=quantity_scale),
+            lambda response: order_mutation_from_proto(response, market=market),
         )
 
     @overload
@@ -504,10 +519,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             lambda client, req: client.preview_order(req),
             proto_request,
             lambda response: preview_order_from_proto(
-                response,
-                quantity_scale=quantity_scale,
-                symbol=normalized.symbol,
-                symbol_id=symbol_id,
+                response, market=OrderMarket(canonical_symbol, symbol_id, quantity_scale)
             ),
         )
 
@@ -560,7 +572,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersServiceClient,
             lambda client, req: client.cancel_order(req),
             request,
-            order_mutation_from_proto,
+            functools.partial(order_mutation_from_proto, market=None),
         )
 
     async def modify(
@@ -1033,6 +1045,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         await self._ensure_catalogs()
         resolved_items: list[CreateOrderRequest] = []
         item_scales: list[tuple[int, int]] = []
+        markets: list[OrderMarket] = []
         for item in items:
             normalized = (
                 item
@@ -1067,6 +1080,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                     ),
                 )
             )
+            markets.append(OrderMarket(canonical_symbol, symbol_id, item_scales[-1][0]))
             resolved_items.append(
                 msgspec.structs.replace(normalized, symbol_id=symbol_id, symbol=canonical_symbol)
             )
@@ -1081,9 +1095,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersServiceClient,
             lambda client, req: client.batch_create_orders(req),
             proto_request,
-            lambda response: batch_create_from_proto(
-                response, quantity_scales=[base for base, _ in item_scales]
-            ),
+            lambda response: batch_create_from_proto(response, markets=markets),
         )
 
     async def batch_cancel(
@@ -1176,7 +1188,9 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
         """
         client = require_realtime(self._realtime)
         resolved = resolve_account_id(account_id, self._default_account_id)
-        return await client.subscribe_private_orders(resolved, order_scales=self._order_scales)
+        return await client.subscribe_private_orders(
+            resolved, order_scales=self._order_scales, order_symbols=self._symbol
+        )
 
     async def wait_for_order_trades_complete(
         self,

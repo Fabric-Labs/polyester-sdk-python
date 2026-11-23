@@ -35,6 +35,7 @@ from polyester.realtime.snapshot_then_stream import AsyncSnapshotThenStreamSubsc
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.orders import AsyncOrdersService
 from polyester.services.withdraw import AsyncWithdrawService, PreparedTradingWithdraw
+from tests.unit.support import BTC_MARKETS, btc_market
 
 
 def _u128(value) -> int:
@@ -164,16 +165,17 @@ def test_response_contract_classification_and_required_entities() -> None:
             internal_transfer_pb2.CreateInternalTransferResponse()
         )
     with pytest.raises(PolyesterResponseContractError):
-        order_mutation_from_proto(orders_pb2.CreateOrderResponse())
+        order_mutation_from_proto(orders_pb2.CreateOrderResponse(), market=btc_market())
     with pytest.raises(PolyesterResponseContractError):
-        order_mutation_from_proto(orders_pb2.CancelOrderResponse())
+        order_mutation_from_proto(orders_pb2.CancelOrderResponse(), market=None)
     with pytest.raises(PolyesterResponseContractError):
         modify_order_from_proto(orders_pb2.ModifyOrderResponse())
     with pytest.raises(PolyesterResponseContractError):
         batch_create_from_proto(
             orders_pb2.BatchCreateOrdersResponse(
                 results=[orders_pb2.BatchCreateResultItem(client_order_id="missing")]
-            )
+            ),
+            markets=BTC_MARKETS,
         )
     with pytest.raises(PolyesterResponseContractError):
         cancel_all_from_proto(

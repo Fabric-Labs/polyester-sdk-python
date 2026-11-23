@@ -29,6 +29,7 @@ from polyester.models import (
     OrderId,
 )
 from polyester.services.orders import is_batch_replace_settled
+from tests.unit.support import BTC_MARKETS
 
 
 def test_batch_create_orders_to_proto_from_dict_and_struct() -> None:
@@ -190,7 +191,7 @@ def test_batch_create_from_proto() -> None:
         accepted_count=1,
         rejected_count=1,
     )
-    result = batch_create_from_proto(msg)
+    result = batch_create_from_proto(msg, markets=BTC_MARKETS)
     assert result.accepted_count == 1
     assert result.rejected_count == 1
     assert len(result.results) == 2
@@ -207,7 +208,7 @@ def test_batch_create_rejects_missing_outcome() -> None:
         results=[orders_pb2.BatchCreateResultItem(client_order_id="missing")]
     )
     with pytest.raises(PolyesterResponseContractError, match="neither accepted nor rejected"):
-        batch_create_from_proto(msg)
+        batch_create_from_proto(msg, markets=BTC_MARKETS)
 
 
 def test_batch_create_preserves_unknown_rejection_code() -> None:
@@ -220,7 +221,7 @@ def test_batch_create_preserves_unknown_rejection_code() -> None:
         ],
         rejected_count=1,
     )
-    result = batch_create_from_proto(msg)
+    result = batch_create_from_proto(msg, markets=BTC_MARKETS)
     assert result.results[0].code == "unknown_error_code(99999)"
 
 
@@ -232,7 +233,7 @@ def test_batch_create_rejects_count_mismatch() -> None:
         rejected_count=1,
     )
     with pytest.raises(PolyesterResponseContractError, match="counts do not match"):
-        batch_create_from_proto(msg)
+        batch_create_from_proto(msg, markets=BTC_MARKETS)
 
 
 def test_batch_cancel_from_proto() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from decimal import Decimal
+from typing import NamedTuple
 
 from google.protobuf.message import Message
 
@@ -82,25 +83,65 @@ from polyester.types.money import Price, Quantity, QuantityDomain
 _E18 = 18
 
 
+class OrderMarket(NamedTuple):
+    """The market a create, preview or batch item was sent to.
+
+    The answers to those calls do not name their pair, so their decoders take
+    it from the request: a resolved quantity carries the pair's name and ID,
+    and ``compatible_with`` refuses it for another market.
+    """
+
+    symbol: str | None
+    """The pair's catalog name; ``None`` when the catalogs do not list it."""
+    symbol_id: int
+    quantity_scale: int | None
+    """The pair's base quantity scale; ``None`` when it is unknown."""
+
+
+PairSymbols = Callable[[int], str]
+"""A pair's catalog name by ``symbol_id``; ``""`` where unknown."""
+
+
+def pair_symbol(symbols: PairSymbols | None, symbol_id: int) -> str | None:
+    """The pair name ``symbols`` knows for ``symbol_id``; ``None`` when it
+    knows none, and for symbol ID 0, which names no pair."""
+    if symbols is None or not symbol_id:
+        return None
+    return symbols(int(symbol_id)) or None
+
+
 def _qty(
     scaled: int,
     *,
+    symbol: str | None,
     symbol_id: int,
     scale: int | None = None,
     domain: QuantityDomain = QuantityDomain.ORDER_BASE,
-    symbol: str | None = None,
 ) -> Quantity:
+    # The market is required: a quantity without it passes compatible_with
+    # for any other market.
     return Quantity.from_scaled(
         int(scaled),
         scale=scale,
         domain=domain,
-        symbol=symbol,
+        symbol=symbol or None,
         symbol_id=int(symbol_id) if symbol_id else None,
     )
 
 
-def _price(ticks: int, *, symbol_id: int | None = None) -> Price:
-    return Price.from_ticks(int(ticks), symbol=None)
+def _price(ticks: int, *, symbol: str | None) -> Price:
+    return Price.from_ticks(int(ticks), symbol=symbol or None)
+
+
+def _resolved_base_qty(scaled: int, market: OrderMarket) -> Quantity:
+    """A create, preview or batch item's resolved base quantity, bound to the
+    market the order was sent to."""
+    return _qty(
+        scaled,
+        symbol=market.symbol,
+        symbol_id=market.symbol_id,
+        scale=market.quantity_scale,
+    )
 
 
 def _optional_scaled(msg: Message, field_name: str) -> str:
@@ -161,6 +202,7 @@ def _attached_risk_state_from_proto(msg) -> AttachedRiskLegState | None:
 def _risk_leg_from_policy(
     policy,
     *,
+    symbol: str | None,
     state: AttachedRiskLegState | None = None,
 ) -> RiskLeg | None:
     if policy is None or not policy.trigger_price_ticks:
@@ -169,10 +211,10 @@ def _risk_leg_from_policy(
         policy.child if policy.HasField("child") else None
     )
     return RiskLeg(
-        trigger_price=_price(policy.trigger_price_ticks),
+        trigger_price=_price(policy.trigger_price_ticks, symbol=symbol),
         trigger_price_source=_trigger_price_source_label(policy.trigger_price_source),
         order_type=order_type,
-        limit_price=_price(limit_ticks) if limit_ticks else None,
+        limit_price=_price(limit_ticks, symbol=symbol) if limit_ticks else None,
         state=state,
     )
 
@@ -180,6 +222,7 @@ def _risk_leg_from_policy(
 def _trailing_stop_from_policy(
     policy,
     *,
+    symbol: str | None,
     state: AttachedRiskLegState | None = None,
 ) -> TrailingStop | None:
     if policy is None:
@@ -198,21 +241,28 @@ def _trailing_stop_from_policy(
         max_slippage_ticks=max_slippage_ticks if max_slippage_ticks > 0 else 0,
         max_slippage_bps=max_slippage_bps if max_slippage_bps > 0 else 0,
         activation_price=(
-            _price(policy.activation_price_ticks) if policy.activation_price_ticks else None
+            _price(policy.activation_price_ticks, symbol=symbol)
+            if policy.activation_price_ticks
+            else None
         ),
-        limit_price=_price(policy.limit_price_ticks) if policy.limit_price_ticks > 0 else None,
+        limit_price=(
+            _price(policy.limit_price_ticks, symbol=symbol)
+            if policy.limit_price_ticks > 0
+            else None
+        ),
         trigger_price_source=_trigger_price_source_label(policy.trigger_price_source),
         state=state,
     )
 
 
-def _attached_risk_from_proto(msg) -> AttachedRisk | None:
+def _attached_risk_from_proto(msg, *, symbol: str | None) -> AttachedRisk | None:
     if msg is None:
         return None
     take_profit = None
     if msg.HasField("take_profit"):
         take_profit = _risk_leg_from_policy(
             msg.take_profit.policy if msg.take_profit.HasField("policy") else None,
+            symbol=symbol,
             state=(
                 _attached_risk_state_from_proto(msg.take_profit.state)
                 if msg.take_profit.HasField("state")
@@ -223,6 +273,7 @@ def _attached_risk_from_proto(msg) -> AttachedRisk | None:
     if msg.HasField("trailing_stop"):
         trailing_stop = _trailing_stop_from_policy(
             msg.trailing_stop.policy if msg.trailing_stop.HasField("policy") else None,
+            symbol=symbol,
             state=(
                 _attached_risk_state_from_proto(msg.trailing_stop.state)
                 if msg.trailing_stop.HasField("state")
@@ -233,6 +284,7 @@ def _attached_risk_from_proto(msg) -> AttachedRisk | None:
     if msg.HasField("stop_loss"):
         stop_loss = _risk_leg_from_policy(
             msg.stop_loss.policy if msg.stop_loss.HasField("policy") else None,
+            symbol=symbol,
             state=(
                 _attached_risk_state_from_proto(msg.stop_loss.state)
                 if msg.stop_loss.HasField("state")
@@ -301,10 +353,18 @@ def pair_scales(scales: OrderScales | None, symbol_id: int) -> tuple[int | None,
     return scales(int(symbol_id))
 
 
-def scaled_order_from_proto(msg: Order, scales: OrderScales | None) -> PublicOrder:
-    """Decode an order with its pair's scales from ``scales`` (catalog lookup)."""
+def scaled_order_from_proto(
+    msg: Order, scales: OrderScales | None, symbols: PairSymbols | None = None
+) -> PublicOrder:
+    """Decode an order with its pair's scales from ``scales`` and its pair's
+    name from ``symbols`` (both catalog lookups)."""
     base, quote = pair_scales(scales, msg.symbol_id)
-    return order_from_proto(msg, quantity_scale=base, quote_quantity_scale=quote)
+    return order_from_proto(
+        msg,
+        quantity_scale=base,
+        quote_quantity_scale=quote,
+        symbol=pair_symbol(symbols, msg.symbol_id),
+    )
 
 
 def order_from_proto(
@@ -312,12 +372,21 @@ def order_from_proto(
     *,
     quantity_scale: int | None = None,
     quote_quantity_scale: int | None = None,
+    symbol: str | None = None,
 ) -> PublicOrder:
+    """Decode an order. Its quantities carry its ``symbol_id``, and its
+    quantities and prices carry ``symbol``, the pair's name, when given."""
     status = proto_enum_name(OrderStatus, msg.status) if msg.status else ""
     symbol_id = int(msg.symbol_id)
     attached = (
-        _attached_risk_from_proto(msg.attached_risk) if msg.HasField("attached_risk") else None
+        _attached_risk_from_proto(msg.attached_risk, symbol=symbol)
+        if msg.HasField("attached_risk")
+        else None
     )
+
+    def qty(scaled: int) -> Quantity:
+        return _qty(scaled, symbol=symbol, symbol_id=symbol_id, scale=quantity_scale)
+
     return PublicOrder(
         order_id=format_uint64_id(msg.order_id),
         symbol_id=symbol_id or None,
@@ -326,16 +395,14 @@ def order_from_proto(
         status=status,
         order_type=proto_enum_name(orders_pb2.OrderType, msg.order_type) or None,
         tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force) or None,
-        orig_qty=_qty(msg.orig_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
-        cum_qty=_qty(msg.cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
-        inherited_cum_qty=_qty(
-            msg.inherited_cum_qty_scaled, symbol_id=symbol_id, scale=quantity_scale
-        ),
-        leaves_qty=_qty(msg.leaves_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
-        display_qty=_qty(msg.display_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
-        hidden_qty=_qty(msg.hidden_qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
-        price=_price(msg.price_ticks) if msg.price_ticks else None,
-        avg_px=_price(msg.avg_price_ticks) if msg.avg_price_ticks else None,
+        orig_qty=qty(msg.orig_qty_scaled),
+        cum_qty=qty(msg.cum_qty_scaled),
+        inherited_cum_qty=qty(msg.inherited_cum_qty_scaled),
+        leaves_qty=qty(msg.leaves_qty_scaled),
+        display_qty=qty(msg.display_qty_scaled),
+        hidden_qty=qty(msg.hidden_qty_scaled),
+        price=_price(msg.price_ticks, symbol=symbol) if msg.price_ticks else None,
+        avg_px=_price(msg.avg_price_ticks, symbol=symbol) if msg.avg_price_ticks else None,
         created_ts_ns=ts_ns_string_from_response(
             msg.created_ts_ns,
             context="Order",
@@ -365,12 +432,14 @@ def order_from_proto(
         ),
         origin=_order_origin_from_proto(msg.origin) if msg.HasField("origin") else None,
         market_client_ref_price=(
-            _price(msg.market_client_ref_price_ticks)
+            _price(msg.market_client_ref_price_ticks, symbol=symbol)
             if msg.market_client_ref_price_ticks > 0
             else None
         ),
         market_max_slippage=(
-            _price(msg.market_max_slippage_ticks) if msg.market_max_slippage_ticks > 0 else None
+            _price(msg.market_max_slippage_ticks, symbol=symbol)
+            if msg.market_max_slippage_ticks > 0
+            else None
         ),
         market_max_slippage_bps=int(msg.market_max_slippage_bps),
         expire_at=(
@@ -397,7 +466,7 @@ def order_from_proto(
                     else "0"
                 ),
                 is_rebate=bool(msg.fee_total.is_rebate),
-                qty=_qty(msg.fee_total.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+                qty=qty(msg.fee_total.qty_scaled),
             )
             if has_field(msg, "fee_total")
             else None
@@ -421,17 +490,22 @@ def orders_list_from_proto(
     msg: GetOpenOrdersResponse | GetOrderHistoryResponse,
     *,
     scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
 ) -> OrdersList:
     operation = msg.DESCRIPTOR.name.removesuffix("Response")
     for item in msg.orders:
         _require_order_ids(operation, item)
     return OrdersList(
-        orders=[scaled_order_from_proto(item, scales) for item in msg.orders],
+        orders=[scaled_order_from_proto(item, scales, symbols) for item in msg.orders],
         next_page_token=msg.next_page_token,
     )
 
 
-def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) -> PublicUserTrade:
+def user_trade_from_proto(
+    msg: UserTrade, *, quantity_scale: int | None = None, symbol: str | None = None
+) -> PublicUserTrade:
+    """Decode a trade. Its quantity carries its ``symbol_id``, and its
+    quantity and price carry ``symbol``, the pair's name, when given."""
     symbol_id = int(msg.symbol_id)
     return PublicUserTrade(
         symbol_id=symbol_id,
@@ -439,8 +513,8 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
         order_id=format_uint64_id(msg.order_id),
         side=proto_enum_name(orders_pb2.Side, msg.side),
         is_maker=bool(msg.is_maker),
-        price=_price(msg.price_ticks) if msg.price_ticks else None,
-        qty=_qty(msg.qty_scaled, symbol_id=symbol_id, scale=quantity_scale),
+        price=_price(msg.price_ticks, symbol=symbol) if msg.price_ticks else None,
+        qty=_qty(msg.qty_scaled, symbol=symbol, symbol_id=symbol_id, scale=quantity_scale),
         fee_amount_e18=(
             u128_from_proto(msg.fee_amount_e18) if msg.HasField("fee_amount_e18") else "0"
         ),
@@ -464,31 +538,43 @@ def user_trade_from_proto(msg: UserTrade, *, quantity_scale: int | None = None) 
     )
 
 
-def scaled_user_trade_from_proto(msg: UserTrade, scales: OrderScales | None) -> PublicUserTrade:
-    """Decode a trade with its pair's base quantity scale from ``scales``."""
-    return user_trade_from_proto(msg, quantity_scale=pair_scales(scales, msg.symbol_id)[0])
+def scaled_user_trade_from_proto(
+    msg: UserTrade, scales: OrderScales | None, symbols: PairSymbols | None = None
+) -> PublicUserTrade:
+    """Decode a trade with its pair's base quantity scale from ``scales`` and
+    its pair's name from ``symbols``."""
+    return user_trade_from_proto(
+        msg,
+        quantity_scale=pair_scales(scales, msg.symbol_id)[0],
+        symbol=pair_symbol(symbols, msg.symbol_id),
+    )
 
 
-def user_trades_list_from_proto(msg, *, scales: OrderScales | None = None) -> UserTradesList:
+def user_trades_list_from_proto(
+    msg, *, scales: OrderScales | None = None, symbols: PairSymbols | None = None
+) -> UserTradesList:
     for item in msg.trades:
         _require_lineage_id("GetUserTrades", item)
     return UserTradesList(
-        trades=[scaled_user_trade_from_proto(item, scales) for item in msg.trades],
+        trades=[scaled_user_trade_from_proto(item, scales, symbols) for item in msg.trades],
         transfers=[order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])],
         next_page_token=msg.next_page_token,
     )
 
 
 def get_order_from_proto(
-    msg: GetOrderResponse, *, scales: OrderScales | None = None
+    msg: GetOrderResponse,
+    *,
+    scales: OrderScales | None = None,
+    symbols: PairSymbols | None = None,
 ) -> GetOrderResult:
     if not msg.HasField("order"):
         raise PolyesterResponseContractError("GetOrder", "missing order")
     _require_order_ids("GetOrder", msg.order)
     for item in msg.trades:
         _require_lineage_id("GetOrder", item)
-    order = scaled_order_from_proto(msg.order, scales) if msg.HasField("order") else None
-    trades = [scaled_user_trade_from_proto(item, scales) for item in msg.trades]
+    order = scaled_order_from_proto(msg.order, scales, symbols) if msg.HasField("order") else None
+    trades = [scaled_user_trade_from_proto(item, scales, symbols) for item in msg.trades]
     transfers = [order_transfer_from_proto(item) for item in getattr(msg, "transfers", [])]
     next_page_token = getattr(msg, "next_page_token", "") or ""
     return GetOrderResult(
@@ -535,7 +621,13 @@ def _leg_trigger_id(msg: Message, field_name: str) -> str:
     return format_uint64_id(value) if value else ""
 
 
-def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> OrderMutationResult:
+def order_mutation_from_proto(msg, *, market: OrderMarket | None) -> OrderMutationResult:
+    """Decode a create or cancel answer.
+
+    ``market`` is the market a create was sent to: a create answer does not
+    name its pair, and its ``resolved_base_qty`` is bound to that market. A
+    cancel answer has no quantity and takes ``None``.
+    """
     client_order_id = getattr(msg, "client_order_id", "") or ""
     message_name = msg.DESCRIPTOR.name
     # CreateOrderResponse no longer carries a status field (POLY-3701): reaching
@@ -549,15 +641,16 @@ def order_mutation_from_proto(msg, *, quantity_scale: int | None = None) -> Orde
             raise PolyesterResponseContractError("CreateOrder", "missing order_id")
     elif message_name == "CancelOrderResponse" and (not msg.order_id or not status):
         raise PolyesterResponseContractError("CancelOrder", "missing order_id or status")
+    resolved = int(getattr(msg, "resolved_base_qty_scaled", 0) or 0)
+    if resolved and market is None:
+        raise ValueError(f"decoding a {message_name} resolved quantity needs the order's market")
     return OrderMutationResult(
         status=status,
         order_id=format_uint64_id(msg.order_id) if msg.order_id else "",
         client_order_id=client_order_id,
-        resolved_base_qty_scaled=str(getattr(msg, "resolved_base_qty_scaled", 0) or ""),
+        resolved_base_qty_scaled=str(resolved) if resolved else "",
         resolved_base_qty=(
-            _qty(msg.resolved_base_qty_scaled, symbol_id=0, scale=quantity_scale)
-            if getattr(msg, "resolved_base_qty_scaled", 0)
-            else None
+            _resolved_base_qty(resolved, market) if resolved and market is not None else None
         ),
         submitted_max_quote_debit_scaled=_optional_scaled(msg, "submitted_max_quote_debit_scaled"),
         submitted_quote_proceeds_scaled=_optional_scaled(msg, "submitted_quote_proceeds_scaled"),
@@ -614,7 +707,9 @@ def _field_violations_from_proto(msg: orders_pb2.ErrorDetail) -> list[OrderField
     ]
 
 
-def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDetail:
+def _order_error_detail_from_proto(
+    msg: orders_pb2.ErrorDetail, *, symbol: str | None
+) -> OrderErrorDetail:
     return OrderErrorDetail(
         code=_error_code_label(int(msg.code)),
         violations=_field_violations_from_proto(msg),
@@ -622,7 +717,9 @@ def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDet
             rate_limit_detail_from_proto(msg.rate_limit) if msg.HasField("rate_limit") else None
         ),
         price_band_limit=(
-            _price(msg.price_band_limit_ticks) if msg.HasField("price_band_limit_ticks") else None
+            _price(msg.price_band_limit_ticks, symbol=symbol)
+            if msg.HasField("price_band_limit_ticks")
+            else None
         ),
     )
 
@@ -630,35 +727,34 @@ def _order_error_detail_from_proto(msg: orders_pb2.ErrorDetail) -> OrderErrorDet
 def preview_order_from_proto(
     msg: orders_pb2.PreviewOrderResponse,
     *,
-    quantity_scale: int | None = None,
-    symbol: str | None = None,
-    symbol_id: int | None = None,
+    market: OrderMarket,
 ) -> PreviewOrderResult:
+    """Decode a preview of an order for ``market``, the market it names.
+
+    Its resolved quantity and prices are bound to that market; the resolved
+    quantity is ``None`` when the market's base scale is unknown.
+    """
     if not msg.HasField("evaluated_at"):
         raise PolyesterResponseContractError(
             "PreviewOrder", "successful response is missing evaluated_at"
         )
-    resolved_symbol_id = int(symbol_id) if symbol_id is not None else 0
     has_resolved = msg.HasField("resolved_base_qty_scaled")
     resolved_scaled = int(msg.resolved_base_qty_scaled) if has_resolved else 0
     return PreviewOrderResult(
         admissible=bool(msg.admissible) if msg.HasField("admissible") else None,
         rejection=(
-            _order_error_detail_from_proto(msg.rejection) if msg.HasField("rejection") else None
+            _order_error_detail_from_proto(msg.rejection, symbol=market.symbol)
+            if msg.HasField("rejection")
+            else None
         ),
         resolved_base_qty_scaled=str(resolved_scaled) if has_resolved else "",
         resolved_base_qty=(
-            _qty(
-                resolved_scaled,
-                symbol_id=resolved_symbol_id,
-                scale=quantity_scale,
-                symbol=symbol,
-            )
-            if has_resolved and quantity_scale is not None
+            _resolved_base_qty(resolved_scaled, market)
+            if has_resolved and market.quantity_scale is not None
             else None
         ),
         protected_price_bound=(
-            _price(msg.protected_price_bound_ticks)
+            _price(msg.protected_price_bound_ticks, symbol=market.symbol)
             if msg.HasField("protected_price_bound_ticks")
             else None
         ),
@@ -916,11 +1012,15 @@ def batch_replace_status_from_proto(msg) -> BatchReplaceStatusResult:
     )
 
 
-def _batch_create_result_item(item, quantity_scale: int | None) -> BatchCreateResultItem:
+def _batch_create_result_item(item, market: OrderMarket | None) -> BatchCreateResultItem:
     # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
         require_id("BatchCreateOrders", "order_id", item.accepted.order_id)
         resolved = int(item.accepted.resolved_base_qty_scaled)
+        if resolved and market is None:
+            raise PolyesterResponseContractError(
+                "BatchCreateOrders", "an accepted result has no requested item"
+            )
         return BatchCreateResultItem(
             status="accepted",
             order_id=format_uint64_id(item.accepted.order_id),
@@ -936,7 +1036,7 @@ def _batch_create_result_item(item, quantity_scale: int | None) -> BatchCreateRe
             ),
             resolved_base_qty_scaled=str(resolved) if resolved else "",
             resolved_base_qty=(
-                _qty(resolved, symbol_id=0, scale=quantity_scale) if resolved else None
+                _resolved_base_qty(resolved, market) if resolved and market is not None else None
             ),
         )
     if item.HasField("rejected"):
@@ -972,14 +1072,14 @@ def _batch_create_result_item(item, quantity_scale: int | None) -> BatchCreateRe
 def batch_create_from_proto(
     msg: orders_pb2.BatchCreateOrdersResponse,
     *,
-    quantity_scales: Sequence[int | None] | None = None,
+    markets: Sequence[OrderMarket],
 ) -> BatchCreateOrdersResult:
-    """Decode a batch create answer. ``quantity_scales`` are the requested
-    items' base quantity scales in request order, the order of the results;
-    an accepted item's ``resolved_base_qty`` carries its item's scale."""
-    scales = list(quantity_scales or [])
+    """Decode a batch create answer. ``markets`` are the requested items'
+    markets in request order, the order of the results: an accepted item's
+    ``resolved_base_qty`` is bound to its own item's market and scale, so a
+    batch over several pairs binds each to its own."""
     results = [
-        _batch_create_result_item(item, scales[index] if index < len(scales) else None)
+        _batch_create_result_item(item, markets[index] if index < len(markets) else None)
         for index, item in enumerate(msg.results)
     ]
     accepted_count = int(msg.accepted_count)

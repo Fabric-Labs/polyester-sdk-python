@@ -15,7 +15,7 @@ from polyester.codecs.decode.orders import (
 from polyester.codecs.scalars import format_id
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.services.orders import AsyncOrdersService
-from tests.unit.support import CaptureUnary
+from tests.unit.support import BTC_MARKETS, CaptureUnary, btc_market
 
 TP_ID = 9_000_000_000_000_001
 SL_ID = 9_000_000_000_000_002
@@ -26,7 +26,8 @@ def test_create_result_carries_configured_leg_trigger_ids_only() -> None:
     result = order_mutation_from_proto(
         orders_pb2.CreateOrderResponse(
             order_id=42, take_profit_trigger_id=TP_ID, stop_loss_trigger_id=SL_ID
-        )
+        ),
+        market=btc_market(),
     )
     assert result.take_profit_trigger_id == format_id(TP_ID)
     assert result.stop_loss_trigger_id == format_id(SL_ID)
@@ -34,7 +35,9 @@ def test_create_result_carries_configured_leg_trigger_ids_only() -> None:
 
 
 def test_create_result_without_attached_risk_has_no_leg_trigger_ids() -> None:
-    result = order_mutation_from_proto(orders_pb2.CreateOrderResponse(order_id=42))
+    result = order_mutation_from_proto(
+        orders_pb2.CreateOrderResponse(order_id=42), market=btc_market()
+    )
     assert (
         result.take_profit_trigger_id,
         result.stop_loss_trigger_id,
@@ -44,7 +47,8 @@ def test_create_result_without_attached_risk_has_no_leg_trigger_ids() -> None:
 
 def test_cancel_result_has_no_leg_trigger_ids() -> None:
     result = order_mutation_from_proto(
-        orders_pb2.CancelOrderResponse(order_id=42, status=orders_pb2.CancelOrderResponse.ACCEPTED)
+        orders_pb2.CancelOrderResponse(order_id=42, status=orders_pb2.CancelOrderResponse.ACCEPTED),
+        market=None,
     )
     assert result.take_profit_trigger_id == ""
 
@@ -79,7 +83,8 @@ def test_batch_create_accepted_items_carry_configured_leg_trigger_ids() -> None:
                 ),
             ],
             accepted_count=2,
-        )
+        ),
+        markets=BTC_MARKETS,
     )
     first, second = result.results
     assert first.take_profit_trigger_id == ""

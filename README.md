@@ -749,7 +749,14 @@ result = await client.orders.create(
 ```
 
 Compatible values from fills/books can be passed back into writes when the
-instrument/domain matches.
+instrument/domain matches. A value the SDK reads names its market: the prices
+and quantities of order reads, trades, fills, triggers and public trades, and
+the `resolved_base_qty` of a create, a preview and each accepted batch item,
+carry the pair's `symbol` when the catalogs know the pair (quantities also
+its `symbol_id`). A write to another
+market refuses it with `PolyesterValidationError` (`quantity symbol mismatch`
+or `price symbol mismatch`) before sending. Such a value equals only a value
+bound to the same market; compare `.scaled` or `.ticks` to compare amounts.
 
 `orders.batch_replace(...)` modifies up to 50 orders on one pair as one quote
 refresh, each item admitted or rejected on its own. An item that keeps the

@@ -10,6 +10,7 @@ from polyester.codecs.decode.orders import batch_create_from_proto
 from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterApiError
 from polyester.gen.orders.v1 import orders_pb2
+from tests.unit.support import BTC_MARKETS
 
 
 def _order_error(**detail: object) -> PolyesterApiError:
@@ -63,7 +64,8 @@ def test_batch_create_rejection_exposes_existing_order_id() -> None:
                 ),
             ],
             rejected_count=2,
-        )
+        ),
+        markets=BTC_MARKETS,
     )
 
     duplicate, capacity = result.results

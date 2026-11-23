@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 from typing import Any
 
-from polyester.codecs.contract_limits import contract_repeated_items, contract_string_length
+from polyester.codecs.contract_limits import (
+    contract_repeated_items,
+    contract_string_length,
+    contract_string_pattern,
+)
 from polyester.codecs.decode.sub_accounts import (
     get_subaccount_from_proto,
     subaccount_activity_list_from_proto,
@@ -56,6 +61,8 @@ _ACTIVITY_MAX_ENTITY_KINDS = contract_repeated_items(ListAccountActivityRequest,
 _ACTIVITY_MAX_ACTIONS = contract_repeated_items(ListAccountActivityRequest, "event_actions")[1]
 _ACTIVITY_MAX_SOURCES = contract_repeated_items(ListAccountActivityRequest, "sources")[1]
 _ACTIVITY_PAGE_TOKEN_MAX_LEN = contract_string_length(ListAccountActivityRequest, "page_token")[1]
+# The ``ak_…`` ID an API key filter takes, as ``ApiKey.key_id`` names the key.
+_ACTIVITY_API_KEY_ID = re.compile(contract_string_pattern(ListAccountActivityRequest, "api_key_id"))
 
 
 class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
@@ -200,7 +207,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         entity_kinds: Sequence[str] | None = None,
         event_actions: Sequence[str] | None = None,
         sources: Sequence[str] | None = None,
-        api_key_id: str | int | None = None,
+        api_key_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int | None = None,
@@ -217,7 +224,8 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         ``entity_kinds`` (at most 16), ``event_actions`` (at most 32) and
         ``sources`` (at most 8) take the labels events carry, such as
         ``"session"``, ``"created"`` and ``"api"``, each once; ``api_key_id``
-        keeps the events performed with that key; ``start_time`` (inclusive)
+        (the key's ``ak_…`` ID, as ``key_id`` shows it) keeps the events
+        performed with that key; ``start_time`` (inclusive)
         and ``end_time`` (exclusive) are timezone-aware ``datetime`` objects,
         ``end_time`` after ``start_time``. ``limit`` is 1 to 200; ``None`` takes the server's 50.
         Reuse ``next_page_token`` only with the same filters. A filter the
@@ -267,7 +275,15 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
                 raise PolyesterValidationError("sub_account_ids must name each sub-account once")
             request.subaccount_ids.extend(ids)
         if api_key_id is not None:
-            request.api_key_id = parse_account_id(api_key_id, "api_key_id")
+            if (
+                not isinstance(api_key_id, str)
+                or _ACTIVITY_API_KEY_ID.fullmatch(api_key_id) is None
+            ):
+                raise PolyesterValidationError(
+                    "api_key_id must be an API key's ID as key_id shows it (ak_ and 32 "
+                    "lowercase hex digits)"
+                )
+            request.api_key_id = api_key_id
         start_ts = optional_datetime_to_timestamp(start_time, "start_time")
         end_ts = optional_datetime_to_timestamp(end_time, "end_time")
         if start_time is not None and end_time is not None and not end_time > start_time:
@@ -304,7 +320,7 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
         entity_kinds: Sequence[str] | None = None,
         event_actions: Sequence[str] | None = None,
         sources: Sequence[str] | None = None,
-        api_key_id: str | int | None = None,
+        api_key_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int | None = None,

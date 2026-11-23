@@ -39,6 +39,12 @@ class Timeframe(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     WEEK_1: _ClassVar[Timeframe]
     MONTH_1: _ClassVar[Timeframe]
 
+class IndexPriceCandleSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED: _ClassVar[IndexPriceCandleSource]
+    INDEX_PRICE_CANDLE_SOURCE_REFERENCE: _ClassVar[IndexPriceCandleSource]
+    INDEX_PRICE_CANDLE_SOURCE_INDEX: _ClassVar[IndexPriceCandleSource]
+
 class PairStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     PAIR_STATUS_UNSPECIFIED: _ClassVar[PairStatus]
@@ -83,6 +89,9 @@ DAY_1: Timeframe
 DAY_3: Timeframe
 WEEK_1: Timeframe
 MONTH_1: Timeframe
+INDEX_PRICE_CANDLE_SOURCE_UNSPECIFIED: IndexPriceCandleSource
+INDEX_PRICE_CANDLE_SOURCE_REFERENCE: IndexPriceCandleSource
+INDEX_PRICE_CANDLE_SOURCE_INDEX: IndexPriceCandleSource
 PAIR_STATUS_UNSPECIFIED: PairStatus
 PAIR_STATUS_ENABLED: PairStatus
 PAIR_STATUS_DISABLED: PairStatus
@@ -273,6 +282,44 @@ class GetCandlesColumnsResponse(_message.Message):
     quote_volume: _containers.RepeatedScalarFieldContainer[str]
     is_closed: _containers.RepeatedScalarFieldContainer[bool]
     def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[_Iterable[int]] = ..., open: _Optional[_Iterable[int]] = ..., high: _Optional[_Iterable[int]] = ..., low: _Optional[_Iterable[int]] = ..., close: _Optional[_Iterable[int]] = ..., volume: _Optional[_Iterable[int]] = ..., reference_ts_sec: _Optional[_Iterable[int]] = ..., reference_open: _Optional[_Iterable[int]] = ..., reference_high: _Optional[_Iterable[int]] = ..., reference_low: _Optional[_Iterable[int]] = ..., reference_close: _Optional[_Iterable[int]] = ..., reference_volume: _Optional[_Iterable[int]] = ..., next_page_token: _Optional[str] = ..., quote_volume: _Optional[_Iterable[str]] = ..., is_closed: _Optional[_Iterable[bool]] = ...) -> None: ...
+
+class GetIndexPriceCandlesRequest(_message.Message):
+    __slots__ = ("symbol_id", "timeframe", "limit", "start_time", "end_time", "page_token")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    START_TIME_FIELD_NUMBER: _ClassVar[int]
+    END_TIME_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: int
+    timeframe: Timeframe
+    limit: int
+    start_time: _timestamp_pb2.Timestamp
+    end_time: _timestamp_pb2.Timestamp
+    page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., limit: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class GetIndexPriceCandlesResponse(_message.Message):
+    __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "source", "next_page_token")
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
+    TS_SEC_FIELD_NUMBER: _ClassVar[int]
+    OPEN_FIELD_NUMBER: _ClassVar[int]
+    HIGH_FIELD_NUMBER: _ClassVar[int]
+    LOW_FIELD_NUMBER: _ClassVar[int]
+    CLOSE_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    symbol_id: int
+    timeframe: Timeframe
+    ts_sec: _containers.RepeatedScalarFieldContainer[int]
+    open: _containers.RepeatedScalarFieldContainer[int]
+    high: _containers.RepeatedScalarFieldContainer[int]
+    low: _containers.RepeatedScalarFieldContainer[int]
+    close: _containers.RepeatedScalarFieldContainer[int]
+    source: _containers.RepeatedScalarFieldContainer[IndexPriceCandleSource]
+    next_page_token: str
+    def __init__(self, symbol_id: _Optional[int] = ..., timeframe: _Optional[_Union[Timeframe, str]] = ..., ts_sec: _Optional[_Iterable[int]] = ..., open: _Optional[_Iterable[int]] = ..., high: _Optional[_Iterable[int]] = ..., low: _Optional[_Iterable[int]] = ..., close: _Optional[_Iterable[int]] = ..., source: _Optional[_Iterable[_Union[IndexPriceCandleSource, str]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class Candle(_message.Message):
     __slots__ = ("symbol_id", "timeframe", "ts_sec", "open", "high", "low", "close", "volume", "quote_volume")

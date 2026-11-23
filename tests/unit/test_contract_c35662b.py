@@ -57,7 +57,13 @@ from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.system.v1 import system_pb2
 from polyester.gen.transfer.v1 import internal_transfer_pb2 as it_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
-from polyester.models import CreateOrderRequest, ServerTime, ZippedAssetSupplyUpdate
+from polyester.models import (
+    ActivityActor,
+    ActivityItem,
+    CreateOrderRequest,
+    ServerTime,
+    ZippedAssetSupplyUpdate,
+)
 from polyester.types.money import Quantity
 from tests.hardening_support import (
     HttpScript,
@@ -728,29 +734,131 @@ def test_activity_event_exposes_every_published_field() -> None:
             source=subaccounts_pb2.ACTIVITY_SOURCE_API,
             ip="203.0.113.7",
             user_agent="wallet/1.0",
-            actor_account_id=56,
-            payload_json='{"method":"wallet","reason":"invalid_signature"}',
             subaccount_id=12,
-            actor_api_key_id=34,
+            actor=subaccounts_pb2.ActivityActor(
+                kind=subaccounts_pb2.ACTIVITY_ACTOR_UNAUTHENTICATED
+            ),
+            item=subaccounts_pb2.ActivityItem(name="sign-in"),
+            details=subaccounts_pb2.ActivityDetails(
+                session=subaccounts_pb2.ActivitySessionDetails(
+                    failure=subaccounts_pb2.ACTIVITY_SIGN_IN_FAILURE_INVALID_SIGNATURE
+                )
+            ),
         )
     )
     assert event.created_at == created
     assert (event.entity_kind, event.event_action, event.source) == ("session", "failed", "api")
     assert (event.ip, event.user_agent) == ("203.0.113.7", "wallet/1.0")
-    assert event.actor_account_id == format_id(56)
-    assert event.payload_json == '{"method":"wallet","reason":"invalid_signature"}'
-    assert (event.subaccount_id, event.actor_api_key_id) == (format_id(12), format_id(34))
+    assert event.subaccount_id == format_id(12)
+    assert event.actor == ActivityActor(kind="unauthenticated")
+    assert event.item == ActivityItem(name="sign-in")
+    assert event.details == {
+        "session": {"failure": "ACTIVITY_SIGN_IN_FAILURE_INVALID_SIGNATURE"}
+    }
     published = set(subaccounts_pb2.ActivityEvent.DESCRIPTOR.fields_by_name)
     assert published <= set(type(event).__struct_fields__)
-
-
-def test_activity_event_names_its_sub_account_and_acting_key() -> None:
-    event = subaccount_activity_event_from_proto(
-        subaccounts_pb2.ActivityEvent(subaccount_id=12, actor_api_key_id=34)
+    assert set(subaccounts_pb2.ActivityActor.DESCRIPTOR.fields_by_name) <= set(
+        ActivityActor.__struct_fields__
     )
-    assert (event.subaccount_id, event.actor_api_key_id) == (format_id(12), format_id(34))
+
+
+def test_activity_event_names_its_sub_account() -> None:
+    event = subaccount_activity_event_from_proto(subaccounts_pb2.ActivityEvent(subaccount_id=12))
+    assert event.subaccount_id == format_id(12)
     main = subaccount_activity_event_from_proto(subaccounts_pb2.ActivityEvent())
-    assert (main.subaccount_id, main.actor_api_key_id) == ("", "")
+    assert main.subaccount_id == ""
+    assert (main.actor, main.item, main.details) == (None, None, None)
+
+
+_KEY_ID = "ak_" + "0123456789abcdef" * 2
+
+
+def test_activity_actor_names_the_account_and_key_that_acted() -> None:
+    event = subaccount_activity_event_from_proto(
+        subaccounts_pb2.ActivityEvent(
+            actor=subaccounts_pb2.ActivityActor(
+                kind=subaccounts_pb2.ACTIVITY_ACTOR_API_KEY,
+                account_id=56,
+                username="ada",
+                api_key_id=_KEY_ID,
+                api_key_kind=subaccounts_pb2.ACTIVITY_KEY_STRATEGY_BOT,
+                api_key_label="grid bot",
+            )
+        )
+    )
+    assert event.actor == ActivityActor(
+        kind="api_key",
+        account_id=format_id(56),
+        username="ada",
+        api_key_id=_KEY_ID,
+        api_key_kind="strategy_bot",
+        api_key_label="grid bot",
+    )
+    system = subaccount_activity_event_from_proto(
+        subaccounts_pb2.ActivityEvent(
+            actor=subaccounts_pb2.ActivityActor(
+                kind=subaccounts_pb2.ACTIVITY_ACTOR_SYSTEM,
+                system_reason=subaccounts_pb2.ACTIVITY_SYSTEM_ASSISTANT_PRESET_UPDATED,
+            )
+        )
+    )
+    assert system.actor == ActivityActor(
+        kind="system", system_reason="assistant_preset_updated"
+    )
+    unknown = subaccount_activity_event_from_proto(
+        subaccounts_pb2.ActivityEvent(actor=subaccounts_pb2.ActivityActor(kind=99))
+    )
+    assert unknown.actor == ActivityActor(kind="99")
+
+
+@pytest.mark.parametrize(
+    ("item", "kind", "item_id"),
+    [
+        (subaccounts_pb2.ActivityItem(api_policy_id=99), "api_policy_id", format_id(99)),
+        (subaccounts_pb2.ActivityItem(subaccount_id=12), "subaccount_id", format_id(12)),
+        (subaccounts_pb2.ActivityItem(api_key_id=_KEY_ID), "api_key_id", _KEY_ID),
+        (subaccounts_pb2.ActivityItem(mfa_factor_id="mfa_1"), "mfa_factor_id", "mfa_1"),
+        (subaccounts_pb2.ActivityItem(name="recovery codes"), "", ""),
+    ],
+)
+def test_activity_item_names_the_id_that_is_set(item, kind: str, item_id: str) -> None:
+    item.name = item.name or "label"
+    event = subaccount_activity_event_from_proto(subaccounts_pb2.ActivityEvent(item=item))
+    assert event.item == ActivityItem(kind=kind, id=item_id, name=item.name)
+
+
+def test_activity_details_show_opaque_ids_as_public_ids() -> None:
+    details = subaccounts_pb2.ActivityDetails()
+    details.policy.source_template_id = 7
+    details.policy.source_template_revision = 3
+    details.policy.strategy_bot_id = 8
+    details.policy.actions.added.append(1)
+    details.policy.subaccount_policy_id.to_id = 9
+    event = subaccount_activity_event_from_proto(
+        subaccounts_pb2.ActivityEvent(details=details)
+    )
+    assert event.details is not None
+    policy = event.details["policy"]
+    assert policy["sourceTemplateId"] == format_id(7)
+    assert policy["strategyBotId"] == format_id(8)
+    # A revision is a count, not an ID: it stays protobuf JSON's decimal string.
+    assert policy["sourceTemplateRevision"] == "3"
+    assert set(policy["actions"]) == {"added"}
+    # Only the side the event set is shown.
+    assert policy["subaccountPolicyId"] == {"toId": format_id(9)}
+
+    tags = subaccounts_pb2.ActivityDetails()
+    tags.destination.tag_ids.added_ids.extend([12, 13])
+    tags.destination.tag_ids.removed_ids.append(14)
+    event = subaccount_activity_event_from_proto(subaccounts_pb2.ActivityEvent(details=tags))
+    assert event.details == {
+        "destination": {
+            "tagIds": {
+                "addedIds": [format_id(12), format_id(13)],
+                "removedIds": [format_id(14)],
+            }
+        }
+    }
 
 
 # --- refusal codes for trigger, OCO and attached exit fields -------------------------------------
@@ -905,7 +1013,7 @@ async def test_list_account_activity_sends_every_filter_exactly() -> None:
     from polyester.gen.auth.v1 import activity_pb2
 
     reply = activity_pb2.ListAccountActivityResponse(
-        events=[subaccounts_pb2.ActivityEvent(subaccount_id=12, actor_api_key_id=34)],
+        events=[subaccounts_pb2.ActivityEvent(subaccount_id=12)],
         next_page_token="next",
     )
     start = datetime(2026, 11, 1, tzinfo=UTC)
@@ -917,7 +1025,7 @@ async def test_list_account_activity_sends_every_filter_exactly() -> None:
             entity_kinds=["session", "ACTIVITY_ENTITY_API_KEY"],
             event_actions=["created", "failed"],
             sources=["api"],
-            api_key_id=format_id(34),
+            api_key_id=_KEY_ID,
             start_time=start,
             end_time=end,
             limit=200,
@@ -937,12 +1045,12 @@ async def test_list_account_activity_sends_every_filter_exactly() -> None:
         subaccounts_pb2.ACTIVITY_ACTION_FAILED,
     ]
     assert list(sent.sources) == [subaccounts_pb2.ACTIVITY_SOURCE_API]
-    assert sent.api_key_id == 34
+    assert sent.api_key_id == _KEY_ID
     assert sent.start_time.ToDatetime(tzinfo=UTC) == start
     assert sent.end_time.ToDatetime(tzinfo=UTC) == end
     assert (sent.limit, sent.page_token) == (200, "tok")
     (event,) = page.events
-    assert (event.subaccount_id, event.actor_api_key_id) == (format_id(12), format_id(34))
+    assert event.subaccount_id == format_id(12)
     assert page.next_page_token == "next"
 
 
@@ -975,7 +1083,13 @@ _START = datetime(2026, 11, 1, tzinfo=UTC)
         {"event_actions": [""]},
         {"sources": ["ápi"]},
         {"api_key_id": 0},
+        {"api_key_id": 34},
         {"api_key_id": ""},
+        {"api_key_id": format_id(34)},
+        {"api_key_id": "ak_" + "0" * 31},
+        {"api_key_id": "AK_" + "0" * 32},
+        {"api_key_id": "ak_" + "A" * 32},
+        {"api_key_id": "ak_" + "0" * 32 + "\n"},
         {"start_time": datetime(2026, 11, 1)},
         {"start_time": _START, "end_time": _START},
         {"limit": 0},

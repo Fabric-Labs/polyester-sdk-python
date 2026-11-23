@@ -44,6 +44,7 @@ class Surface(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     QUICKSWAP: _ClassVar[Surface]
     REWARDS: _ClassVar[Surface]
     ASSISTANT: _ClassVar[Surface]
+    TRADING_BOTS: _ClassVar[Surface]
 
 class Environment(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -86,6 +87,7 @@ MARKET_DATA: Surface
 QUICKSWAP: Surface
 REWARDS: Surface
 ASSISTANT: Surface
+TRADING_BOTS: Surface
 ENVIRONMENT_UNSPECIFIED: Environment
 DEVNET: Environment
 TESTNET: Environment

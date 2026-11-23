@@ -210,6 +210,10 @@ PROBES: list[tuple[str, Probe]] = [
         lambda c, s: c.market_data.get_candles_columns(symbol=s),
     ),
     (
+        "market_data.get_index_price_candles",
+        lambda c, s: c.market_data.get_index_price_candles(symbol=s),
+    ),
+    (
         "market_data.get_current_candle",
         lambda c, s: c.market_data.get_current_candle(symbol=s),
     ),

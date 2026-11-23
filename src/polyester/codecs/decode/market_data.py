@@ -10,6 +10,8 @@ from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.models.market import (
     Candle,
     CandlesResult,
+    IndexPriceCandle,
+    IndexPriceCandlesResult,
     MarketTrade,
     MarketTradesResult,
     TradeEpochEnd,
@@ -274,3 +276,51 @@ def _reference_candles_from_columns(
             )
         )
     return candles
+
+
+def _index_price_candle_source(value: int) -> str:
+    return proto_enum_name(marketdata_pb2.IndexPriceCandleSource, value).removeprefix(
+        "index_price_candle_source_"
+    )
+
+
+def index_price_candles_from_proto(
+    msg: marketdata_pb2.GetIndexPriceCandlesResponse,
+    *,
+    reference_price_scale: int,
+) -> IndexPriceCandlesResult:
+    """Decode a ``GetIndexPriceCandles`` page into rows, newest first as sent.
+
+    Element ``i`` of every column is the same candle; a column of another
+    length is a contract violation. Both series use the pair's
+    ``reference_price_scale``.
+    """
+    row_count = len(msg.ts_sec)
+    lengths = {
+        "open": len(msg.open),
+        "high": len(msg.high),
+        "low": len(msg.low),
+        "close": len(msg.close),
+        "source": len(msg.source),
+    }
+    if any(length != row_count for length in lengths.values()):
+        rendered = ", ".join(
+            [f"ts_sec={row_count}", *(f"{name}={length}" for name, length in lengths.items())]
+        )
+        raise PolyesterTransportError(f"invalid GetIndexPriceCandles response lengths: {rendered}")
+    return IndexPriceCandlesResult(
+        symbol_id=int(msg.symbol_id),
+        timeframe=_timeframe_label(msg.timeframe),
+        candles=[
+            IndexPriceCandle(
+                ts_sec=int(ts),
+                open=format_qty_scaled(int(msg.open[index]), reference_price_scale),
+                high=format_qty_scaled(int(msg.high[index]), reference_price_scale),
+                low=format_qty_scaled(int(msg.low[index]), reference_price_scale),
+                close=format_qty_scaled(int(msg.close[index]), reference_price_scale),
+                source=_index_price_candle_source(msg.source[index]),
+            )
+            for index, ts in enumerate(msg.ts_sec)
+        ],
+        next_page_token=msg.next_page_token,
+    )

@@ -928,10 +928,11 @@ def test_assistant_surface_reads_and_filters() -> None:
     assert _enum_values(changelog_pb2.Surface, ["assistant"], "surfaces") == [11]
 
 
-def test_list_changes_filter_takes_all_eleven_surfaces() -> None:
+def test_list_changes_filter_takes_all_twelve_surfaces() -> None:
     labels = [name.lower() for name, number in changelog_pb2.Surface.items() if number != 0]
-    assert len(labels) == 11
-    assert _enum_values(changelog_pb2.Surface, labels, "surfaces") == list(range(1, 12))
+    assert len(labels) == 12
+    assert "trading_bots" in labels
+    assert _enum_values(changelog_pb2.Surface, labels, "surfaces") == list(range(1, 13))
 
 
 # --- attached-risk leg violations (covered with no code change) ---------------------------------

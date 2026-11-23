@@ -172,8 +172,8 @@ async def test_unset_timestamps_read_none_through_services(json_wire: bool) -> N
         "ListSubaccountInvites": subaccounts_pb2.ListSubaccountInvitesResponse(invites=_invites()),
         "ListSubaccountActivity": subaccounts_pb2.ListSubaccountEventsResponse(
             events=[
-                subaccounts_pb2.ActivityEvent(actor_account_id=7),
-                subaccounts_pb2.ActivityEvent(actor_account_id=7, created_at=_ts(_CREATED)),
+                subaccounts_pb2.ActivityEvent(subaccount_id=7),
+                subaccounts_pb2.ActivityEvent(subaccount_id=7, created_at=_ts(_CREATED)),
             ]
         ),
     }

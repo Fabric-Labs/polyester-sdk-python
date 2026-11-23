@@ -126,9 +126,20 @@ lists only the main account's own events, which carry no `subaccount_id`),
 `"failed"`, ...), `sources`, `api_key_id`, and a timezone-aware `start_time`
 (inclusive) and `end_time` (exclusive). A filter the contract refuses (an
 unknown label, a repeated value or ID, too many values, an empty range) raises
-`PolyesterValidationError` before sending. Each event names its `subaccount_id`
-and, when the actor used an API key, `actor_api_key_id`. A wallet sign-in is a
-`"session"` event, `"created"` or `"failed"`. An API key needs
+`PolyesterValidationError` before sending. `api_key_id` takes the key's `ak_…`
+ID, as `key_id` shows it. Each event names its `subaccount_id`, who acted in
+`actor` (`kind` `"user"`, `"api_key"`, `"system"` or `"unauthenticated"`, with
+the account, the API key's `ak_…` ID, kind and label, or the system reason),
+the item it changed in `item` (`kind` names the ID that is set, `id` and
+`name`), and what changed in `details`: the change in its REST JSON form, one
+key naming the kind of item and holding only the fields the event set. A value
+that changed is a `{"from": ..., "to": ...}` pair (text, flags, numbers, times
+and statuses), an ID that changed a `{"fromId": ..., "toId": ...}` pair, and a
+list that changed an `{"added": [...], "removed": [...]}` or
+`{"addedIds": [...], "removedIds": [...]}` change; other fields are plain
+values, such as a sign-in `method` or a policy's `sourceTemplateId`. Keys are
+camelCase, enums their names, times RFC 3339, and IDs public IDs. A wallet
+sign-in is a `"session"` event, `"created"` or `"failed"`. An API key needs
 `READ_ACCOUNT_ACTIVITY`.
 
 Private streams require an Account ID and the corresponding API-key permission.
@@ -1226,7 +1237,7 @@ needs no API key, and the server rate-limits it per client address.
 Categories (`breaking_change`, `new_feature`, `improvement`, `bug_fix`),
 audiences (`all_users`, `traders`, `market_makers`, `developers`) and surfaces
 (`trading`, `funding`, `accounts`, `api`, `explorer`, `documentation`,
-`platform`, `market_data`, `quickswap`, `rewards`, `assistant`),
+`platform`, `market_data`, `quickswap`, `rewards`, `assistant`, `trading_bots`),
 environments (`devnet`, `testnet`, `mainnet`) and change availabilities
 (`ahead`, `pending`, `unavailable`) are lowercase labels. A
 value newer than this SDK reads as its number instead of failing. Each
@@ -2346,6 +2357,30 @@ reads `False`. Reference candles are always closed. From a server that sends no
 closed column, a columnar candle reads `is_closed=True`, except the newest
 primary candle of a first page (no `page_token`) asked with
 `include_incomplete=True`, which reads `False` (not known to be closed).
+
+`get_index_price_candles()` returns one page of a spot market's index price
+series, closed candles only, newest first. It is continuous: the market's
+composite reference candles before the bucket containing its listing time
+(`source="reference"`), its index price candles from that bucket on
+(`source="index"`). Prices use the pair's `reference_price_scale`; there is no
+volume. A missing bucket is a gap, never filled. Every timeframe except `"1s"`
+is served. `start_time` and `end_time` are inclusive, timezone-aware
+`datetime` bounds; pass `next_page_token` back with the same symbol, timeframe
+and bounds to read older candles.
+
+```python
+from datetime import UTC, datetime
+
+page = await client.market_data.get_index_price_candles(
+    symbol="BTC-USDT",
+    timeframe="1h",
+    start_time=datetime(2026, 1, 1, tzinfo=UTC),
+    end_time=datetime(2026, 2, 1, tzinfo=UTC),
+    limit=745,
+)
+for candle in page.candles:
+    print(candle.ts_sec, candle.close, candle.source)
+```
 
 Merged market overview stream (snapshot + live updates). The create call waits
 for the WebSocket handshake and initial snapshot. With `symbols=[...]`, the

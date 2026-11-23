@@ -1,5 +1,5 @@
 {
-  "source": "Fabric-Labs/polyester-proto develop 74b89c528efa62b7df288697a46f64ad4d9baee2 docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
+  "source": "Fabric-Labs/polyester-proto develop ebfc83b9fa594fa487f14af666e83b7f11749b20 docs/errors.json, every (code, status, connect) variant of every catalog but QuickSwap's (swap-api), whose API this SDK does not call",
   "codes": [
     {"code": "ACCOUNT_ORDERS_SUSPENDED", "status": 400, "connect": "failed_precondition"},
     {"code": "ACCOUNT_REPAIRING", "status": 400, "connect": "failed_precondition"},
@@ -165,6 +165,7 @@
     {"code": "ORDER_TYPE_NOT_ALLOWED_IN_AUCTION", "status": 400, "connect": "failed_precondition"},
     {"code": "ORDER_UNKNOWN", "status": 404, "connect": "not_found"},
     {"code": "OVERLOADED", "status": 503, "connect": "resource_exhausted"},
+    {"code": "PAGE_TOKEN_INVALID", "status": 400, "connect": "invalid_argument"},
     {"code": "PAIR_BACKLOGGED", "status": 503, "connect": "unavailable"},
     {"code": "PAIR_CANCEL_ONLY", "status": 400, "connect": "invalid_argument"},
     {"code": "PAIR_DELISTED", "status": 400, "connect": "invalid_argument"},

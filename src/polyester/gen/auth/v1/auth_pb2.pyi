@@ -98,6 +98,7 @@ class AuthErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AUTH_STRATEGY_BOT_MANAGED: _ClassVar[AuthErrorCode]
     AUTH_STRATEGY_BOT_SUBACCOUNT_INELIGIBLE: _ClassVar[AuthErrorCode]
     AUTH_STRATEGY_BOT_OPERATION_CONFLICT: _ClassVar[AuthErrorCode]
+    AUTH_SUBACCOUNT_IDEMPOTENCY_CONFLICT: _ClassVar[AuthErrorCode]
 WALLET_PROOF_UNSPECIFIED: WalletChallengePurpose
 LOGIN: WalletChallengePurpose
 AUTH_UNSPECIFIED: AuthErrorCode
@@ -175,6 +176,7 @@ AUTH_CONNECTED_APP_LIMIT_REACHED: AuthErrorCode
 AUTH_STRATEGY_BOT_MANAGED: AuthErrorCode
 AUTH_STRATEGY_BOT_SUBACCOUNT_INELIGIBLE: AuthErrorCode
 AUTH_STRATEGY_BOT_OPERATION_CONFLICT: AuthErrorCode
+AUTH_SUBACCOUNT_IDEMPOTENCY_CONFLICT: AuthErrorCode
 
 class CreateWalletChallengeRequest(_message.Message):
     __slots__ = ("smart_account_address", "signer_address", "uri", "purpose")

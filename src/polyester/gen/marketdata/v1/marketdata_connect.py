@@ -31,6 +31,9 @@ class MarketDataService(Protocol):
     async def get_candles_columns(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_index_price_candles(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def get_spot_config(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -82,6 +85,16 @@ class MarketDataServiceASGIApplication(ConnectASGIApplication[MarketDataService]
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_candles_columns,
+                ),
+                "/marketdata.v1.MarketDataService/GetIndexPriceCandles": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetIndexPriceCandles",
+                        service_name="marketdata.v1.MarketDataService",
+                        input=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest,
+                        output=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.get_index_price_candles,
                 ),
                 "/marketdata.v1.MarketDataService/GetSpotConfig": Endpoint.unary(
                     method=MethodInfo(
@@ -199,6 +212,26 @@ class MarketDataServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_index_price_candles(
+        self,
+        request: marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetIndexPriceCandles",
+                service_name="marketdata.v1.MarketDataService",
+                input=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest,
+                output=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
     async def get_spot_config(
         self,
         request: marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigRequest,
@@ -252,6 +285,8 @@ class MarketDataServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_candles_columns(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_index_price_candles(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_spot_config(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetSpotConfigResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_price_band(self, request: marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandRequest, ctx: RequestContext) -> marketdata_dot_v1_dot_marketdata__pb2.GetPriceBandResponse:
@@ -301,6 +336,16 @@ class MarketDataServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_candles_columns,
+                ),
+                "/marketdata.v1.MarketDataService/GetIndexPriceCandles": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetIndexPriceCandles",
+                        service_name="marketdata.v1.MarketDataService",
+                        input=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest,
+                        output=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.get_index_price_candles,
                 ),
                 "/marketdata.v1.MarketDataService/GetSpotConfig": EndpointSync.unary(
                     method=MethodInfo(
@@ -412,6 +457,26 @@ class MarketDataServiceClientSync(ConnectClientSync):
                 service_name="marketdata.v1.MarketDataService",
                 input=marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsRequest,
                 output=marketdata_dot_v1_dot_marketdata__pb2.GetCandlesColumnsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_index_price_candles(
+        self,
+        request: marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetIndexPriceCandles",
+                service_name="marketdata.v1.MarketDataService",
+                input=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesRequest,
+                output=marketdata_dot_v1_dot_marketdata__pb2.GetIndexPriceCandlesResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

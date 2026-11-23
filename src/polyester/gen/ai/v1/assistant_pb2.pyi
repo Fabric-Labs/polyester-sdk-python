@@ -291,18 +291,28 @@ class ErrorDetail(_message.Message):
     def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
 
 class Conversation(_message.Message):
-    __slots__ = ("conversation_id", "title", "created_at", "updated_at", "subject")
+    __slots__ = ("conversation_id", "title", "created_at", "updated_at", "subject", "last_account")
     CONVERSATION_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     SUBJECT_FIELD_NUMBER: _ClassVar[int]
+    LAST_ACCOUNT_FIELD_NUMBER: _ClassVar[int]
     conversation_id: int
     title: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     subject: Subject
-    def __init__(self, conversation_id: _Optional[int] = ..., title: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., subject: _Optional[_Union[Subject, _Mapping]] = ...) -> None: ...
+    last_account: ConversationAccount
+    def __init__(self, conversation_id: _Optional[int] = ..., title: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., subject: _Optional[_Union[Subject, _Mapping]] = ..., last_account: _Optional[_Union[ConversationAccount, _Mapping]] = ...) -> None: ...
+
+class ConversationAccount(_message.Message):
+    __slots__ = ("account_selection", "subaccount_id")
+    ACCOUNT_SELECTION_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    account_selection: AccountSelection
+    subaccount_id: int
+    def __init__(self, account_selection: _Optional[_Union[AccountSelection, str]] = ..., subaccount_id: _Optional[int] = ...) -> None: ...
 
 class Message(_message.Message):
     __slots__ = ("message_id", "role", "text", "created_at", "run_id", "images")
@@ -573,18 +583,30 @@ class SubagentStarted(_message.Message):
     def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ..., funding: _Optional[_Union[FundingMode, str]] = ..., credit_cap: _Optional[int] = ...) -> None: ...
 
 class SubagentFinished(_message.Message):
-    __slots__ = ("subagent_id", "name", "ok", "summary", "deploy_url")
+    __slots__ = ("subagent_id", "name", "ok", "summary", "deploy_url", "draft_version")
     SUBAGENT_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     OK_FIELD_NUMBER: _ClassVar[int]
     SUMMARY_FIELD_NUMBER: _ClassVar[int]
     DEPLOY_URL_FIELD_NUMBER: _ClassVar[int]
+    DRAFT_VERSION_FIELD_NUMBER: _ClassVar[int]
     subagent_id: str
     name: str
     ok: bool
     summary: str
     deploy_url: str
-    def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ..., ok: _Optional[bool] = ..., summary: _Optional[str] = ..., deploy_url: _Optional[str] = ...) -> None: ...
+    draft_version: DraftVersion
+    def __init__(self, subagent_id: _Optional[str] = ..., name: _Optional[str] = ..., ok: _Optional[bool] = ..., summary: _Optional[str] = ..., deploy_url: _Optional[str] = ..., draft_version: _Optional[_Union[DraftVersion, _Mapping]] = ...) -> None: ...
+
+class DraftVersion(_message.Message):
+    __slots__ = ("strategy_id", "revision", "version_id")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    revision: int
+    version_id: str
+    def __init__(self, strategy_id: _Optional[int] = ..., revision: _Optional[int] = ..., version_id: _Optional[str] = ...) -> None: ...
 
 class ApprovalParameter(_message.Message):
     __slots__ = ("label", "value")
@@ -918,6 +940,12 @@ class CancelTriggerPreview(_message.Message):
     cancels_open_orders: bool
     def __init__(self, trigger_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., type: _Optional[_Union[_triggers_pb2.TriggerType, str]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., quantity: _Optional[str] = ..., trigger_price: _Optional[str] = ..., filled_quantity: _Optional[str] = ..., slices_done: _Optional[int] = ..., slice_count: _Optional[int] = ..., levels_filled: _Optional[int] = ..., level_count: _Optional[int] = ..., cancels_open_orders: _Optional[bool] = ...) -> None: ...
 
+class CancelTriggersPreview(_message.Message):
+    __slots__ = ("triggers",)
+    TRIGGERS_FIELD_NUMBER: _ClassVar[int]
+    triggers: _containers.RepeatedCompositeFieldContainer[CancelTriggerPreview]
+    def __init__(self, triggers: _Optional[_Iterable[_Union[CancelTriggerPreview, _Mapping]]] = ...) -> None: ...
+
 class OrderChange(_message.Message):
     __slots__ = ("order_id", "side", "price", "new_price", "quantity", "new_quantity", "filled_quantity", "replaced")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -1009,7 +1037,7 @@ class TriggerChangePreview(_message.Message):
     def __init__(self, trigger_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., type: _Optional[_Union[_triggers_pb2.TriggerType, str]] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., quantity: _Optional[str] = ..., action: _Optional[_Union[TriggerChangeAction, str]] = ..., before: _Optional[_Union[TriggerSettings, _Mapping]] = ..., after: _Optional[_Union[TriggerSettings, _Mapping]] = ..., reference_price: _Optional[_Union[ReferencePrice, _Mapping]] = ..., direction: _Optional[_Union[TriggerDirection, str]] = ..., reserve_increase: _Optional[str] = ..., reserve_release: _Optional[str] = ..., fires_on_resume: _Optional[bool] = ...) -> None: ...
 
 class ApprovalRequested(_message.Message):
-    __slots__ = ("approval_id", "summary", "expires_at", "parameters", "account_id", "order_preview", "cancel_orders", "order_change", "trigger_change", "place_orders", "swap", "cancel_trigger")
+    __slots__ = ("approval_id", "summary", "expires_at", "parameters", "account_id", "order_preview", "cancel_orders", "order_change", "trigger_change", "place_orders", "swap", "cancel_trigger", "cancel_triggers")
     APPROVAL_ID_FIELD_NUMBER: _ClassVar[int]
     SUMMARY_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
@@ -1022,6 +1050,7 @@ class ApprovalRequested(_message.Message):
     PLACE_ORDERS_FIELD_NUMBER: _ClassVar[int]
     SWAP_FIELD_NUMBER: _ClassVar[int]
     CANCEL_TRIGGER_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_TRIGGERS_FIELD_NUMBER: _ClassVar[int]
     approval_id: int
     summary: str
     expires_at: _timestamp_pb2.Timestamp
@@ -1034,7 +1063,8 @@ class ApprovalRequested(_message.Message):
     place_orders: PlaceOrdersPreview
     swap: SwapPreview
     cancel_trigger: CancelTriggerPreview
-    def __init__(self, approval_id: _Optional[int] = ..., summary: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., parameters: _Optional[_Iterable[_Union[ApprovalParameter, _Mapping]]] = ..., account_id: _Optional[int] = ..., order_preview: _Optional[_Union[OrderPreview, _Mapping]] = ..., cancel_orders: _Optional[_Union[CancelOrdersPreview, _Mapping]] = ..., order_change: _Optional[_Union[OrderChangePreview, _Mapping]] = ..., trigger_change: _Optional[_Union[TriggerChangePreview, _Mapping]] = ..., place_orders: _Optional[_Union[PlaceOrdersPreview, _Mapping]] = ..., swap: _Optional[_Union[SwapPreview, _Mapping]] = ..., cancel_trigger: _Optional[_Union[CancelTriggerPreview, _Mapping]] = ...) -> None: ...
+    cancel_triggers: CancelTriggersPreview
+    def __init__(self, approval_id: _Optional[int] = ..., summary: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., parameters: _Optional[_Iterable[_Union[ApprovalParameter, _Mapping]]] = ..., account_id: _Optional[int] = ..., order_preview: _Optional[_Union[OrderPreview, _Mapping]] = ..., cancel_orders: _Optional[_Union[CancelOrdersPreview, _Mapping]] = ..., order_change: _Optional[_Union[OrderChangePreview, _Mapping]] = ..., trigger_change: _Optional[_Union[TriggerChangePreview, _Mapping]] = ..., place_orders: _Optional[_Union[PlaceOrdersPreview, _Mapping]] = ..., swap: _Optional[_Union[SwapPreview, _Mapping]] = ..., cancel_trigger: _Optional[_Union[CancelTriggerPreview, _Mapping]] = ..., cancel_triggers: _Optional[_Union[CancelTriggersPreview, _Mapping]] = ...) -> None: ...
 
 class ApprovalResolved(_message.Message):
     __slots__ = ("approval_id", "status")
@@ -1275,12 +1305,14 @@ class ListMessagesRequest(_message.Message):
     def __init__(self, conversation_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListMessagesResponse(_message.Message):
-    __slots__ = ("messages", "next_page_token")
+    __slots__ = ("messages", "next_page_token", "last_account")
     MESSAGES_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    LAST_ACCOUNT_FIELD_NUMBER: _ClassVar[int]
     messages: _containers.RepeatedCompositeFieldContainer[Message]
     next_page_token: str
-    def __init__(self, messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    last_account: ConversationAccount
+    def __init__(self, messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., last_account: _Optional[_Union[ConversationAccount, _Mapping]] = ...) -> None: ...
 
 class GetMessageImageRequest(_message.Message):
     __slots__ = ("image_id",)

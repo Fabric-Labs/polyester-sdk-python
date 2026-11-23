@@ -1,6 +1,7 @@
 import datetime
 
 from polyester.gen.auth.v1 import api_keys_pb2 as _api_keys_pb2
+from polyester.gen.auth.v1 import mfa_pb2 as _mfa_pb2
 from polyester.gen.auth.v1 import policies_pb2 as _policies_pb2
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
@@ -133,6 +134,70 @@ class ActivityEventSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTIVITY_SOURCE_WEB: _ClassVar[ActivityEventSource]
     ACTIVITY_SOURCE_MOBILE: _ClassVar[ActivityEventSource]
     ACTIVITY_SOURCE_API: _ClassVar[ActivityEventSource]
+    ACTIVITY_SOURCE_SYSTEM: _ClassVar[ActivityEventSource]
+
+class ActivityActorKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_ACTOR_UNSPECIFIED: _ClassVar[ActivityActorKind]
+    ACTIVITY_ACTOR_USER: _ClassVar[ActivityActorKind]
+    ACTIVITY_ACTOR_API_KEY: _ClassVar[ActivityActorKind]
+    ACTIVITY_ACTOR_SYSTEM: _ClassVar[ActivityActorKind]
+    ACTIVITY_ACTOR_UNAUTHENTICATED: _ClassVar[ActivityActorKind]
+
+class ActivityApiKeyKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_KEY_UNSPECIFIED: _ClassVar[ActivityApiKeyKind]
+    ACTIVITY_KEY_STANDARD: _ClassVar[ActivityApiKeyKind]
+    ACTIVITY_KEY_ASSISTANT: _ClassVar[ActivityApiKeyKind]
+    ACTIVITY_KEY_ADMIN: _ClassVar[ActivityApiKeyKind]
+    ACTIVITY_KEY_STRATEGY_BOT: _ClassVar[ActivityApiKeyKind]
+    ACTIVITY_KEY_BROKER: _ClassVar[ActivityApiKeyKind]
+
+class ActivityBrokerRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_BROKER_ROLE_UNSPECIFIED: _ClassVar[ActivityBrokerRole]
+    ACTIVITY_BROKER_OWNER: _ClassVar[ActivityBrokerRole]
+    ACTIVITY_BROKER_ADMIN: _ClassVar[ActivityBrokerRole]
+    ACTIVITY_BROKER_FINANCE: _ClassVar[ActivityBrokerRole]
+    ACTIVITY_BROKER_AFFILIATE_MANAGER: _ClassVar[ActivityBrokerRole]
+    ACTIVITY_BROKER_VIEWER: _ClassVar[ActivityBrokerRole]
+
+class ActivitySystemReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_SYSTEM_REASON_UNSPECIFIED: _ClassVar[ActivitySystemReason]
+    ACTIVITY_SYSTEM_ASSISTANT_PRESET_UPDATED: _ClassVar[ActivitySystemReason]
+    ACTIVITY_SYSTEM_BROKER_ALLOWLIST_CHANGE_SETTLED: _ClassVar[ActivitySystemReason]
+    ACTIVITY_SYSTEM_QUICKSWAP_POOL_PROVISIONED: _ClassVar[ActivitySystemReason]
+    ACTIVITY_SYSTEM_QUICKSWAP_BROKER_PROVISIONED: _ClassVar[ActivitySystemReason]
+    ACTIVITY_SYSTEM_BROKER_ALLOWLIST_CHANGE_RECONCILING: _ClassVar[ActivitySystemReason]
+
+class ActivitySignInMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_SIGN_IN_UNSPECIFIED: _ClassVar[ActivitySignInMethod]
+    ACTIVITY_SIGN_IN_WALLET: _ClassVar[ActivitySignInMethod]
+    ACTIVITY_SIGN_IN_CONNECTED_APP: _ClassVar[ActivitySignInMethod]
+
+class ActivitySignInFailure(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_SIGN_IN_FAILURE_UNSPECIFIED: _ClassVar[ActivitySignInFailure]
+    ACTIVITY_SIGN_IN_FAILURE_INVALID_CHALLENGE: _ClassVar[ActivitySignInFailure]
+    ACTIVITY_SIGN_IN_FAILURE_CHALLENGE_EXPIRED: _ClassVar[ActivitySignInFailure]
+    ACTIVITY_SIGN_IN_FAILURE_CHALLENGE_USED: _ClassVar[ActivitySignInFailure]
+    ACTIVITY_SIGN_IN_FAILURE_INVALID_SIGNATURE: _ClassVar[ActivitySignInFailure]
+    ACTIVITY_SIGN_IN_FAILURE_NO_CHALLENGE: _ClassVar[ActivitySignInFailure]
+
+class ActivityElevatedAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_ELEVATED_UNSPECIFIED: _ClassVar[ActivityElevatedAction]
+    ACTIVITY_ELEVATED_ASSISTANT_ACCESS: _ClassVar[ActivityElevatedAction]
+    ACTIVITY_ELEVATED_STRATEGY_BOT_ACCESS: _ClassVar[ActivityElevatedAction]
+    ACTIVITY_ELEVATED_TELEGRAM_LINK: _ClassVar[ActivityElevatedAction]
+
+class ActivityAllowlistAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ACTIVITY_ALLOWLIST_UNSPECIFIED: _ClassVar[ActivityAllowlistAction]
+    ACTIVITY_ALLOWLIST_ADD: _ClassVar[ActivityAllowlistAction]
+    ACTIVITY_ALLOWLIST_REMOVE: _ClassVar[ActivityAllowlistAction]
 SUBACCOUNT_STATUS_UNSPECIFIED: SubaccountStatus
 SUBACCOUNT_STATUS_ACTIVE: SubaccountStatus
 SUBACCOUNT_STATUS_DISABLED: SubaccountStatus
@@ -220,6 +285,46 @@ ACTIVITY_SOURCE_UNSPECIFIED: ActivityEventSource
 ACTIVITY_SOURCE_WEB: ActivityEventSource
 ACTIVITY_SOURCE_MOBILE: ActivityEventSource
 ACTIVITY_SOURCE_API: ActivityEventSource
+ACTIVITY_SOURCE_SYSTEM: ActivityEventSource
+ACTIVITY_ACTOR_UNSPECIFIED: ActivityActorKind
+ACTIVITY_ACTOR_USER: ActivityActorKind
+ACTIVITY_ACTOR_API_KEY: ActivityActorKind
+ACTIVITY_ACTOR_SYSTEM: ActivityActorKind
+ACTIVITY_ACTOR_UNAUTHENTICATED: ActivityActorKind
+ACTIVITY_KEY_UNSPECIFIED: ActivityApiKeyKind
+ACTIVITY_KEY_STANDARD: ActivityApiKeyKind
+ACTIVITY_KEY_ASSISTANT: ActivityApiKeyKind
+ACTIVITY_KEY_ADMIN: ActivityApiKeyKind
+ACTIVITY_KEY_STRATEGY_BOT: ActivityApiKeyKind
+ACTIVITY_KEY_BROKER: ActivityApiKeyKind
+ACTIVITY_BROKER_ROLE_UNSPECIFIED: ActivityBrokerRole
+ACTIVITY_BROKER_OWNER: ActivityBrokerRole
+ACTIVITY_BROKER_ADMIN: ActivityBrokerRole
+ACTIVITY_BROKER_FINANCE: ActivityBrokerRole
+ACTIVITY_BROKER_AFFILIATE_MANAGER: ActivityBrokerRole
+ACTIVITY_BROKER_VIEWER: ActivityBrokerRole
+ACTIVITY_SYSTEM_REASON_UNSPECIFIED: ActivitySystemReason
+ACTIVITY_SYSTEM_ASSISTANT_PRESET_UPDATED: ActivitySystemReason
+ACTIVITY_SYSTEM_BROKER_ALLOWLIST_CHANGE_SETTLED: ActivitySystemReason
+ACTIVITY_SYSTEM_QUICKSWAP_POOL_PROVISIONED: ActivitySystemReason
+ACTIVITY_SYSTEM_QUICKSWAP_BROKER_PROVISIONED: ActivitySystemReason
+ACTIVITY_SYSTEM_BROKER_ALLOWLIST_CHANGE_RECONCILING: ActivitySystemReason
+ACTIVITY_SIGN_IN_UNSPECIFIED: ActivitySignInMethod
+ACTIVITY_SIGN_IN_WALLET: ActivitySignInMethod
+ACTIVITY_SIGN_IN_CONNECTED_APP: ActivitySignInMethod
+ACTIVITY_SIGN_IN_FAILURE_UNSPECIFIED: ActivitySignInFailure
+ACTIVITY_SIGN_IN_FAILURE_INVALID_CHALLENGE: ActivitySignInFailure
+ACTIVITY_SIGN_IN_FAILURE_CHALLENGE_EXPIRED: ActivitySignInFailure
+ACTIVITY_SIGN_IN_FAILURE_CHALLENGE_USED: ActivitySignInFailure
+ACTIVITY_SIGN_IN_FAILURE_INVALID_SIGNATURE: ActivitySignInFailure
+ACTIVITY_SIGN_IN_FAILURE_NO_CHALLENGE: ActivitySignInFailure
+ACTIVITY_ELEVATED_UNSPECIFIED: ActivityElevatedAction
+ACTIVITY_ELEVATED_ASSISTANT_ACCESS: ActivityElevatedAction
+ACTIVITY_ELEVATED_STRATEGY_BOT_ACCESS: ActivityElevatedAction
+ACTIVITY_ELEVATED_TELEGRAM_LINK: ActivityElevatedAction
+ACTIVITY_ALLOWLIST_UNSPECIFIED: ActivityAllowlistAction
+ACTIVITY_ALLOWLIST_ADD: ActivityAllowlistAction
+ACTIVITY_ALLOWLIST_REMOVE: ActivityAllowlistAction
 
 class SubaccountPermissionDefinition(_message.Message):
     __slots__ = ("permission", "display_name", "description", "policy_action")
@@ -284,7 +389,7 @@ class SubaccountRoleView(_message.Message):
     def __init__(self, subaccount_id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ...) -> None: ...
 
 class Subaccount(_message.Message):
-    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa", "smart_account_salt_nonce", "updated_at", "revision", "removed")
+    __slots__ = ("id", "role", "label", "icon", "color", "status", "smart_account_address", "owner_username", "owner_avatar_url", "owner_root_smart_account_address", "subaccount_policy_id", "require_member_mfa", "smart_account_salt_nonce", "updated_at", "revision", "removed", "idempotency_key")
     ID_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
     LABEL_FIELD_NUMBER: _ClassVar[int]
@@ -301,6 +406,7 @@ class Subaccount(_message.Message):
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
     REMOVED_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     id: int
     role: SubaccountRole
     label: str
@@ -317,7 +423,8 @@ class Subaccount(_message.Message):
     updated_at: _timestamp_pb2.Timestamp
     revision: int
     removed: bool
-    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[_Union[SubaccountStatus, str]] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., removed: _Optional[bool] = ...) -> None: ...
+    idempotency_key: str
+    def __init__(self, id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., status: _Optional[_Union[SubaccountStatus, str]] = ..., smart_account_address: _Optional[str] = ..., owner_username: _Optional[str] = ..., owner_avatar_url: _Optional[str] = ..., owner_root_smart_account_address: _Optional[str] = ..., subaccount_policy_id: _Optional[int] = ..., require_member_mfa: _Optional[bool] = ..., smart_account_salt_nonce: _Optional[int] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., revision: _Optional[int] = ..., removed: _Optional[bool] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class ListSubaccountsRequest(_message.Message):
     __slots__ = ()
@@ -354,32 +461,36 @@ class CreateSubaccountChallengeResponse(_message.Message):
     def __init__(self, message: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., smart_account_salt_nonce: _Optional[int] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., polyester_chain_id: _Optional[int] = ...) -> None: ...
 
 class CreateSubaccountRequest(_message.Message):
-    __slots__ = ("label", "icon", "color", "smart_account_address", "message", "signature")
+    __slots__ = ("label", "icon", "color", "smart_account_address", "message", "signature", "idempotency_key")
     LABEL_FIELD_NUMBER: _ClassVar[int]
     ICON_FIELD_NUMBER: _ClassVar[int]
     COLOR_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     label: str
     icon: str
     color: str
     smart_account_address: str
     message: str
     signature: str
-    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., message: _Optional[str] = ..., signature: _Optional[str] = ...) -> None: ...
+    idempotency_key: str
+    def __init__(self, label: _Optional[str] = ..., icon: _Optional[str] = ..., color: _Optional[str] = ..., smart_account_address: _Optional[str] = ..., message: _Optional[str] = ..., signature: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class CreateSubaccountResponse(_message.Message):
-    __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce", "revision")
+    __slots__ = ("subaccount_id", "total_created", "smart_account_salt_nonce", "revision", "replayed")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     TOTAL_CREATED_FIELD_NUMBER: _ClassVar[int]
     SMART_ACCOUNT_SALT_NONCE_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    REPLAYED_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     total_created: int
     smart_account_salt_nonce: int
     revision: int
-    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ..., revision: _Optional[int] = ...) -> None: ...
+    replayed: bool
+    def __init__(self, subaccount_id: _Optional[int] = ..., total_created: _Optional[int] = ..., smart_account_salt_nonce: _Optional[int] = ..., revision: _Optional[int] = ..., replayed: _Optional[bool] = ...) -> None: ...
 
 class SubaccountUpdateSpec(_message.Message):
     __slots__ = ("label", "icon", "color", "status")
@@ -585,29 +696,347 @@ class GetSubaccountResponse(_message.Message):
     balances: _ledger_read_pb2.GetBalancesResponse
     def __init__(self, subaccount: _Optional[_Union[Subaccount, _Mapping]] = ..., api_keys: _Optional[_Iterable[_Union[_api_keys_pb2.ApiKey, _Mapping]]] = ..., members: _Optional[_Iterable[_Union[SubaccountMemberView, _Mapping]]] = ..., invites: _Optional[_Iterable[_Union[SubaccountInvite, _Mapping]]] = ..., policy: _Optional[_Union[_policies_pb2.SubaccountPolicyView, _Mapping]] = ..., balances: _Optional[_Union[_ledger_read_pb2.GetBalancesResponse, _Mapping]] = ...) -> None: ...
 
+class ActivityActor(_message.Message):
+    __slots__ = ("kind", "account_id", "username", "api_key_id", "api_key_kind", "api_key_label", "system_reason")
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    USERNAME_FIELD_NUMBER: _ClassVar[int]
+    API_KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    API_KEY_KIND_FIELD_NUMBER: _ClassVar[int]
+    API_KEY_LABEL_FIELD_NUMBER: _ClassVar[int]
+    SYSTEM_REASON_FIELD_NUMBER: _ClassVar[int]
+    kind: ActivityActorKind
+    account_id: int
+    username: str
+    api_key_id: str
+    api_key_kind: ActivityApiKeyKind
+    api_key_label: str
+    system_reason: ActivitySystemReason
+    def __init__(self, kind: _Optional[_Union[ActivityActorKind, str]] = ..., account_id: _Optional[int] = ..., username: _Optional[str] = ..., api_key_id: _Optional[str] = ..., api_key_kind: _Optional[_Union[ActivityApiKeyKind, str]] = ..., api_key_label: _Optional[str] = ..., system_reason: _Optional[_Union[ActivitySystemReason, str]] = ...) -> None: ...
+
+class ActivityItem(_message.Message):
+    __slots__ = ("account_id", "subaccount_id", "invite_id", "subaccount_policy_id", "api_policy_id", "api_key_id", "mfa_factor_id", "address_book_entry_id", "broker_allowlist_change_id", "connected_app_id", "name")
+    ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    INVITE_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    API_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    API_KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    MFA_FACTOR_ID_FIELD_NUMBER: _ClassVar[int]
+    ADDRESS_BOOK_ENTRY_ID_FIELD_NUMBER: _ClassVar[int]
+    BROKER_ALLOWLIST_CHANGE_ID_FIELD_NUMBER: _ClassVar[int]
+    CONNECTED_APP_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    account_id: int
+    subaccount_id: int
+    invite_id: int
+    subaccount_policy_id: int
+    api_policy_id: int
+    api_key_id: str
+    mfa_factor_id: str
+    address_book_entry_id: int
+    broker_allowlist_change_id: int
+    connected_app_id: int
+    name: str
+    def __init__(self, account_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., invite_id: _Optional[int] = ..., subaccount_policy_id: _Optional[int] = ..., api_policy_id: _Optional[int] = ..., api_key_id: _Optional[str] = ..., mfa_factor_id: _Optional[str] = ..., address_book_entry_id: _Optional[int] = ..., broker_allowlist_change_id: _Optional[int] = ..., connected_app_id: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+
+class ActivityTextChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: str
+    def __init__(self, to: _Optional[str] = ..., **kwargs) -> None: ...
+
+class ActivityBoolChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: bool
+    def __init__(self, to: _Optional[bool] = ..., **kwargs) -> None: ...
+
+class ActivityUintChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: int
+    def __init__(self, to: _Optional[int] = ..., **kwargs) -> None: ...
+
+class ActivityTimeChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: _timestamp_pb2.Timestamp
+    def __init__(self, to: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., **kwargs) -> None: ...
+
+class ActivityIdChange(_message.Message):
+    __slots__ = ("from_id", "to_id")
+    FROM_ID_FIELD_NUMBER: _ClassVar[int]
+    TO_ID_FIELD_NUMBER: _ClassVar[int]
+    from_id: int
+    to_id: int
+    def __init__(self, from_id: _Optional[int] = ..., to_id: _Optional[int] = ...) -> None: ...
+
+class ActivityActionsChange(_message.Message):
+    __slots__ = ("added", "removed")
+    ADDED_FIELD_NUMBER: _ClassVar[int]
+    REMOVED_FIELD_NUMBER: _ClassVar[int]
+    added: _containers.RepeatedScalarFieldContainer[_policies_pb2.PolicyAction]
+    removed: _containers.RepeatedScalarFieldContainer[_policies_pb2.PolicyAction]
+    def __init__(self, added: _Optional[_Iterable[_Union[_policies_pb2.PolicyAction, str]]] = ..., removed: _Optional[_Iterable[_Union[_policies_pb2.PolicyAction, str]]] = ...) -> None: ...
+
+class ActivityListChange(_message.Message):
+    __slots__ = ("added", "removed")
+    ADDED_FIELD_NUMBER: _ClassVar[int]
+    REMOVED_FIELD_NUMBER: _ClassVar[int]
+    added: _containers.RepeatedScalarFieldContainer[str]
+    removed: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, added: _Optional[_Iterable[str]] = ..., removed: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class ActivityIdListChange(_message.Message):
+    __slots__ = ("added_ids", "removed_ids")
+    ADDED_IDS_FIELD_NUMBER: _ClassVar[int]
+    REMOVED_IDS_FIELD_NUMBER: _ClassVar[int]
+    added_ids: _containers.RepeatedScalarFieldContainer[int]
+    removed_ids: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, added_ids: _Optional[_Iterable[int]] = ..., removed_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class ActivityApiKeyStatusChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: _api_keys_pb2.ApiKeyStatus
+    def __init__(self, to: _Optional[_Union[_api_keys_pb2.ApiKeyStatus, str]] = ..., **kwargs) -> None: ...
+
+class ActivityApiKeyPurposeChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: _api_keys_pb2.ApiKeyPurpose
+    def __init__(self, to: _Optional[_Union[_api_keys_pb2.ApiKeyPurpose, str]] = ..., **kwargs) -> None: ...
+
+class ActivitySubaccountStatusChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: SubaccountStatus
+    def __init__(self, to: _Optional[_Union[SubaccountStatus, str]] = ..., **kwargs) -> None: ...
+
+class ActivitySubaccountRoleChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: SubaccountRole
+    def __init__(self, to: _Optional[_Union[SubaccountRole, str]] = ..., **kwargs) -> None: ...
+
+class ActivityBrokerRoleChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: ActivityBrokerRole
+    def __init__(self, to: _Optional[_Union[ActivityBrokerRole, str]] = ..., **kwargs) -> None: ...
+
+class ActivityInviteStatusChange(_message.Message):
+    __slots__ = ("to",)
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    TO_FIELD_NUMBER: _ClassVar[int]
+    to: SubaccountInviteStatus
+    def __init__(self, to: _Optional[_Union[SubaccountInviteStatus, str]] = ..., **kwargs) -> None: ...
+
+class ActivityAccountDetails(_message.Message):
+    __slots__ = ("username", "generated_username")
+    USERNAME_FIELD_NUMBER: _ClassVar[int]
+    GENERATED_USERNAME_FIELD_NUMBER: _ClassVar[int]
+    username: ActivityTextChange
+    generated_username: bool
+    def __init__(self, username: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., generated_username: _Optional[bool] = ...) -> None: ...
+
+class ActivitySessionDetails(_message.Message):
+    __slots__ = ("method", "wallet_address", "failure", "scopes", "elevated_action")
+    METHOD_FIELD_NUMBER: _ClassVar[int]
+    WALLET_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    FAILURE_FIELD_NUMBER: _ClassVar[int]
+    SCOPES_FIELD_NUMBER: _ClassVar[int]
+    ELEVATED_ACTION_FIELD_NUMBER: _ClassVar[int]
+    method: ActivitySignInMethod
+    wallet_address: str
+    failure: ActivitySignInFailure
+    scopes: _containers.RepeatedScalarFieldContainer[str]
+    elevated_action: ActivityElevatedAction
+    def __init__(self, method: _Optional[_Union[ActivitySignInMethod, str]] = ..., wallet_address: _Optional[str] = ..., failure: _Optional[_Union[ActivitySignInFailure, str]] = ..., scopes: _Optional[_Iterable[str]] = ..., elevated_action: _Optional[_Union[ActivityElevatedAction, str]] = ...) -> None: ...
+
+class ActivityApiKeyDetails(_message.Message):
+    __slots__ = ("label", "status", "purpose", "icon", "color", "ip_allowlist", "expires_at", "api_policy_id", "strategy_bot_id")
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    PURPOSE_FIELD_NUMBER: _ClassVar[int]
+    ICON_FIELD_NUMBER: _ClassVar[int]
+    COLOR_FIELD_NUMBER: _ClassVar[int]
+    IP_ALLOWLIST_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    API_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    label: ActivityTextChange
+    status: ActivityApiKeyStatusChange
+    purpose: ActivityApiKeyPurposeChange
+    icon: ActivityTextChange
+    color: ActivityTextChange
+    ip_allowlist: ActivityListChange
+    expires_at: ActivityTimeChange
+    api_policy_id: ActivityIdChange
+    strategy_bot_id: int
+    def __init__(self, label: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., status: _Optional[_Union[ActivityApiKeyStatusChange, _Mapping]] = ..., purpose: _Optional[_Union[ActivityApiKeyPurposeChange, _Mapping]] = ..., icon: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., color: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., ip_allowlist: _Optional[_Union[ActivityListChange, _Mapping]] = ..., expires_at: _Optional[_Union[ActivityTimeChange, _Mapping]] = ..., api_policy_id: _Optional[_Union[ActivityIdChange, _Mapping]] = ..., strategy_bot_id: _Optional[int] = ...) -> None: ...
+
+class ActivityPolicyDetails(_message.Message):
+    __slots__ = ("name", "description", "actions", "all_spot_markets", "max_order_notional", "max_open_orders", "trading_halted", "locked", "review_at", "expires_at", "assistant_preset", "source_template_id", "source_template_revision", "subaccount_policy_id", "strategy_bot_id")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    ACTIONS_FIELD_NUMBER: _ClassVar[int]
+    ALL_SPOT_MARKETS_FIELD_NUMBER: _ClassVar[int]
+    MAX_ORDER_NOTIONAL_FIELD_NUMBER: _ClassVar[int]
+    MAX_OPEN_ORDERS_FIELD_NUMBER: _ClassVar[int]
+    TRADING_HALTED_FIELD_NUMBER: _ClassVar[int]
+    LOCKED_FIELD_NUMBER: _ClassVar[int]
+    REVIEW_AT_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    ASSISTANT_PRESET_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TEMPLATE_REVISION_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_POLICY_ID_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    name: ActivityTextChange
+    description: ActivityTextChange
+    actions: ActivityActionsChange
+    all_spot_markets: ActivityBoolChange
+    max_order_notional: ActivityUintChange
+    max_open_orders: ActivityUintChange
+    trading_halted: ActivityBoolChange
+    locked: ActivityBoolChange
+    review_at: ActivityTimeChange
+    expires_at: ActivityTimeChange
+    assistant_preset: _api_keys_pb2.AssistantKeyPreset
+    source_template_id: int
+    source_template_revision: int
+    subaccount_policy_id: ActivityIdChange
+    strategy_bot_id: int
+    def __init__(self, name: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., description: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., actions: _Optional[_Union[ActivityActionsChange, _Mapping]] = ..., all_spot_markets: _Optional[_Union[ActivityBoolChange, _Mapping]] = ..., max_order_notional: _Optional[_Union[ActivityUintChange, _Mapping]] = ..., max_open_orders: _Optional[_Union[ActivityUintChange, _Mapping]] = ..., trading_halted: _Optional[_Union[ActivityBoolChange, _Mapping]] = ..., locked: _Optional[_Union[ActivityBoolChange, _Mapping]] = ..., review_at: _Optional[_Union[ActivityTimeChange, _Mapping]] = ..., expires_at: _Optional[_Union[ActivityTimeChange, _Mapping]] = ..., assistant_preset: _Optional[_Union[_api_keys_pb2.AssistantKeyPreset, str]] = ..., source_template_id: _Optional[int] = ..., source_template_revision: _Optional[int] = ..., subaccount_policy_id: _Optional[_Union[ActivityIdChange, _Mapping]] = ..., strategy_bot_id: _Optional[int] = ...) -> None: ...
+
+class ActivitySubaccountDetails(_message.Message):
+    __slots__ = ("label", "status", "icon", "color", "require_member_mfa")
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    ICON_FIELD_NUMBER: _ClassVar[int]
+    COLOR_FIELD_NUMBER: _ClassVar[int]
+    REQUIRE_MEMBER_MFA_FIELD_NUMBER: _ClassVar[int]
+    label: ActivityTextChange
+    status: ActivitySubaccountStatusChange
+    icon: ActivityTextChange
+    color: ActivityTextChange
+    require_member_mfa: ActivityBoolChange
+    def __init__(self, label: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., status: _Optional[_Union[ActivitySubaccountStatusChange, _Mapping]] = ..., icon: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., color: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., require_member_mfa: _Optional[_Union[ActivityBoolChange, _Mapping]] = ...) -> None: ...
+
+class ActivityMemberDetails(_message.Message):
+    __slots__ = ("role", "broker_role", "ownership_transfer")
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    BROKER_ROLE_FIELD_NUMBER: _ClassVar[int]
+    OWNERSHIP_TRANSFER_FIELD_NUMBER: _ClassVar[int]
+    role: ActivitySubaccountRoleChange
+    broker_role: ActivityBrokerRoleChange
+    ownership_transfer: bool
+    def __init__(self, role: _Optional[_Union[ActivitySubaccountRoleChange, _Mapping]] = ..., broker_role: _Optional[_Union[ActivityBrokerRoleChange, _Mapping]] = ..., ownership_transfer: _Optional[bool] = ...) -> None: ...
+
+class ActivityInviteDetails(_message.Message):
+    __slots__ = ("grantee_account_id", "role", "broker_role", "status")
+    GRANTEE_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    BROKER_ROLE_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    grantee_account_id: int
+    role: SubaccountRole
+    broker_role: ActivityBrokerRole
+    status: ActivityInviteStatusChange
+    def __init__(self, grantee_account_id: _Optional[int] = ..., role: _Optional[_Union[SubaccountRole, str]] = ..., broker_role: _Optional[_Union[ActivityBrokerRole, str]] = ..., status: _Optional[_Union[ActivityInviteStatusChange, _Mapping]] = ...) -> None: ...
+
+class ActivityDestinationDetails(_message.Message):
+    __slots__ = ("label", "note_changed", "tag_ids")
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    NOTE_CHANGED_FIELD_NUMBER: _ClassVar[int]
+    TAG_IDS_FIELD_NUMBER: _ClassVar[int]
+    label: ActivityTextChange
+    note_changed: bool
+    tag_ids: ActivityIdListChange
+    def __init__(self, label: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., note_changed: _Optional[bool] = ..., tag_ids: _Optional[_Union[ActivityIdListChange, _Mapping]] = ...) -> None: ...
+
+class ActivityBrokerAllowlistDetails(_message.Message):
+    __slots__ = ("action", "destination", "destination_chain_id", "label")
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    action: ActivityAllowlistAction
+    destination: str
+    destination_chain_id: int
+    label: str
+    def __init__(self, action: _Optional[_Union[ActivityAllowlistAction, str]] = ..., destination: _Optional[str] = ..., destination_chain_id: _Optional[int] = ..., label: _Optional[str] = ...) -> None: ...
+
+class ActivitySecurityDetails(_message.Message):
+    __slots__ = ("factor_type", "label", "challenge_purpose", "recovery_codes_rotated")
+    FACTOR_TYPE_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    CHALLENGE_PURPOSE_FIELD_NUMBER: _ClassVar[int]
+    RECOVERY_CODES_ROTATED_FIELD_NUMBER: _ClassVar[int]
+    factor_type: _mfa_pb2.MFAFactorType
+    label: ActivityTextChange
+    challenge_purpose: _mfa_pb2.MFAChallengePurpose
+    recovery_codes_rotated: bool
+    def __init__(self, factor_type: _Optional[_Union[_mfa_pb2.MFAFactorType, str]] = ..., label: _Optional[_Union[ActivityTextChange, _Mapping]] = ..., challenge_purpose: _Optional[_Union[_mfa_pb2.MFAChallengePurpose, str]] = ..., recovery_codes_rotated: _Optional[bool] = ...) -> None: ...
+
+class ActivityDetails(_message.Message):
+    __slots__ = ("account", "session", "api_key", "policy", "subaccount", "member", "invite", "destination", "broker_allowlist", "security")
+    ACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    SESSION_FIELD_NUMBER: _ClassVar[int]
+    API_KEY_FIELD_NUMBER: _ClassVar[int]
+    POLICY_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    MEMBER_FIELD_NUMBER: _ClassVar[int]
+    INVITE_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_FIELD_NUMBER: _ClassVar[int]
+    BROKER_ALLOWLIST_FIELD_NUMBER: _ClassVar[int]
+    SECURITY_FIELD_NUMBER: _ClassVar[int]
+    account: ActivityAccountDetails
+    session: ActivitySessionDetails
+    api_key: ActivityApiKeyDetails
+    policy: ActivityPolicyDetails
+    subaccount: ActivitySubaccountDetails
+    member: ActivityMemberDetails
+    invite: ActivityInviteDetails
+    destination: ActivityDestinationDetails
+    broker_allowlist: ActivityBrokerAllowlistDetails
+    security: ActivitySecurityDetails
+    def __init__(self, account: _Optional[_Union[ActivityAccountDetails, _Mapping]] = ..., session: _Optional[_Union[ActivitySessionDetails, _Mapping]] = ..., api_key: _Optional[_Union[ActivityApiKeyDetails, _Mapping]] = ..., policy: _Optional[_Union[ActivityPolicyDetails, _Mapping]] = ..., subaccount: _Optional[_Union[ActivitySubaccountDetails, _Mapping]] = ..., member: _Optional[_Union[ActivityMemberDetails, _Mapping]] = ..., invite: _Optional[_Union[ActivityInviteDetails, _Mapping]] = ..., destination: _Optional[_Union[ActivityDestinationDetails, _Mapping]] = ..., broker_allowlist: _Optional[_Union[ActivityBrokerAllowlistDetails, _Mapping]] = ..., security: _Optional[_Union[ActivitySecurityDetails, _Mapping]] = ...) -> None: ...
+
 class ActivityEvent(_message.Message):
-    __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "actor_account_id", "payload_json", "subaccount_id", "actor_api_key_id")
+    __slots__ = ("created_at", "entity_kind", "event_action", "source", "ip", "user_agent", "subaccount_id", "actor", "item", "details")
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     ENTITY_KIND_FIELD_NUMBER: _ClassVar[int]
     EVENT_ACTION_FIELD_NUMBER: _ClassVar[int]
     SOURCE_FIELD_NUMBER: _ClassVar[int]
     IP_FIELD_NUMBER: _ClassVar[int]
     USER_AGENT_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    PAYLOAD_JSON_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
-    ACTOR_API_KEY_ID_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FIELD_NUMBER: _ClassVar[int]
+    ITEM_FIELD_NUMBER: _ClassVar[int]
+    DETAILS_FIELD_NUMBER: _ClassVar[int]
     created_at: _timestamp_pb2.Timestamp
     entity_kind: ActivityEntityKind
     event_action: ActivityEventAction
     source: ActivityEventSource
     ip: str
     user_agent: str
-    actor_account_id: int
-    payload_json: str
     subaccount_id: int
-    actor_api_key_id: int
-    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[_Union[ActivityEntityKind, str]] = ..., event_action: _Optional[_Union[ActivityEventAction, str]] = ..., source: _Optional[_Union[ActivityEventSource, str]] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., actor_account_id: _Optional[int] = ..., payload_json: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., actor_api_key_id: _Optional[int] = ...) -> None: ...
+    actor: ActivityActor
+    item: ActivityItem
+    details: ActivityDetails
+    def __init__(self, created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., entity_kind: _Optional[_Union[ActivityEntityKind, str]] = ..., event_action: _Optional[_Union[ActivityEventAction, str]] = ..., source: _Optional[_Union[ActivityEventSource, str]] = ..., ip: _Optional[str] = ..., user_agent: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., actor: _Optional[_Union[ActivityActor, _Mapping]] = ..., item: _Optional[_Union[ActivityItem, _Mapping]] = ..., details: _Optional[_Union[ActivityDetails, _Mapping]] = ...) -> None: ...
 
 class ListSubaccountEventsRequest(_message.Message):
     __slots__ = ("subaccount_id", "limit", "page_token")

@@ -33,10 +33,10 @@ class ListAccountActivityRequest(_message.Message):
     entity_kinds: _containers.RepeatedScalarFieldContainer[_subaccounts_pb2.ActivityEntityKind]
     event_actions: _containers.RepeatedScalarFieldContainer[_subaccounts_pb2.ActivityEventAction]
     sources: _containers.RepeatedScalarFieldContainer[_subaccounts_pb2.ActivityEventSource]
-    api_key_id: int
+    api_key_id: str
     start_time: _timestamp_pb2.Timestamp
     end_time: _timestamp_pb2.Timestamp
-    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ..., subaccount_ids: _Optional[_Iterable[int]] = ..., include_main_account: _Optional[bool] = ..., entity_kinds: _Optional[_Iterable[_Union[_subaccounts_pb2.ActivityEntityKind, str]]] = ..., event_actions: _Optional[_Iterable[_Union[_subaccounts_pb2.ActivityEventAction, str]]] = ..., sources: _Optional[_Iterable[_Union[_subaccounts_pb2.ActivityEventSource, str]]] = ..., api_key_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, limit: _Optional[int] = ..., page_token: _Optional[str] = ..., subaccount_ids: _Optional[_Iterable[int]] = ..., include_main_account: _Optional[bool] = ..., entity_kinds: _Optional[_Iterable[_Union[_subaccounts_pb2.ActivityEntityKind, str]]] = ..., event_actions: _Optional[_Iterable[_Union[_subaccounts_pb2.ActivityEventAction, str]]] = ..., sources: _Optional[_Iterable[_Union[_subaccounts_pb2.ActivityEventSource, str]]] = ..., api_key_id: _Optional[str] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ListAccountActivityResponse(_message.Message):
     __slots__ = ("events", "next_page_token")

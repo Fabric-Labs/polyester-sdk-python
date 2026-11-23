@@ -45,6 +45,18 @@ class StrategiesService(Protocol):
     async def delete_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.DeleteStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.DeleteStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def get_strategy_notes(self, request: strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def save_strategy_notes(self, request: strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_strategy_notes_revisions(self, request: strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_backtests(self, request: strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def run_scenarios(self, request: strategies_dot_v1_dot_strategies__pb2.RunScenariosRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.RunScenariosResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -54,10 +66,16 @@ class StrategiesService(Protocol):
     async def get_backtest(self, request: strategies_dot_v1_dot_strategies__pb2.GetBacktestRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetBacktestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def list_backtest_trades(self, request: strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def explain_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.ExplainStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ExplainStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def propose_deploy(self, request: strategies_dot_v1_dot_strategies__pb2.ProposeDeployRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ProposeDeployResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def deploy_bot(self, request: strategies_dot_v1_dot_strategies__pb2.DeployBotRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.DeployBotResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def get_deploy_status(self, request: strategies_dot_v1_dot_strategies__pb2.GetDeployStatusRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetDeployStatusResponse:
@@ -180,6 +198,46 @@ class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]
                     ),
                     function=svc.delete_strategy,
                 ),
+                "/strategies.v1.StrategiesService/GetStrategyNotes": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetStrategyNotes",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_strategy_notes,
+                ),
+                "/strategies.v1.StrategiesService/SaveStrategyNotes": Endpoint.unary(
+                    method=MethodInfo(
+                        name="SaveStrategyNotes",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.save_strategy_notes,
+                ),
+                "/strategies.v1.StrategiesService/ListStrategyNotesRevisions": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListStrategyNotesRevisions",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_strategy_notes_revisions,
+                ),
+                "/strategies.v1.StrategiesService/ListBacktests": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListBacktests",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_backtests,
+                ),
                 "/strategies.v1.StrategiesService/RunScenarios": Endpoint.unary(
                     method=MethodInfo(
                         name="RunScenarios",
@@ -210,6 +268,16 @@ class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]
                     ),
                     function=svc.get_backtest,
                 ),
+                "/strategies.v1.StrategiesService/ListBacktestTrades": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListBacktestTrades",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_backtest_trades,
+                ),
                 "/strategies.v1.StrategiesService/ExplainStrategy": Endpoint.unary(
                     method=MethodInfo(
                         name="ExplainStrategy",
@@ -229,6 +297,16 @@ class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]
                         idempotency_level=IdempotencyLevel.IDEMPOTENT,
                     ),
                     function=svc.propose_deploy,
+                ),
+                "/strategies.v1.StrategiesService/DeployBot": Endpoint.unary(
+                    method=MethodInfo(
+                        name="DeployBot",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.DeployBotRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.DeployBotResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.deploy_bot,
                 ),
                 "/strategies.v1.StrategiesService/GetDeployStatus": Endpoint.unary(
                     method=MethodInfo(
@@ -514,6 +592,92 @@ class StrategiesServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def get_strategy_notes(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetStrategyNotes",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def save_strategy_notes(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SaveStrategyNotes",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_strategy_notes_revisions(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListStrategyNotesRevisions",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def list_backtests(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListBacktests",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     async def run_scenarios(
         self,
         request: strategies_dot_v1_dot_strategies__pb2.RunScenariosRequest,
@@ -576,6 +740,28 @@ class StrategiesServiceClient(ConnectClient):
             use_get=use_get,
         )
 
+    async def list_backtest_trades(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListBacktestTrades",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     async def explain_strategy(
         self,
         request: strategies_dot_v1_dot_strategies__pb2.ExplainStrategyRequest,
@@ -612,6 +798,26 @@ class StrategiesServiceClient(ConnectClient):
                 service_name="strategies.v1.StrategiesService",
                 input=strategies_dot_v1_dot_strategies__pb2.ProposeDeployRequest,
                 output=strategies_dot_v1_dot_strategies__pb2.ProposeDeployResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def deploy_bot(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.DeployBotRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.DeployBotResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="DeployBot",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.DeployBotRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.DeployBotResponse,
                 idempotency_level=IdempotencyLevel.IDEMPOTENT,
             ),
             headers=headers,
@@ -815,15 +1021,27 @@ class StrategiesServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def delete_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.DeleteStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.DeleteStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_strategy_notes(self, request: strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def save_strategy_notes(self, request: strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_strategy_notes_revisions(self, request: strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_backtests(self, request: strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def run_scenarios(self, request: strategies_dot_v1_dot_strategies__pb2.RunScenariosRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.RunScenariosResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def start_backtest(self, request: strategies_dot_v1_dot_strategies__pb2.StartBacktestRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.StartBacktestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_backtest(self, request: strategies_dot_v1_dot_strategies__pb2.GetBacktestRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetBacktestResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_backtest_trades(self, request: strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def explain_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.ExplainStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ExplainStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def propose_deploy(self, request: strategies_dot_v1_dot_strategies__pb2.ProposeDeployRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ProposeDeployResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def deploy_bot(self, request: strategies_dot_v1_dot_strategies__pb2.DeployBotRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.DeployBotResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_deploy_status(self, request: strategies_dot_v1_dot_strategies__pb2.GetDeployStatusRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetDeployStatusResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -937,6 +1155,46 @@ class StrategiesServiceWSGIApplication(ConnectWSGIApplication):
                     ),
                     function=service.delete_strategy,
                 ),
+                "/strategies.v1.StrategiesService/GetStrategyNotes": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetStrategyNotes",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_strategy_notes,
+                ),
+                "/strategies.v1.StrategiesService/SaveStrategyNotes": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="SaveStrategyNotes",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.save_strategy_notes,
+                ),
+                "/strategies.v1.StrategiesService/ListStrategyNotesRevisions": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListStrategyNotesRevisions",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_strategy_notes_revisions,
+                ),
+                "/strategies.v1.StrategiesService/ListBacktests": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListBacktests",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_backtests,
+                ),
                 "/strategies.v1.StrategiesService/RunScenarios": EndpointSync.unary(
                     method=MethodInfo(
                         name="RunScenarios",
@@ -967,6 +1225,16 @@ class StrategiesServiceWSGIApplication(ConnectWSGIApplication):
                     ),
                     function=service.get_backtest,
                 ),
+                "/strategies.v1.StrategiesService/ListBacktestTrades": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListBacktestTrades",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_backtest_trades,
+                ),
                 "/strategies.v1.StrategiesService/ExplainStrategy": EndpointSync.unary(
                     method=MethodInfo(
                         name="ExplainStrategy",
@@ -986,6 +1254,16 @@ class StrategiesServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.IDEMPOTENT,
                     ),
                     function=service.propose_deploy,
+                ),
+                "/strategies.v1.StrategiesService/DeployBot": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="DeployBot",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.DeployBotRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.DeployBotResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.deploy_bot,
                 ),
                 "/strategies.v1.StrategiesService/GetDeployStatus": EndpointSync.unary(
                     method=MethodInfo(
@@ -1271,6 +1549,92 @@ class StrategiesServiceClientSync(ConnectClientSync):
             timeout_ms=timeout_ms,
         )
 
+    def get_strategy_notes(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetStrategyNotes",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.GetStrategyNotesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def save_strategy_notes(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="SaveStrategyNotes",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.SaveStrategyNotesResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_strategy_notes_revisions(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListStrategyNotesRevisions",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListStrategyNotesRevisionsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def list_backtests(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListBacktests",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListBacktestsRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListBacktestsResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     def run_scenarios(
         self,
         request: strategies_dot_v1_dot_strategies__pb2.RunScenariosRequest,
@@ -1333,6 +1697,28 @@ class StrategiesServiceClientSync(ConnectClientSync):
             use_get=use_get,
         )
 
+    def list_backtest_trades(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListBacktestTrades",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListBacktestTradesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     def explain_strategy(
         self,
         request: strategies_dot_v1_dot_strategies__pb2.ExplainStrategyRequest,
@@ -1369,6 +1755,26 @@ class StrategiesServiceClientSync(ConnectClientSync):
                 service_name="strategies.v1.StrategiesService",
                 input=strategies_dot_v1_dot_strategies__pb2.ProposeDeployRequest,
                 output=strategies_dot_v1_dot_strategies__pb2.ProposeDeployResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def deploy_bot(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.DeployBotRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.DeployBotResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="DeployBot",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.DeployBotRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.DeployBotResponse,
                 idempotency_level=IdempotencyLevel.IDEMPOTENT,
             ),
             headers=headers,

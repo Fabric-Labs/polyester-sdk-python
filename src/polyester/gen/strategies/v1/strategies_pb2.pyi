@@ -47,12 +47,35 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TEMPLATE_NOT_FOUND: _ClassVar[ErrorCode]
     STRATEGY_IN_USE: _ClassVar[ErrorCode]
     REVISION_NOT_FOUND: _ClassVar[ErrorCode]
+    BACKTEST_NOT_DONE: _ClassVar[ErrorCode]
+    MFA_ELEVATION_REQUIRED: _ClassVar[ErrorCode]
+    PROPOSAL_EXPIRED: _ClassVar[ErrorCode]
+    SUBACCOUNT_AUTHORIZATION_REQUIRED: _ClassVar[ErrorCode]
+    NOTES_REVISION_CONFLICT: _ClassVar[ErrorCode]
+
+class NotBacktestableReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    NOT_BACKTESTABLE_REASON_UNSPECIFIED: _ClassVar[NotBacktestableReason]
+    REACTS_TO_TRADES_OR_QUOTES: _ClassVar[NotBacktestableReason]
+    READS_SOCIAL_SIGNALS: _ClassVar[NotBacktestableReason]
+    MIXED_QUOTE_ASSETS: _ClassVar[NotBacktestableReason]
+    NO_REFERENCE_CANDLES: _ClassVar[NotBacktestableReason]
+    PLACES_LIMIT_ORDERS: _ClassVar[NotBacktestableReason]
+    READS_VOLUME: _ClassVar[NotBacktestableReason]
 
 class OrderSide(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SIDE_UNSPECIFIED: _ClassVar[OrderSide]
     BUY: _ClassVar[OrderSide]
     SELL: _ClassVar[OrderSide]
+
+class EvidenceGrade(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    EVIDENCE_GRADE_UNSPECIFIED: _ClassVar[EvidenceGrade]
+    NOT_ENOUGH: _ClassVar[EvidenceGrade]
+    LOW: _ClassVar[EvidenceGrade]
+    MEDIUM: _ClassVar[EvidenceGrade]
+    HIGH: _ClassVar[EvidenceGrade]
 
 class StopMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -90,9 +113,26 @@ STRATEGY_CAP_REACHED: ErrorCode
 TEMPLATE_NOT_FOUND: ErrorCode
 STRATEGY_IN_USE: ErrorCode
 REVISION_NOT_FOUND: ErrorCode
+BACKTEST_NOT_DONE: ErrorCode
+MFA_ELEVATION_REQUIRED: ErrorCode
+PROPOSAL_EXPIRED: ErrorCode
+SUBACCOUNT_AUTHORIZATION_REQUIRED: ErrorCode
+NOTES_REVISION_CONFLICT: ErrorCode
+NOT_BACKTESTABLE_REASON_UNSPECIFIED: NotBacktestableReason
+REACTS_TO_TRADES_OR_QUOTES: NotBacktestableReason
+READS_SOCIAL_SIGNALS: NotBacktestableReason
+MIXED_QUOTE_ASSETS: NotBacktestableReason
+NO_REFERENCE_CANDLES: NotBacktestableReason
+PLACES_LIMIT_ORDERS: NotBacktestableReason
+READS_VOLUME: NotBacktestableReason
 SIDE_UNSPECIFIED: OrderSide
 BUY: OrderSide
 SELL: OrderSide
+EVIDENCE_GRADE_UNSPECIFIED: EvidenceGrade
+NOT_ENOUGH: EvidenceGrade
+LOW: EvidenceGrade
+MEDIUM: EvidenceGrade
+HIGH: EvidenceGrade
 STOP_UNSPECIFIED: StopMode
 KEEP_ORDERS: StopMode
 CANCEL_ORDERS: StopMode
@@ -128,7 +168,7 @@ class RevisionConflictDetail(_message.Message):
     def __init__(self, revision: _Optional[int] = ..., head_version_id: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code", "field_path", "retry_after", "bot_cap", "markets", "shortfall", "strategy_cap", "revision_conflict")
+    __slots__ = ("code", "field_path", "retry_after", "bot_cap", "markets", "shortfall", "strategy_cap", "revision_conflict", "not_backtestable_reason", "backtest_limit", "notes_conflict")
     CODE_FIELD_NUMBER: _ClassVar[int]
     FIELD_PATH_FIELD_NUMBER: _ClassVar[int]
     RETRY_AFTER_FIELD_NUMBER: _ClassVar[int]
@@ -137,6 +177,9 @@ class ErrorDetail(_message.Message):
     SHORTFALL_FIELD_NUMBER: _ClassVar[int]
     STRATEGY_CAP_FIELD_NUMBER: _ClassVar[int]
     REVISION_CONFLICT_FIELD_NUMBER: _ClassVar[int]
+    NOT_BACKTESTABLE_REASON_FIELD_NUMBER: _ClassVar[int]
+    BACKTEST_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    NOTES_CONFLICT_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     field_path: str
     retry_after: _timestamp_pb2.Timestamp
@@ -145,7 +188,28 @@ class ErrorDetail(_message.Message):
     shortfall: _containers.RepeatedCompositeFieldContainer[Money]
     strategy_cap: StrategyCapDetail
     revision_conflict: RevisionConflictDetail
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., field_path: _Optional[str] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot_cap: _Optional[_Union[BotCapDetail, _Mapping]] = ..., markets: _Optional[_Iterable[str]] = ..., shortfall: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., strategy_cap: _Optional[_Union[StrategyCapDetail, _Mapping]] = ..., revision_conflict: _Optional[_Union[RevisionConflictDetail, _Mapping]] = ...) -> None: ...
+    not_backtestable_reason: NotBacktestableReason
+    backtest_limit: BacktestLimitDetail
+    notes_conflict: NotesConflictDetail
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., field_path: _Optional[str] = ..., retry_after: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot_cap: _Optional[_Union[BotCapDetail, _Mapping]] = ..., markets: _Optional[_Iterable[str]] = ..., shortfall: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., strategy_cap: _Optional[_Union[StrategyCapDetail, _Mapping]] = ..., revision_conflict: _Optional[_Union[RevisionConflictDetail, _Mapping]] = ..., not_backtestable_reason: _Optional[_Union[NotBacktestableReason, str]] = ..., backtest_limit: _Optional[_Union[BacktestLimitDetail, _Mapping]] = ..., notes_conflict: _Optional[_Union[NotesConflictDetail, _Mapping]] = ...) -> None: ...
+
+class NotesConflictDetail(_message.Message):
+    __slots__ = ("notes_revision",)
+    NOTES_REVISION_FIELD_NUMBER: _ClassVar[int]
+    notes_revision: int
+    def __init__(self, notes_revision: _Optional[int] = ...) -> None: ...
+
+class BacktestLimitDetail(_message.Message):
+    __slots__ = ("daily_limit", "daily_used", "active_limit", "active")
+    DAILY_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    DAILY_USED_FIELD_NUMBER: _ClassVar[int]
+    ACTIVE_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    ACTIVE_FIELD_NUMBER: _ClassVar[int]
+    daily_limit: int
+    daily_used: int
+    active_limit: int
+    active: int
+    def __init__(self, daily_limit: _Optional[int] = ..., daily_used: _Optional[int] = ..., active_limit: _Optional[int] = ..., active: _Optional[int] = ...) -> None: ...
 
 class Money(_message.Message):
     __slots__ = ("asset", "amount")
@@ -252,20 +316,22 @@ class SkillDocument(_message.Message):
     def __init__(self, name: _Optional[str] = ..., markdown: _Optional[str] = ...) -> None: ...
 
 class StrategyTemplate(_message.Message):
-    __slots__ = ("template_id", "name", "description", "manifest", "code", "runtime_version")
+    __slots__ = ("template_id", "name", "description", "manifest", "code", "runtime_version", "money_card")
     TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     MANIFEST_FIELD_NUMBER: _ClassVar[int]
     CODE_FIELD_NUMBER: _ClassVar[int]
     RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
+    MONEY_CARD_FIELD_NUMBER: _ClassVar[int]
     template_id: str
     name: str
     description: str
     manifest: _struct_pb2.Struct
     code: str
     runtime_version: str
-    def __init__(self, template_id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., runtime_version: _Optional[str] = ...) -> None: ...
+    money_card: MoneyCard
+    def __init__(self, template_id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., runtime_version: _Optional[str] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ...) -> None: ...
 
 class ListStrategyTemplatesRequest(_message.Message):
     __slots__ = ()
@@ -382,20 +448,54 @@ class RunScenariosResponse(_message.Message):
     def __init__(self, version_id: _Optional[str] = ..., passed: _Optional[int] = ..., failed: _Optional[int] = ..., results: _Optional[_Iterable[_Union[ScenarioResult, _Mapping]]] = ...) -> None: ...
 
 class BacktestMetrics(_message.Message):
-    __slots__ = ("return_percent", "max_drawdown_percent", "trades", "win_rate_percent", "fees", "exposure_percent")
+    __slots__ = ("return_percent", "max_drawdown_percent", "trades", "win_rate_percent", "fees", "exposure_percent", "sharpe_ratio", "realized_pnl", "max_drawdown_start", "max_drawdown_end", "start_equity", "end_equity")
     RETURN_PERCENT_FIELD_NUMBER: _ClassVar[int]
     MAX_DRAWDOWN_PERCENT_FIELD_NUMBER: _ClassVar[int]
     TRADES_FIELD_NUMBER: _ClassVar[int]
     WIN_RATE_PERCENT_FIELD_NUMBER: _ClassVar[int]
     FEES_FIELD_NUMBER: _ClassVar[int]
     EXPOSURE_PERCENT_FIELD_NUMBER: _ClassVar[int]
+    SHARPE_RATIO_FIELD_NUMBER: _ClassVar[int]
+    REALIZED_PNL_FIELD_NUMBER: _ClassVar[int]
+    MAX_DRAWDOWN_START_FIELD_NUMBER: _ClassVar[int]
+    MAX_DRAWDOWN_END_FIELD_NUMBER: _ClassVar[int]
+    START_EQUITY_FIELD_NUMBER: _ClassVar[int]
+    END_EQUITY_FIELD_NUMBER: _ClassVar[int]
     return_percent: str
     max_drawdown_percent: str
     trades: int
     win_rate_percent: str
     fees: Money
     exposure_percent: str
-    def __init__(self, return_percent: _Optional[str] = ..., max_drawdown_percent: _Optional[str] = ..., trades: _Optional[int] = ..., win_rate_percent: _Optional[str] = ..., fees: _Optional[_Union[Money, _Mapping]] = ..., exposure_percent: _Optional[str] = ...) -> None: ...
+    sharpe_ratio: str
+    realized_pnl: str
+    max_drawdown_start: _timestamp_pb2.Timestamp
+    max_drawdown_end: _timestamp_pb2.Timestamp
+    start_equity: str
+    end_equity: str
+    def __init__(self, return_percent: _Optional[str] = ..., max_drawdown_percent: _Optional[str] = ..., trades: _Optional[int] = ..., win_rate_percent: _Optional[str] = ..., fees: _Optional[_Union[Money, _Mapping]] = ..., exposure_percent: _Optional[str] = ..., sharpe_ratio: _Optional[str] = ..., realized_pnl: _Optional[str] = ..., max_drawdown_start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., max_drawdown_end: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., start_equity: _Optional[str] = ..., end_equity: _Optional[str] = ...) -> None: ...
+
+class BacktestScenario(_message.Message):
+    __slots__ = ("name", "slippage_bps", "metrics", "held_back_metrics")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    SLIPPAGE_BPS_FIELD_NUMBER: _ClassVar[int]
+    METRICS_FIELD_NUMBER: _ClassVar[int]
+    HELD_BACK_METRICS_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    slippage_bps: int
+    metrics: BacktestMetrics
+    held_back_metrics: BacktestMetrics
+    def __init__(self, name: _Optional[str] = ..., slippage_bps: _Optional[int] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., held_back_metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ...) -> None: ...
+
+class EquityPoint(_message.Message):
+    __slots__ = ("time", "equity", "buy_and_hold_equity")
+    TIME_FIELD_NUMBER: _ClassVar[int]
+    EQUITY_FIELD_NUMBER: _ClassVar[int]
+    BUY_AND_HOLD_EQUITY_FIELD_NUMBER: _ClassVar[int]
+    time: _timestamp_pb2.Timestamp
+    equity: str
+    buy_and_hold_equity: str
+    def __init__(self, time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., equity: _Optional[str] = ..., buy_and_hold_equity: _Optional[str] = ...) -> None: ...
 
 class Baseline(_message.Message):
     __slots__ = ("name", "metrics")
@@ -406,7 +506,7 @@ class Baseline(_message.Message):
     def __init__(self, name: _Optional[str] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ...) -> None: ...
 
 class BacktestTrade(_message.Message):
-    __slots__ = ("time", "market", "side", "price", "quantity", "fee", "reason")
+    __slots__ = ("time", "market", "side", "price", "quantity", "fee", "reason", "realized_pnl", "trade_index", "after_gap")
     TIME_FIELD_NUMBER: _ClassVar[int]
     MARKET_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
@@ -414,6 +514,9 @@ class BacktestTrade(_message.Message):
     QUANTITY_FIELD_NUMBER: _ClassVar[int]
     FEE_FIELD_NUMBER: _ClassVar[int]
     REASON_FIELD_NUMBER: _ClassVar[int]
+    REALIZED_PNL_FIELD_NUMBER: _ClassVar[int]
+    TRADE_INDEX_FIELD_NUMBER: _ClassVar[int]
+    AFTER_GAP_FIELD_NUMBER: _ClassVar[int]
     time: _timestamp_pb2.Timestamp
     market: str
     side: OrderSide
@@ -421,48 +524,65 @@ class BacktestTrade(_message.Message):
     quantity: str
     fee: Money
     reason: str
-    def __init__(self, time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., market: _Optional[str] = ..., side: _Optional[_Union[OrderSide, str]] = ..., price: _Optional[str] = ..., quantity: _Optional[str] = ..., fee: _Optional[_Union[Money, _Mapping]] = ..., reason: _Optional[str] = ...) -> None: ...
+    realized_pnl: str
+    trade_index: int
+    after_gap: bool
+    def __init__(self, time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., market: _Optional[str] = ..., side: _Optional[_Union[OrderSide, str]] = ..., price: _Optional[str] = ..., quantity: _Optional[str] = ..., fee: _Optional[_Union[Money, _Mapping]] = ..., reason: _Optional[str] = ..., realized_pnl: _Optional[str] = ..., trade_index: _Optional[int] = ..., after_gap: _Optional[bool] = ...) -> None: ...
 
 class DataGap(_message.Message):
-    __slots__ = ("market", "timeframe", "window")
+    __slots__ = ("market", "timeframe", "window", "affected")
     MARKET_FIELD_NUMBER: _ClassVar[int]
     TIMEFRAME_FIELD_NUMBER: _ClassVar[int]
     WINDOW_FIELD_NUMBER: _ClassVar[int]
+    AFFECTED_FIELD_NUMBER: _ClassVar[int]
     market: str
     timeframe: str
     window: TimeWindow
-    def __init__(self, market: _Optional[str] = ..., timeframe: _Optional[str] = ..., window: _Optional[_Union[TimeWindow, _Mapping]] = ...) -> None: ...
+    affected: bool
+    def __init__(self, market: _Optional[str] = ..., timeframe: _Optional[str] = ..., window: _Optional[_Union[TimeWindow, _Mapping]] = ..., affected: _Optional[bool] = ...) -> None: ...
 
 class BacktestReport(_message.Message):
-    __slots__ = ("fidelity", "evidence_grade", "period", "held_back_period", "metrics", "held_back_metrics", "baselines", "attempts", "trades", "data_gaps", "warnings", "report_url")
+    __slots__ = ("fidelity", "period", "held_back_period", "metrics", "held_back_metrics", "baselines", "trades", "data_gaps", "warnings", "evidence_grade", "held_back_baselines", "scenarios", "equity", "held_back_start", "window_max_drawdown_percent", "window_max_drawdown_start", "window_max_drawdown_end", "held_back_seen")
     FIDELITY_FIELD_NUMBER: _ClassVar[int]
-    EVIDENCE_GRADE_FIELD_NUMBER: _ClassVar[int]
     PERIOD_FIELD_NUMBER: _ClassVar[int]
     HELD_BACK_PERIOD_FIELD_NUMBER: _ClassVar[int]
     METRICS_FIELD_NUMBER: _ClassVar[int]
     HELD_BACK_METRICS_FIELD_NUMBER: _ClassVar[int]
     BASELINES_FIELD_NUMBER: _ClassVar[int]
-    ATTEMPTS_FIELD_NUMBER: _ClassVar[int]
     TRADES_FIELD_NUMBER: _ClassVar[int]
     DATA_GAPS_FIELD_NUMBER: _ClassVar[int]
     WARNINGS_FIELD_NUMBER: _ClassVar[int]
-    REPORT_URL_FIELD_NUMBER: _ClassVar[int]
+    EVIDENCE_GRADE_FIELD_NUMBER: _ClassVar[int]
+    HELD_BACK_BASELINES_FIELD_NUMBER: _ClassVar[int]
+    SCENARIOS_FIELD_NUMBER: _ClassVar[int]
+    EQUITY_FIELD_NUMBER: _ClassVar[int]
+    HELD_BACK_START_FIELD_NUMBER: _ClassVar[int]
+    WINDOW_MAX_DRAWDOWN_PERCENT_FIELD_NUMBER: _ClassVar[int]
+    WINDOW_MAX_DRAWDOWN_START_FIELD_NUMBER: _ClassVar[int]
+    WINDOW_MAX_DRAWDOWN_END_FIELD_NUMBER: _ClassVar[int]
+    HELD_BACK_SEEN_FIELD_NUMBER: _ClassVar[int]
     fidelity: str
-    evidence_grade: str
     period: TimeWindow
     held_back_period: TimeWindow
     metrics: BacktestMetrics
     held_back_metrics: BacktestMetrics
     baselines: _containers.RepeatedCompositeFieldContainer[Baseline]
-    attempts: int
     trades: _containers.RepeatedCompositeFieldContainer[BacktestTrade]
     data_gaps: _containers.RepeatedCompositeFieldContainer[DataGap]
     warnings: _containers.RepeatedScalarFieldContainer[str]
-    report_url: str
-    def __init__(self, fidelity: _Optional[str] = ..., evidence_grade: _Optional[str] = ..., period: _Optional[_Union[TimeWindow, _Mapping]] = ..., held_back_period: _Optional[_Union[TimeWindow, _Mapping]] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., held_back_metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., baselines: _Optional[_Iterable[_Union[Baseline, _Mapping]]] = ..., attempts: _Optional[int] = ..., trades: _Optional[_Iterable[_Union[BacktestTrade, _Mapping]]] = ..., data_gaps: _Optional[_Iterable[_Union[DataGap, _Mapping]]] = ..., warnings: _Optional[_Iterable[str]] = ..., report_url: _Optional[str] = ...) -> None: ...
+    evidence_grade: EvidenceGrade
+    held_back_baselines: _containers.RepeatedCompositeFieldContainer[Baseline]
+    scenarios: _containers.RepeatedCompositeFieldContainer[BacktestScenario]
+    equity: _containers.RepeatedCompositeFieldContainer[EquityPoint]
+    held_back_start: _timestamp_pb2.Timestamp
+    window_max_drawdown_percent: str
+    window_max_drawdown_start: _timestamp_pb2.Timestamp
+    window_max_drawdown_end: _timestamp_pb2.Timestamp
+    held_back_seen: bool
+    def __init__(self, fidelity: _Optional[str] = ..., period: _Optional[_Union[TimeWindow, _Mapping]] = ..., held_back_period: _Optional[_Union[TimeWindow, _Mapping]] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., held_back_metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., baselines: _Optional[_Iterable[_Union[Baseline, _Mapping]]] = ..., trades: _Optional[_Iterable[_Union[BacktestTrade, _Mapping]]] = ..., data_gaps: _Optional[_Iterable[_Union[DataGap, _Mapping]]] = ..., warnings: _Optional[_Iterable[str]] = ..., evidence_grade: _Optional[_Union[EvidenceGrade, str]] = ..., held_back_baselines: _Optional[_Iterable[_Union[Baseline, _Mapping]]] = ..., scenarios: _Optional[_Iterable[_Union[BacktestScenario, _Mapping]]] = ..., equity: _Optional[_Iterable[_Union[EquityPoint, _Mapping]]] = ..., held_back_start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., window_max_drawdown_percent: _Optional[str] = ..., window_max_drawdown_start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., window_max_drawdown_end: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., held_back_seen: _Optional[bool] = ...) -> None: ...
 
 class Backtest(_message.Message):
-    __slots__ = ("backtest_id", "version_id", "status", "window", "created_at", "finished_at", "report", "failure")
+    __slots__ = ("backtest_id", "version_id", "status", "window", "created_at", "finished_at", "report", "failure", "attempts", "not_backtestable_reason")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[Backtest.Status]
@@ -470,11 +590,13 @@ class Backtest(_message.Message):
         RUNNING: _ClassVar[Backtest.Status]
         DONE: _ClassVar[Backtest.Status]
         FAILED: _ClassVar[Backtest.Status]
+        NOT_BACKTESTABLE: _ClassVar[Backtest.Status]
     STATUS_UNSPECIFIED: Backtest.Status
     QUEUED: Backtest.Status
     RUNNING: Backtest.Status
     DONE: Backtest.Status
     FAILED: Backtest.Status
+    NOT_BACKTESTABLE: Backtest.Status
     BACKTEST_ID_FIELD_NUMBER: _ClassVar[int]
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
@@ -483,6 +605,8 @@ class Backtest(_message.Message):
     FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
     REPORT_FIELD_NUMBER: _ClassVar[int]
     FAILURE_FIELD_NUMBER: _ClassVar[int]
+    ATTEMPTS_FIELD_NUMBER: _ClassVar[int]
+    NOT_BACKTESTABLE_REASON_FIELD_NUMBER: _ClassVar[int]
     backtest_id: int
     version_id: str
     status: Backtest.Status
@@ -491,7 +615,9 @@ class Backtest(_message.Message):
     finished_at: _timestamp_pb2.Timestamp
     report: BacktestReport
     failure: str
-    def __init__(self, backtest_id: _Optional[int] = ..., version_id: _Optional[str] = ..., status: _Optional[_Union[Backtest.Status, str]] = ..., window: _Optional[_Union[TimeWindow, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., report: _Optional[_Union[BacktestReport, _Mapping]] = ..., failure: _Optional[str] = ...) -> None: ...
+    attempts: int
+    not_backtestable_reason: NotBacktestableReason
+    def __init__(self, backtest_id: _Optional[int] = ..., version_id: _Optional[str] = ..., status: _Optional[_Union[Backtest.Status, str]] = ..., window: _Optional[_Union[TimeWindow, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., report: _Optional[_Union[BacktestReport, _Mapping]] = ..., failure: _Optional[str] = ..., attempts: _Optional[int] = ..., not_backtestable_reason: _Optional[_Union[NotBacktestableReason, str]] = ...) -> None: ...
 
 class StartBacktestRequest(_message.Message):
     __slots__ = ("version_id", "start_time", "end_time", "settings", "initial_balances", "idempotency_key")
@@ -531,6 +657,24 @@ class GetBacktestResponse(_message.Message):
     backtest: Backtest
     def __init__(self, backtest: _Optional[_Union[Backtest, _Mapping]] = ...) -> None: ...
 
+class ListBacktestTradesRequest(_message.Message):
+    __slots__ = ("backtest_id", "page_token", "limit")
+    BACKTEST_ID_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    backtest_id: int
+    page_token: str
+    limit: int
+    def __init__(self, backtest_id: _Optional[int] = ..., page_token: _Optional[str] = ..., limit: _Optional[int] = ...) -> None: ...
+
+class ListBacktestTradesResponse(_message.Message):
+    __slots__ = ("trades", "next_page_token")
+    TRADES_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    trades: _containers.RepeatedCompositeFieldContainer[BacktestTrade]
+    next_page_token: str
+    def __init__(self, trades: _Optional[_Iterable[_Union[BacktestTrade, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
 class ScenarioSummary(_message.Message):
     __slots__ = ("name", "outcome")
     class Outcome(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -550,20 +694,18 @@ class ScenarioSummary(_message.Message):
     def __init__(self, name: _Optional[str] = ..., outcome: _Optional[_Union[ScenarioSummary.Outcome, str]] = ...) -> None: ...
 
 class BacktestSummary(_message.Message):
-    __slots__ = ("backtest_id", "status", "metrics", "held_back_metrics", "attempts", "report_url")
+    __slots__ = ("backtest_id", "status", "metrics", "held_back_metrics", "attempts")
     BACKTEST_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     METRICS_FIELD_NUMBER: _ClassVar[int]
     HELD_BACK_METRICS_FIELD_NUMBER: _ClassVar[int]
     ATTEMPTS_FIELD_NUMBER: _ClassVar[int]
-    REPORT_URL_FIELD_NUMBER: _ClassVar[int]
     backtest_id: int
     status: Backtest.Status
     metrics: BacktestMetrics
     held_back_metrics: BacktestMetrics
     attempts: int
-    report_url: str
-    def __init__(self, backtest_id: _Optional[int] = ..., status: _Optional[_Union[Backtest.Status, str]] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., held_back_metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., attempts: _Optional[int] = ..., report_url: _Optional[str] = ...) -> None: ...
+    def __init__(self, backtest_id: _Optional[int] = ..., status: _Optional[_Union[Backtest.Status, str]] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., held_back_metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., attempts: _Optional[int] = ...) -> None: ...
 
 class ExplainStrategyRequest(_message.Message):
     __slots__ = ("version_id",)
@@ -606,7 +748,7 @@ class SettingValue(_message.Message):
     def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ..., description: _Optional[str] = ..., kind: _Optional[str] = ..., asset: _Optional[str] = ...) -> None: ...
 
 class DeployProposalSummary(_message.Message):
-    __slots__ = ("version_id", "bot_name", "money_card", "settings", "funding_subaccount_id", "funding", "scenarios_passed", "backtest", "strategy_id", "revision")
+    __slots__ = ("version_id", "bot_name", "money_card", "settings", "funding_subaccount_id", "funding", "scenarios_passed", "backtest", "strategy_id", "revision", "not_backtestable_reason")
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     BOT_NAME_FIELD_NUMBER: _ClassVar[int]
     MONEY_CARD_FIELD_NUMBER: _ClassVar[int]
@@ -617,6 +759,7 @@ class DeployProposalSummary(_message.Message):
     BACKTEST_FIELD_NUMBER: _ClassVar[int]
     STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
+    NOT_BACKTESTABLE_REASON_FIELD_NUMBER: _ClassVar[int]
     version_id: str
     bot_name: str
     money_card: MoneyCard
@@ -627,7 +770,8 @@ class DeployProposalSummary(_message.Message):
     backtest: BacktestSummary
     strategy_id: int
     revision: int
-    def __init__(self, version_id: _Optional[str] = ..., bot_name: _Optional[str] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., funding_subaccount_id: _Optional[int] = ..., funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., scenarios_passed: _Optional[int] = ..., backtest: _Optional[_Union[BacktestSummary, _Mapping]] = ..., strategy_id: _Optional[int] = ..., revision: _Optional[int] = ...) -> None: ...
+    not_backtestable_reason: NotBacktestableReason
+    def __init__(self, version_id: _Optional[str] = ..., bot_name: _Optional[str] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., funding_subaccount_id: _Optional[int] = ..., funding: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., scenarios_passed: _Optional[int] = ..., backtest: _Optional[_Union[BacktestSummary, _Mapping]] = ..., strategy_id: _Optional[int] = ..., revision: _Optional[int] = ..., not_backtestable_reason: _Optional[_Union[NotBacktestableReason, str]] = ...) -> None: ...
 
 class ProposeDeployRequest(_message.Message):
     __slots__ = ("strategy_id", "revision", "bot_name", "settings", "funding", "idempotency_key", "funding_subaccount_id")
@@ -667,6 +811,7 @@ class DeployStatus(_message.Message):
         PROPOSED: _ClassVar[DeployStatus.State]
         VALIDATING: _ClassVar[DeployStatus.State]
         CREATING_SUBACCOUNT: _ClassVar[DeployStatus.State]
+        SETTING_ACCESS: _ClassVar[DeployStatus.State]
         FUNDING: _ClassVar[DeployStatus.State]
         DEPLOYING: _ClassVar[DeployStatus.State]
         LIVE: _ClassVar[DeployStatus.State]
@@ -676,6 +821,7 @@ class DeployStatus(_message.Message):
     PROPOSED: DeployStatus.State
     VALIDATING: DeployStatus.State
     CREATING_SUBACCOUNT: DeployStatus.State
+    SETTING_ACCESS: DeployStatus.State
     FUNDING: DeployStatus.State
     DEPLOYING: DeployStatus.State
     LIVE: DeployStatus.State
@@ -713,6 +859,30 @@ class GetDeployStatusResponse(_message.Message):
     status: DeployStatus
     def __init__(self, status: _Optional[_Union[DeployStatus, _Mapping]] = ...) -> None: ...
 
+class SubaccountAuthorization(_message.Message):
+    __slots__ = ("smart_account_address", "message", "signature")
+    SMART_ACCOUNT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    smart_account_address: str
+    message: str
+    signature: str
+    def __init__(self, smart_account_address: _Optional[str] = ..., message: _Optional[str] = ..., signature: _Optional[str] = ...) -> None: ...
+
+class DeployBotRequest(_message.Message):
+    __slots__ = ("proposal_id", "subaccount_authorization")
+    PROPOSAL_ID_FIELD_NUMBER: _ClassVar[int]
+    SUBACCOUNT_AUTHORIZATION_FIELD_NUMBER: _ClassVar[int]
+    proposal_id: int
+    subaccount_authorization: SubaccountAuthorization
+    def __init__(self, proposal_id: _Optional[int] = ..., subaccount_authorization: _Optional[_Union[SubaccountAuthorization, _Mapping]] = ...) -> None: ...
+
+class DeployBotResponse(_message.Message):
+    __slots__ = ("status",)
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    status: DeployStatus
+    def __init__(self, status: _Optional[_Union[DeployStatus, _Mapping]] = ...) -> None: ...
+
 class GetDeployProposalRequest(_message.Message):
     __slots__ = ("proposal_id",)
     PROPOSAL_ID_FIELD_NUMBER: _ClassVar[int]
@@ -734,7 +904,7 @@ class GetDeployProposalResponse(_message.Message):
     def __init__(self, proposal_id: _Optional[int] = ..., summary: _Optional[_Union[DeployProposalSummary, _Mapping]] = ..., status: _Optional[_Union[DeployStatus, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., funding_subaccount_label: _Optional[str] = ...) -> None: ...
 
 class Bot(_message.Message):
-    __slots__ = ("bot_id", "name", "subaccount_id", "status", "status_reason", "version_id", "profit_and_loss", "last_decision_at", "created_at", "quote_asset", "markets", "funding", "uptime_ratio", "running_since", "pause_reason")
+    __slots__ = ("bot_id", "name", "subaccount_id", "status", "status_reason", "version_id", "last_decision_at", "created_at", "quote_asset", "markets", "funding", "uptime_ratio", "running_since", "pause_reason", "activity")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[Bot.Status]
@@ -755,17 +925,18 @@ class Bot(_message.Message):
         BOT_DECIDED: _ClassVar[Bot.PauseReason]
         FAILURES_IN_A_ROW: _ClassVar[Bot.PauseReason]
         ENVIRONMENT_RESET: _ClassVar[Bot.PauseReason]
+        UNRECORDED_ORDER: _ClassVar[Bot.PauseReason]
     PAUSE_REASON_UNSPECIFIED: Bot.PauseReason
     BOT_DECIDED: Bot.PauseReason
     FAILURES_IN_A_ROW: Bot.PauseReason
     ENVIRONMENT_RESET: Bot.PauseReason
+    UNRECORDED_ORDER: Bot.PauseReason
     BOT_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     STATUS_REASON_FIELD_NUMBER: _ClassVar[int]
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
-    PROFIT_AND_LOSS_FIELD_NUMBER: _ClassVar[int]
     LAST_DECISION_AT_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     QUOTE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -774,13 +945,13 @@ class Bot(_message.Message):
     UPTIME_RATIO_FIELD_NUMBER: _ClassVar[int]
     RUNNING_SINCE_FIELD_NUMBER: _ClassVar[int]
     PAUSE_REASON_FIELD_NUMBER: _ClassVar[int]
+    ACTIVITY_FIELD_NUMBER: _ClassVar[int]
     bot_id: int
     name: str
     subaccount_id: int
     status: Bot.Status
     status_reason: str
     version_id: str
-    profit_and_loss: str
     last_decision_at: _timestamp_pb2.Timestamp
     created_at: _timestamp_pb2.Timestamp
     quote_asset: str
@@ -789,7 +960,20 @@ class Bot(_message.Message):
     uptime_ratio: str
     running_since: _timestamp_pb2.Timestamp
     pause_reason: Bot.PauseReason
-    def __init__(self, bot_id: _Optional[int] = ..., name: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ..., status_reason: _Optional[str] = ..., version_id: _Optional[str] = ..., profit_and_loss: _Optional[str] = ..., last_decision_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., quote_asset: _Optional[str] = ..., markets: _Optional[_Iterable[str]] = ..., funding: _Optional[_Union[BotFunding, _Mapping]] = ..., uptime_ratio: _Optional[str] = ..., running_since: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pause_reason: _Optional[_Union[Bot.PauseReason, str]] = ...) -> None: ...
+    activity: _containers.RepeatedCompositeFieldContainer[BotActivityHour]
+    def __init__(self, bot_id: _Optional[int] = ..., name: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ..., status_reason: _Optional[str] = ..., version_id: _Optional[str] = ..., last_decision_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., quote_asset: _Optional[str] = ..., markets: _Optional[_Iterable[str]] = ..., funding: _Optional[_Union[BotFunding, _Mapping]] = ..., uptime_ratio: _Optional[str] = ..., running_since: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pause_reason: _Optional[_Union[Bot.PauseReason, str]] = ..., activity: _Optional[_Iterable[_Union[BotActivityHour, _Mapping]]] = ...) -> None: ...
+
+class BotActivityHour(_message.Message):
+    __slots__ = ("start", "decisions", "fills", "expired")
+    START_FIELD_NUMBER: _ClassVar[int]
+    DECISIONS_FIELD_NUMBER: _ClassVar[int]
+    FILLS_FIELD_NUMBER: _ClassVar[int]
+    EXPIRED_FIELD_NUMBER: _ClassVar[int]
+    start: _timestamp_pb2.Timestamp
+    decisions: int
+    fills: int
+    expired: int
+    def __init__(self, start: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., decisions: _Optional[int] = ..., fills: _Optional[int] = ..., expired: _Optional[int] = ...) -> None: ...
 
 class BotFunding(_message.Message):
     __slots__ = ("subaccount_id", "subaccount_label", "initial_funding")
@@ -827,49 +1011,17 @@ class ListBotsResponse(_message.Message):
     status_counts: _containers.RepeatedCompositeFieldContainer[BotStatusCount]
     def __init__(self, bots: _Optional[_Iterable[_Union[Bot, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., status_counts: _Optional[_Iterable[_Union[BotStatusCount, _Mapping]]] = ...) -> None: ...
 
-class BotBalance(_message.Message):
-    __slots__ = ("asset", "free", "locked")
-    ASSET_FIELD_NUMBER: _ClassVar[int]
-    FREE_FIELD_NUMBER: _ClassVar[int]
-    LOCKED_FIELD_NUMBER: _ClassVar[int]
-    asset: str
-    free: str
-    locked: str
-    def __init__(self, asset: _Optional[str] = ..., free: _Optional[str] = ..., locked: _Optional[str] = ...) -> None: ...
-
-class BotOrder(_message.Message):
-    __slots__ = ("order_id", "market", "side", "type", "price", "quantity", "filled_quantity", "created_at")
-    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
-    MARKET_FIELD_NUMBER: _ClassVar[int]
-    SIDE_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    PRICE_FIELD_NUMBER: _ClassVar[int]
-    QUANTITY_FIELD_NUMBER: _ClassVar[int]
-    FILLED_QUANTITY_FIELD_NUMBER: _ClassVar[int]
-    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
-    order_id: int
-    market: str
-    side: OrderSide
-    type: str
-    price: str
-    quantity: str
-    filled_quantity: str
-    created_at: _timestamp_pb2.Timestamp
-    def __init__(self, order_id: _Optional[int] = ..., market: _Optional[str] = ..., side: _Optional[_Union[OrderSide, str]] = ..., type: _Optional[str] = ..., price: _Optional[str] = ..., quantity: _Optional[str] = ..., filled_quantity: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
-
 class BotDecision(_message.Message):
-    __slots__ = ("decided_at", "event", "orders", "logs", "snapshot")
+    __slots__ = ("decided_at", "event", "orders", "logs")
     DECIDED_AT_FIELD_NUMBER: _ClassVar[int]
     EVENT_FIELD_NUMBER: _ClassVar[int]
     ORDERS_FIELD_NUMBER: _ClassVar[int]
     LOGS_FIELD_NUMBER: _ClassVar[int]
-    SNAPSHOT_FIELD_NUMBER: _ClassVar[int]
     decided_at: _timestamp_pb2.Timestamp
     event: str
     orders: _containers.RepeatedCompositeFieldContainer[_struct_pb2.Struct]
     logs: _containers.RepeatedScalarFieldContainer[str]
-    snapshot: _struct_pb2.Struct
-    def __init__(self, decided_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., event: _Optional[str] = ..., orders: _Optional[_Iterable[_Union[_struct_pb2.Struct, _Mapping]]] = ..., logs: _Optional[_Iterable[str]] = ..., snapshot: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ...) -> None: ...
+    def __init__(self, decided_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., event: _Optional[str] = ..., orders: _Optional[_Iterable[_Union[_struct_pb2.Struct, _Mapping]]] = ..., logs: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class BotError(_message.Message):
     __slots__ = ("time", "event", "message")
@@ -906,22 +1058,18 @@ class StopBotResponse(_message.Message):
     def __init__(self, bot: _Optional[_Union[Bot, _Mapping]] = ..., mode: _Optional[_Union[StopMode, str]] = ...) -> None: ...
 
 class GetBotResponse(_message.Message):
-    __slots__ = ("bot", "money_card", "settings", "balances", "open_orders", "decisions", "errors")
+    __slots__ = ("bot", "money_card", "settings", "decisions", "errors")
     BOT_FIELD_NUMBER: _ClassVar[int]
     MONEY_CARD_FIELD_NUMBER: _ClassVar[int]
     SETTINGS_FIELD_NUMBER: _ClassVar[int]
-    BALANCES_FIELD_NUMBER: _ClassVar[int]
-    OPEN_ORDERS_FIELD_NUMBER: _ClassVar[int]
     DECISIONS_FIELD_NUMBER: _ClassVar[int]
     ERRORS_FIELD_NUMBER: _ClassVar[int]
     bot: Bot
     money_card: MoneyCard
     settings: _containers.RepeatedCompositeFieldContainer[SettingValue]
-    balances: _containers.RepeatedCompositeFieldContainer[BotBalance]
-    open_orders: _containers.RepeatedCompositeFieldContainer[BotOrder]
     decisions: _containers.RepeatedCompositeFieldContainer[BotDecision]
     errors: _containers.RepeatedCompositeFieldContainer[BotError]
-    def __init__(self, bot: _Optional[_Union[Bot, _Mapping]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., balances: _Optional[_Iterable[_Union[BotBalance, _Mapping]]] = ..., open_orders: _Optional[_Iterable[_Union[BotOrder, _Mapping]]] = ..., decisions: _Optional[_Iterable[_Union[BotDecision, _Mapping]]] = ..., errors: _Optional[_Iterable[_Union[BotError, _Mapping]]] = ...) -> None: ...
+    def __init__(self, bot: _Optional[_Union[Bot, _Mapping]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., settings: _Optional[_Iterable[_Union[SettingValue, _Mapping]]] = ..., decisions: _Optional[_Iterable[_Union[BotDecision, _Mapping]]] = ..., errors: _Optional[_Iterable[_Union[BotError, _Mapping]]] = ...) -> None: ...
 
 class ListBotVersionsRequest(_message.Message):
     __slots__ = ("bot_id", "limit", "page_token")
@@ -962,7 +1110,7 @@ class GetStrategyVersionRequest(_message.Message):
     def __init__(self, version_id: _Optional[str] = ...) -> None: ...
 
 class GetStrategyVersionResponse(_message.Message):
-    __slots__ = ("version_id", "name", "runtime_version", "manifest", "code", "settings_form", "valid", "created_at", "flow")
+    __slots__ = ("version_id", "name", "runtime_version", "manifest", "code", "settings_form", "valid", "created_at", "flow", "validation")
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
@@ -972,6 +1120,7 @@ class GetStrategyVersionResponse(_message.Message):
     VALID_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     FLOW_FIELD_NUMBER: _ClassVar[int]
+    VALIDATION_FIELD_NUMBER: _ClassVar[int]
     version_id: str
     name: str
     runtime_version: str
@@ -981,7 +1130,8 @@ class GetStrategyVersionResponse(_message.Message):
     valid: bool
     created_at: _timestamp_pb2.Timestamp
     flow: StrategyFlow
-    def __init__(self, version_id: _Optional[str] = ..., name: _Optional[str] = ..., runtime_version: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., valid: _Optional[bool] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow: _Optional[_Union[StrategyFlow, _Mapping]] = ...) -> None: ...
+    validation: VersionValidation
+    def __init__(self, version_id: _Optional[str] = ..., name: _Optional[str] = ..., runtime_version: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., valid: _Optional[bool] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., flow: _Optional[_Union[StrategyFlow, _Mapping]] = ..., validation: _Optional[_Union[VersionValidation, _Mapping]] = ...) -> None: ...
 
 class StrategyFlow(_message.Message):
     __slots__ = ("nodes", "edges", "notes", "complete")
@@ -1042,7 +1192,7 @@ class SourceSpan(_message.Message):
     def __init__(self, start_line: _Optional[int] = ..., end_line: _Optional[int] = ...) -> None: ...
 
 class Strategy(_message.Message):
-    __slots__ = ("strategy_id", "name", "revision", "head_version_id", "valid", "origin", "created_at", "updated_at", "bot")
+    __slots__ = ("strategy_id", "name", "revision", "head_version_id", "valid", "origin", "created_at", "updated_at", "bot", "markets", "summary")
     STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     REVISION_FIELD_NUMBER: _ClassVar[int]
@@ -1052,6 +1202,8 @@ class Strategy(_message.Message):
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     BOT_FIELD_NUMBER: _ClassVar[int]
+    MARKETS_FIELD_NUMBER: _ClassVar[int]
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
     strategy_id: int
     name: str
     revision: int
@@ -1061,7 +1213,9 @@ class Strategy(_message.Message):
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     bot: StrategyBot
-    def __init__(self, strategy_id: _Optional[int] = ..., name: _Optional[str] = ..., revision: _Optional[int] = ..., head_version_id: _Optional[str] = ..., valid: _Optional[bool] = ..., origin: _Optional[_Union[StrategyOrigin, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot: _Optional[_Union[StrategyBot, _Mapping]] = ...) -> None: ...
+    markets: _containers.RepeatedScalarFieldContainer[str]
+    summary: str
+    def __init__(self, strategy_id: _Optional[int] = ..., name: _Optional[str] = ..., revision: _Optional[int] = ..., head_version_id: _Optional[str] = ..., valid: _Optional[bool] = ..., origin: _Optional[_Union[StrategyOrigin, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot: _Optional[_Union[StrategyBot, _Mapping]] = ..., markets: _Optional[_Iterable[str]] = ..., summary: _Optional[str] = ...) -> None: ...
 
 class StrategyBot(_message.Message):
     __slots__ = ("bot_id", "status")
@@ -1130,7 +1284,7 @@ class CreateStrategyResponse(_message.Message):
     def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ..., version: _Optional[_Union[VersionValidation, _Mapping]] = ...) -> None: ...
 
 class SaveDraftVersionRequest(_message.Message):
-    __slots__ = ("strategy_id", "expected_revision", "name", "manifest", "code", "runtime_version", "idempotency_key")
+    __slots__ = ("strategy_id", "expected_revision", "name", "manifest", "code", "runtime_version", "idempotency_key", "expected_notes_revision")
     STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
     EXPECTED_REVISION_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -1138,6 +1292,7 @@ class SaveDraftVersionRequest(_message.Message):
     CODE_FIELD_NUMBER: _ClassVar[int]
     RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_NOTES_REVISION_FIELD_NUMBER: _ClassVar[int]
     strategy_id: int
     expected_revision: int
     name: str
@@ -1145,7 +1300,8 @@ class SaveDraftVersionRequest(_message.Message):
     code: str
     runtime_version: str
     idempotency_key: str
-    def __init__(self, strategy_id: _Optional[int] = ..., expected_revision: _Optional[int] = ..., name: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., runtime_version: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+    expected_notes_revision: int
+    def __init__(self, strategy_id: _Optional[int] = ..., expected_revision: _Optional[int] = ..., name: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., runtime_version: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., expected_notes_revision: _Optional[int] = ...) -> None: ...
 
 class SaveDraftVersionResponse(_message.Message):
     __slots__ = ("revision", "version")
@@ -1162,12 +1318,14 @@ class GetStrategyRequest(_message.Message):
     def __init__(self, strategy_id: _Optional[int] = ...) -> None: ...
 
 class GetStrategyResponse(_message.Message):
-    __slots__ = ("strategy", "head")
+    __slots__ = ("strategy", "head", "notes")
     STRATEGY_FIELD_NUMBER: _ClassVar[int]
     HEAD_FIELD_NUMBER: _ClassVar[int]
+    NOTES_FIELD_NUMBER: _ClassVar[int]
     strategy: Strategy
     head: GetStrategyVersionResponse
-    def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ..., head: _Optional[_Union[GetStrategyVersionResponse, _Mapping]] = ...) -> None: ...
+    notes: StrategyNotes
+    def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ..., head: _Optional[_Union[GetStrategyVersionResponse, _Mapping]] = ..., notes: _Optional[_Union[StrategyNotes, _Mapping]] = ...) -> None: ...
 
 class ListStrategiesRequest(_message.Message):
     __slots__ = ("limit", "page_token")
@@ -1227,6 +1385,108 @@ class DeleteStrategyResponse(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 
+class StrategyNotes(_message.Message):
+    __slots__ = ("strategy_id", "notes_revision", "summary", "body", "saved_at", "saved_by")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    NOTES_REVISION_FIELD_NUMBER: _ClassVar[int]
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    SAVED_AT_FIELD_NUMBER: _ClassVar[int]
+    SAVED_BY_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    notes_revision: int
+    summary: str
+    body: str
+    saved_at: _timestamp_pb2.Timestamp
+    saved_by: StrategyRevision.SavedBy
+    def __init__(self, strategy_id: _Optional[int] = ..., notes_revision: _Optional[int] = ..., summary: _Optional[str] = ..., body: _Optional[str] = ..., saved_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., saved_by: _Optional[_Union[StrategyRevision.SavedBy, str]] = ...) -> None: ...
+
+class GetStrategyNotesRequest(_message.Message):
+    __slots__ = ("strategy_id",)
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    def __init__(self, strategy_id: _Optional[int] = ...) -> None: ...
+
+class GetStrategyNotesResponse(_message.Message):
+    __slots__ = ("notes",)
+    NOTES_FIELD_NUMBER: _ClassVar[int]
+    notes: StrategyNotes
+    def __init__(self, notes: _Optional[_Union[StrategyNotes, _Mapping]] = ...) -> None: ...
+
+class SaveStrategyNotesRequest(_message.Message):
+    __slots__ = ("strategy_id", "expected_notes_revision", "summary", "body", "idempotency_key", "expected_revision")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_NOTES_REVISION_FIELD_NUMBER: _ClassVar[int]
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_REVISION_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    expected_notes_revision: int
+    summary: str
+    body: str
+    idempotency_key: str
+    expected_revision: int
+    def __init__(self, strategy_id: _Optional[int] = ..., expected_notes_revision: _Optional[int] = ..., summary: _Optional[str] = ..., body: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., expected_revision: _Optional[int] = ...) -> None: ...
+
+class SaveStrategyNotesResponse(_message.Message):
+    __slots__ = ("notes",)
+    NOTES_FIELD_NUMBER: _ClassVar[int]
+    notes: StrategyNotes
+    def __init__(self, notes: _Optional[_Union[StrategyNotes, _Mapping]] = ...) -> None: ...
+
+class ListStrategyNotesRevisionsRequest(_message.Message):
+    __slots__ = ("strategy_id", "limit", "page_token")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    limit: int
+    page_token: str
+    def __init__(self, strategy_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListStrategyNotesRevisionsResponse(_message.Message):
+    __slots__ = ("revisions", "next_page_token")
+    REVISIONS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    revisions: _containers.RepeatedCompositeFieldContainer[StrategyNotes]
+    next_page_token: str
+    def __init__(self, revisions: _Optional[_Iterable[_Union[StrategyNotes, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class ListBacktestsRequest(_message.Message):
+    __slots__ = ("strategy_id", "limit", "page_token")
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    strategy_id: int
+    limit: int
+    page_token: str
+    def __init__(self, strategy_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class StrategyBacktest(_message.Message):
+    __slots__ = ("summary", "version_id", "revision", "window", "created_at", "finished_at")
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    WINDOW_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    summary: BacktestSummary
+    version_id: str
+    revision: int
+    window: TimeWindow
+    created_at: _timestamp_pb2.Timestamp
+    finished_at: _timestamp_pb2.Timestamp
+    def __init__(self, summary: _Optional[_Union[BacktestSummary, _Mapping]] = ..., version_id: _Optional[str] = ..., revision: _Optional[int] = ..., window: _Optional[_Union[TimeWindow, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ListBacktestsResponse(_message.Message):
+    __slots__ = ("backtests", "next_page_token")
+    BACKTESTS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    backtests: _containers.RepeatedCompositeFieldContainer[StrategyBacktest]
+    next_page_token: str
+    def __init__(self, backtests: _Optional[_Iterable[_Union[StrategyBacktest, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
 class BotLogEntry(_message.Message):
     __slots__ = ("sequence", "time", "kind", "message")
     class Kind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -1262,9 +1522,13 @@ class ListBotLogsRequest(_message.Message):
     def __init__(self, bot_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListBotLogsResponse(_message.Message):
-    __slots__ = ("entries", "next_page_token")
+    __slots__ = ("entries", "next_page_token", "follow_token", "deployed_again")
     ENTRIES_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    FOLLOW_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    DEPLOYED_AGAIN_FIELD_NUMBER: _ClassVar[int]
     entries: _containers.RepeatedCompositeFieldContainer[BotLogEntry]
     next_page_token: str
-    def __init__(self, entries: _Optional[_Iterable[_Union[BotLogEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    follow_token: str
+    deployed_again: bool
+    def __init__(self, entries: _Optional[_Iterable[_Union[BotLogEntry, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., follow_token: _Optional[str] = ..., deployed_again: _Optional[bool] = ...) -> None: ...

@@ -35,6 +35,7 @@ class TransferCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FEE_REFILL: _ClassVar[TransferCode]
     SYSTEM_ADJUSTMENT: _ClassVar[TransferCode]
     WITHDRAW_FAILED: _ClassVar[TransferCode]
+    DUST_CONVERT: _ClassVar[TransferCode]
     INTERNAL_BATCH: _ClassVar[TransferCode]
 ACCOUNT_CODE_UNSPECIFIED: AccountCode
 FUNDING: AccountCode
@@ -62,4 +63,5 @@ FEE_SWEEP: TransferCode
 FEE_REFILL: TransferCode
 SYSTEM_ADJUSTMENT: TransferCode
 WITHDRAW_FAILED: TransferCode
+DUST_CONVERT: TransferCode
 INTERNAL_BATCH: TransferCode

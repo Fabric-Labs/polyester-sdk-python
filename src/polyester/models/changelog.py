@@ -14,7 +14,7 @@ CHANGELOG_CATEGORY_BUG_FIX = "bug_fix"
 # Audience labels: "all_users", "traders", "market_makers", "developers".
 # Surface labels: "trading", "funding", "accounts", "api", "explorer",
 # "documentation", "platform", "market_data", "quickswap", "rewards",
-# "assistant". Values newer than this SDK read as numbers.
+# "assistant", "trading_bots". Values newer than this SDK read as numbers.
 
 # Environment labels. An environment newer than this SDK reads as its number.
 CHANGELOG_ENVIRONMENT_DEVNET = "devnet"

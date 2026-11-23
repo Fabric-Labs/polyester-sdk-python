@@ -21,6 +21,7 @@ import polyester.gen.auth.v1.auth_pb2  # noqa: F401
 import polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2  # noqa: F401
 import polyester.gen.ledger.read.v1.ledger_read_pb2  # noqa: F401
 import polyester.gen.ledger.read.v1.statement_export_pb2  # noqa: F401
+import polyester.gen.marketdata.v1.marketdata_pb2  # noqa: F401
 import polyester.gen.orderbook.v1.orderbook_pb2  # noqa: F401
 import polyester.gen.orders.v1.orders_pb2  # noqa: F401
 import polyester.gen.transfer.v1.dust_conversion_pb2  # noqa: F401
@@ -29,6 +30,7 @@ import polyester.models
 from polyester.services.dust_conversions import AsyncDustConversionsService
 from polyester.services.internal_transfers import AsyncInternalTransfersService
 from polyester.services.lifecycle import AsyncLifecycleService
+from polyester.services.market_data import AsyncMarketDataService
 from polyester.services.orderbook import AsyncOrderbookService
 from polyester.services.statements import AsyncStatementsService
 from polyester.services.sub_accounts import AsyncSubAccountsService
@@ -97,6 +99,12 @@ MESSAGES = [
     "transfer.v1.GetInternalTransferBatchRequest",
     "transfer.v1.GetInternalTransferBatchResponse",
     "triggers.v1.LadderDetails",
+    # Public contract ebfc83b (0.93.9).
+    "auth.v1.ActivityEvent",
+    "auth.v1.ActivityActor",
+    "auth.v1.ActivityItem",
+    "marketdata.v1.GetIndexPriceCandlesRequest",
+    "marketdata.v1.GetIndexPriceCandlesResponse",
 ]
 
 METHODS = {
@@ -116,6 +124,7 @@ METHODS = {
     "dust_conversions.list": AsyncDustConversionsService.list,
     "internal_transfers.batch_create": AsyncInternalTransfersService.batch_create,
     "orderbook.get": AsyncOrderbookService.get,
+    "market_data.get_index_price_candles": AsyncMarketDataService.get_index_price_candles,
 }
 
 

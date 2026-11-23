@@ -64,6 +64,36 @@ class CandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
     next_page_token: str = ""
 
 
+class IndexPriceCandle(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One closed candle of a spot market's index price series.
+
+    ``source`` is ``"reference"`` for the market's composite reference candle
+    (buckets before the one containing its listing time) or ``"index"`` for
+    its index price candle (from that bucket on); a value this SDK does not
+    know reads as its number. Prices are decimal strings decoded with the
+    pair's ``reference_price_scale``. There is no volume.
+    """
+
+    ts_sec: int
+    open: str = ""
+    high: str = ""
+    low: str = ""
+    close: str = ""
+    source: str = ""
+
+
+class IndexPriceCandlesResult(msgspec.Struct, kw_only=True, omit_defaults=True):
+    """One page of index price candles, newest first. A missing ``ts_sec``
+    is a gap. ``next_page_token`` continues toward older candles with the
+    same ``symbol_id``, ``timeframe``, ``start_time`` and ``end_time``; it is
+    empty when no older candle exists in the range."""
+
+    symbol_id: int = 0
+    timeframe: str = ""
+    candles: list[IndexPriceCandle]
+    next_page_token: str = ""
+
+
 class MarketOverviewSparkline(msgspec.Struct, kw_only=True, omit_defaults=True):
     """A market's recent closing prices over ``interval``, newest first."""
 

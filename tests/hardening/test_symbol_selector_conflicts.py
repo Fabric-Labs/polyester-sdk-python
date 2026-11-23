@@ -150,6 +150,10 @@ METHODS: list[tuple[str, Call]] = [
     ("market_data.get_trades", lambda c, s: c.market_data.get_trades(**s)),
     ("market_data.get_candles", lambda c, s: c.market_data.get_candles(**s)),
     ("market_data.get_candles_columns", lambda c, s: c.market_data.get_candles_columns(**s)),
+    (
+        "market_data.get_index_price_candles",
+        lambda c, s: c.market_data.get_index_price_candles(**s),
+    ),
     ("market_data.get_current_candle", lambda c, s: c.market_data.get_current_candle(**s)),
     ("market_data.subscribe_candles", lambda c, s: c.market_data.subscribe_candles(**s)),
     ("heatmap.get", lambda c, s: c.heatmap.get(**s)),

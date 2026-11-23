@@ -275,6 +275,7 @@ class SyncMarketDataService(_SyncSubscribeService):
 
     get_candles = call(AsyncMarketDataService.get_candles)
     get_candles_columns = call(AsyncMarketDataService.get_candles_columns)
+    get_index_price_candles = call(AsyncMarketDataService.get_index_price_candles)
     get_current_candle = call(AsyncMarketDataService.get_current_candle)
     get_spot_config = call(AsyncMarketDataService.get_spot_config)
     get_trades = call(AsyncMarketDataService.get_trades)

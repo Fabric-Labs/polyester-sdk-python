@@ -534,8 +534,10 @@ class _QuantityDomain:
   LEDGER_E18 = "ledger_e18"
 
 
-class _AssetAmount:
-  """Marker base of the SDK's transfer amount, which order fields refuse."""
+def _is(value, kind):
+  # A price, quantity or transfer amount names its kind, so the SDK's slotted
+  # types are read as this file's own.
+  return getattr(value, "_polyester_kind", None) == kind
 
 
 def _require_scaled_int(value, field, allow_u128=False):
@@ -561,6 +563,7 @@ class _Price:
 
   ticks: int
   symbol: str | None = None
+  _polyester_kind = "price"
   from_ticks = _price_from_ticks
 
   def __repr__(self):
@@ -573,8 +576,12 @@ class _Price:
     return _format_scaled(self.ticks, _PRICE_SCALE)
 
   def compatible_with(self, *, symbol=None):
-    if self.symbol is not None and symbol is not None and self.symbol != symbol:
-      raise _err(f"price symbol mismatch: value is for {self.symbol}, destination is {symbol}")
+    _price_compatible(self, symbol)
+
+
+def _price_compatible(price, symbol):
+  if price.symbol is not None and symbol is not None and price.symbol != symbol:
+    raise _err(f"price symbol mismatch: value is for {price.symbol}, destination is {symbol}")
 
 
 def _quantity_from_scaled(scaled, *, scale=None, domain="order_base", symbol=None, symbol_id=None):
@@ -606,6 +613,7 @@ class _Quantity:
   domain: str = "order_base"
   symbol: str | None = None
   symbol_id: int | None = None
+  _polyester_kind = "quantity"
   from_scaled = _quantity_from_scaled
   from_quote_scaled = _quote_quantity_from_scaled
   from_quote_decimal = _quote_quantity_from_decimal
@@ -614,34 +622,39 @@ class _Quantity:
   def __repr__(self):
     return _fields_repr("Quantity", self, "scaled scale domain symbol symbol_id")
 
-  def _text(self, scale, name):
-    resolved = scale if scale is not None else self.scale
-    if resolved is None:
-      raise _err(f"{name} requires a known scale; pass scale= or construct with scale=")
-    return _format_qty_scaled(self.scaled, resolved)
-
   def as_decimal(self, scale=None):
-    return _Decimal(self._text(scale, "as_decimal"))
+    return _Decimal(_quantity_text(self, scale, "as_decimal"))
 
   def format(self, scale=None):
-    return self._text(scale, "format")
+    return _quantity_text(self, scale, "format")
 
   def compatible_with(self, *, domain="order_base", scale=None, symbol=None, symbol_id=None):
-    if self.domain != domain:
-      raise _err(f"quantity domain mismatch: value is {self.domain}, destination is {domain}")
-    if self.scale is not None and scale is not None and self.scale != scale:
-      raise _err(f"quantity scale mismatch: value scale is {self.scale}, destination is {scale}")
-    if self.symbol is not None and symbol is not None and self.symbol != symbol:
-      raise _err(f"quantity symbol mismatch: value is for {self.symbol}, destination is {symbol}")
-    if self.symbol_id is not None and symbol_id is not None and self.symbol_id != symbol_id:
-      raise _err(
-        f"quantity symbol_id mismatch: value is for {self.symbol_id}, destination is {symbol_id}"
-      )
+    _quantity_compatible(self, domain, scale, symbol, symbol_id)
+
+
+def _quantity_text(qty, scale, name):
+  resolved = scale if scale is not None else qty.scale
+  if resolved is None:
+    raise _err(f"{name} requires a known scale; pass scale= or construct with scale=")
+  return _format_qty_scaled(qty.scaled, resolved)
+
+
+def _quantity_compatible(qty, domain, scale, symbol, symbol_id):
+  if qty.domain != domain:
+    raise _err(f"quantity domain mismatch: value is {qty.domain}, destination is {domain}")
+  if qty.scale is not None and scale is not None and qty.scale != scale:
+    raise _err(f"quantity scale mismatch: value scale is {qty.scale}, destination is {scale}")
+  if qty.symbol is not None and symbol is not None and qty.symbol != symbol:
+    raise _err(f"quantity symbol mismatch: value is for {qty.symbol}, destination is {symbol}")
+  if qty.symbol_id is not None and symbol_id is not None and qty.symbol_id != symbol_id:
+    raise _err(
+      f"quantity symbol_id mismatch: value is for {qty.symbol_id}, destination is {symbol_id}"
+    )
 
 
 def _resolve_price_ticks(value, field="price", symbol=None, positive=False):
-  if isinstance(value, _Price):
-    value.compatible_with(symbol=symbol)
+  if _is(value, "price"):
+    _price_compatible(value, symbol)
     ticks = value.ticks
   elif isinstance(value, (int, float, bool)):
     raise _err(
@@ -655,21 +668,17 @@ def _resolve_price_ticks(value, field="price", symbol=None, positive=False):
 
 
 def _resolve_qty(value, scale, field, symbol, symbol_id, quote):
-  if isinstance(value, _Quantity):
+  if _is(value, "quantity"):
     if quote and value.scale is None:
       raise _err(
         "quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal"
       )
-    value.compatible_with(
-      domain="order_quote" if quote else "order_base",
-      scale=scale,
-      symbol=symbol,
-      symbol_id=symbol_id,
-    )
+    domain = "order_quote" if quote else "order_base"
+    _quantity_compatible(value, domain, scale, symbol, symbol_id)
     if value.scaled <= 0:
       raise _err(f"{field} must be positive")
     return value.scaled
-  if isinstance(value, _AssetAmount):
+  if _is(value, "asset_amount"):
     target = "order quote" if quote else "order/trigger"
     raise _err(f"{field} expects Quantity ({target}), not AssetAmount")
   if isinstance(value, (int, float, bool)):
@@ -694,7 +703,7 @@ def _resolve_quote_qty_scaled(value, scale, field="max_quote_debit", symbol=None
 
 def _value_scale(scale, *values):
   for value in values:
-    if isinstance(value, _Quantity) and value.scale is not None and value.scale != scale:
+    if _is(value, "quantity") and value.scale is not None and value.scale != scale:
       raise _err(f"quantity scale mismatch: value scale is {value.scale}, destination is {scale}")
   return scale
 
@@ -702,7 +711,7 @@ def _value_scale(scale, *values):
 def _quote_value_scale(scale, *values):
   present = [value for value in values if value is not None]
   for value in present:
-    if isinstance(value, _Quantity):
+    if _is(value, "quantity"):
       if value.scale is None:
         raise _err(
           "quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal"
@@ -715,7 +724,7 @@ def _quote_value_scale(scale, *values):
 def _codec_scale(value, quantity_scale):
   if quantity_scale is not None:
     return quantity_scale
-  if isinstance(value, _Quantity):
+  if _is(value, "quantity"):
     return value.scale if value.scale is not None else 0
   raise _err("decimal quantity encoding requires an explicit quantity_scale resolved from catalogs")
 
@@ -942,8 +951,12 @@ def _normalize_create(data):
     raise _err("Invalid orders.create request")
   request = {name: data.get(name) for name in _CREATE_ORDER_FIELDS}
   request["post_only"] = bool(data.get("post_only", False))
+  return _refuse_float_amounts(request)
+
+
+def _refuse_float_amounts(request):
   for name in _DECIMAL_FIELDS.split():
-    if isinstance(request[name], float):
+    if isinstance(request.get(name), float):
       raise _err(
         f"{name} must be a decimal string, Decimal, or typed scaled value (floats are not allowed)"
       )
@@ -1420,6 +1433,7 @@ class _OrderId:
   """An exchange-assigned order ID (public base58 string or int)."""
 
   value: str | int
+  _polyester_kind = "order_id"
 
   def __repr__(self):
     return _fields_repr("OrderId", self, "value")
@@ -1430,17 +1444,18 @@ class _ClientOrderId:
   """A caller-supplied client order ID."""
 
   value: str
+  _polyester_kind = "client_order_id"
 
   def __repr__(self):
     return _fields_repr("ClientOrderId", self, "value")
 
 
 def _require_order_key(key, op):
-  if isinstance(key, _OrderId):
+  if _is(key, "order_id"):
     if key.value is None or (isinstance(key.value, str) and key.value.strip() == ""):
       raise _err(f"{op} requires a non-empty OrderId")
     return key
-  if isinstance(key, _ClientOrderId):
+  if _is(key, "client_order_id"):
     if not str(key.value).strip():
       raise _err(f"{op} requires a non-empty ClientOrderId")
     return key
@@ -1449,7 +1464,7 @@ def _require_order_key(key, op):
 
 def _order_key(key, op):
   key = _require_order_key(key, op)
-  if isinstance(key, _OrderId):
+  if _is(key, "order_id"):
     return {"orderId": str(_id_to_int(key.value, "order_id"))}
   return {"clientOrderId": _required_client_id(key.value, "client_order_id")}
 
@@ -1484,6 +1499,30 @@ def _positive(resolved, field):
   return resolved
 
 
+def _new_price_ticks(value, symbol):
+  _refuse_non_positive(value, "new_price")
+  ticks = _grid(
+    _PRICE_TICK_SIZE, "new_price_ticks", _resolve_price_ticks, value, "new_price", symbol
+  )
+  return _positive(ticks, "new_price")
+
+
+def _new_qty_scaled(value, quantity_scale, symbol, symbol_id):
+  _refuse_non_positive(value, "new_qty")
+  scale = _codec_scale(value, quantity_scale)
+  scaled = _grid(
+    _QTY_STEP_SIZE,
+    "new_qty_scaled",
+    _resolve_qty_scaled,
+    value,
+    scale,
+    "new_qty",
+    symbol,
+    symbol_id,
+  )
+  return _positive(scaled, "new_qty")
+
+
 def _modify_order(
   symbol,
   symbol_id,
@@ -1514,24 +1553,9 @@ def _modify_order(
   if sub_account_id is not None:
     request["subaccountId"] = str(_id_to_int(sub_account_id, "sub_account_id"))
   if new_price is not None:
-    _refuse_non_positive(new_price, "new_price")
-    ticks = _grid(
-      _PRICE_TICK_SIZE, "new_price_ticks", _resolve_price_ticks, new_price, "new_price", symbol
-    )
-    request["newPriceTicks"] = str(_positive(ticks, "new_price"))
+    request["newPriceTicks"] = str(_new_price_ticks(new_price, symbol))
   if new_qty is not None:
-    _refuse_non_positive(new_qty, "new_qty")
-    scaled = _grid(
-      _QTY_STEP_SIZE,
-      "new_qty_scaled",
-      _resolve_qty_scaled,
-      new_qty,
-      _codec_scale(new_qty, quantity_scale),
-      "new_qty",
-      symbol,
-      symbol_id,
-    )
-    request["newQtyScaled"] = str(_positive(scaled, "new_qty"))
+    request["newQtyScaled"] = str(_new_qty_scaled(new_qty, quantity_scale, symbol, symbol_id))
   if behavior:
     name = behavior.lower()
     if name not in _MODIFY_BEHAVIORS:

@@ -22,6 +22,7 @@ from pydantic_monty import Monty
 
 from polyester import pure
 from tests.unit import test_pure_create_equivalence as create_cases
+from tests.unit import test_pure_mutation_equivalence as mutation_cases
 from tests.unit.pure_equivalence import MARKET, Expires, Key, P, Q
 
 SOURCE = Path(pure.__file__).read_text(encoding="utf-8")
@@ -50,28 +51,28 @@ def _rt_decode(value):
   return value
 
 
-def _rt_build(builder, args, now):
+def _rt_build(builder, args, now, market):
   if builder == "orders.create":
-    return polyester.orders.create(rt_market, now=now, **args)
+    return polyester.orders.create(market, now=now, **args)
   if builder == "orders.modify":
-    return polyester.orders.modify(rt_market, **args)
+    return polyester.orders.modify(market, **args)
   if builder == "orders.cancel":
-    return polyester.orders.cancel(rt_market, **args)
+    return polyester.orders.cancel(market, **args)
   if builder == "triggers.create":
-    return polyester.triggers.create(rt_market, **args)
+    return polyester.triggers.create(market, **args)
   if builder == "triggers.create_oco":
-    return polyester.triggers.create_oco(rt_market, **args)
+    return polyester.triggers.create_oco(market, **args)
   if builder == "triggers.modify":
-    return polyester.triggers.modify(rt_market, **args)
+    return polyester.triggers.modify(market, **args)
   return polyester.triggers.cancel(**args)
 
 
 def _rt_run(cases, now_text):
   now = _rt_datetime.fromisoformat(now_text)
   results = []
-  for builder, args in cases:
+  for builder, args, with_market in cases:
     try:
-      built = _rt_build(builder, _rt_decode(args), now)
+      built = _rt_build(builder, _rt_decode(args), now, rt_market if with_market else None)
       results.append(["ok", _rt_json.dumps(built, sort_keys=True)])
     except Exception as exc:
       message = str(exc) if isinstance(exc, ValueError) else ""
@@ -104,9 +105,25 @@ def _encode(value: Any) -> Any:
 def matrix() -> list[list[Any]]:
     cases: list[list[Any]] = []
     for _, args in create_cases._order_cases():
-        cases.append(["orders.create", _encode(args)])
+        cases.append(["orders.create", _encode(args), True])
     for _, args in create_cases._trigger_cases():
-        cases.append(["triggers.create", _encode(args)])
+        cases.append(["triggers.create", _encode(args), True])
+    for builder, bases, mutations in (
+        ("orders.modify", mutation_cases.MODIFY_BASES, mutation_cases.MODIFY_MUTATIONS),
+        ("triggers.create_oco", mutation_cases.OCO_BASES, mutation_cases.OCO_MUTATIONS),
+    ):
+        for _, args in mutation_cases._cases(bases, mutations):
+            cases.append([builder, _encode(args), True])
+    for _, args in mutation_cases._cases(
+        mutation_cases.CANCEL_BASES, mutation_cases.CANCEL_MUTATIONS
+    ):
+        cases.append(["orders.cancel", _encode(args), "symbol" in args or "symbol_id" in args])
+    for _, args in mutation_cases._cases(
+        mutation_cases.TRIGGER_MODIFY_BASES, mutation_cases.TRIGGER_MODIFY_MUTATIONS
+    ):
+        cases.append(["triggers.modify", _encode(args), True])
+        cases.append(["triggers.modify", _encode(args), False])
+        cases.append(["triggers.cancel", _encode({"trigger_id": args["trigger_id"]}), False])
     return cases
 
 

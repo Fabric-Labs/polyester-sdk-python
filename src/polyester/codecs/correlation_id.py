@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from polyester.errors import PolyesterValidationError
+from polyester.codecs.pure_bridge import call, pure
 
-CLIENT_ID_MAX_LEN = 36
-REQUEST_ID_MAX_LEN = 64
-_ALLOWED_PUNCTUATION = "._:/-"
+CLIENT_ID_MAX_LEN: int = pure._CLIENT_ID_MAX_LEN
+REQUEST_ID_MAX_LEN: int = pure._REQUEST_ID_MAX_LEN
 
 
 def validate_correlation_id(value: str, field: str, max_len: int) -> str:
@@ -14,29 +13,16 @@ def validate_correlation_id(value: str, field: str, max_len: int) -> str:
 def check_correlation_id(value: str, field: str, max_len: int) -> str:
     """Check ``value`` as given, untrimmed: 1 to ``max_len`` ASCII letters,
     digits, ``.``, ``_``, ``:``, ``/`` or ``-``, the client order ID rule."""
-    if not value or len(value) > max_len:
-        raise PolyesterValidationError(f"{field} must be 1 to {max_len} characters")
-    valid_chars = (
-        char.isascii() and (char.isalnum() or char in _ALLOWED_PUNCTUATION) for char in value
-    )
-    if not all(valid_chars):
-        raise PolyesterValidationError(
-            f"{field} contains invalid characters; allowed: A-Z a-z 0-9 . _ : / -"
-        )
-    return value
+    return call(pure._check_correlation_id, value, field, max_len)
 
 
 def optional_client_id(value: str | None, field: str = "client_order_id") -> str | None:
-    if value is None or not value.strip():
-        return None
-    return validate_correlation_id(value, field, CLIENT_ID_MAX_LEN)
+    return call(pure._optional_client_id, value, field)
 
 
 def required_client_id(value: str, field: str) -> str:
-    return validate_correlation_id(value, field, CLIENT_ID_MAX_LEN)
+    return call(pure._required_client_id, value, field)
 
 
 def optional_request_id(value: str | None) -> str | None:
-    if value is None or not value.strip():
-        return None
-    return validate_correlation_id(value, "request_id", REQUEST_ID_MAX_LEN)
+    return call(pure._optional_request_id, value)

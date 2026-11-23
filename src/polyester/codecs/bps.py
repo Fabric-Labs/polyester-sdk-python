@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import operator
+from polyester.codecs.pure_bridge import call, pure
 
-from polyester.codecs.scalars import ascii_int
-from polyester.errors import PolyesterValidationError
-
-MAX_BPS = 10_000
+MAX_BPS: int = pure._MAX_BPS
 # A slippage cap on anything that sells, and on every trailing stop, stops
 # short of 100%, which would leave no positive price to sell at.
 MAX_SELL_SLIPPAGE_BPS = MAX_BPS - 1
@@ -19,21 +16,10 @@ def validate_bps(
     max_value: int = MAX_BPS,
 ) -> int:
     """Validate a basis-point field before assigning it to protobuf."""
-    if isinstance(value, bool) or not isinstance(value, (int, str)):
-        raise PolyesterValidationError(f"{field_name} must be an integer")
-    try:
-        # operator.index, not int(): an int subclass may override __int__.
-        parsed = operator.index(value) if isinstance(value, int) else ascii_int(value)
-    except ValueError as exc:
-        raise PolyesterValidationError(f"{field_name} must be an integer") from exc
-    if allow_clear and parsed == 0:
-        return parsed
-    if parsed < 1 or parsed > max_value:
-        raise PolyesterValidationError(f"{field_name} must be between 1 and {max_value}")
-    return parsed
+    return call(pure._bps, value, field_name, allow_clear, max_value)
 
 
 def max_slippage_bps_for_side(side: str) -> int:
     """Largest market slippage cap for an execution on ``side``: 10000 bps to
     buy, 9999 to sell."""
-    return MAX_SELL_SLIPPAGE_BPS if side == "sell" else MAX_BPS
+    return int(pure._max_slippage_bps_for_side(side))

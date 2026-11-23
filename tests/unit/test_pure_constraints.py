@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -310,7 +311,29 @@ def test_each_rule_catches_what_it_bans(snippet: str) -> None:
 
 
 def test_size_budget() -> None:
-    assert len(SOURCE.encode("utf-8")) < MAX_BYTES
+    size = len(SOURCE.encode("utf-8"))
+    print(f"polyester/pure.py is {size} bytes of {MAX_BYTES}")
+    assert size < MAX_BYTES, f"polyester/pure.py is {size} bytes, over its {MAX_BYTES}-byte budget"
+
+
+def test_contract_limits_are_the_contracts() -> None:
+    """The file holds the limits the SDK reads from the contract's rules."""
+    import msgspec
+
+    from polyester.codecs import oco, triggers
+    from polyester.models import CreateOrderRequest
+
+    impl: Any = pure
+    assert impl._TWAP_DURATION_MS == (triggers.TWAP_DURATION_MS_MIN, triggers.TWAP_DURATION_MS_MAX)
+    assert impl._TWAP_SLICE_INTERVAL_MS == (
+        triggers.TWAP_SLICE_INTERVAL_MS_MIN,
+        triggers.TWAP_SLICE_INTERVAL_MS_MAX,
+    )
+    assert impl._LADDER_LEVELS == (triggers.LADDER_LEVELS_MIN, triggers.LADDER_LEVELS_MAX)
+    assert impl._CLIENT_TRIGGER_ID_MAX_BYTES == triggers.CLIENT_TRIGGER_ID_MAX_BYTES
+    assert impl._CLIENT_LIST_ID_MAX_LEN == oco.CLIENT_LIST_ID_MAX_LEN
+    fields = {field.name for field in msgspec.structs.fields(CreateOrderRequest)}
+    assert set(impl._CREATE_ORDER_FIELDS) == fields
 
 
 def test_version_is_the_sdk_version() -> None:

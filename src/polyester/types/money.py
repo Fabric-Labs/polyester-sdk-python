@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import operator
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import ClassVar
 
+from polyester.codecs.pure_bridge import call, pure
 from polyester.codecs.scalars import (
-    INT64_MAX,
-    INT64_MIN,
     PRICE_TICK_SCALE,
     decimal_to_scaled,
     format_price_ticks,
     format_qty_scaled,
-    parse_price_ticks,
     parse_qty_scaled,
     validate_protocol_scale,
 )
@@ -29,22 +26,8 @@ class QuantityDomain(StrEnum):
     LEDGER_E18 = "ledger_e18"
 
 
-def _reject_bool(value: Any, field_name: str) -> None:
-    if isinstance(value, bool):
-        raise PolyesterValidationError(f"{field_name} must not be a boolean")
-
-
 def _require_scaled_int(value: int, field_name: str, *, allow_u128: bool = False) -> int:
-    _reject_bool(value, field_name)
-    if not isinstance(value, int):
-        raise PolyesterValidationError(f"{field_name} must be an int")
-    # operator.index, not the object: an int subclass may override __int__.
-    value = operator.index(value)
-    if value < 0:
-        raise PolyesterValidationError(f"{field_name} must be non-negative")
-    if not allow_u128 and (value < INT64_MIN or value > INT64_MAX):
-        raise PolyesterValidationError(f"{field_name} exceeds int64 range")
-    return value
+    return call(pure._require_scaled_int, value, field_name, allow_u128)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,13 +36,12 @@ class Price:
 
     ticks: int
     symbol: str | None = None
+    # How polyester.pure, which holds the rules, recognises a price.
+    _polyester_kind: ClassVar[str] = "price"
 
     @classmethod
     def from_ticks(cls, ticks: int, *, symbol: str | None = None) -> Price:
-        value = _require_scaled_int(ticks, "ticks")
-        if value < 0:
-            raise PolyesterValidationError("ticks must be non-negative")
-        return cls(ticks=value, symbol=symbol)
+        return cls(ticks=_require_scaled_int(ticks, "ticks"), symbol=symbol)
 
     def as_decimal(self) -> Decimal:
         return Decimal(format_price_ticks(self.ticks))
@@ -68,10 +50,7 @@ class Price:
         return format_price_ticks(self.ticks)
 
     def compatible_with(self, *, symbol: str | None = None) -> None:
-        if self.symbol is not None and symbol is not None and self.symbol != symbol:
-            raise PolyesterValidationError(
-                f"price symbol mismatch: value is for {self.symbol}, destination is {symbol}"
-            )
+        call(pure._price_compatible, self, symbol)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +62,7 @@ class Quantity:
     domain: QuantityDomain = QuantityDomain.ORDER_BASE
     symbol: str | None = None
     symbol_id: int | None = None
+    _polyester_kind: ClassVar[str] = "quantity"
 
     @classmethod
     def from_scaled(
@@ -94,17 +74,18 @@ class Quantity:
         symbol: str | None = None,
         symbol_id: int | None = None,
     ) -> Quantity:
-        value = _require_scaled_int(scaled, "scaled")
-        if domain not in (QuantityDomain.ORDER_BASE, QuantityDomain.ORDER_QUOTE):
-            raise PolyesterValidationError(
-                "Quantity domain must be order_base or order_quote"
-            )
-        if scale is not None:
-            validate_protocol_scale(scale)
-        return cls(
-            scaled=value,
+        checked = call(
+            pure._quantity_from_scaled,
+            scaled,
             scale=scale,
             domain=domain,
+            symbol=symbol,
+            symbol_id=symbol_id,
+        )
+        return cls(
+            scaled=checked.scaled,
+            scale=scale,
+            domain=QuantityDomain(domain),
             symbol=symbol,
             symbol_id=symbol_id,
         )
@@ -142,9 +123,7 @@ class Quantity:
         symbol_id: int | None = None,
     ) -> Quantity:
         scaled = parse_qty_scaled(raw, scale, "quote amount")
-        return cls.from_quote_scaled(
-            scaled, scale, symbol=symbol, symbol_id=symbol_id
-        )
+        return cls.from_quote_scaled(scaled, scale, symbol=symbol, symbol_id=symbol_id)
 
     @classmethod
     def from_quote_decimal(
@@ -156,27 +135,13 @@ class Quantity:
         symbol_id: int | None = None,
     ) -> Quantity:
         scaled = parse_qty_scaled(raw, scale, "quote amount")
-        return cls.from_quote_scaled(
-            scaled, scale, symbol=symbol, symbol_id=symbol_id
-        )
+        return cls.from_quote_scaled(scaled, scale, symbol=symbol, symbol_id=symbol_id)
 
     def as_decimal(self, scale: int | None = None) -> Decimal:
-        resolved = scale if scale is not None else self.scale
-        if resolved is None:
-            raise PolyesterValidationError(
-                "as_decimal requires a known scale; pass scale= or construct with scale="
-            )
-        validate_protocol_scale(resolved)
-        return Decimal(format_qty_scaled(self.scaled, resolved))
+        return Decimal(call(pure._quantity_text, self, scale, "as_decimal"))
 
     def format(self, scale: int | None = None) -> str:
-        resolved = scale if scale is not None else self.scale
-        if resolved is None:
-            raise PolyesterValidationError(
-                "format requires a known scale; pass scale= or construct with scale="
-            )
-        validate_protocol_scale(resolved)
-        return format_qty_scaled(self.scaled, resolved)
+        return str(call(pure._quantity_text, self, scale, "format"))
 
     def compatible_with(
         self,
@@ -186,24 +151,7 @@ class Quantity:
         symbol: str | None = None,
         symbol_id: int | None = None,
     ) -> None:
-        if self.domain != domain:
-            raise PolyesterValidationError(
-                f"quantity domain mismatch: value is {self.domain.value}, "
-                f"destination is {domain.value}"
-            )
-        if self.scale is not None and scale is not None and self.scale != scale:
-            raise PolyesterValidationError(
-                f"quantity scale mismatch: value scale is {self.scale}, destination is {scale}"
-            )
-        if self.symbol is not None and symbol is not None and self.symbol != symbol:
-            raise PolyesterValidationError(
-                f"quantity symbol mismatch: value is for {self.symbol}, destination is {symbol}"
-            )
-        if self.symbol_id is not None and symbol_id is not None and self.symbol_id != symbol_id:
-            raise PolyesterValidationError(
-                f"quantity symbol_id mismatch: value is for {self.symbol_id}, "
-                f"destination is {symbol_id}"
-            )
+        call(pure._quantity_compatible, self, domain, scale, symbol, symbol_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +162,7 @@ class AssetAmount:
     scale: int | None = None
     domain: QuantityDomain = QuantityDomain.ASSET
     asset_id: int | None = None
+    _polyester_kind: ClassVar[str] = "asset_amount"
 
     @classmethod
     def from_scaled(
@@ -281,15 +230,7 @@ def resolve_price_ticks(
     *,
     symbol: str | None = None,
 ) -> int:
-    if isinstance(value, Price):
-        value.compatible_with(symbol=symbol)
-        return value.ticks
-    if isinstance(value, (int, float, bool)) and not isinstance(value, Decimal):
-        raise PolyesterValidationError(
-            f"{field_name} must be a decimal string, Decimal, or Price "
-            "(use Price.from_ticks for scaled ints)"
-        )
-    return parse_price_ticks(value, field_name)
+    return call(pure._resolve_price_ticks, value, field_name, symbol)
 
 
 def resolve_positive_price_ticks(
@@ -304,10 +245,7 @@ def resolve_positive_price_ticks(
     ``Price.from_ticks(0)``) is refused: on the wire a 0 price reads as no
     price, so it would be sent as if it had been left out.
     """
-    ticks = resolve_price_ticks(value, field_name, symbol=symbol)
-    if ticks <= 0:
-        raise PolyesterValidationError(f"{field_name} must be positive")
-    return ticks
+    return call(pure._resolve_price_ticks, value, field_name, symbol, True)
 
 
 def resolve_qty_scaled(
@@ -318,26 +256,7 @@ def resolve_qty_scaled(
     symbol: str | None = None,
     symbol_id: int | None = None,
 ) -> int:
-    if isinstance(value, Quantity):
-        value.compatible_with(
-            domain=QuantityDomain.ORDER_BASE,
-            scale=scale,
-            symbol=symbol,
-            symbol_id=symbol_id,
-        )
-        if value.scaled <= 0:
-            raise PolyesterValidationError(f"{field_name} must be positive")
-        return value.scaled
-    if isinstance(value, AssetAmount):
-        raise PolyesterValidationError(
-            f"{field_name} expects Quantity (order/trigger), not AssetAmount"
-        )
-    if isinstance(value, (int, float, bool)) and not isinstance(value, Decimal):
-        raise PolyesterValidationError(
-            f"{field_name} must be a decimal string, Decimal, or Quantity "
-            "(use Quantity.from_scaled for scaled ints)"
-        )
-    return _parse_order_qty_scaled(value, scale, field_name)
+    return call(pure._resolve_qty_scaled, value, scale, field_name, symbol, symbol_id)
 
 
 def resolve_quote_qty_scaled(
@@ -349,42 +268,7 @@ def resolve_quote_qty_scaled(
     symbol_id: int | None = None,
 ) -> int:
     """Resolve a quote-debit budget. Typed values must carry the catalog quote scale."""
-    if isinstance(value, Quantity):
-        if value.scale is None:
-            raise PolyesterValidationError(
-                "quote amount scale is required; use "
-                "Quantity.from_quote_scaled/from_quote_decimal"
-            )
-        value.compatible_with(
-            domain=QuantityDomain.ORDER_QUOTE,
-            scale=scale,
-            symbol=symbol,
-            symbol_id=symbol_id,
-        )
-        if value.scaled <= 0:
-            raise PolyesterValidationError(f"{field_name} must be positive")
-        return value.scaled
-    if isinstance(value, AssetAmount):
-        raise PolyesterValidationError(
-            f"{field_name} expects Quantity (order quote), not AssetAmount"
-        )
-    if isinstance(value, (int, float, bool)) and not isinstance(value, Decimal):
-        raise PolyesterValidationError(
-            f"{field_name} must be a decimal string, Decimal, or Quantity "
-            "(use Quantity.from_quote_scaled for scaled ints)"
-        )
-    return _parse_order_qty_scaled(value, scale, field_name)
-
-
-def _parse_order_qty_scaled(value: str | Decimal, scale: int, field_name: str) -> int:
-    """Parse a decimal order quantity for an int64 wire field.
-
-    ``parse_qty_scaled`` allows wider values at scale 18 for ledger amounts.
-    """
-    scaled = parse_qty_scaled(value, scale, field_name)
-    if scaled > INT64_MAX:
-        raise PolyesterValidationError(f"{field_name} exceeds int64 range")
-    return scaled
+    return call(pure._resolve_quote_qty_scaled, value, scale, field_name, symbol, symbol_id)
 
 
 def resolve_asset_amount_scaled(

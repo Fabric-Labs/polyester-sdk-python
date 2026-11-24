@@ -11,6 +11,7 @@ Builders are deterministic: frozen clocks and entropy seeds change nothing.
 from __future__ import annotations
 
 import ast
+import builtins
 import json
 import operator
 from collections.abc import Iterator
@@ -35,24 +36,33 @@ from datetime import datetime as _rt_datetime
 from decimal import Decimal as _rt_Decimal
 import json as _rt_json
 
+# Bound before any shadowing code runs, which may rebind the builtins.
+_rt_isinstance = isinstance
+_rt_list = list
+_rt_dict = dict
+_rt_str = str
+_rt_type = type
+_rt_Exception = Exception
+_rt_ValueError = ValueError
+
 
 def _rt_decode(value):
-  if isinstance(value, list) and value and value[0] == "$D":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$D":
     return _rt_Decimal(value[1])
-  if isinstance(value, list) and value and value[0] == "$PR":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$PR":
     return polyester.Price(value[1], value[2])
-  if isinstance(value, list) and value and value[0] == "$QR":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$QR":
     return polyester.Quantity(value[1], value[2], value[3], value[4], value[5])
-  if isinstance(value, list) and value and value[0] == "$P":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$P":
     return polyester.Price.from_ticks(value[1], symbol=value[2])
-  if isinstance(value, list) and value and value[0] == "$Q":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$Q":
     return polyester.Quantity.from_scaled(
       value[1], scale=value[2], domain=value[3], symbol=value[4], symbol_id=value[5])
-  if isinstance(value, list) and value and value[0] == "$K":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$K":
     return polyester.OrderId(value[1])
-  if isinstance(value, list) and value and value[0] == "$C":
+  if _rt_isinstance(value, _rt_list) and value and value[0] == "$C":
     return polyester.ClientOrderId(value[1])
-  if isinstance(value, dict):
+  if _rt_isinstance(value, _rt_dict):
     return {key: _rt_decode(item) for key, item in value.items()}
   return value
 
@@ -80,9 +90,9 @@ def _rt_run(cases, now_text):
     try:
       built = _rt_build(builder, _rt_decode(args), now, rt_market if with_market else None)
       results.append(["ok", _rt_json.dumps(built, sort_keys=True)])
-    except Exception as exc:
-      message = str(exc) if isinstance(exc, ValueError) else ""
-      results.append(["error", type(exc).__name__, message])
+    except _rt_Exception as exc:
+      message = _rt_str(exc) if _rt_isinstance(exc, _rt_ValueError) else ""
+      results.append(["error", _rt_type(exc).__name__, message])
   return results
 
 
@@ -259,10 +269,32 @@ def _factory_names() -> list[str]:
     return sorted(names)
 
 
+def _referenced_globals() -> list[str]:
+    """Every builtin the file reads, and every module and name it imports
+    under its own name: what a bot is most likely to rebind."""
+    tree = ast.parse(SOURCE)
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and hasattr(builtins, node.id):
+            names.add(node.id)
+        elif isinstance(node, ast.Import):
+            names.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.add((node.module or "").split(".")[0])
+            names.update(alias.name for alias in node.names)
+    return sorted(names - {"", "polyester"})
+
+
+def _shadowed_names() -> list[str]:
+    return sorted(set(_factory_names()) | set(_referenced_globals()))
+
+
 def _shadowing_code() -> str:
-    """Code a bot or a host prelude might run after loading the file: its own
-    definitions of every name the file uses inside."""
-    lines = [f"{name} = None" for name in _factory_names()]
+    """Code a bot or a host prelude might run after loading the file: junk
+    bound to every builtin, module and name the file uses, and its own
+    definitions of some of them."""
+    junk = ('"x"', "None", "1")
+    lines = [f"{name} = {junk[i % 3]}" for i, name in enumerate(_shadowed_names())]
     lines += [
         "class _Market:",
         "  pass",
@@ -278,24 +310,61 @@ def _shadowing_code() -> str:
     return "\n".join(lines) + "\n"
 
 
+def test_the_shadowed_names_cover_builtins_and_imports() -> None:
+    names = _shadowed_names()
+    assert len(_factory_names()) > 100
+    builtin_names = {"type", "int", "str", "isinstance", "len", "range", "divmod", "abs"}
+    imported = {"re", "decimal", "datetime", "dataclasses", "Decimal", "dataclass", "timezone"}
+    assert builtin_names | imported <= set(names)
+    assert "polyester" not in names
+
+
 def test_names_defined_after_loading_do_not_change_the_builders(monty: Monty) -> None:
     cases = matrix()
-    assert len(_factory_names()) > 100
     expected = _cpython(cases, NOW)
+    body, _, last = RUNNER.rstrip().rpartition("\n")
     with monty.checkout() as session:
         session.feed_run(SOURCE)
+        session.feed_run(body)
         session.feed_run(_shadowing_code())
         got = session.feed_run(
-            RUNNER,
-            inputs={"rt_cases": cases, "rt_now": NOW.isoformat(), "rt_market": MARKET},
+            last, inputs={"rt_cases": cases, "rt_now": NOW.isoformat(), "rt_market": MARKET}
         )
     assert [list(result) for result in got] == expected
-    # One shared namespace in CPython too: the file, then the shadowing code.
+    # One shared namespace in CPython too: the file, the runner, then the shadowing code.
     namespace: dict[str, Any] = {}
-    exec(compile(SOURCE + "\n" + _shadowing_code(), "shared", "exec"), namespace)  # noqa: S102
+    for code in (SOURCE, body, _shadowing_code()):
+        exec(compile(code, "shared", "exec"), namespace)  # noqa: S102 - the file under test
     namespace.update(
         rt_cases=json.loads(json.dumps(cases)), rt_now=NOW.isoformat(), rt_market=MARKET
     )
-    body, _, last = RUNNER.rstrip().rpartition("\n")
-    exec(compile(body, "runner", "exec"), namespace)  # noqa: S102
+    assert all(
+        namespace[name] is not getattr(builtins, name)
+        for name in _shadowed_names()
+        if hasattr(builtins, name)
+    )
     assert eval(last, namespace) == expected  # noqa: S307
+
+
+def test_a_bot_that_names_a_variable_type_can_build(monty: Monty) -> None:
+    bot = (
+        'type = "limit"\n'
+        'm = polyester.market({"symbol": "BTC-USDT", "symbolId": 7, "baseQuantityScale": 8})\n'
+        'polyester.orders.create(m, side="buy", order_type=type, qty="0.25", price="1")\n'
+    )
+    want = {
+        "order": {
+            "symbolId": 7,
+            "side": "BUY",
+            "baseQtyScaled": "25000000",
+            "limitGtc": {"priceTicks": "1000000000"},
+        }
+    }
+    with monty.checkout() as session:
+        session.feed_run(SOURCE)
+        assert session.feed_run(bot) == want
+    namespace: dict[str, Any] = {}
+    exec(compile(SOURCE, "shared", "exec"), namespace)  # noqa: S102 - the file under test
+    head, _, last = bot.rstrip().rpartition("\n")
+    exec(compile(head, "bot", "exec"), namespace)  # noqa: S102
+    assert eval(last, namespace) == want  # noqa: S307

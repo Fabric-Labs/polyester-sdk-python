@@ -2566,8 +2566,9 @@ A host copies the file from the installed wheel, where it is
 `polyester/pure.py` (`importlib.resources.files("polyester") / "pure.py"`), or
 from `src/polyester/pure.py` at a release tag, and runs it in the bot's
 namespace. Its one top-level name is `polyester`: everything else is defined
-inside it, so names the host or the bot define afterwards do not change the
-builders. `polyester.VERSION` is the SDK version it ships with.
+inside it, and the builtins it calls are bound when it loads, so names the host
+or the bot define afterwards, even `type` or `str`, do not change the builders.
+`polyester.VERSION` is the SDK version it ships with.
 
 Each builder takes the pair as `GetSpotConfig` serves it (or
 `polyester.market(pair)`; a scale proto-JSON leaves out is 0, and the fields the

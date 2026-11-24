@@ -7,7 +7,30 @@ name is ``polyester``. Formatted with
 """
 
 
-def polyester():
+# Builtins bound at load: code loaded later into the same namespace can't rebind them.
+def polyester(
+  AttributeError=AttributeError,
+  OverflowError=OverflowError,
+  ValueError=ValueError,
+  abs=abs,
+  all=all,
+  bool=bool,
+  dict=dict,
+  divmod=divmod,
+  float=float,
+  format=format,
+  getattr=getattr,
+  int=int,
+  isinstance=isinstance,
+  len=len,
+  locals=locals,
+  range=range,
+  repr=repr,
+  setattr=setattr,
+  sorted=sorted,
+  str=str,
+  type=type,
+):
   import re as _re
   from dataclasses import dataclass as _dataclass
   from datetime import datetime as _datetime

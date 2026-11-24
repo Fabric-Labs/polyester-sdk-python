@@ -494,3 +494,9 @@ class GetPriceBandResponse(_message.Message):
     BAND_FIELD_NUMBER: _ClassVar[int]
     band: LivePriceBand
     def __init__(self, band: _Optional[_Union[LivePriceBand, _Mapping]] = ...) -> None: ...
+
+class ErrorDetail(_message.Message):
+    __slots__ = ("reason",)
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    reason: str
+    def __init__(self, reason: _Optional[str] = ...) -> None: ...

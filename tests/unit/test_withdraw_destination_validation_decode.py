@@ -19,6 +19,7 @@ from polyester.gen.chain.withdraw.v1 import withdraw_pb2
         (withdraw_pb2.POLYESTER_SMART_ACCOUNT, "polyester_smart_account"),
         (withdraw_pb2.TOKEN_CONTRACT, "token_contract"),
         (withdraw_pb2.DENYLISTED_ADDRESS, "denylisted_address"),
+        (withdraw_pb2.SWAP_DEPOSIT_ADDRESS, "swap_deposit_address"),
         (99, "unknown_code_99"),
     ],
 )

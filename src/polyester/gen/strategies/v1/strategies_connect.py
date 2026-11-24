@@ -102,6 +102,18 @@ class StrategiesService(Protocol):
     async def stop_bot(self, request: strategies_dot_v1_dot_strategies__pb2.StopBotRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.StopBotResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def publish_strategy_version(self, request: strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def unpublish_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_community_strategies(self, request: strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_community_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]):
     def __init__(self, service: StrategiesService | AsyncGenerator[StrategiesService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -387,6 +399,46 @@ class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]
                         idempotency_level=IdempotencyLevel.IDEMPOTENT,
                     ),
                     function=svc.stop_bot,
+                ),
+                "/strategies.v1.StrategiesService/PublishStrategyVersion": Endpoint.unary(
+                    method=MethodInfo(
+                        name="PublishStrategyVersion",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.publish_strategy_version,
+                ),
+                "/strategies.v1.StrategiesService/UnpublishStrategy": Endpoint.unary(
+                    method=MethodInfo(
+                        name="UnpublishStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.unpublish_strategy,
+                ),
+                "/strategies.v1.StrategiesService/ListCommunityStrategies": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListCommunityStrategies",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.list_community_strategies,
+                ),
+                "/strategies.v1.StrategiesService/GetCommunityStrategy": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetCommunityStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_community_strategy,
                 ),
             },
             interceptors=interceptors,
@@ -998,6 +1050,90 @@ class StrategiesServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def publish_strategy_version(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="PublishStrategyVersion",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def unpublish_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UnpublishStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_community_strategies(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListCommunityStrategies",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    async def get_community_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCommunityStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
 
 
 
@@ -1058,6 +1194,14 @@ class StrategiesServiceSync(Protocol):
     def list_bot_logs(self, request: strategies_dot_v1_dot_strategies__pb2.ListBotLogsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBotLogsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def stop_bot(self, request: strategies_dot_v1_dot_strategies__pb2.StopBotRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.StopBotResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def publish_strategy_version(self, request: strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def unpublish_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_community_strategies(self, request: strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_community_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -1344,6 +1488,46 @@ class StrategiesServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.IDEMPOTENT,
                     ),
                     function=service.stop_bot,
+                ),
+                "/strategies.v1.StrategiesService/PublishStrategyVersion": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="PublishStrategyVersion",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.publish_strategy_version,
+                ),
+                "/strategies.v1.StrategiesService/UnpublishStrategy": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="UnpublishStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.unpublish_strategy,
+                ),
+                "/strategies.v1.StrategiesService/ListCommunityStrategies": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListCommunityStrategies",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.list_community_strategies,
+                ),
+                "/strategies.v1.StrategiesService/GetCommunityStrategy": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetCommunityStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_community_strategy,
                 ),
             },
             interceptors=interceptors,
@@ -1953,6 +2137,90 @@ class StrategiesServiceClientSync(ConnectClientSync):
             ),
             headers=headers,
             timeout_ms=timeout_ms,
+        )
+
+    def publish_strategy_version(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="PublishStrategyVersion",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def unpublish_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="UnpublishStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_community_strategies(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListCommunityStrategies",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
+    def get_community_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetCommunityStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
         )
 
 

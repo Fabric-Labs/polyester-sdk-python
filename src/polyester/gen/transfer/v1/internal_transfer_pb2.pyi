@@ -244,10 +244,12 @@ class BatchCreateInternalTransfersResponse(_message.Message):
     def __init__(self, request_id: _Optional[str] = ..., status: _Optional[_Union[InternalTransferBatchStatus, str]] = ..., legs: _Optional[_Iterable[_Union[InternalTransferBatchLegResult, _Mapping]]] = ...) -> None: ...
 
 class GetInternalTransferBatchRequest(_message.Message):
-    __slots__ = ("request_id",)
+    __slots__ = ("request_id", "idempotency_key")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     request_id: str
-    def __init__(self, request_id: _Optional[str] = ...) -> None: ...
+    idempotency_key: str
+    def __init__(self, request_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class GetInternalTransferBatchResponse(_message.Message):
     __slots__ = ("request_id", "status", "legs")

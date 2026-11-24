@@ -35,8 +35,12 @@ class StatementRow(msgspec.Struct, kw_only=True, omit_defaults=True):
     ``time`` is the entry time, an aware UTC datetime exact to the
     microsecond. ``entry_id`` is the entry's unsigned 128-bit identifier as a
     decimal string, the ``transfer_id`` of its first transfer leg on the
-    account. ``type`` is ``"trade"`` for a trade's settlement and its fees,
-    otherwise the transfer reason (``"deposit"``, ``"withdraw"``,
+    account within the export's period, the same whichever asset the export
+    keeps. A period boundary can fall between the legs of one entry: each
+    export then holds its own part of it, under the ``transfer_id`` of that
+    part's first leg, so do not join rows of different periods on
+    ``entry_id`` alone. ``type`` is ``"trade"`` for a trade's settlement and
+    its fees, otherwise the transfer reason (``"deposit"``, ``"withdraw"``,
     ``"internal_transfer"``, ...). ``account`` is the bucket, ``"funding"`` or
     ``"trading"``. ``amount`` (the signed balance change, fees in ``fee``
     excluded), ``fee`` (fees the account paid) and ``balance`` (the bucket's
@@ -138,11 +142,12 @@ class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
     period and no other export of the account is being produced),
     ``"processing"`` (``movements`` and ``bytes`` count its progress),
     ``"ready"`` (downloadable until ``expires_at``), ``"failed"``
-    (``failure_reason`` says why: ``"too_large"``, more than 4,000,000 ledger
-    movements, so split the period; or ``"unavailable"``, create a new
-    export), ``"expired"`` (the file was deleted; create a new export) or
-    ``"canceled"`` (stopped by ``statements.cancel_export``; any partial file
-    was deleted). The last four are final. "" when the server names none;
+    (``failure_reason`` says why: ``"too_large"``, the period holds more than
+    4,000,000 ledger movements of the account, counting every asset's even
+    when the export keeps one, so split the period; or ``"unavailable"``,
+    create a new export), ``"expired"`` (the file was deleted; create a new
+    export) or ``"canceled"`` (stopped by ``statements.cancel_export``; any
+    partial file was deleted). The last four are final. "" when the server names none;
     ``"UNKNOWN(n)"`` for a value this SDK does not know.
 
     ``export_id`` and ``subaccount_id`` are public IDs; ``subaccount_id`` is

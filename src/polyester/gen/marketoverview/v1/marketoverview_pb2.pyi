@@ -76,14 +76,33 @@ class Sparkline(_message.Message):
     close_ticks: _containers.RepeatedScalarFieldContainer[int]
     def __init__(self, interval: _Optional[_Union[SparklineInterval, str]] = ..., close_ticks: _Optional[_Iterable[int]] = ...) -> None: ...
 
+class RollingWindowStats(_message.Message):
+    __slots__ = ("open_ticks", "high_ticks", "low_ticks", "change_bps")
+    OPEN_TICKS_FIELD_NUMBER: _ClassVar[int]
+    HIGH_TICKS_FIELD_NUMBER: _ClassVar[int]
+    LOW_TICKS_FIELD_NUMBER: _ClassVar[int]
+    CHANGE_BPS_FIELD_NUMBER: _ClassVar[int]
+    open_ticks: int
+    high_ticks: int
+    low_ticks: int
+    change_bps: int
+    def __init__(self, open_ticks: _Optional[int] = ..., high_ticks: _Optional[int] = ..., low_ticks: _Optional[int] = ..., change_bps: _Optional[int] = ...) -> None: ...
+
 class MarketOverview(_message.Message):
-    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "volume_24h_base_scaled", "volume_24h_quote_scaled", "volume_24h_usd_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks", "price_band")
+    __slots__ = ("symbol_id", "last_price_ticks", "last_trade_ts_ns", "change_24h_bps", "high_24h_ticks", "low_24h_ticks", "open_24h_ticks", "trade_count_24h", "vwap_24h_ticks", "open_utc_day_ticks", "stats_1h", "stats_4h", "stats_7d", "volume_24h_base_scaled", "volume_24h_quote_scaled", "volume_24h_usd_scaled", "listed_ts_ns", "best_bid_ticks", "best_bid_qty_scaled", "best_ask_ticks", "best_ask_qty_scaled", "sparklines", "index_price_ticks", "price_band")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LAST_PRICE_TICKS_FIELD_NUMBER: _ClassVar[int]
     LAST_TRADE_TS_NS_FIELD_NUMBER: _ClassVar[int]
     CHANGE_24H_BPS_FIELD_NUMBER: _ClassVar[int]
     HIGH_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
     LOW_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
+    OPEN_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
+    TRADE_COUNT_24H_FIELD_NUMBER: _ClassVar[int]
+    VWAP_24H_TICKS_FIELD_NUMBER: _ClassVar[int]
+    OPEN_UTC_DAY_TICKS_FIELD_NUMBER: _ClassVar[int]
+    STATS_1H_FIELD_NUMBER: _ClassVar[int]
+    STATS_4H_FIELD_NUMBER: _ClassVar[int]
+    STATS_7D_FIELD_NUMBER: _ClassVar[int]
     VOLUME_24H_BASE_SCALED_FIELD_NUMBER: _ClassVar[int]
     VOLUME_24H_QUOTE_SCALED_FIELD_NUMBER: _ClassVar[int]
     VOLUME_24H_USD_SCALED_FIELD_NUMBER: _ClassVar[int]
@@ -101,6 +120,13 @@ class MarketOverview(_message.Message):
     change_24h_bps: int
     high_24h_ticks: int
     low_24h_ticks: int
+    open_24h_ticks: int
+    trade_count_24h: int
+    vwap_24h_ticks: int
+    open_utc_day_ticks: int
+    stats_1h: RollingWindowStats
+    stats_4h: RollingWindowStats
+    stats_7d: RollingWindowStats
     volume_24h_base_scaled: int
     volume_24h_quote_scaled: int
     volume_24h_usd_scaled: int
@@ -112,10 +138,34 @@ class MarketOverview(_message.Message):
     sparklines: _containers.RepeatedCompositeFieldContainer[Sparkline]
     index_price_ticks: int
     price_band: _marketdata_pb2.LivePriceBand
-    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., volume_24h_usd_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ..., price_band: _Optional[_Union[_marketdata_pb2.LivePriceBand, _Mapping]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., last_price_ticks: _Optional[int] = ..., last_trade_ts_ns: _Optional[int] = ..., change_24h_bps: _Optional[int] = ..., high_24h_ticks: _Optional[int] = ..., low_24h_ticks: _Optional[int] = ..., open_24h_ticks: _Optional[int] = ..., trade_count_24h: _Optional[int] = ..., vwap_24h_ticks: _Optional[int] = ..., open_utc_day_ticks: _Optional[int] = ..., stats_1h: _Optional[_Union[RollingWindowStats, _Mapping]] = ..., stats_4h: _Optional[_Union[RollingWindowStats, _Mapping]] = ..., stats_7d: _Optional[_Union[RollingWindowStats, _Mapping]] = ..., volume_24h_base_scaled: _Optional[int] = ..., volume_24h_quote_scaled: _Optional[int] = ..., volume_24h_usd_scaled: _Optional[int] = ..., listed_ts_ns: _Optional[int] = ..., best_bid_ticks: _Optional[int] = ..., best_bid_qty_scaled: _Optional[int] = ..., best_ask_ticks: _Optional[int] = ..., best_ask_qty_scaled: _Optional[int] = ..., sparklines: _Optional[_Iterable[_Union[Sparkline, _Mapping]]] = ..., index_price_ticks: _Optional[int] = ..., price_band: _Optional[_Union[_marketdata_pb2.LivePriceBand, _Mapping]] = ...) -> None: ...
+
+class PriceTicksRange(_message.Message):
+    __slots__ = ("min_ticks", "max_ticks")
+    MIN_TICKS_FIELD_NUMBER: _ClassVar[int]
+    MAX_TICKS_FIELD_NUMBER: _ClassVar[int]
+    min_ticks: int
+    max_ticks: int
+    def __init__(self, min_ticks: _Optional[int] = ..., max_ticks: _Optional[int] = ...) -> None: ...
+
+class BpsRange(_message.Message):
+    __slots__ = ("min_bps", "max_bps")
+    MIN_BPS_FIELD_NUMBER: _ClassVar[int]
+    MAX_BPS_FIELD_NUMBER: _ClassVar[int]
+    min_bps: int
+    max_bps: int
+    def __init__(self, min_bps: _Optional[int] = ..., max_bps: _Optional[int] = ...) -> None: ...
+
+class UsdVolumeRange(_message.Message):
+    __slots__ = ("min_usd_scaled", "max_usd_scaled")
+    MIN_USD_SCALED_FIELD_NUMBER: _ClassVar[int]
+    MAX_USD_SCALED_FIELD_NUMBER: _ClassVar[int]
+    min_usd_scaled: int
+    max_usd_scaled: int
+    def __init__(self, min_usd_scaled: _Optional[int] = ..., max_usd_scaled: _Optional[int] = ...) -> None: ...
 
 class ListMarketOverviewRequest(_message.Message):
-    __slots__ = ("symbol_id", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals")
+    __slots__ = ("symbol_id", "limit", "page_token", "order_by", "sort", "include_sparklines", "sparkline_intervals", "last_price", "change_24h", "volume_24h")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
@@ -123,6 +173,9 @@ class ListMarketOverviewRequest(_message.Message):
     SORT_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_SPARKLINES_FIELD_NUMBER: _ClassVar[int]
     SPARKLINE_INTERVALS_FIELD_NUMBER: _ClassVar[int]
+    LAST_PRICE_FIELD_NUMBER: _ClassVar[int]
+    CHANGE_24H_FIELD_NUMBER: _ClassVar[int]
+    VOLUME_24H_FIELD_NUMBER: _ClassVar[int]
     symbol_id: _containers.RepeatedScalarFieldContainer[int]
     limit: int
     page_token: str
@@ -130,7 +183,10 @@ class ListMarketOverviewRequest(_message.Message):
     sort: SortDirection
     include_sparklines: bool
     sparkline_intervals: _containers.RepeatedScalarFieldContainer[SparklineInterval]
-    def __init__(self, symbol_id: _Optional[_Iterable[int]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[MarketOrderBy, str]] = ..., sort: _Optional[_Union[SortDirection, str]] = ..., include_sparklines: _Optional[bool] = ..., sparkline_intervals: _Optional[_Iterable[_Union[SparklineInterval, str]]] = ...) -> None: ...
+    last_price: PriceTicksRange
+    change_24h: BpsRange
+    volume_24h: UsdVolumeRange
+    def __init__(self, symbol_id: _Optional[_Iterable[int]] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ..., order_by: _Optional[_Union[MarketOrderBy, str]] = ..., sort: _Optional[_Union[SortDirection, str]] = ..., include_sparklines: _Optional[bool] = ..., sparkline_intervals: _Optional[_Iterable[_Union[SparklineInterval, str]]] = ..., last_price: _Optional[_Union[PriceTicksRange, _Mapping]] = ..., change_24h: _Optional[_Union[BpsRange, _Mapping]] = ..., volume_24h: _Optional[_Union[UsdVolumeRange, _Mapping]] = ...) -> None: ...
 
 class ListMarketOverviewResponse(_message.Message):
     __slots__ = ("markets", "next_page_token")

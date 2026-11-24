@@ -68,6 +68,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_VERSION_CONFLICT: _ClassVar[ErrorCode]
     ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN: _ClassVar[ErrorCode]
     ERROR_CODE_ROUTE_SUSPENDED: _ClassVar[ErrorCode]
+    ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS: _ClassVar[ErrorCode]
 
 class TradingWithdrawAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -84,6 +85,7 @@ class WithdrawDestinationValidationCode(int, metaclass=_enum_type_wrapper.EnumTy
     POLYESTER_SMART_ACCOUNT: _ClassVar[WithdrawDestinationValidationCode]
     TOKEN_CONTRACT: _ClassVar[WithdrawDestinationValidationCode]
     DENYLISTED_ADDRESS: _ClassVar[WithdrawDestinationValidationCode]
+    SWAP_DEPOSIT_ADDRESS: _ClassVar[WithdrawDestinationValidationCode]
 
 class WalletAssetUnavailableReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -142,6 +144,7 @@ ERROR_CODE_ROUTE_UNSUPPORTED: ErrorCode
 ERROR_CODE_VERSION_CONFLICT: ErrorCode
 ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN: ErrorCode
 ERROR_CODE_ROUTE_SUSPENDED: ErrorCode
+ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS: ErrorCode
 ACTION_UNSPECIFIED: TradingWithdrawAction
 TO_FUNDING: TradingWithdrawAction
 TO_EXTERNAL_CHAIN: TradingWithdrawAction
@@ -152,6 +155,7 @@ UNSUPPORTED_CHAIN: WithdrawDestinationValidationCode
 POLYESTER_SMART_ACCOUNT: WithdrawDestinationValidationCode
 TOKEN_CONTRACT: WithdrawDestinationValidationCode
 DENYLISTED_ADDRESS: WithdrawDestinationValidationCode
+SWAP_DEPOSIT_ADDRESS: WithdrawDestinationValidationCode
 UNAVAILABLE_UNSPECIFIED: WalletAssetUnavailableReason
 NO_CONTRACT: WalletAssetUnavailableReason
 READ_FAILED: WalletAssetUnavailableReason

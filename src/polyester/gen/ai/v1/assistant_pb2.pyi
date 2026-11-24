@@ -700,6 +700,26 @@ class LimitOrderPreview(_message.Message):
     attached: AttachedExits
     def __init__(self, price: _Optional[str] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., post_only: _Optional[bool] = ..., attached: _Optional[_Union[AttachedExits, _Mapping]] = ...) -> None: ...
 
+class PeggedLimitOrderPreview(_message.Message):
+    __slots__ = ("reference", "offset_ticks", "tick_size", "current_price", "bound_price", "time_in_force", "expire_at", "post_only")
+    REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    OFFSET_TICKS_FIELD_NUMBER: _ClassVar[int]
+    TICK_SIZE_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_PRICE_FIELD_NUMBER: _ClassVar[int]
+    BOUND_PRICE_FIELD_NUMBER: _ClassVar[int]
+    TIME_IN_FORCE_FIELD_NUMBER: _ClassVar[int]
+    EXPIRE_AT_FIELD_NUMBER: _ClassVar[int]
+    POST_ONLY_FIELD_NUMBER: _ClassVar[int]
+    reference: _orders_pb2.PegReference
+    offset_ticks: int
+    tick_size: str
+    current_price: str
+    bound_price: str
+    time_in_force: _orders_pb2.TimeInForce
+    expire_at: _timestamp_pb2.Timestamp
+    post_only: bool
+    def __init__(self, reference: _Optional[_Union[_orders_pb2.PegReference, str]] = ..., offset_ticks: _Optional[int] = ..., tick_size: _Optional[str] = ..., current_price: _Optional[str] = ..., bound_price: _Optional[str] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., post_only: _Optional[bool] = ...) -> None: ...
+
 class StopOrderPreview(_message.Message):
     __slots__ = ("trigger_price", "trigger_price_source", "direction", "limit_price", "time_in_force", "post_only", "max_slippage_bps", "funds_reserved")
     TRIGGER_PRICE_FIELD_NUMBER: _ClassVar[int]
@@ -782,8 +802,30 @@ class LadderPreview(_message.Message):
     all_levels_at_once: bool
     def __init__(self, low_price: _Optional[str] = ..., high_price: _Optional[str] = ..., levels: _Optional[_Iterable[_Union[LadderLevel, _Mapping]]] = ..., post_only: _Optional[bool] = ..., time_in_force: _Optional[_Union[_orders_pb2.TimeInForce, str]] = ..., all_levels_at_once: _Optional[bool] = ...) -> None: ...
 
+class OcoLegPreview(_message.Message):
+    __slots__ = ("trigger_price", "trigger_price_source", "direction", "limit_price")
+    TRIGGER_PRICE_FIELD_NUMBER: _ClassVar[int]
+    TRIGGER_PRICE_SOURCE_FIELD_NUMBER: _ClassVar[int]
+    DIRECTION_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_PRICE_FIELD_NUMBER: _ClassVar[int]
+    trigger_price: str
+    trigger_price_source: _orders_pb2.TriggerPriceSource
+    direction: TriggerDirection
+    limit_price: str
+    def __init__(self, trigger_price: _Optional[str] = ..., trigger_price_source: _Optional[_Union[_orders_pb2.TriggerPriceSource, str]] = ..., direction: _Optional[_Union[TriggerDirection, str]] = ..., limit_price: _Optional[str] = ...) -> None: ...
+
+class OcoPreview(_message.Message):
+    __slots__ = ("take_profit", "stop_loss", "reserved_asset")
+    TAKE_PROFIT_FIELD_NUMBER: _ClassVar[int]
+    STOP_LOSS_FIELD_NUMBER: _ClassVar[int]
+    RESERVED_ASSET_FIELD_NUMBER: _ClassVar[int]
+    take_profit: OcoLegPreview
+    stop_loss: OcoLegPreview
+    reserved_asset: str
+    def __init__(self, take_profit: _Optional[_Union[OcoLegPreview, _Mapping]] = ..., stop_loss: _Optional[_Union[OcoLegPreview, _Mapping]] = ..., reserved_asset: _Optional[str] = ...) -> None: ...
+
 class OrderPreview(_message.Message):
-    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "side", "quantity", "quote_amount", "estimated_value", "reserved_amount", "reference_price", "market", "limit", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "relative_prices")
+    __slots__ = ("symbol_id", "symbol", "base_asset", "quote_asset", "side", "quantity", "quote_amount", "quote_proceeds", "estimated_value", "reserved_amount", "reference_price", "market", "limit", "stop_loss", "take_profit", "trailing_stop", "twap", "ladder", "oco", "pegged_limit", "relative_prices")
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_FIELD_NUMBER: _ClassVar[int]
     BASE_ASSET_FIELD_NUMBER: _ClassVar[int]
@@ -791,6 +833,7 @@ class OrderPreview(_message.Message):
     SIDE_FIELD_NUMBER: _ClassVar[int]
     QUANTITY_FIELD_NUMBER: _ClassVar[int]
     QUOTE_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    QUOTE_PROCEEDS_FIELD_NUMBER: _ClassVar[int]
     ESTIMATED_VALUE_FIELD_NUMBER: _ClassVar[int]
     RESERVED_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     REFERENCE_PRICE_FIELD_NUMBER: _ClassVar[int]
@@ -801,6 +844,8 @@ class OrderPreview(_message.Message):
     TRAILING_STOP_FIELD_NUMBER: _ClassVar[int]
     TWAP_FIELD_NUMBER: _ClassVar[int]
     LADDER_FIELD_NUMBER: _ClassVar[int]
+    OCO_FIELD_NUMBER: _ClassVar[int]
+    PEGGED_LIMIT_FIELD_NUMBER: _ClassVar[int]
     RELATIVE_PRICES_FIELD_NUMBER: _ClassVar[int]
     symbol_id: int
     symbol: str
@@ -809,6 +854,7 @@ class OrderPreview(_message.Message):
     side: _orders_pb2.Side
     quantity: str
     quote_amount: str
+    quote_proceeds: str
     estimated_value: str
     reserved_amount: str
     reference_price: ReferencePrice
@@ -819,8 +865,10 @@ class OrderPreview(_message.Message):
     trailing_stop: TrailingStopPreview
     twap: TwapPreview
     ladder: LadderPreview
+    oco: OcoPreview
+    pegged_limit: PeggedLimitOrderPreview
     relative_prices: _containers.RepeatedCompositeFieldContainer[RelativePrice]
-    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., quantity: _Optional[str] = ..., quote_amount: _Optional[str] = ..., estimated_value: _Optional[str] = ..., reserved_amount: _Optional[str] = ..., reference_price: _Optional[_Union[ReferencePrice, _Mapping]] = ..., market: _Optional[_Union[MarketOrderPreview, _Mapping]] = ..., limit: _Optional[_Union[LimitOrderPreview, _Mapping]] = ..., stop_loss: _Optional[_Union[StopOrderPreview, _Mapping]] = ..., take_profit: _Optional[_Union[StopOrderPreview, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopPreview, _Mapping]] = ..., twap: _Optional[_Union[TwapPreview, _Mapping]] = ..., ladder: _Optional[_Union[LadderPreview, _Mapping]] = ..., relative_prices: _Optional[_Iterable[_Union[RelativePrice, _Mapping]]] = ...) -> None: ...
+    def __init__(self, symbol_id: _Optional[int] = ..., symbol: _Optional[str] = ..., base_asset: _Optional[str] = ..., quote_asset: _Optional[str] = ..., side: _Optional[_Union[_orders_pb2.Side, str]] = ..., quantity: _Optional[str] = ..., quote_amount: _Optional[str] = ..., quote_proceeds: _Optional[str] = ..., estimated_value: _Optional[str] = ..., reserved_amount: _Optional[str] = ..., reference_price: _Optional[_Union[ReferencePrice, _Mapping]] = ..., market: _Optional[_Union[MarketOrderPreview, _Mapping]] = ..., limit: _Optional[_Union[LimitOrderPreview, _Mapping]] = ..., stop_loss: _Optional[_Union[StopOrderPreview, _Mapping]] = ..., take_profit: _Optional[_Union[StopOrderPreview, _Mapping]] = ..., trailing_stop: _Optional[_Union[TrailingStopPreview, _Mapping]] = ..., twap: _Optional[_Union[TwapPreview, _Mapping]] = ..., ladder: _Optional[_Union[LadderPreview, _Mapping]] = ..., oco: _Optional[_Union[OcoPreview, _Mapping]] = ..., pegged_limit: _Optional[_Union[PeggedLimitOrderPreview, _Mapping]] = ..., relative_prices: _Optional[_Iterable[_Union[RelativePrice, _Mapping]]] = ...) -> None: ...
 
 class QuoteValue(_message.Message):
     __slots__ = ("quote_asset", "value")
@@ -1305,14 +1353,16 @@ class ListMessagesRequest(_message.Message):
     def __init__(self, conversation_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListMessagesResponse(_message.Message):
-    __slots__ = ("messages", "next_page_token", "last_account")
+    __slots__ = ("messages", "next_page_token", "last_account", "subject")
     MESSAGES_FIELD_NUMBER: _ClassVar[int]
     NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     LAST_ACCOUNT_FIELD_NUMBER: _ClassVar[int]
+    SUBJECT_FIELD_NUMBER: _ClassVar[int]
     messages: _containers.RepeatedCompositeFieldContainer[Message]
     next_page_token: str
     last_account: ConversationAccount
-    def __init__(self, messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., last_account: _Optional[_Union[ConversationAccount, _Mapping]] = ...) -> None: ...
+    subject: Subject
+    def __init__(self, messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., next_page_token: _Optional[str] = ..., last_account: _Optional[_Union[ConversationAccount, _Mapping]] = ..., subject: _Optional[_Union[Subject, _Mapping]] = ...) -> None: ...
 
 class GetMessageImageRequest(_message.Message):
     __slots__ = ("image_id",)

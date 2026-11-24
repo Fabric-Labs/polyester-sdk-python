@@ -23,12 +23,14 @@ from polyester.codecs.scalars import format_id
 from polyester.codecs.wire_decode import decode_balance_history
 from polyester.errors import (
     AUTH_SOCIAL_CHANGE_LIMIT_REACHED,
+    DESTINATION_SWAP_DEPOSIT_ADDRESS,
     ROUTE_SUSPENDED,
     PolyesterApiError,
     PolyesterRateLimitError,
     PolyesterResponseContractError,
     PolyesterValidationError,
     PolyesterWithdrawError,
+    is_destination_swap_deposit_address,
     is_retryable_error,
     is_route_suspended,
     mutation_outcome_unknown,
@@ -847,6 +849,44 @@ async def test_route_suspended_rest_problem_reads_the_same_code() -> None:
     )
     assert is_route_suspended(err)
     assert not is_retryable_error(err) and not mutation_outcome_unknown(err)
+
+
+@pytest.mark.parametrize("status", ["failed_precondition", "invalid_argument"])
+async def test_swap_deposit_address_destination_is_final(status: str) -> None:
+    answer = _connect_error(
+        status,
+        "chain.withdraw.v1.ErrorDetail",
+        withdraw_pb2.ErrorDetail(
+            code=withdraw_pb2.ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS,
+            field_path="destinations[0]",
+        ),
+        400,
+    )
+    err = await _raised(answer, lambda c: c.dust_conversions.list_balances())
+    assert withdraw_pb2.ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS == 51
+    assert isinstance(err, PolyesterWithdrawError)
+    assert err.code == DESTINATION_SWAP_DEPOSIT_ADDRESS
+    assert err.field_path == "destinations[0]"
+    assert is_destination_swap_deposit_address(err) and not is_route_suspended(err)
+    assert not is_retryable_error(err) and not mutation_outcome_unknown(err)
+
+
+async def test_swap_deposit_address_rest_problem_reads_the_same_code() -> None:
+    err = await _raised(
+        _problem(
+            400,
+            {"code": "DESTINATION_SWAP_DEPOSIT_ADDRESS", "status": 400, "detail": "swap deposit"},
+        ),
+        lambda c: c.dust_conversions.list_balances(),
+    )
+    assert isinstance(err, PolyesterApiError) and err.code == DESTINATION_SWAP_DEPOSIT_ADDRESS
+    assert is_destination_swap_deposit_address(err)
+    assert not is_retryable_error(err) and not mutation_outcome_unknown(err)
+
+
+def test_other_destination_refusals_are_not_a_swap_deposit_address() -> None:
+    err = PolyesterWithdrawError("invalid", code="ERROR_CODE_DESTINATION_INVALID")
+    assert not is_destination_swap_deposit_address(err)
 
 
 async def test_dust_busy_is_a_retryable_rate_limit() -> None:

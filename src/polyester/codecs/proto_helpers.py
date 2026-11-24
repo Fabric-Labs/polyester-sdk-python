@@ -154,10 +154,12 @@ def timestamp_to_rfc3339(msg: Message | None) -> str | None:
     nanos = int(getattr(msg, "nanos", 0) or 0)
     if seconds == 0 and nanos == 0:
         return None
-    dt = timestamp_parts_to_datetime(seconds, nanos)
+    # isoformat, not strftime: RFC 3339's four-digit year on every platform
+    # (glibc's %Y writes the year 1 as "1").
+    text = timestamp_parts_to_datetime(seconds, nanos).replace(tzinfo=None, microsecond=0)
     if nanos == 0:
-        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{nanos:09d}Z"
+        return f"{text.isoformat()}Z"
+    return f"{text.isoformat()}.{nanos:09d}Z"
 
 
 def bytes_to_hex(value: bytes | None) -> str:

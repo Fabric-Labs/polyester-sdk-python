@@ -85,7 +85,7 @@ exclude = ["src/polyester/gen"]
 
 [tool.ruff.format]
 # Formatted with indent-width=2 and line-length=120 to fit its size budget.
-exclude = ["src/polyester/pure.py"]
+exclude = ["src/polyester/pure.py", "src/polyester/pure_models.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -94,6 +94,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 # The restricted runtime pure.py targets has no datetime.UTC; split word lists and
 # 120-column lines keep it within its size budget.
 "src/polyester/pure.py" = ["E501", "SIM905", "UP017"]
+# Loaded after pure.py into the namespace that holds pure.py's polyester (F821).
+"src/polyester/pure_models.py" = ["E501", "F821"]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--import-mode=importlib"]

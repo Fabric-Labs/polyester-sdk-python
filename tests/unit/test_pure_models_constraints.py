@@ -109,7 +109,7 @@ def test_outside_names_are_read_only_while_the_file_loads() -> None:
 
 @pytest.mark.parametrize(
     ("old", "new"),
-    [("_len(prefix)", "len(prefix)"), ("_Price.from_ticks", "polyester.Price.from_ticks")],
+    [("  len=len,\n", ""), ("_Price.from_ticks", "polyester.Price.from_ticks")],
 )
 def test_a_late_read_is_caught(old: str, new: str) -> None:
     assert old in SOURCE

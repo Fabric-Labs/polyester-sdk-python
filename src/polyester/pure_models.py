@@ -9,7 +9,18 @@ models with the SDK's field names, types and values. Its one top-level name is
 """
 
 
-def polyester_models():
+# Builtins bound at load: code loaded later into the same namespace can't rebind them.
+def polyester_models(
+  ValueError=ValueError,
+  bool=bool,
+  dict=dict,
+  int=int,
+  isinstance=isinstance,
+  len=len,
+  max=max,
+  str=str,
+  type=type,
+):
   from dataclasses import dataclass as _dataclass
   from datetime import datetime as _datetime
   from datetime import timedelta as _timedelta
@@ -21,16 +32,6 @@ def polyester_models():
   _encode_id = polyester._sdk["_encode_id"]
   _parse_id = polyester._sdk["_parse_id"]
   _format_scaled = polyester._sdk["_format_scaled"]
-  # Builtins too: a name defined after this file loads (``type = "limit"``) cannot reach the decoders.
-  _ValueError = ValueError
-  _bool = bool
-  _dict = dict
-  _int = int
-  _isinstance = isinstance
-  _len = len
-  _max = max
-  _str = str
-  _type = type
   _EPOCH = "1970-01-01T00:00:00"
   _PREFIXES = ("TRIGGER_CANCEL_REASON_", "TRIGGER_FAILURE_REASON_", "STATUS_")
 
@@ -215,11 +216,11 @@ def polyester_models():
     version: int = 0
 
   def _num(data, key):
-    return _int(data.get(key, 0))
+    return int(data.get(key, 0))
 
   def _id(value):
     # The SDK's public ID, and "0" for 0.
-    value = _parse_id(_int(value), "id")
+    value = _parse_id(int(value), "id")
     return _encode_id(value) if value else "0"
 
   def _id_if_set(data, key):
@@ -230,21 +231,21 @@ def polyester_models():
 
   def _ts_ns(data, key):
     value = _num(data, key)
-    return _str(value) if value else ""
+    return str(value) if value else ""
 
   def _u128(data):
-    return _int(data.get("hi", 0)) * 18446744073709551616 + _int(data.get("lo", 0))
+    return int(data.get("hi", 0)) * 18446744073709551616 + int(data.get("lo", 0))
 
   def _label(value):
     # An enum as the SDK names it: lower case, without its prefix; a number
     # (a value newer than the contract this file knows) as its decimal.
-    if _isinstance(value, _int):
-      return _str(value) if value else ""
+    if isinstance(value, int):
+      return str(value) if value else ""
     if value.endswith("UNSPECIFIED"):
       return ""
     for prefix in _PREFIXES:
       if value.startswith(prefix):
-        return value[_len(prefix) :].lower()
+        return value[len(prefix) :].lower()
     return value.lower()
 
   def _or_none(value):
@@ -253,9 +254,9 @@ def polyester_models():
   def _code(value, prefix, unknown):
     if not value or value == prefix + "UNSPECIFIED":
       return None
-    if _isinstance(value, _int):
+    if isinstance(value, int):
       return f"{unknown}({value})"
-    return (value[_len(prefix) :] if value.startswith(prefix) else value).lower()
+    return (value[len(prefix) :] if value.startswith(prefix) else value).lower()
 
   def _source(data):
     name = _label(data.get("triggerPriceSource", 0))
@@ -269,10 +270,10 @@ def polyester_models():
 
   def _time(text):
     # (the second as RFC 3339 text, nanoseconds), as proto-JSON writes a Timestamp.
-    if not _isinstance(text, _str) or not text.endswith("Z"):
-      raise _ValueError(f"timestamp must be an RFC 3339 UTC string, not {text!r}")
+    if not isinstance(text, str) or not text.endswith("Z"):
+      raise ValueError(f"timestamp must be an RFC 3339 UTC string, not {text!r}")
     base, _, fraction = text[:-1].partition(".")
-    return base, _int((fraction + "000000000")[:9])
+    return base, int((fraction + "000000000")[:9])
 
   def _datetime_of(data, key):
     if key not in data:
@@ -284,14 +285,14 @@ def polyester_models():
 
   def _bind(data, market, kind):
     # The market the values bind to: None without one, and for a message that names no pair.
-    if not _isinstance(data, _dict):
-      raise _ValueError(f"{kind} must be a proto-JSON dict, not {_type(data).__name__}")
+    if not isinstance(data, dict):
+      raise ValueError(f"{kind} must be a proto-JSON dict, not {type(data).__name__}")
     symbol_id = _num(data, "symbolId")
     spec = None if market is None else _market(market)
     if spec is None or not symbol_id:
       return None
     if spec.symbol_id != symbol_id:
-      raise _ValueError(f"{kind} symbol_id {symbol_id} is not the market's symbol_id {spec.symbol_id}")
+      raise ValueError(f"{kind} symbol_id {symbol_id} is not the market's symbol_id {spec.symbol_id}")
     return spec
 
   def _leg_state(data):
@@ -335,8 +336,8 @@ def polyester_models():
     return TrailingStop(
       ticks,
       bps,
-      _max(_num(policy, "maxSlippageTicks"), 0),
-      _max(_num(policy, "maxSlippageBps"), 0),
+      max(_num(policy, "maxSlippageTicks"), 0),
+      max(_num(policy, "maxSlippageBps"), 0),
       _price(policy, "activationPriceTicks", symbol),
       _price(policy, "limitPriceTicks", symbol, True),
       _source(policy),
@@ -351,7 +352,7 @@ def polyester_models():
     stop_loss = _risk_leg(data.get("stopLoss"), symbol)
     if take_profit is None and stop_loss is None and trailing_stop is None:
       return None
-    return AttachedRisk(take_profit, stop_loss, trailing_stop, _bool(data.get("oco", False)))
+    return AttachedRisk(take_profit, stop_loss, trailing_stop, bool(data.get("oco", False)))
 
   def _origin(data):
     origin = OrderOrigin(
@@ -376,7 +377,7 @@ def polyester_models():
     symbol_id = _num(data, "symbolId")
 
     def qty(value):
-      return _Quantity.from_scaled(_int(value), scale=scale, symbol=symbol, symbol_id=symbol_id or None)
+      return _Quantity.from_scaled(int(value), scale=scale, symbol=symbol, symbol_id=symbol_id or None)
 
     def quantity(key):
       return qty(data.get(key, 0))
@@ -394,8 +395,8 @@ def polyester_models():
         expire_at = base + (f".{nanos:09d}Z" if nanos else "Z")
 
     def fee(total):
-      amount = _str(_u128(total["amountE18"])) if "amountE18" in total else "0"
-      return OrderFeeTotal(amount, _bool(total.get("isRebate", False)), qty(total.get("qtyScaled", 0)))
+      amount = str(_u128(total["amountE18"])) if "amountE18" in total else "0"
+      return OrderFeeTotal(amount, bool(total.get("isRebate", False)), qty(total.get("qtyScaled", 0)))
 
     # Read in the SDK's order, so a refusal names the same first bad value.
     return Order(
@@ -417,13 +418,13 @@ def polyester_models():
       created_ts_ns=_ts_ns(data, "createdTsNs"),
       terminal_ts_ns=_ts_ns(data, "terminalTsNs"),
       version=_num(data, "version"),
-      post_only=_bool(data.get("postOnly", False)),
+      post_only=bool(data.get("postOnly", False)),
       fee_asset=_or_none(data.get("feeAsset", 0)),
       self_trade_prevention_mode=_or_none(data.get("selfTradePreventionMode", 0)),
-      submitted_max_quote_debit_scaled=_str(_num(data, "submittedMaxQuoteDebitScaled"))
+      submitted_max_quote_debit_scaled=str(_num(data, "submittedMaxQuoteDebitScaled"))
       if "submittedMaxQuoteDebitScaled" in data
       else "",
-      submitted_quote_proceeds_scaled=_str(_num(data, "submittedQuoteProceedsScaled"))
+      submitted_quote_proceeds_scaled=str(_num(data, "submittedQuoteProceedsScaled"))
       if "submittedQuoteProceedsScaled" in data
       else "",
       attached_risk=attached,
@@ -437,7 +438,7 @@ def polyester_models():
       reject_reason=_code(data.get("rejectReason", 0), "ERROR_CODE_", "UNKNOWN_ERROR_CODE"),
       cancel_reason=_code(data.get("cancelReason", 0), "CANCEL_REASON_", "UNKNOWN_CANCEL_REASON"),
       avg_price=_Decimal(_format_scaled(_u128(data["avgPriceE18"]), 18)) if "avgPriceE18" in data else None,
-      cum_notional_scaled=_str(_u128(data["cumNotional"])) if "cumNotional" in data else "0",
+      cum_notional_scaled=str(_u128(data["cumNotional"])) if "cumNotional" in data else "0",
       fee_total=fee(data["feeTotal"]) if "feeTotal" in data else None,
       quote_quantity_scale=spec.quote_quantity_scale if spec else None,
     )
@@ -535,7 +536,7 @@ def polyester_models():
         cap(execution["marketIoc"])
       elif "limitGtc" in execution:
         config.update(order_type="limit", time_in_force="gtc")
-        config["post_only"] = _bool(execution["limitGtc"].get("postOnly", False))
+        config["post_only"] = bool(execution["limitGtc"].get("postOnly", False))
         config["limit_price"] = _price(execution["limitGtc"], "priceTicks", symbol)
       elif "limitIoc" in execution:
         config.update(order_type="limit", time_in_force="ioc")
@@ -570,7 +571,7 @@ def polyester_models():
     elif "ladder" in data:
       ladder = data["ladder"]
       child("ladder", "limit", "gtc", None)
-      config.update(side=_label(ladder.get("side", 0)), post_only=_bool(ladder.get("postOnly", False)))
+      config.update(side=_label(ladder.get("side", 0)), post_only=bool(ladder.get("postOnly", False)))
     return config
 
   def _trigger(data, market=None):

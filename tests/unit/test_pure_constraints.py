@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import symtable
 from pathlib import Path
 from typing import Any
 
@@ -95,6 +96,7 @@ BANNED_NODES = (
     ast.Yield,
     ast.YieldFrom,
 )
+BUILTINS = frozenset(name for name in vars(builtins) if not name.startswith("_"))
 BUILTIN_TYPES = {"int", "str", "bool", "dict", "list", "tuple", "set", "None"}
 
 
@@ -175,6 +177,7 @@ def problems(source: str) -> list[str]:
         found.append("top level is not one polyester() factory and its call")
         return found
     found += _builtin_bindings(factory)
+    found += _builtin_scopes(source)
     direct = {id(node) for node in factory.body}
     for node in ast.walk(factory):
         if isinstance(node, BANNED_NODES):
@@ -302,6 +305,33 @@ def _builtin_bindings(factory: ast.FunctionDef) -> list[str]:
     return found
 
 
+def _builtin_scopes(source: str) -> list[str]:
+    """Each read of a builtin name inside the factory resolves to the factory's
+    binding (or to a function's own local), never to the shared namespace. A
+    class body that assigns a name reads it from the shared namespace, not the
+    factory (``int = int`` there is whatever global ``int`` the bot bound); a
+    method named ``format`` that the class body never reads is harmless."""
+    top = symtable.symtable(source, "pure.py", "exec")
+    factory = next(table for table in top.get_children() if table.get_name() == "polyester")
+    found: list[str] = []
+    for name in set(factory.get_identifiers()) & BUILTINS:
+        symbol = factory.lookup(name)
+        if not symbol.is_parameter() or symbol.is_assigned() or symbol.is_imported():
+            found.append(f"builtin {name} rebound in the factory")
+    tables = list(factory.get_children())
+    while tables:
+        table = tables.pop()
+        tables += table.get_children()
+        local_ok = table.get_type() != "class"
+        for name in set(table.get_identifiers()) & BUILTINS:
+            symbol = table.lookup(name)
+            if not symbol.is_referenced() or symbol.is_free() or (local_ok and symbol.is_local()):
+                continue
+            where = f"{table.get_type()} {table.get_name()} at line {table.get_lineno()}"
+            found.append(f"builtin {name} read from the shared namespace in {where}")
+    return sorted(found)
+
+
 def _tags(node: ast.Call) -> bool:
     # setattr(exc, "code" | "violations" | "fractional", ...) is how a refusal
     # carries the server's code where the runtime allows it; nothing else.
@@ -395,6 +425,7 @@ def test_each_rule_catches_what_it_bans(snippet: str) -> None:
 
 def test_every_builtin_is_bound_at_load() -> None:
     assert _builtin_bindings(_factory(ast.parse(SOURCE))) == []
+    assert _builtin_scopes(SOURCE) == []
     params = [arg.arg for arg in _factory(ast.parse(SOURCE)).args.args]
     assert {"type", "int", "str", "isinstance", "len", "range", "divmod", "abs"} <= set(params)
 
@@ -408,6 +439,7 @@ def test_every_builtin_is_bound_at_load() -> None:
         ("  type=type,\n", "  type=type,\n  _x=1,\n"),
         ("  type=type,\n", "  type=type,\n  *rest,\n"),
         ("def polyester(\n", "def polyester(\n  min,\n"),
+        ("  _types = (", "  str = 1\n  _types = ("),  # the factory's binding replaced
     ],
 )
 def test_the_builtin_binding_rule_catches_what_it_bans(old: str, new: str) -> None:
@@ -453,3 +485,54 @@ def test_contract_limits_are_the_contracts() -> None:
 def test_version_is_the_sdk_version() -> None:
     namespace: Any = pure.polyester
     assert polyester.__version__ == namespace.VERSION
+
+
+# A class body that assigns a name reads it from the module namespace, not the
+# enclosing function: ``int = int`` there is whatever ``int`` the bot bound.
+CLASS_SCOPE_PROBE = """
+def polyester(int=int):
+  def _probe():
+    class _C:
+      int = int
+    return _C.int
+  return _probe
+
+polyester = polyester()
+"""
+
+
+def test_a_class_body_rebinding_a_builtin_reads_the_shared_namespace() -> None:
+    namespace: dict[str, Any] = {}
+    exec(compile(CLASS_SCOPE_PROBE, "probe", "exec"), namespace)  # noqa: S102 - the probe
+    assert namespace["polyester"]() is int
+    namespace["int"] = "junk"
+    assert namespace["polyester"]() == "junk"
+    assert _builtin_bindings(_factory(ast.parse(CLASS_SCOPE_PROBE))) == []
+    assert problems(CLASS_SCOPE_PROBE) == [
+        "builtin int read from the shared namespace in class _C at line 4"
+    ]
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        "class _A:\n    str = str",
+        "class _A:\n    len = 1\n    x = len",
+        "class _A:\n    def repr(self): return ''\n    x = repr",
+        "def _f():\n    class _A:\n        isinstance = isinstance\n    return _A",
+    ],
+)
+def test_a_class_body_cannot_rebind_a_builtin_it_reads(snippet: str) -> None:
+    assert _builtin_scopes(_inside(snippet)) != []
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        "class _A:\n    def format(self): return str(self)",  # the class body never reads it
+        "def _f(type):\n    return type",  # the function's own value
+        "def _f(x):\n    return [str for str in x]",
+    ],
+)
+def test_a_name_that_is_not_a_builtin_read_is_allowed(snippet: str) -> None:
+    assert _builtin_scopes(_inside(snippet)) == []

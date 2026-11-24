@@ -3103,11 +3103,11 @@ Other withdrawal refusals carried by a typed ConnectRPC detail raise
 `PolyesterWithdrawError`, a `PolyesterApiError` whose `code` is the
 `chain.withdraw.v1.ErrorCode` name. `field_path` names the request field to fix
 when the server names one; `min_floor_e18` and `min_floor` give the floor of
-`ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`. Over REST these refusals are a
-`PolyesterApiError` with the same `code` (the problem code read with its
-`ERROR_CODE_` prefix), without the detail fields `field_path`, `min_floor` and
-`payable_from`; the `is_...` predicates below recognise them on either
-transport.
+`ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`. Over REST, `ROUTE_SUSPENDED` and
+`DESTINATION_SWAP_DEPOSIT_ADDRESS` are a `PolyesterApiError` whose `code` reads
+with the `ERROR_CODE_` prefix, as the ConnectRPC detail names it, without
+`field_path`; `is_route_suspended` and `is_destination_swap_deposit_address`
+recognise them on either transport.
 `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN` refuses a broker vault's payout to
 a destination whitelisted less than 24 hours ago: the destination is listed and
 nothing was reserved, so send it again at `payable_from` (`None` when not known

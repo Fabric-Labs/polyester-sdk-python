@@ -147,8 +147,10 @@ ROUTE_SUSPENDED = "ERROR_CODE_ROUTE_SUSPENDED"
 # withdrawal destination: a withdrawal could reach it after its swap stopped
 # accepting deposits, and could then be neither swapped nor returned. A
 # Polyester account's own deposit address is not affected. Nothing was
-# reserved; on an auto-withdraw destination ``field_path`` names it. Final, not
-# retryable: choose another destination.
+# reserved. Final, not retryable: choose another destination. Over ConnectRPC
+# it is a PolyesterWithdrawError whose ``field_path`` names an auto-withdraw
+# destination when the server names one; over REST it is a PolyesterApiError
+# with the same code. is_destination_swap_deposit_address recognises both.
 DESTINATION_SWAP_DEPOSIT_ADDRESS = "ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS"
 
 # auth.v1.AuthErrorCode values of a refused X/Twitter or Discord link change
@@ -545,8 +547,9 @@ class PolyesterWithdrawError(PolyesterApiError):
     (:data:`DESTINATION_SWAP_DEPOSIT_ADDRESS`) refuses a destination that is a
     deposit address issued for a Quick Swap, which is never a withdrawal
     destination. Nothing was reserved; on an auto-withdraw destination
-    ``field_path`` names it. :func:`is_retryable_error` reports ``False``:
-    choose another destination.
+    ``field_path`` names it when the server names one. Over REST the same
+    refusal is a :class:`PolyesterApiError` with the same ``code``.
+    :func:`is_retryable_error` reports ``False``: choose another destination.
     """
 
     def __init__(
@@ -709,8 +712,8 @@ def is_route_suspended(err: BaseException) -> bool:
 def is_destination_swap_deposit_address(err: BaseException) -> bool:
     """Whether ``err`` refuses a withdrawal, or an auto-withdraw destination,
     because its destination is a deposit address issued for a Quick Swap
-    (:data:`DESTINATION_SWAP_DEPOSIT_ADDRESS`). Nothing was reserved; final:
-    choose another destination."""
+    (:data:`DESTINATION_SWAP_DEPOSIT_ADDRESS`), over ConnectRPC or REST.
+    Nothing was reserved; final: choose another destination."""
     return isinstance(err, PolyesterApiError) and err.code == DESTINATION_SWAP_DEPOSIT_ADDRESS
 
 

@@ -879,6 +879,7 @@ async def test_swap_deposit_address_rest_problem_reads_the_same_code() -> None:
         ),
         lambda c: c.dust_conversions.list_balances(),
     )
+    assert isinstance(err, PolyesterApiError) and err.code == DESTINATION_SWAP_DEPOSIT_ADDRESS
     assert is_destination_swap_deposit_address(err)
     assert not is_retryable_error(err) and not mutation_outcome_unknown(err)
 

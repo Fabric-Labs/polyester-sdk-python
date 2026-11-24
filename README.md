@@ -3099,10 +3099,15 @@ when the key's market list does, a main-account key's included. Every order
 code an HTTP 403 or 401 REST problem carries reads with its `ERROR_CODE_`
 prefix, as the ConnectRPC detail names it.
 
-Other withdrawal refusals raise `PolyesterWithdrawError`, a `PolyesterApiError`
-whose `code` is the `chain.withdraw.v1.ErrorCode` name. `field_path` names the
-request field to fix when the server names one; `min_floor_e18` and
-`min_floor` give the floor of `ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`.
+Other withdrawal refusals carried by a typed ConnectRPC detail raise
+`PolyesterWithdrawError`, a `PolyesterApiError` whose `code` is the
+`chain.withdraw.v1.ErrorCode` name. `field_path` names the request field to fix
+when the server names one; `min_floor_e18` and `min_floor` give the floor of
+`ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`. Over REST these refusals are a
+`PolyesterApiError` with the same `code` (the problem code read with its
+`ERROR_CODE_` prefix), without the detail fields `field_path`, `min_floor` and
+`payable_from`; the `is_...` predicates below recognise them on either
+transport.
 `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN` refuses a broker vault's payout to
 a destination whitelisted less than 24 hours ago: the destination is listed and
 nothing was reserved, so send it again at `payable_from` (`None` when not known
@@ -3114,6 +3119,12 @@ request is safe: submit a new one once the route's `withdrawal_status` in
 `zipper.get_deposit_withdraw_config()` is `"normal"` again. It is final and not
 retryable as is. An auto-withdraw run or a broker payout reports the same
 status with the reason `route_suspended`, next to `destination_cooling_down`.
+`ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS`
+(`polyester.DESTINATION_SWAP_DEPOSIT_ADDRESS`,
+`polyester.is_destination_swap_deposit_address(err)`) refuses a withdrawal or an
+auto-withdraw destination whose address is a deposit address issued for a Quick
+Swap, which is never a withdrawal destination. Nothing was reserved; it is final:
+choose another destination.
 
 `PolyesterApiError.cause_code` and `level_index` explain a ladder refused with
 `ERROR_CODE_LADDER_LEVEL_REJECTED`: the code the refused order would return as a

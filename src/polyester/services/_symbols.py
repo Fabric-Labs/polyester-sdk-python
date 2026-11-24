@@ -27,7 +27,11 @@ def catalog_lookup(catalogs: CatalogManager | None) -> tuple[Any, Any] | None:
     """The catalogs as the shared resolver reads them: (ID of a name, name of an ID)."""
     if catalogs is None:
         return None
-    return (catalogs.symbol_id_for_symbol, catalogs.symbol_for_symbol_id)
+    # Read at use, as before: a lookup a call needs is the only one it makes.
+    return (
+        lambda symbol: catalogs.symbol_id_for_symbol(symbol),
+        lambda symbol_id: catalogs.symbol_for_symbol_id(symbol_id),
+    )
 
 
 def resolve_order_identity(

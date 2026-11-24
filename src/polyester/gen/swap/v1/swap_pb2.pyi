@@ -41,6 +41,7 @@ class SwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EXPIRED: _ClassVar[SwapReason]
     MINIMUM_NOT_MET: _ClassVar[SwapReason]
     MAX_ORDER_QUANTITY: _ClassVar[SwapReason]
+    INTERMEDIATE_BELOW_MINIMUM: _ClassVar[SwapReason]
 
 class SwapOrderStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -86,6 +87,7 @@ ORDER_REJECTED: SwapReason
 EXPIRED: SwapReason
 MINIMUM_NOT_MET: SwapReason
 MAX_ORDER_QUANTITY: SwapReason
+INTERMEDIATE_BELOW_MINIMUM: SwapReason
 ORDER_STATUS_UNSPECIFIED: SwapOrderStatus
 PLACING: SwapOrderStatus
 PLACED: SwapOrderStatus
@@ -108,16 +110,38 @@ SERVICE_UNAVAILABLE: ErrorCode
 DIRECTION_UNSUPPORTED: ErrorCode
 
 class SwapTerms(_message.Message):
-    __slots__ = ("subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18")
+    __slots__ = ("subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18", "execution")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SOURCE_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
+    EXECUTION_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     source_asset_id: int
     destination_asset_id: int
     amount_e18: _u128_pb2.U128
-    def __init__(self, subaccount_id: _Optional[int] = ..., source_asset_id: _Optional[int] = ..., destination_asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ...) -> None: ...
+    execution: Execution
+    def __init__(self, subaccount_id: _Optional[int] = ..., source_asset_id: _Optional[int] = ..., destination_asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., execution: _Optional[_Union[Execution, _Mapping]] = ...) -> None: ...
+
+class MarketExecution(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class TwapExecution(_message.Message):
+    __slots__ = ("duration_ms", "slice_interval_ms")
+    DURATION_MS_FIELD_NUMBER: _ClassVar[int]
+    SLICE_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
+    duration_ms: int
+    slice_interval_ms: int
+    def __init__(self, duration_ms: _Optional[int] = ..., slice_interval_ms: _Optional[int] = ...) -> None: ...
+
+class Execution(_message.Message):
+    __slots__ = ("market", "twap")
+    MARKET_FIELD_NUMBER: _ClassVar[int]
+    TWAP_FIELD_NUMBER: _ClassVar[int]
+    market: MarketExecution
+    twap: TwapExecution
+    def __init__(self, market: _Optional[_Union[MarketExecution, _Mapping]] = ..., twap: _Optional[_Union[TwapExecution, _Mapping]] = ...) -> None: ...
 
 class SwapQuoteLeg(_message.Message):
     __slots__ = ("symbol_id", "side", "average_price", "price_impact_bps", "taker_fee_rate_percent", "fee_e18", "fee_asset_id")
@@ -138,23 +162,29 @@ class SwapQuoteLeg(_message.Message):
     def __init__(self, symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., average_price: _Optional[str] = ..., price_impact_bps: _Optional[int] = ..., taker_fee_rate_percent: _Optional[str] = ..., fee_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_asset_id: _Optional[int] = ...) -> None: ...
 
 class SwapQuote(_message.Message):
-    __slots__ = ("terms", "legs", "expected_amount_out_e18", "min_amount_out_e18", "quoted_at", "expires_at")
+    __slots__ = ("terms", "legs", "expected_amount_out_e18", "min_amount_out_e18", "quoted_at", "expires_at", "intermediate_asset_id", "price_impact_bps", "total_slices")
     TERMS_FIELD_NUMBER: _ClassVar[int]
     LEGS_FIELD_NUMBER: _ClassVar[int]
     EXPECTED_AMOUNT_OUT_E18_FIELD_NUMBER: _ClassVar[int]
     MIN_AMOUNT_OUT_E18_FIELD_NUMBER: _ClassVar[int]
     QUOTED_AT_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    INTERMEDIATE_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    PRICE_IMPACT_BPS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_SLICES_FIELD_NUMBER: _ClassVar[int]
     terms: SwapTerms
     legs: _containers.RepeatedCompositeFieldContainer[SwapQuoteLeg]
     expected_amount_out_e18: _u128_pb2.U128
     min_amount_out_e18: _u128_pb2.U128
     quoted_at: _timestamp_pb2.Timestamp
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, terms: _Optional[_Union[SwapTerms, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[SwapQuoteLeg, _Mapping]]] = ..., expected_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., min_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., quoted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    intermediate_asset_id: int
+    price_impact_bps: int
+    total_slices: int
+    def __init__(self, terms: _Optional[_Union[SwapTerms, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[SwapQuoteLeg, _Mapping]]] = ..., expected_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., min_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., quoted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., price_impact_bps: _Optional[int] = ..., total_slices: _Optional[int] = ...) -> None: ...
 
 class SwapOrder(_message.Message):
-    __slots__ = ("order_id", "symbol_id", "side", "leg", "status", "limit_price_ticks", "spent_e18", "received_e18", "fee_e18")
+    __slots__ = ("order_id", "symbol_id", "side", "leg", "status", "limit_price_ticks", "spent_e18", "received_e18", "fee_e18", "slice")
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     SIDE_FIELD_NUMBER: _ClassVar[int]
@@ -164,6 +194,7 @@ class SwapOrder(_message.Message):
     SPENT_E18_FIELD_NUMBER: _ClassVar[int]
     RECEIVED_E18_FIELD_NUMBER: _ClassVar[int]
     FEE_E18_FIELD_NUMBER: _ClassVar[int]
+    SLICE_FIELD_NUMBER: _ClassVar[int]
     order_id: int
     symbol_id: int
     side: Side
@@ -173,10 +204,111 @@ class SwapOrder(_message.Message):
     spent_e18: _u128_pb2.U128
     received_e18: _u128_pb2.U128
     fee_e18: _u128_pb2.U128
-    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., leg: _Optional[int] = ..., status: _Optional[_Union[SwapOrderStatus, str]] = ..., limit_price_ticks: _Optional[int] = ..., spent_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ...) -> None: ...
+    slice: int
+    def __init__(self, order_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., leg: _Optional[int] = ..., status: _Optional[_Union[SwapOrderStatus, str]] = ..., limit_price_ticks: _Optional[int] = ..., spent_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., slice: _Optional[int] = ...) -> None: ...
+
+class SwapLeg(_message.Message):
+    __slots__ = ("leg", "symbol_id", "side", "spent_e18", "received_e18", "fee_e18", "fee_asset_id")
+    LEG_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
+    SIDE_FIELD_NUMBER: _ClassVar[int]
+    SPENT_E18_FIELD_NUMBER: _ClassVar[int]
+    RECEIVED_E18_FIELD_NUMBER: _ClassVar[int]
+    FEE_E18_FIELD_NUMBER: _ClassVar[int]
+    FEE_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    leg: int
+    symbol_id: int
+    side: Side
+    spent_e18: _u128_pb2.U128
+    received_e18: _u128_pb2.U128
+    fee_e18: _u128_pb2.U128
+    fee_asset_id: int
+    def __init__(self, leg: _Optional[int] = ..., symbol_id: _Optional[int] = ..., side: _Optional[_Union[Side, str]] = ..., spent_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_asset_id: _Optional[int] = ...) -> None: ...
+
+class SwapSlice(_message.Message):
+    __slots__ = ("index", "planned_at", "executed_at", "finished_at", "state", "reason", "completed", "input_traded_e18", "output_received_e18", "second_leg_input_e18", "intermediate_carried_e18", "carry_reason")
+    class State(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        STATE_UNSPECIFIED: _ClassVar[SwapSlice.State]
+        PLANNED: _ClassVar[SwapSlice.State]
+        EXECUTING: _ClassVar[SwapSlice.State]
+        TRADED: _ClassVar[SwapSlice.State]
+        PARTLY_TRADED: _ClassVar[SwapSlice.State]
+        SKIPPED: _ClassVar[SwapSlice.State]
+        FAILED: _ClassVar[SwapSlice.State]
+    STATE_UNSPECIFIED: SwapSlice.State
+    PLANNED: SwapSlice.State
+    EXECUTING: SwapSlice.State
+    TRADED: SwapSlice.State
+    PARTLY_TRADED: SwapSlice.State
+    SKIPPED: SwapSlice.State
+    FAILED: SwapSlice.State
+    class Reason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        SLICE_REASON_UNSPECIFIED: _ClassVar[SwapSlice.Reason]
+        SLOT_MISSED: _ClassVar[SwapSlice.Reason]
+        DEADLINE_REACHED: _ClassVar[SwapSlice.Reason]
+        MARKET_CLOSED: _ClassVar[SwapSlice.Reason]
+        BELOW_MINIMUM: _ClassVar[SwapSlice.Reason]
+        ABOVE_MAXIMUM: _ClassVar[SwapSlice.Reason]
+        PROTECTION_NOT_MET: _ClassVar[SwapSlice.Reason]
+        REFUSED: _ClassVar[SwapSlice.Reason]
+        INSUFFICIENT_LIQUIDITY: _ClassVar[SwapSlice.Reason]
+        EXECUTION_ENDED: _ClassVar[SwapSlice.Reason]
+    SLICE_REASON_UNSPECIFIED: SwapSlice.Reason
+    SLOT_MISSED: SwapSlice.Reason
+    DEADLINE_REACHED: SwapSlice.Reason
+    MARKET_CLOSED: SwapSlice.Reason
+    BELOW_MINIMUM: SwapSlice.Reason
+    ABOVE_MAXIMUM: SwapSlice.Reason
+    PROTECTION_NOT_MET: SwapSlice.Reason
+    REFUSED: SwapSlice.Reason
+    INSUFFICIENT_LIQUIDITY: SwapSlice.Reason
+    EXECUTION_ENDED: SwapSlice.Reason
+    INDEX_FIELD_NUMBER: _ClassVar[int]
+    PLANNED_AT_FIELD_NUMBER: _ClassVar[int]
+    EXECUTED_AT_FIELD_NUMBER: _ClassVar[int]
+    FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    COMPLETED_FIELD_NUMBER: _ClassVar[int]
+    INPUT_TRADED_E18_FIELD_NUMBER: _ClassVar[int]
+    OUTPUT_RECEIVED_E18_FIELD_NUMBER: _ClassVar[int]
+    SECOND_LEG_INPUT_E18_FIELD_NUMBER: _ClassVar[int]
+    INTERMEDIATE_CARRIED_E18_FIELD_NUMBER: _ClassVar[int]
+    CARRY_REASON_FIELD_NUMBER: _ClassVar[int]
+    index: int
+    planned_at: _timestamp_pb2.Timestamp
+    executed_at: _timestamp_pb2.Timestamp
+    finished_at: _timestamp_pb2.Timestamp
+    state: SwapSlice.State
+    reason: SwapSlice.Reason
+    completed: bool
+    input_traded_e18: _u128_pb2.U128
+    output_received_e18: _u128_pb2.U128
+    second_leg_input_e18: _u128_pb2.U128
+    intermediate_carried_e18: _u128_pb2.U128
+    carry_reason: SwapSlice.Reason
+    def __init__(self, index: _Optional[int] = ..., planned_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., executed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., state: _Optional[_Union[SwapSlice.State, str]] = ..., reason: _Optional[_Union[SwapSlice.Reason, str]] = ..., completed: _Optional[bool] = ..., input_traded_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., output_received_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., second_leg_input_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., intermediate_carried_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., carry_reason: _Optional[_Union[SwapSlice.Reason, str]] = ...) -> None: ...
+
+class SwapProgress(_message.Message):
+    __slots__ = ("completed_slices", "total_slices", "started_at", "deadline", "slices", "slices_truncated")
+    COMPLETED_SLICES_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_SLICES_FIELD_NUMBER: _ClassVar[int]
+    STARTED_AT_FIELD_NUMBER: _ClassVar[int]
+    DEADLINE_FIELD_NUMBER: _ClassVar[int]
+    SLICES_FIELD_NUMBER: _ClassVar[int]
+    SLICES_TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    completed_slices: int
+    total_slices: int
+    started_at: _timestamp_pb2.Timestamp
+    deadline: _timestamp_pb2.Timestamp
+    slices: _containers.RepeatedCompositeFieldContainer[SwapSlice]
+    slices_truncated: bool
+    def __init__(self, completed_slices: _Optional[int] = ..., total_slices: _Optional[int] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deadline: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., slices: _Optional[_Iterable[_Union[SwapSlice, _Mapping]]] = ..., slices_truncated: _Optional[bool] = ...) -> None: ...
 
 class Swap(_message.Message):
-    __slots__ = ("swap_id", "idempotency_key", "subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18", "min_amount_out_e18", "status", "reason", "is_terminal", "executed_amount_e18", "unspent_amount_e18", "received_amount_e18", "fee_e18", "orders", "created_at")
+    __slots__ = ("swap_id", "idempotency_key", "subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18", "min_amount_out_e18", "status", "reason", "is_terminal", "executed_amount_e18", "unspent_amount_e18", "received_amount_e18", "orders", "created_at", "execution", "intermediate_asset_id", "intermediate_remainder_e18", "legs", "progress")
     SWAP_ID_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -190,9 +322,13 @@ class Swap(_message.Message):
     EXECUTED_AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     UNSPENT_AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
     RECEIVED_AMOUNT_E18_FIELD_NUMBER: _ClassVar[int]
-    FEE_E18_FIELD_NUMBER: _ClassVar[int]
     ORDERS_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    EXECUTION_FIELD_NUMBER: _ClassVar[int]
+    INTERMEDIATE_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    INTERMEDIATE_REMAINDER_E18_FIELD_NUMBER: _ClassVar[int]
+    LEGS_FIELD_NUMBER: _ClassVar[int]
+    PROGRESS_FIELD_NUMBER: _ClassVar[int]
     swap_id: int
     idempotency_key: str
     subaccount_id: int
@@ -206,10 +342,14 @@ class Swap(_message.Message):
     executed_amount_e18: _u128_pb2.U128
     unspent_amount_e18: _u128_pb2.U128
     received_amount_e18: _u128_pb2.U128
-    fee_e18: _u128_pb2.U128
     orders: _containers.RepeatedCompositeFieldContainer[SwapOrder]
     created_at: _timestamp_pb2.Timestamp
-    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., source_asset_id: _Optional[int] = ..., destination_asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., min_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., status: _Optional[_Union[SwapStatus, str]] = ..., reason: _Optional[_Union[SwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., executed_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., unspent_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., fee_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., orders: _Optional[_Iterable[_Union[SwapOrder, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    execution: Execution
+    intermediate_asset_id: int
+    intermediate_remainder_e18: _u128_pb2.U128
+    legs: _containers.RepeatedCompositeFieldContainer[SwapLeg]
+    progress: SwapProgress
+    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., source_asset_id: _Optional[int] = ..., destination_asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., min_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., status: _Optional[_Union[SwapStatus, str]] = ..., reason: _Optional[_Union[SwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., executed_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., unspent_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., orders: _Optional[_Iterable[_Union[SwapOrder, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., execution: _Optional[_Union[Execution, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., intermediate_remainder_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[SwapLeg, _Mapping]]] = ..., progress: _Optional[_Union[SwapProgress, _Mapping]] = ...) -> None: ...
 
 class QuoteSwapRequest(_message.Message):
     __slots__ = ("terms", "max_slippage_bps")

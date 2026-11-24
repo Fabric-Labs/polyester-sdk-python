@@ -566,7 +566,7 @@ class GetTriggerResponse(_message.Message):
     def __init__(self, trigger: _Optional[_Union[Trigger, _Mapping]] = ...) -> None: ...
 
 class ListTriggersRequest(_message.Message):
-    __slots__ = ("subaccount_id", "symbol_id", "status", "trigger_type", "parent_order_id", "order_list_id", "client_list_id", "limit", "page_token")
+    __slots__ = ("subaccount_id", "symbol_id", "status", "trigger_type", "parent_order_id", "order_list_id", "client_list_id", "client_trigger_id", "limit", "page_token")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     SYMBOL_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
@@ -574,6 +574,7 @@ class ListTriggersRequest(_message.Message):
     PARENT_ORDER_ID_FIELD_NUMBER: _ClassVar[int]
     ORDER_LIST_ID_FIELD_NUMBER: _ClassVar[int]
     CLIENT_LIST_ID_FIELD_NUMBER: _ClassVar[int]
+    CLIENT_TRIGGER_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
@@ -583,9 +584,10 @@ class ListTriggersRequest(_message.Message):
     parent_order_id: int
     order_list_id: int
     client_list_id: str
+    client_trigger_id: str
     limit: int
     page_token: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Iterable[_Union[TriggerStatus, str]]] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., parent_order_id: _Optional[int] = ..., order_list_id: _Optional[int] = ..., client_list_id: _Optional[str] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+    def __init__(self, subaccount_id: _Optional[int] = ..., symbol_id: _Optional[int] = ..., status: _Optional[_Iterable[_Union[TriggerStatus, str]]] = ..., trigger_type: _Optional[_Union[TriggerType, str]] = ..., parent_order_id: _Optional[int] = ..., order_list_id: _Optional[int] = ..., client_list_id: _Optional[str] = ..., client_trigger_id: _Optional[str] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class ListTriggersResponse(_message.Message):
     __slots__ = ("triggers", "next_page_token")

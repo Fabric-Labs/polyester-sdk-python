@@ -2552,6 +2552,59 @@ async with subscription:
   `client.orders.wait_batch_replace(...)`) and watch each order's revisions on
   this stream.
 
+## Request builders for restricted runtimes
+
+`polyester/pure.py` builds the order, trigger and OCO requests of
+`orders.create`, `orders.modify`, `orders.cancel`, `triggers.create`,
+`triggers.create_oco`, `triggers.cancel` and `triggers.modify`, with the SDK's
+client-side checks and messages, for a restricted Python runtime with no C
+extensions. It is one self-contained file: standard library only, no I/O, no
+clock and no entropy, under 80 KB. The SDK builds the same requests with it, so
+a bot that uses it and the SDK refuse and send alike.
+
+A host copies the file from the installed wheel, where it is
+`polyester/pure.py` (`importlib.resources.files("polyester") / "pure.py"`), or
+from `src/polyester/pure.py` at a release tag, and runs it in the bot's
+namespace. Its one top-level name is `polyester`: everything else is defined
+inside it, so names the host or the bot define afterwards do not change the
+builders. `polyester.VERSION` is the SDK version it ships with.
+
+Each builder takes the pair as `GetSpotConfig` serves it (or
+`polyester.market(pair)`; a scale proto-JSON leaves out is 0, and the fields the
+builders do not use, such as the tick, step and minimums the server enforces,
+are ignored) and the SDK method's keyword arguments, and returns
+the request as a canonical proto-JSON dict. A refusal raises `ValueError`
+(`polyester.ValidationError`) with the SDK's message; in CPython it also
+carries the server's `code` and field `violations`. The host fills what
+identifies the caller and the attempt: `subaccountId`, `clientOrderId`,
+`clientTriggerId`, `clientListId` and a modify's `requestId`; passing one of
+them is refused. A GTD order takes `now`, an aware `datetime`, and its
+`expires_at` may be a `timedelta` after it.
+
+```python
+from datetime import UTC, datetime, timedelta
+
+from polyester.pure import polyester as pure
+
+pair = {"symbol": "BTC-USDT", "symbolId": 1, "baseQuantityScale": 8, "quoteQuantityScale": 6}
+market = pure.market(pair)
+request = pure.orders.create(
+    market,
+    side="buy",
+    order_type="limit",
+    tif="gtd",
+    qty=market.qty("0.25"),
+    price=market.price("64000.5"),
+    expires_at=timedelta(minutes=30),
+    now=datetime.now(UTC),
+)
+# {"order": {"symbolId": 1, "side": "BUY", "baseQtyScaled": "25000000", "limitGtd": {...}}}
+```
+
+`market.price(...)` and `market.qty(...)` bind a value to the pair, as
+`Price` and `Quantity` do in the SDK: a price or quantity bound to another pair
+is refused.
+
 ## Sync client
 
 The sync `Polyester` client exposes the same service tree and constructor

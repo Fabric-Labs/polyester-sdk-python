@@ -41,6 +41,7 @@ from polyester.codecs.orders import (
     resolve_quote_quantity_scale,
     set_order_key,
 )
+from polyester.codecs.pure_bridge import call, exact_index, message, pure
 from polyester.codecs.scalars import id_to_int, market_ids
 from polyester.errors import (
     PolyesterApiError,
@@ -558,15 +559,10 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                 symbol_id=None,
                 label="cancel",
             )
-        request = CancelOrderRequest()
-        set_order_key(request, key, op="cancel")
-        if symbol_id is not None:
-            request.symbol_id = symbol_id
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is not None:
-            request.subaccount_id = parsed_sub
+        # The key and market are checked before the account scope, as before.
+        built = call(pure._cancel_order, key, exact_index(symbol_id))
+        scope = self._resolve_sub_account_id(sub_account_id, account=account)
+        request = message(call(pure._account, built, scope), CancelOrderRequest())
         return await unary_auth_decoded(
             self._transport,
             OrdersServiceClient,

@@ -1,21 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import msgspec
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.bps import (
-    MAX_SELL_SLIPPAGE_BPS,
-    max_slippage_bps_for_side,
-    validate_bps,
-)
 from polyester.codecs.correlation_id import (
     REQUEST_ID_MAX_LEN,
     check_correlation_id,
@@ -23,70 +16,38 @@ from polyester.codecs.correlation_id import (
     optional_request_id,
     required_client_id,
 )
-from polyester.codecs.proto_helpers import datetime_to_timestamp
-from polyester.codecs.refusal_codes import (
-    BAD_PRICE,
-    FEE_ASSET_NOT_ALLOWED,
-    SLIPPAGE_TICKS_INVALID,
-    TRAILING_DISTANCE_INVALID,
-    TRIGGER_ACTIVATION_PRICE_INVALID,
-    TRIGGER_PRICE_INVALID,
-    refusal_code,
-)
+from polyester.codecs.pure_bridge import call, message, pure
 from polyester.codecs.scalars import (
     UINT32_MAX,
-    FractionalDigitsError,
-    aware_datetime,
     exact_integer,
-    id_to_int,
     market_id,
     market_ids,
     omit_none,
     parse_account_id,
     refuse_item_scope,
-    tick_count,
-)
-from polyester.codecs.triggers import (
-    _slippage_bps,
-    self_trade_prevention_mode_to_proto,
-    trigger_price_source_to_proto,
 )
 from polyester.errors import PolyesterValidationError
 from polyester.gen.buf.validate import validate_pb2
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.models import BatchReplaceItem, CreateOrderRequest
-from polyester.models.order_key import ClientOrderId, OrderId, OrderKey
+from polyester.models.order_key import OrderKey
 from polyester.models.trading import (
     AttachedRisk,
-    OrderFieldViolation,
     OrderPeg,
     RiskLeg,
     TrailingStop,
 )
 from polyester.types.money import (
-    Quantity,
     resolve_positive_price_ticks,
-    resolve_price_ticks,
     resolve_qty_scaled,
-    resolve_quote_qty_scaled,
 )
 
-ORDER_SIDE_TO_PROTO = {"buy": "BUY", "sell": "SELL"}
-ORDER_TYPE_TO_PROTO = {"limit": "LIMIT", "market": "MARKET"}
-TIF_TO_PROTO = {"gtc": "GTC", "ioc": "IOC", "fok": "FOK", "gtd": "GTD"}
-FEE_ASSET_TO_PROTO = {"quote": "QUOTE", "base": "BASE"}
-PEG_REFERENCE_TO_PROTO = {"best_bid": "BEST_BID", "best_ask": "BEST_ASK"}
-_PEG_KEYS = frozenset({"reference", "offset_ticks", "offsetTicks"})
-_INT64_MIN = -(1 << 63)
-_INT64_MAX = (1 << 63) - 1
-_GTD_MIN_OFFSET = timedelta(seconds=1)
-_GTD_MAX_OFFSET = timedelta(days=30)
-_TIF_VALUES = "', '".join(TIF_TO_PROTO)
-MODIFY_BEHAVIOR_TO_PROTO = {
-    "amend_or_replace": "AMEND_OR_REPLACE",
-    "amend_only": "AMEND_ONLY",
-    "replace_only": "REPLACE_ONLY",
-}
+ORDER_SIDE_TO_PROTO: dict[str, str] = pure._SIDES
+ORDER_TYPE_TO_PROTO: dict[str, str] = pure._ORDER_TYPES
+TIF_TO_PROTO: dict[str, str] = pure._TIFS
+FEE_ASSET_TO_PROTO: dict[str, str] = pure._FEE_ASSETS
+PEG_REFERENCE_TO_PROTO: dict[str, str] = pure._PEG_REFERENCES
+MODIFY_BEHAVIOR_TO_PROTO: dict[str, str] = pure._MODIFY_BEHAVIORS
 
 
 def _contract_max_items(request: Any) -> int:
@@ -102,52 +63,13 @@ BATCH_MAX_ITEMS: dict[str, int] = {
     "batch_replace": _contract_max_items(orders_pb2.BatchReplaceOrdersRequest),
 }
 
-QTY_STEP_SIZE = "ERROR_CODE_QTY_STEP_SIZE"
-PRICE_TICK_SIZE = "ERROR_CODE_PRICE_TICK_SIZE"
-_GRID_RULES = {
-    QTY_STEP_SIZE: ("step_size", "quantity does not align with the pair step size"),
-    PRICE_TICK_SIZE: ("tick_size", "price does not align with the pair tick size"),
-}
-
-
-@contextmanager
-def _on_grid(code: str, field_path: str) -> Iterator[None]:
-    """Report a decimal finer than its scale as the server does.
-
-    A nonzero digit beyond the scale is off the pair's step (quantity) or tick
-    (limit, trigger, activation and attached-exit prices), whatever the pair:
-    the server answers ``QTY_STEP_SIZE`` or ``PRICE_TICK_SIZE`` with the
-    violation at ``field_path``. Zeros beyond the scale parse.
-    """
-    try:
-        yield
-    except FractionalDigitsError as exc:
-        rule_id, message = _GRID_RULES[code]
-        raise PolyesterValidationError(
-            str(exc),
-            code=code,
-            violations=[
-                OrderFieldViolation(field_path=field_path, rule_id=rule_id, message=message)
-            ],
-        ) from exc
-
-
-def _limit_price_path(tif: str | None) -> str:
-    execution = {"gtd": "limit_gtd", "ioc": "limit_ioc", "fok": "limit_fok"}.get(
-        tif or "gtc", "limit_gtc"
-    )
-    return f"order.{execution}.price_ticks"
-
-
+QTY_STEP_SIZE: str = pure._QTY_STEP_SIZE
+PRICE_TICK_SIZE: str = pure._PRICE_TICK_SIZE
 def gtd_expires_at_text(value: object) -> str | None:
     """A caller's ``expires_at``: ``None`` or an RFC3339 string. Any other
     type (an int of seconds or milliseconds, a ``datetime``) is refused by
     name rather than read."""
-    if value is None or isinstance(value, str):
-        return value
-    raise PolyesterValidationError(
-        f"expires_at must be an RFC3339 UTC timestamp string, not {type(value).__name__}"
-    )
+    return call(pure._gtd_text, value)
 
 
 def parse_gtd_expire_at(
@@ -156,26 +78,9 @@ def parse_gtd_expire_at(
     now: datetime | None = None,
 ) -> Timestamp:
     """Parse a UTC RFC3339 ``expires_at`` and enforce the 1s–30d GTD window."""
-    text = (gtd_expires_at_text(value) or "").strip()
-    if not text:
-        raise PolyesterValidationError("tif='gtd' requires expires_at")
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError as exc:
-        raise PolyesterValidationError("expires_at must be an RFC3339 UTC timestamp") from exc
-    if parsed.tzinfo is None:
-        raise PolyesterValidationError("expires_at must be timezone-aware UTC")
-    # An offset that moves the time outside years 1 to 9999 in UTC is refused.
-    parsed = aware_datetime(parsed, "expires_at").astimezone(UTC)
-    current = (now or datetime.now(UTC)).astimezone(UTC)
-    delta = parsed - current
-    if delta < _GTD_MIN_OFFSET or delta > _GTD_MAX_OFFSET:
-        raise PolyesterValidationError(
-            "expires_at must be between 1 second and 30 days after validation"
-        )
-    return datetime_to_timestamp(parsed, "expires_at")
+    timestamp = Timestamp()
+    timestamp.FromJsonString(call(pure._gtd_expire_at, value, now or datetime.now(UTC)))
+    return timestamp
 
 
 def validate_batch_size(operation: str, length: int) -> None:
@@ -190,24 +95,16 @@ def validate_batch_size(operation: str, length: int) -> None:
 
 def require_order_key(key: OrderKey, op: str) -> OrderKey:
     """Validate a typed OrderKey for ``op`` (get/cancel/modify/batch)."""
-    if isinstance(key, OrderId):
-        if key.value is None or (isinstance(key.value, str) and key.value.strip() == ""):
-            raise PolyesterValidationError(f"{op} requires a non-empty OrderId")
-        return key
-    if isinstance(key, ClientOrderId):
-        if not str(key.value).strip():
-            raise PolyesterValidationError(f"{op} requires a non-empty ClientOrderId")
-        return key
-    raise PolyesterValidationError(f"{op} requires an OrderKey (OrderId or ClientOrderId)")
+    return call(pure._require_order_key, key, op)
 
 
 def set_order_key(target: Any, key: OrderKey, *, op: str) -> None:
     """Set proto ``order_id`` / ``client_order_id`` oneof from a typed OrderKey."""
-    key = require_order_key(key, op)
-    if isinstance(key, OrderId):
-        target.order_id = id_to_int(key.value, "order_id")
+    built = call(pure._order_key, key, op)
+    if "orderId" in built:
+        target.order_id = int(built["orderId"])
     else:
-        target.client_order_id = required_client_id(key.value, "client_order_id")
+        target.client_order_id = built["clientOrderId"]
 
 
 def _item_order_key(item: dict[str, Any], *, label: str) -> OrderKey:
@@ -230,44 +127,37 @@ def normalize_create_order_request(
         raise PolyesterValidationError("Pass either request or keyword arguments, not both")
     data = request if request is not None else kwargs
     if isinstance(data, Mapping):
-        unknown = sorted(str(key) for key in data if key not in _CREATE_ORDER_FIELDS)
-        if unknown:
-            raise PolyesterValidationError(
-                "unsupported create order argument(s): " + ", ".join(unknown)
-            )
-        # Named here: the conversion below would only say the request is invalid.
-        gtd_expires_at_text(data.get("expires_at"))
+        # Unknown names, a non-string expires_at, wrong types and floats are
+        # refused by name, before the conversion below.
+        call(pure._normalize_create, dict(data))
     try:
         normalized = msgspec.convert(data, type=CreateOrderRequest)
     except (msgspec.ValidationError, TypeError) as exc:
         raise PolyesterValidationError("Invalid orders.create request") from exc
     gtd_expires_at_text(normalized.expires_at)
-    # Reject floats even when qty is typed as Any for dual-path inputs.
-    for field_name in (
-        "qty",
-        "max_quote_debit",
-        "quote_proceeds",
-        "display_qty",
-        "price",
-        "market_client_ref_price",
-    ):
-        value = getattr(normalized, field_name, None)
-        if isinstance(value, float):
-            raise PolyesterValidationError(
-                f"{field_name} must be a decimal string, Decimal, or typed scaled value "
-                "(floats are not allowed)"
-            )
+    call(pure._refuse_float_amounts, _create_fields(normalized))
     return normalized
 
 
 def _codec_quantity_scale(value: object | None, quantity_scale: int | None) -> int:
-    if quantity_scale is not None:
-        return quantity_scale
-    if isinstance(value, Quantity):
-        return value.scale if value.scale is not None else 0
-    raise PolyesterValidationError(
-        "decimal quantity encoding requires an explicit quantity_scale resolved from catalogs"
-    )
+    return call(pure._codec_scale, value, quantity_scale)
+
+
+def _create_fields(request: CreateOrderRequest) -> dict[str, Any]:
+    """The request's fields as the shared builder takes them: typed attached
+    risk and peg models as dicts."""
+    fields = {name: getattr(request, name) for name in _CREATE_ORDER_FIELDS}
+    fields["attached_risk"] = _risk_input(fields["attached_risk"])
+    peg = fields["peg"]
+    if isinstance(peg, OrderPeg):
+        fields["peg"] = {"reference": peg.reference, "offset_ticks": peg.offset_ticks}
+    elif isinstance(peg, Mapping) and not isinstance(peg, dict):
+        fields["peg"] = dict(peg)
+    return fields
+
+
+def _risk_input(value: object) -> object:
+    return _attached_risk_to_dict(value) if isinstance(value, AttachedRisk) else value
 
 
 def create_order_to_wire(
@@ -282,7 +172,7 @@ def create_order_to_wire(
     if request.order_type not in ORDER_TYPE_TO_PROTO:
         raise PolyesterValidationError("order_type must be 'limit' or 'market'")
     if request.tif is not None and request.tif not in TIF_TO_PROTO:
-        raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
+        raise PolyesterValidationError(f"tif must be one of '{pure._TIF_VALUES}'")
 
     if request.sub_account_id is not None:
         parse_account_id(request.sub_account_id, "sub_account_id")
@@ -323,242 +213,16 @@ def order_intent_from_request(
 
     The flat ``order_type``/``tif``/``post_only`` inputs are mapped onto the
     explicit execution oneof (``market_ioc``/``limit_gtc``/``limit_ioc``/
-    ``limit_fok``/``limit_gtd``) introduced in POLY-3701.
+    ``limit_fok``/``limit_gtd``). The rules are ``polyester.pure``'s.
     """
-    if request.symbol is None and request.symbol_id is None:
-        raise PolyesterValidationError("orders.create requires symbol or symbol_id")
-    if request.side not in ORDER_SIDE_TO_PROTO:
-        raise PolyesterValidationError("side must be 'buy' or 'sell'")
-    if request.order_type not in ORDER_TYPE_TO_PROTO:
-        raise PolyesterValidationError("order_type must be 'limit' or 'market'")
-    if request.tif is not None and request.tif not in TIF_TO_PROTO:
-        raise PolyesterValidationError(f"tif must be one of '{_TIF_VALUES}'")
-
-    sizes = [request.qty, request.max_quote_debit, request.quote_proceeds]
-    if sum(size is not None for size in sizes) != 1:
-        raise PolyesterValidationError(
-            "orders.create requires exactly one of qty, max_quote_debit or quote_proceeds"
-        )
-    is_ioc = request.order_type == "market" or (request.tif or "gtc") == "ioc"
-    if request.max_quote_debit is not None and (request.side != "buy" or not is_ioc):
-        raise PolyesterValidationError(
-            "max_quote_debit is only valid for buy market or limit IOC orders"
-        )
-    # The contract's order_intent.quote_proceeds_eligibility rule.
-    if request.quote_proceeds is not None and (request.side != "sell" or not is_ioc):
-        raise PolyesterValidationError(
-            "quote_proceeds is only valid for sell market or limit IOC orders"
-        )
-    if request.symbol_id is None or int(request.symbol_id) == 0:
-        raise PolyesterValidationError(
-            "orders.create requires a resolved symbol_id; pass symbol_id or wait for catalogs"
-        )
-    intent = orders_pb2.OrderIntent(
-        symbol_id=int(request.symbol_id),
-        side=orders_pb2.BUY if request.side == "buy" else orders_pb2.SELL,
+    built = call(
+        pure._order_intent,
+        _create_fields(request),
+        quantity_scale,
+        quote_quantity_scale,
+        datetime.now(UTC),
     )
-    if request.qty is not None:
-        with _on_grid(QTY_STEP_SIZE, "order.base_qty_scaled"):
-            intent.base_qty_scaled = resolve_qty_scaled(
-                request.qty,
-                _codec_quantity_scale(request.qty, quantity_scale),
-                symbol=request.symbol,
-                symbol_id=request.symbol_id,
-            )
-    else:
-        quote_field = "max_quote_debit" if request.max_quote_debit is not None else "quote_proceeds"
-        if quote_quantity_scale is None:
-            raise PolyesterValidationError(
-                f"quote quantity scale is required for {quote_field}; "
-                "await client.wait_for_catalogs() or pass quote_quantity_scale"
-            )
-        quote_scaled = resolve_quote_qty_scaled(
-            cast(Any, getattr(request, quote_field)),
-            quote_quantity_scale,
-            quote_field,
-            symbol=request.symbol,
-            symbol_id=request.symbol_id,
-        )
-        if quote_field == "max_quote_debit":
-            intent.max_quote_debit_scaled = quote_scaled
-        else:
-            intent.quote_proceeds_scaled = quote_scaled
-    client_order_id = optional_client_id(request.client_order_id)
-    if client_order_id:
-        intent.client_order_id = client_order_id
-    if request.fee_asset is not None:
-        fee_asset = request.fee_asset.lower()
-        if fee_asset not in FEE_ASSET_TO_PROTO:
-            raise PolyesterValidationError("fee_asset must be quote or base")
-        if request.side == "sell" and fee_asset != "quote":
-            raise PolyesterValidationError(
-                "sell orders must use fee_asset=quote", code=FEE_ASSET_NOT_ALLOWED
-            )
-        intent.fee_asset = getattr(orders_pb2, FEE_ASSET_TO_PROTO[fee_asset])
-    if request.self_trade_prevention_mode is not None:
-        # Attached take-profit, stop-loss and trailing-stop exits use this mode.
-        intent.self_trade_prevention_mode = self_trade_prevention_mode_to_proto(
-            request.self_trade_prevention_mode
-        )
-
-    with _on_grid(PRICE_TICK_SIZE, _limit_price_path(request.tif)):
-        price_ticks = (
-            resolve_positive_price_ticks(request.price, "price", symbol=request.symbol)
-            if request.price is not None
-            else None
-        )
-    tif = request.tif or "gtc"
-    gtd_expires_at_text(request.expires_at)
-    if request.expires_at and tif != "gtd":
-        raise PolyesterValidationError("expires_at is only valid for limit GTD orders")
-    display_qty_scaled = _display_qty_scaled(request, tif=tif, quantity_scale=quantity_scale)
-    peg = _static_peg_from_input(request.peg)
-    if peg is not None:
-        if request.order_type == "market":
-            raise PolyesterValidationError(
-                "peg is only valid for limit orders: a market order cannot carry a peg"
-            )
-        if request.max_quote_debit is not None or request.quote_proceeds is not None:
-            raise PolyesterValidationError(
-                "peg is only valid with qty: quote sizing (max_quote_debit or "
-                "quote_proceeds) cannot carry a peg"
-            )
-        intent.peg.CopyFrom(peg)
-    if request.order_type == "market":
-        # The contract's only market execution is market_ioc: market orders
-        # always execute immediate-or-cancel. Any other requested tif is
-        # refused, never sent as IOC.
-        if request.tif is not None and request.tif != "ioc":
-            raise PolyesterValidationError(f"tif='{request.tif}' is only valid for limit orders")
-        if request.post_only:
-            raise PolyesterValidationError("post_only is only valid for limit GTC or GTD orders")
-        if request.price is not None:
-            raise PolyesterValidationError(
-                "price is not valid for market orders; "
-                "use market_client_ref_price for a reservation reference"
-            )
-        market = intent.market_ioc
-        market.SetInParent()
-        if request.market_client_ref_price is not None:
-            market.client_ref_price_ticks = resolve_price_ticks(
-                request.market_client_ref_price,
-                "market_client_ref_price",
-                symbol=request.symbol,
-            )
-        _set_market_max_slippage(
-            market,
-            ticks=request.max_slippage_ticks,
-            bps=request.max_slippage_bps,
-            side=request.side,
-        )
-    else:
-        if request.max_slippage_ticks is not None or request.max_slippage_bps is not None:
-            raise PolyesterValidationError(
-                "max_slippage_ticks and max_slippage_bps are only valid for market orders"
-            )
-        if request.market_client_ref_price is not None:
-            raise PolyesterValidationError(
-                "market_client_ref_price is only valid for market orders"
-            )
-        if tif == "gtc":
-            intent.limit_gtc.SetInParent()
-            if price_ticks is not None:
-                intent.limit_gtc.price_ticks = price_ticks
-            if request.post_only:
-                intent.limit_gtc.post_only = True
-            if display_qty_scaled:
-                intent.limit_gtc.display_qty_scaled = display_qty_scaled
-        elif tif == "gtd":
-            if not request.expires_at:
-                raise PolyesterValidationError("tif='gtd' requires expires_at")
-            intent.limit_gtd.SetInParent()
-            if price_ticks is not None:
-                intent.limit_gtd.price_ticks = price_ticks
-            if request.post_only:
-                intent.limit_gtd.post_only = True
-            intent.limit_gtd.expire_at.CopyFrom(parse_gtd_expire_at(request.expires_at))
-            if display_qty_scaled:
-                intent.limit_gtd.display_qty_scaled = display_qty_scaled
-        else:
-            if request.post_only:
-                raise PolyesterValidationError(
-                    "post_only is only valid for limit GTC or GTD orders"
-                )
-            if tif == "ioc":
-                intent.limit_ioc.SetInParent()
-                if price_ticks is not None:
-                    intent.limit_ioc.price_ticks = price_ticks
-            else:  # fok
-                intent.limit_fok.SetInParent()
-                if price_ticks is not None:
-                    intent.limit_fok.price_ticks = price_ticks
-
-    risk = risk_policy_from_dict(request.attached_risk, symbol=request.symbol, side=request.side)
-    if risk is not None:
-        if peg is not None:
-            raise PolyesterValidationError("peg cannot be combined with attached_risk")
-        intent.attached_risk.CopyFrom(risk)
-    return intent
-
-
-def _display_qty_scaled(
-    request: CreateOrderRequest, *, tif: str, quantity_scale: int | None
-) -> int:
-    """The iceberg display, encoded at the pair's base scale as ``qty`` is.
-
-    Only a limit GTC or GTD order has a display. Its other rules (below
-    ``qty``, a step multiple, at least the minimum quantity and ``qty / 100``,
-    no attached risk) are the API's.
-    """
-    if request.display_qty is None:
-        return 0
-    if request.order_type != "limit" or tif not in ("gtc", "gtd"):
-        raise PolyesterValidationError(
-            "display_qty is only valid for limit GTC or GTD orders: market, IOC and "
-            "FOK orders have no display"
-        )
-    return resolve_qty_scaled(
-        request.display_qty,
-        _codec_quantity_scale(request.display_qty, quantity_scale),
-        "display_qty",
-        symbol=request.symbol,
-        symbol_id=request.symbol_id,
-    )
-
-
-def _static_peg_from_input(value: object) -> orders_pb2.StaticPeg | None:
-    """Encode an :class:`OrderPeg` or a ``{"reference", "offset_ticks"}`` dict.
-
-    ``offset_ticks`` is a signed count of the pair's price increments (its
-    tick size), sent as given.
-    """
-    if value is None:
-        return None
-    if isinstance(value, OrderPeg):
-        reference: object = value.reference
-        offset: object = value.offset_ticks
-    elif isinstance(value, Mapping):
-        _reject_unknown_keys(dict(value), _PEG_KEYS, field_name="peg")
-        if "reference" not in value:
-            raise PolyesterValidationError("peg requires reference ('best_bid' or 'best_ask')")
-        reference = value["reference"]
-        offset = _mapping_get(dict(value), "offset_ticks", "offsetTicks")
-        if offset is None:
-            offset = 0
-    else:
-        raise PolyesterValidationError("peg must be an OrderPeg or a dict")
-    key = reference.strip().lower() if isinstance(reference, str) else ""
-    if key not in PEG_REFERENCE_TO_PROTO:
-        raise PolyesterValidationError(
-            f"peg reference must be 'best_bid' or 'best_ask' (got {reference!r})"
-        )
-    if isinstance(offset, bool) or not isinstance(offset, int):
-        raise PolyesterValidationError("peg offset_ticks must be an integer")
-    if not _INT64_MIN <= offset <= _INT64_MAX:
-        raise PolyesterValidationError("peg offset_ticks is outside int64 range")
-    return orders_pb2.StaticPeg(
-        reference=getattr(orders_pb2, PEG_REFERENCE_TO_PROTO[key]), offset_ticks=offset
-    )
+    return message(built, orders_pb2.OrderIntent())
 
 
 def create_order_to_proto(
@@ -602,100 +266,8 @@ def preview_order_to_proto(
     return proto
 
 
-_RISK_POLICY_KEYS = frozenset(
-    {"take_profit", "takeProfit", "stop_loss", "stopLoss", "trailing_stop", "trailingStop", "oco"}
-)
-_RISK_LEG_KEYS = frozenset(
-    {
-        "trigger_price",
-        "triggerPrice",
-        "order_type",
-        "orderType",
-        "limit_price",
-        "limitPrice",
-        "trigger_price_source",
-        "triggerPriceSource",
-        "trigger_price_ticks",
-        "triggerPriceTicks",
-        "child",
-    }
-)
-_RISK_CHILD_KEYS = frozenset({"market_ioc", "marketIoc", "limit_gtc", "limitGtc"})
-_RISK_LIMIT_GTC_KEYS = frozenset({"price_ticks", "priceTicks", "price"})
-_TRAILING_STOP_KEYS = frozenset(
-    {
-        "trailing_distance_ticks",
-        "trailingDistanceTicks",
-        "trailing_distance_bps",
-        "trailingDistanceBps",
-        "distance_ticks",
-        "distance_bps",
-        "max_slippage_ticks",
-        "maxSlippageTicks",
-        "max_slippage_bps",
-        "maxSlippageBps",
-        "activation_price",
-        "activationPrice",
-        "activation_price_ticks",
-        "activationPriceTicks",
-        "limit_price",
-        "limitPrice",
-        "limit_price_ticks",
-        "limitPriceTicks",
-        "order_type",
-        "orderType",
-        "trigger_price_source",
-        "triggerPriceSource",
-    }
-)
-
-
-def _mapping_get(data: dict[str, Any], *names: str) -> Any:
-    for name in names:
-        if name in data and data[name] is not None:
-            return data[name]
-    return None
-
-
-def _mapping_has(data: dict[str, Any], *names: str) -> bool:
-    return any(name in data for name in names)
-
-
 def _reject_unknown_keys(data: dict[str, Any], allowed: frozenset[str], *, field_name: str) -> None:
-    unknown = set(data) - allowed
-    if unknown:
-        raise PolyesterValidationError(
-            f"{field_name} has unsupported fields: {', '.join(sorted(unknown))}"
-        )
-
-
-def _attached_trigger_price_source(
-    data: dict[str, Any], *, field_name: str
-) -> orders_pb2.TriggerPriceSource:
-    return trigger_price_source_to_proto(
-        _mapping_get(data, "trigger_price_source", "triggerPriceSource"),
-        f"{field_name}.trigger_price_source",
-    )
-
-
-def _set_market_max_slippage(
-    market: orders_pb2.MarketIoc,
-    *,
-    ticks: int | None,
-    bps: int | None,
-    side: str,
-) -> None:
-    if ticks is not None and bps is not None:
-        raise PolyesterValidationError(
-            "market_ioc allows at most one of max_slippage_ticks or max_slippage_bps"
-        )
-    if ticks is not None:
-        market.max_slippage_ticks = tick_count(ticks, "max_slippage_ticks")
-    elif bps is not None:
-        # The backend rejects 10000 bps on a market order that sells.
-        market.max_slippage_bps = validate_bps(
-            bps, "max_slippage_bps", max_value=max_slippage_bps_for_side(side)
-        )
+    call(pure._reject_unknown, data, allowed, field_name)
 
 
 def _risk_leg_model_to_dict(leg: RiskLeg) -> dict[str, Any]:
@@ -745,319 +317,6 @@ def _attached_risk_to_dict(risk: AttachedRisk) -> dict[str, Any]:
     return out
 
 
-def _resolve_optional_price_ticks(
-    value: object,
-    field_name: str,
-    *,
-    symbol: str | None,
-    field_path: str,
-    positive: bool = True,
-) -> int:
-    """Resolve an attached-exit or OCO price; ``field_path`` is its wire path
-    for a ``PRICE_TICK_SIZE`` refusal. The price must be positive unless
-    ``positive`` is false, for a caller that refuses 0 itself."""
-    resolve = resolve_positive_price_ticks if positive else resolve_price_ticks
-    with _on_grid(PRICE_TICK_SIZE, field_path):
-        return resolve(value, field_name, symbol=symbol)  # type: ignore[arg-type]
-
-
-def _risk_execution_from_friendly(
-    *,
-    order_type: object | None,
-    limit_price: object | None,
-    field_name: str,
-    symbol: str | None,
-    field_path: str,
-    price_code: str | None = None,
-) -> orders_pb2.RiskExecution:
-    child = orders_pb2.RiskExecution()
-    label = str(order_type).strip().lower() if order_type is not None else "market"
-    if label in {"market", "market_ioc"}:
-        if limit_price is not None:
-            raise PolyesterValidationError(f"{field_name} MARKET child must not set limit_price")
-        child.market_ioc.SetInParent()
-        return child
-    if label in {"limit", "limit_gtc"}:
-        if limit_price is None:
-            raise PolyesterValidationError(
-                f"{field_name} LIMIT child requires limit_price", code=price_code
-            )
-        with refusal_code(price_code):
-            child.limit_gtc.price_ticks = _resolve_optional_price_ticks(
-                limit_price,
-                f"{field_name}.limit_price",
-                symbol=symbol,
-                field_path=f"{field_path}.child.limit_gtc.price_ticks",
-            )
-        return child
-    raise PolyesterValidationError(
-        f"{field_name} order_type must be 'market' or 'limit' (got {order_type!r})"
-    )
-
-
-def _risk_execution_from_child(
-    child: object,
-    *,
-    field_name: str,
-    symbol: str | None,
-    field_path: str,
-    price_code: str | None = None,
-) -> orders_pb2.RiskExecution:
-    if not isinstance(child, dict):
-        raise PolyesterValidationError(f"{field_name}.child must be an object")
-    if _mapping_has(child, "execution"):
-        raise PolyesterValidationError(
-            f"{field_name}.child.execution is not a wire field; set child.market_ioc "
-            "or child.limit_gtc (limit_ioc and limit_fok are not attached-risk children)"
-        )
-    _reject_unknown_keys(child, _RISK_CHILD_KEYS, field_name=f"{field_name}.child")
-    has_market = _mapping_has(child, "market_ioc", "marketIoc")
-    has_limit = _mapping_has(child, "limit_gtc", "limitGtc")
-    if has_market and has_limit:
-        raise PolyesterValidationError(
-            f"{field_name}.child must set exactly one of market_ioc or limit_gtc"
-        )
-    execution = orders_pb2.RiskExecution()
-    if has_limit:
-        limit = _mapping_get(child, "limit_gtc", "limitGtc")
-        if not isinstance(limit, dict):
-            raise PolyesterValidationError(f"{field_name}.child.limit_gtc must be an object")
-        _reject_unknown_keys(
-            limit, _RISK_LIMIT_GTC_KEYS, field_name=f"{field_name}.child.limit_gtc"
-        )
-        price = _mapping_get(limit, "price")
-        ticks = _mapping_get(limit, "price_ticks", "priceTicks")
-        if price is not None and ticks is not None:
-            raise PolyesterValidationError(
-                f"{field_name}.child.limit_gtc accepts price or price_ticks, not both"
-            )
-        with refusal_code(price_code):
-            if price is not None:
-                execution.limit_gtc.price_ticks = _resolve_optional_price_ticks(
-                    price,
-                    f"{field_name}.child.limit_gtc.price",
-                    symbol=symbol,
-                    field_path=f"{field_path}.child.limit_gtc.price_ticks",
-                )
-            elif ticks is not None:
-                execution.limit_gtc.price_ticks = tick_count(
-                    ticks, f"{field_name}.child.limit_gtc.price_ticks"
-                )
-            else:
-                raise PolyesterValidationError(f"{field_name} LIMIT child requires limit_price")
-        return execution
-    if has_market:
-        market = _mapping_get(child, "market_ioc", "marketIoc")
-        if market not in (None, {}):
-            if not isinstance(market, dict):
-                raise PolyesterValidationError(f"{field_name}.child.market_ioc must be an object")
-            if market:
-                raise PolyesterValidationError(
-                    f"{field_name}.child.market_ioc does not accept extra fields"
-                )
-        execution.market_ioc.SetInParent()
-        return execution
-    execution.market_ioc.SetInParent()
-    return execution
-
-
-def _risk_leg_from_dict(
-    data: object,
-    *,
-    field_name: str,
-    symbol: str | None,
-    risk_field: str = "order.attached_risk",
-    trigger_price_code: str | None = None,
-    limit_price_code: str | None = None,
-) -> orders_pb2.TakeProfitPolicy:
-    """Encode a take-profit or stop-loss leg.
-
-    A refused trigger price carries ``trigger_price_code`` and a refused limit price
-    ``limit_price_code``, when given: the codes an OCO's legs answer.
-    """
-    if not isinstance(data, dict):
-        raise PolyesterValidationError(f"{field_name} must be an object")
-    _reject_unknown_keys(data, _RISK_LEG_KEYS, field_name=field_name)
-    price_source = _attached_trigger_price_source(data, field_name=field_name)
-    leg_path = f"{risk_field}.{field_name}"
-
-    trigger_price = _mapping_get(data, "trigger_price", "triggerPrice")
-    trigger_ticks = _mapping_get(data, "trigger_price_ticks", "triggerPriceTicks")
-    if trigger_price is not None and trigger_ticks is not None:
-        raise PolyesterValidationError(
-            f"{field_name} accepts trigger_price or trigger_price_ticks, not both"
-        )
-    if trigger_price is not None:
-        with refusal_code(trigger_price_code):
-            ticks = _resolve_optional_price_ticks(
-                trigger_price,
-                f"{field_name}.trigger_price",
-                symbol=symbol,
-                field_path=f"{leg_path}.trigger_price_ticks",
-            )
-    elif trigger_ticks is not None:
-        with refusal_code(trigger_price_code):
-            ticks = tick_count(trigger_ticks, f"{field_name}.trigger_price_ticks")
-    else:
-        raise PolyesterValidationError(f"{field_name} requires trigger_price")
-
-    order_type = _mapping_get(data, "order_type", "orderType")
-    limit_price = _mapping_get(data, "limit_price", "limitPrice")
-    child_data = data.get("child") if "child" in data else None
-    if child_data is not None and (order_type is not None or limit_price is not None):
-        raise PolyesterValidationError(
-            f"{field_name} accepts friendly order_type/limit_price or child, not both"
-        )
-    if child_data is not None:
-        child = _risk_execution_from_child(
-            child_data,
-            field_name=field_name,
-            symbol=symbol,
-            field_path=leg_path,
-            price_code=limit_price_code,
-        )
-    else:
-        child = _risk_execution_from_friendly(
-            order_type=order_type,
-            limit_price=limit_price,
-            field_name=field_name,
-            symbol=symbol,
-            field_path=leg_path,
-            price_code=limit_price_code,
-        )
-
-    policy = orders_pb2.TakeProfitPolicy(
-        trigger_price_ticks=ticks, trigger_price_source=price_source
-    )
-    policy.child.CopyFrom(child)
-    return policy
-
-
-def _trailing_stop_from_dict(
-    data: object,
-    *,
-    symbol: str | None,
-    risk_field: str = "order.attached_risk",
-) -> orders_pb2.TrailingStopPolicy:
-    if not isinstance(data, dict):
-        raise PolyesterValidationError("attached_risk.trailing_stop must be an object")
-    _reject_unknown_keys(data, _TRAILING_STOP_KEYS, field_name="attached_risk.trailing_stop")
-    if _mapping_has(data, "order_type", "orderType"):
-        raise PolyesterValidationError(
-            "attached trailing_stop takes no order_type: its child is a limit IOC at "
-            "limit_price when the order sells, and a market order when it buys"
-        )
-
-    dist_ticks = _mapping_get(
-        data, "trailing_distance_ticks", "trailingDistanceTicks", "distance_ticks"
-    )
-    dist_bps = _mapping_get(data, "trailing_distance_bps", "trailingDistanceBps", "distance_bps")
-    if dist_ticks is None and dist_bps is None:
-        raise PolyesterValidationError(
-            "trailing_stop requires trailing_distance_ticks or trailing_distance_bps"
-        )
-    if dist_ticks is not None and dist_bps is not None:
-        raise PolyesterValidationError(
-            "trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps"
-        )
-
-    proto = orders_pb2.TrailingStopPolicy(
-        trigger_price_source=_attached_trigger_price_source(
-            data, field_name="attached_risk.trailing_stop"
-        )
-    )
-    # A refused value carries the code a standalone trailing stop answers for
-    # the same mistake, as the API answers it for an attached one.
-    with refusal_code(TRAILING_DISTANCE_INVALID):
-        if dist_ticks is not None:
-            proto.trailing_distance_ticks = tick_count(dist_ticks, "trailing_distance_ticks")
-        else:
-            proto.trailing_distance_bps = validate_bps(dist_bps, "trailing_distance_bps")
-
-    slip_ticks = _mapping_get(data, "max_slippage_ticks", "maxSlippageTicks")
-    slip_bps = _mapping_get(data, "max_slippage_bps", "maxSlippageBps")
-    if slip_ticks is not None and slip_bps is not None:
-        raise PolyesterValidationError(
-            "trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps"
-        )
-    if slip_ticks is not None:
-        with refusal_code(SLIPPAGE_TICKS_INVALID):
-            proto.max_slippage_ticks = tick_count(slip_ticks, "max_slippage_ticks")
-    if slip_bps is not None:
-        # An attached trailing stop takes at most 9999 bps on either side: not
-        # positive is SLIPPAGE_BPS_INVALID, 10000 or more MAX_SLIPPAGE_INVALID.
-        proto.max_slippage_bps = _slippage_bps(slip_bps, max_value=MAX_SELL_SLIPPAGE_BPS)
-
-    activation = _mapping_get(data, "activation_price", "activationPrice")
-    activation_ticks = _mapping_get(data, "activation_price_ticks", "activationPriceTicks")
-    if activation is not None and activation_ticks is not None:
-        raise PolyesterValidationError(
-            "trailing_stop accepts activation_price or activation_price_ticks, not both"
-        )
-    with refusal_code(TRIGGER_ACTIVATION_PRICE_INVALID):
-        if activation is not None:
-            proto.activation_price_ticks = _resolve_optional_price_ticks(
-                activation,
-                "attached_risk.trailing_stop.activation_price",
-                symbol=symbol,
-                field_path=f"{risk_field}.trailing_stop.activation_price_ticks",
-            )
-        elif activation_ticks is not None:
-            proto.activation_price_ticks = tick_count(activation_ticks, "activation_price_ticks")
-
-    # The most a buy-back exit pays per unit; the parent order's side decides
-    # whether it is required (see risk_policy_from_dict).
-    limit = _mapping_get(data, "limit_price", "limitPrice")
-    limit_ticks = _mapping_get(data, "limit_price_ticks", "limitPriceTicks")
-    if limit is not None and limit_ticks is not None:
-        raise PolyesterValidationError(
-            "trailing_stop accepts limit_price or limit_price_ticks, not both"
-        )
-    if limit is not None:
-        proto.limit_price_ticks = _resolve_optional_price_ticks(
-            limit,
-            "attached_risk.trailing_stop.limit_price",
-            symbol=symbol,
-            field_path=f"{risk_field}.trailing_stop.limit_price_ticks",
-            positive=False,
-        )
-        if proto.limit_price_ticks <= 0:
-            raise _trailing_limit_error(
-                "attached_risk.trailing_stop.limit_price must be positive",
-                code="ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
-                rule_id="buy_required",
-                risk_field=risk_field,
-            )
-    elif limit_ticks is not None:
-        proto.limit_price_ticks = tick_count(limit_ticks, "limit_price_ticks")
-    if proto.limit_price_ticks and proto.activation_price_ticks > proto.limit_price_ticks:
-        raise _trailing_limit_error(
-            "attached_risk.trailing_stop.limit_price must be at least activation_price",
-            code="ERROR_CODE_BAD_PRICE",
-            rule_id="buy_at_least_activation",
-            risk_field=risk_field,
-        )
-    return proto
-
-
-def _trailing_limit_error(
-    message: str, *, code: str, rule_id: str, risk_field: str
-) -> PolyesterValidationError:
-    """A refused attached trailing-stop maximum, with the code, rule ID and
-    field path the server answers for the same mistake."""
-    return PolyesterValidationError(
-        message,
-        code=code,
-        violations=[
-            OrderFieldViolation(
-                field_path=f"{risk_field}.trailing_stop.limit_price_ticks",
-                rule_id=rule_id,
-                message=message,
-            )
-        ],
-    )
-
-
 def risk_policy_from_dict(
     data: dict[str, Any] | AttachedRisk | None,
     *,
@@ -1089,96 +348,8 @@ def risk_policy_from_dict(
     raises :class:`PolyesterValidationError` with the contract's
     ``risk_policy.oco_requires_tp_and_one_stop`` violation at ``risk_field``.
     """
-    if data is None:
-        return None
-    if isinstance(data, AttachedRisk):
-        data = _attached_risk_to_dict(data)
-    elif not isinstance(data, dict):
-        raise PolyesterValidationError("attached_risk must be an object or AttachedRisk")
-    if not data:
-        # An empty risk is never dropped: it would leave the order's legs as
-        # they were while the call succeeds.
-        message = "attached_risk requires take_profit and/or a stop leg"
-        if risk_field == "new_attached_risk":
-            message += "; to remove the order's attached risk, pass clear_attached_risk=True"
-        raise PolyesterValidationError(message)
-    _reject_unknown_keys(data, _RISK_POLICY_KEYS, field_name="attached_risk")
-
-    take_profit = _mapping_get(data, "take_profit", "takeProfit")
-    stop_loss = _mapping_get(data, "stop_loss", "stopLoss")
-    trailing_stop = _mapping_get(data, "trailing_stop", "trailingStop")
-    if stop_loss is not None and trailing_stop is not None:
-        raise PolyesterValidationError(
-            "attached_risk allows at most one of stop_loss or trailing_stop"
-        )
-    if take_profit is None and stop_loss is None and trailing_stop is None:
-        raise PolyesterValidationError("attached_risk requires take_profit and/or a stop leg")
-
-    risk = orders_pb2.RiskPolicy()
-    if _mapping_has(data, "oco"):
-        oco = data.get("oco")
-        if not isinstance(oco, bool):
-            raise PolyesterValidationError("attached_risk.oco must be a boolean")
-        if oco and (take_profit is None or (stop_loss is None and trailing_stop is None)):
-            message = (
-                "oco requires take_profit and exactly one stop leg (stop_loss or trailing_stop)"
-            )
-            raise PolyesterValidationError(
-                message,
-                violations=[
-                    OrderFieldViolation(
-                        field_path=risk_field,
-                        rule_id="risk_policy.oco_requires_tp_and_one_stop",
-                        message=message,
-                    )
-                ],
-            )
-        risk.oco = oco
-    if take_profit is not None:
-        tp = _risk_leg_from_dict(
-            take_profit,
-            field_name="take_profit",
-            symbol=symbol,
-            risk_field=risk_field,
-            trigger_price_code=TRIGGER_PRICE_INVALID,
-            limit_price_code=BAD_PRICE,
-        )
-        risk.take_profit.CopyFrom(tp)
-    if stop_loss is not None:
-        sl = _risk_leg_from_dict(
-            stop_loss,
-            field_name="stop_loss",
-            symbol=symbol,
-            risk_field=risk_field,
-            trigger_price_code=TRIGGER_PRICE_INVALID,
-            limit_price_code=BAD_PRICE,
-        )
-        risk.stop_loss.CopyFrom(
-            orders_pb2.StopLossPolicy(
-                trigger_price_ticks=sl.trigger_price_ticks,
-                child=sl.child,
-                trigger_price_source=sl.trigger_price_source,
-            )
-        )
-    if trailing_stop is not None:
-        trailing = _trailing_stop_from_dict(trailing_stop, symbol=symbol, risk_field=risk_field)
-        if side == "sell" and not trailing.limit_price_ticks:
-            raise _trailing_limit_error(
-                "attached_risk.trailing_stop.limit_price is required when the order sells: "
-                "the trailing stop buys back and pays at most this price",
-                code="ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
-                rule_id="buy_required",
-                risk_field=risk_field,
-            )
-        if side == "buy" and trailing.limit_price_ticks:
-            raise _trailing_limit_error(
-                "attached_risk.trailing_stop.limit_price must be unset when the order buys",
-                code="ERROR_CODE_BAD_PRICE",
-                rule_id="sell_unset",
-                risk_field=risk_field,
-            )
-        risk.trailing_stop.CopyFrom(trailing)
-    return risk
+    built = call(pure._risk_policy, _risk_input(data), symbol, side, risk_field)
+    return None if built is None else message(built, orders_pb2.RiskPolicy())
 
 
 # Fields a batch item dictionary may carry. Account scope and order_id /
@@ -1208,60 +379,13 @@ def replacement_risk_policy(
     ``new_attached_risk`` it raises. Otherwise ``None`` leaves the legs
     unchanged, and an empty risk raises.
     """
-    if not isinstance(clear_attached_risk, bool):
-        raise PolyesterValidationError("clear_attached_risk must be a bool")
-    if clear_attached_risk:
-        if new_attached_risk is not None:
-            raise PolyesterValidationError(
-                "pass new_attached_risk or clear_attached_risk=True, not both"
-            )
-        return orders_pb2.RiskPolicy()
-    # The request carries no side: the server applies the side rule to a
-    # trailing stop's maximum and answers ERROR_CODE_BAD_PRICE.
-    return risk_policy_from_dict(new_attached_risk, symbol=symbol, risk_field="new_attached_risk")
+    built = call(
+        pure._replacement_risk, _risk_input(new_attached_risk), clear_attached_risk, symbol
+    )
+    return None if built is None else message(built, orders_pb2.RiskPolicy())
 
 
 _BATCH_CANCEL_ITEM_KEYS = frozenset({"key", "symbol_id"})
-
-
-_KEEP_UNCHANGED = {"new_price": "price", "new_qty": "quantity"}
-
-
-def _non_positive_error(field_name: str) -> PolyesterValidationError:
-    return PolyesterValidationError(
-        f"{field_name} must be positive; leave it None to keep the order's "
-        f"{_KEEP_UNCHANGED[field_name]}"
-    )
-
-
-def _refuse_non_positive(value: object, field_name: str) -> None:
-    """Refuse a zero or negative modify value in any numeric form, before it is resolved.
-
-    The wire reads a new price or quantity of 0 as no change, so a 0 would be dropped
-    silently. Values of other types and malformed strings are left to the resolver.
-    """
-    if isinstance(value, bool):
-        return
-    number: object = value
-    if isinstance(value, str):
-        try:
-            number = Decimal(value.strip())
-        except InvalidOperation:
-            return
-    if not isinstance(number, (int, float, Decimal)):
-        return
-    try:
-        non_positive = number <= 0
-    except InvalidOperation:  # Decimal NaN
-        return
-    if non_positive:
-        raise _non_positive_error(field_name)
-
-
-def _positive(resolved: int, field_name: str) -> int:
-    if resolved <= 0:
-        raise _non_positive_error(field_name)
-    return resolved
 
 
 def batch_replace_item_to_proto(
@@ -1299,21 +423,13 @@ def batch_replace_item_to_proto(
         )
     proto = orders_pb2.BatchReplaceOrderItem()
     set_order_key(proto, key, op="each batch replace item")
+    # The new price and quantity follow a modify's rules.
     if new_price is not None:
-        _refuse_non_positive(new_price, "new_price")
-        with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
-            proto.new_price_ticks = _positive(
-                resolve_price_ticks(new_price, "new_price", symbol=symbol), "new_price"
-            )
+        proto.new_price_ticks = call(pure._new_price_ticks, new_price, symbol)
     if new_qty is not None:
-        _refuse_non_positive(new_qty, "new_qty")
-        with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
-            proto.new_qty_scaled = _positive(
-                resolve_qty_scaled(
-                    new_qty, quantity_scale, "new_qty", symbol=symbol, symbol_id=symbol_id
-                ),
-                "new_qty",
-            )
+        proto.new_qty_scaled = call(
+            pure._new_qty_scaled, new_qty, quantity_scale, symbol, symbol_id
+        )
     if item.get("new_client_order_id"):
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
@@ -1494,62 +610,23 @@ def modify_order_to_proto(
     quantity_scale: int | None = None,
     clear_attached_risk: bool = False,
 ) -> orders_pb2.ModifyOrderRequest:
-    if (
-        new_price is None
-        and new_qty is None
-        and new_attached_risk is None
-        and clear_attached_risk is False
-    ):
-        raise PolyesterValidationError(
-            "modify requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk"
-        )
-    risk = replacement_risk_policy(new_attached_risk, clear_attached_risk, symbol=symbol)
-
-    if symbol_id <= 0:
-        raise PolyesterValidationError("modify requires a resolved symbol_id")
-    proto = orders_pb2.ModifyOrderRequest(
-        request_id=optional_request_id(request_id) or f"mod-{uuid.uuid4().hex[:12]}",
-        symbol_id=int(symbol_id),
+    built = call(
+        pure._modify_order,
+        symbol,
+        symbol_id,
+        key,
+        sub_account_id,
+        request_id,
+        new_price,
+        new_qty,
+        _risk_input(new_attached_risk),
+        behavior,
+        new_client_order_id,
+        quantity_scale,
+        clear_attached_risk,
     )
-    set_order_key(proto, key, op="modify")
-    if sub_account_id is not None:
-        proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
-    if new_price is not None:
-        _refuse_non_positive(new_price, "new_price")
-        with _on_grid(PRICE_TICK_SIZE, "new_price_ticks"):
-            proto.new_price_ticks = _positive(
-                resolve_price_ticks(
-                    new_price,  # type: ignore[arg-type]
-                    "new_price",
-                    symbol=symbol,
-                ),
-                "new_price",
-            )
-    if new_qty is not None:
-        _refuse_non_positive(new_qty, "new_qty")
-        with _on_grid(QTY_STEP_SIZE, "new_qty_scaled"):
-            proto.new_qty_scaled = _positive(
-                resolve_qty_scaled(
-                    new_qty,  # type: ignore[arg-type]
-                    _codec_quantity_scale(new_qty, quantity_scale),
-                    "new_qty",
-                    symbol=symbol,
-                    symbol_id=symbol_id,
-                ),
-                "new_qty",
-            )
-    if behavior:
-        behavior_key = behavior.lower()
-        if behavior_key not in MODIFY_BEHAVIOR_TO_PROTO:
-            raise PolyesterValidationError(
-                "behavior must be amend_or_replace, amend_only, or replace_only"
-            )
-        proto.behavior = getattr(orders_pb2, MODIFY_BEHAVIOR_TO_PROTO[behavior_key])
-    if new_client_order_id:
-        proto.new_client_order_id = required_client_id(new_client_order_id, "new_client_order_id")
-    if risk is not None:
-        proto.new_attached_risk.CopyFrom(risk)
-    return proto
+    built.setdefault("requestId", f"mod-{uuid.uuid4().hex[:12]}")
+    return message(built, orders_pb2.ModifyOrderRequest())
 
 
 def cancel_all_orders_request_id(request_id: object) -> str:
@@ -1679,12 +756,7 @@ def resolve_quantity_scale(
 ) -> int:
     """Resolve the destination catalog scale, including for raw scaled inputs."""
     scale = quantity_scale_for_symbol(catalogs, symbol, symbol_id=symbol_id)
-    for value in values:
-        if isinstance(value, Quantity) and value.scale is not None and value.scale != scale:
-            raise PolyesterValidationError(
-                f"quantity scale mismatch: value scale is {value.scale}, destination is {scale}"
-            )
-    return scale
+    return call(pure._value_scale, scale, *values)
 
 
 def resolve_quote_quantity_scale(
@@ -1699,19 +771,7 @@ def resolve_quote_quantity_scale(
     if not present:
         return 0
     catalog_scale = quote_quantity_scale_for_symbol(catalogs, symbol, symbol_id=symbol_id)
-    for value in present:
-        if isinstance(value, Quantity):
-            if value.scale is None:
-                raise PolyesterValidationError(
-                    "quote amount scale is required; "
-                    "use Quantity.from_quote_scaled/from_quote_decimal"
-                )
-            if value.scale != catalog_scale:
-                raise PolyesterValidationError(
-                    f"quantity scale mismatch: value scale is {value.scale}, "
-                    f"destination is {catalog_scale}"
-                )
-    return catalog_scale
+    return call(pure._quote_value_scale, catalog_scale, *present)
 
 
 def parse_optional_subaccount_id(value: str | int | None) -> int | None:

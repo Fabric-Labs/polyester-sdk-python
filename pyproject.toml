@@ -44,6 +44,7 @@ dev = [
   "python-dotenv>=1.0",
   "ruff>=0.8",
   "mypy>=1.13",
+  "pydantic-monty==1.6.0",
   "build>=1.2",
   "twine>=5",
 ]
@@ -82,8 +83,17 @@ line-length = 100
 target-version = "py311"
 exclude = ["src/polyester/gen"]
 
+[tool.ruff.format]
+# Formatted with indent-width=2 and line-length=120 to fit its size budget.
+exclude = ["src/polyester/pure.py"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# The restricted runtime pure.py targets has no datetime.UTC; split word lists and
+# 120-column lines keep it within its size budget.
+"src/polyester/pure.py" = ["E501", "SIM905", "UP017"]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--import-mode=importlib"]

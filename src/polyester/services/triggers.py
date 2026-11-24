@@ -23,6 +23,7 @@ from polyester.codecs.orders import (
     parse_optional_subaccount_id,
     resolve_quantity_scale,
 )
+from polyester.codecs.pure_bridge import call, message, pure
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
 from polyester.codecs.scalars import id_to_int
 from polyester.codecs.triggers import (
@@ -70,6 +71,7 @@ from polyester.services._retry import (
 )
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 from polyester.services._symbols import (
+    catalog_lookup,
     check_optional_symbol,
     display_symbol_for_id,
     resolve_cancel_all_symbol_ids,
@@ -433,12 +435,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         apart; ``TRIGGER_NOT_FOUND`` also names an ID that is none of the
         account's triggers, so the helper leaves it out.
         """
-        request = CancelTriggerRequest(trigger_id=id_to_int(trigger_id, "trigger_id"))
-        parsed_sub = parse_optional_subaccount_id(
-            self._resolve_sub_account_id(sub_account_id, account=account)
-        )
-        if parsed_sub is not None:
-            request.subaccount_id = parsed_sub
+        # The ID is checked before the account scope, as before.
+        built = call(pure._cancel_trigger, trigger_id)
+        scope = self._resolve_sub_account_id(sub_account_id, account=account)
+        request = message(call(pure._account, built, scope), CancelTriggerRequest())
         return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,
@@ -751,24 +751,20 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         resolved_symbol_id = await self._optional_control_symbol_id(
             symbol=symbol, symbol_id=symbol_id, label="triggers.modify"
         )
-        market: str | None = None
-        bound = [
-            price
-            for price in (trigger_price, activation_price)
-            if isinstance(price, Price) and price.symbol is not None
-        ]
-        if resolved_symbol_id and bound:
-            # A bound price is checked against the named market; one that
-            # can't be named can't be checked, so the price is refused.
+        prices = (trigger_price, activation_price)
+        if resolved_symbol_id and any(
+            isinstance(price, Price) and price.symbol is not None for price in prices
+        ):
             await self._ensure_catalogs()
-            if self._catalogs is not None:
-                market = self._catalogs.symbol_for_symbol_id(resolved_symbol_id)
-            if market is None:
-                raise PolyesterValidationError(
-                    f"triggers.modify cannot check a price bound to {bound[0].symbol} "
-                    f"against symbol_id {resolved_symbol_id}: the market is not in the "
-                    "catalogs; hydrate catalogs or pass an unbound price"
-                )
+        # A bound price is checked against the named market; one that can't
+        # be named can't be checked, so the price is refused.
+        market = call(
+            pure._bound_market,
+            resolved_symbol_id,
+            prices,
+            catalog_lookup(self._catalogs),
+            "triggers.modify",
+        )
         request = modify_trigger_to_proto(
             trigger_id=trigger_id,
             symbol_id=resolved_symbol_id,

@@ -141,6 +141,16 @@ ORDER_PERMISSION_REFUSAL_CODES = frozenset(
 # request with the same idempotency key still returns the accepted withdrawal.
 ROUTE_SUSPENDED = "ERROR_CODE_ROUTE_SUSPENDED"
 
+# chain.withdraw.v1.ErrorCode of a withdrawal, or an auto-withdraw destination,
+# whose destination address is a deposit address issued for a Quick Swap (51;
+# REST ``DESTINATION_SWAP_DEPOSIT_ADDRESS``). Such an address is never a
+# withdrawal destination: a withdrawal could reach it after its swap stopped
+# accepting deposits, and could then be neither swapped nor returned. A
+# Polyester account's own deposit address is not affected. Nothing was
+# reserved; on an auto-withdraw destination ``field_path`` names it. Final, not
+# retryable: choose another destination.
+DESTINATION_SWAP_DEPOSIT_ADDRESS = "ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS"
+
 # auth.v1.AuthErrorCode values of a refused X/Twitter or Discord link change
 # (HTTP 412). ``PolyesterApiError.retry_at`` says when the same request may
 # succeed. AUTH_SOCIAL_ACCOUNT_COOLDOWN: the provider account was unlinked from
@@ -530,6 +540,13 @@ class PolyesterWithdrawError(PolyesterApiError):
     fresh request is safe: submit a new one once the route's
     ``withdrawal_status`` in ``zipper.get_deposit_withdraw_config()`` is
     ``"normal"`` again. :func:`is_retryable_error` reports ``False``.
+
+    ``ERROR_CODE_DESTINATION_SWAP_DEPOSIT_ADDRESS``
+    (:data:`DESTINATION_SWAP_DEPOSIT_ADDRESS`) refuses a destination that is a
+    deposit address issued for a Quick Swap, which is never a withdrawal
+    destination. Nothing was reserved; on an auto-withdraw destination
+    ``field_path`` names it. :func:`is_retryable_error` reports ``False``:
+    choose another destination.
     """
 
     def __init__(
@@ -687,6 +704,14 @@ def is_route_suspended(err: BaseException) -> bool:
     submit a new request once the route's ``withdrawal_status`` is
     ``"normal"`` again."""
     return isinstance(err, PolyesterApiError) and err.code == ROUTE_SUSPENDED
+
+
+def is_destination_swap_deposit_address(err: BaseException) -> bool:
+    """Whether ``err`` refuses a withdrawal, or an auto-withdraw destination,
+    because its destination is a deposit address issued for a Quick Swap
+    (:data:`DESTINATION_SWAP_DEPOSIT_ADDRESS`). Nothing was reserved; final:
+    choose another destination."""
+    return isinstance(err, PolyesterApiError) and err.code == DESTINATION_SWAP_DEPOSIT_ADDRESS
 
 
 def is_request_too_large(err: BaseException) -> bool:

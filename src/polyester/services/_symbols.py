@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.pure_bridge import call, pure
+from polyester.codecs.pure_bridge import call, exact_index, pure
 from polyester.codecs.scalars import market_ids
 from polyester.errors import PolyesterValidationError
 
@@ -20,7 +20,9 @@ def resolve_symbol_id(
     Given both, they must name one market: a name that is not the catalog's
     name for the ID, or that the catalog maps to another ID, is refused.
     """
-    return call(pure._resolve_symbol_id, symbol, symbol_id, label, catalog_lookup(catalogs))
+    return call(
+        pure._resolve_symbol_id, symbol, exact_index(symbol_id), label, catalog_lookup(catalogs)
+    )
 
 
 def catalog_lookup(catalogs: CatalogManager | None) -> tuple[Any, Any] | None:

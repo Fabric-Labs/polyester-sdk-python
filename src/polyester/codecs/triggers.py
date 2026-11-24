@@ -11,7 +11,7 @@ from polyester.codecs.correlation_id import (
     check_correlation_id,
     optional_request_id,
 )
-from polyester.codecs.pure_bridge import call, message, pure
+from polyester.codecs.pure_bridge import call, exact_index, message, pure
 from polyester.codecs.scalars import (
     INT64_MAX,
     id_to_int,
@@ -162,11 +162,11 @@ def create_trigger_to_proto(
         activation_price=activation_price,
         max_slippage_ticks=max_slippage_ticks,
         max_slippage_bps=max_slippage_bps,
-        twap_duration_ms=twap_duration_ms,
-        twap_slice_interval_ms=twap_slice_interval_ms,
+        twap_duration_ms=exact_index(twap_duration_ms),
+        twap_slice_interval_ms=exact_index(twap_slice_interval_ms),
         ladder_price_min=ladder_price_min,
         ladder_price_max=ladder_price_max,
-        ladder_levels=ladder_levels,
+        ladder_levels=exact_index(ladder_levels),
         ladder_distribution=ladder_distribution,
     )
     if client_trigger_id is None:

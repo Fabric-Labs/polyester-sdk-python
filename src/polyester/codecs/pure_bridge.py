@@ -10,6 +10,8 @@ same message, code and violations.
 
 from __future__ import annotations
 
+import numbers
+import operator
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any, TypeVar
@@ -43,6 +45,19 @@ def translate(exc: ValueError) -> PolyesterValidationError:
     cls = FractionalDigitsError if getattr(exc, "fractional", False) else PolyesterValidationError
     violations = [OrderFieldViolation(**item) for item in getattr(exc, "violations", None) or []]
     return cls(str(exc), code=getattr(exc, "code", None), violations=violations)
+
+
+def exact_index(value: object) -> object:
+    """A non-``int`` exact integer (NumPy's) as the plain ``int`` it is.
+
+    The SDK takes any :class:`numbers.Integral` where it takes an integer ID,
+    count or duration; the shared rules take a plain ``int``. numbers.Integral,
+    not __index__: a float subclass may implement __index__ and would read 8.9
+    as 8. Everything else, floats and bools included, is passed on to be refused.
+    """
+    if isinstance(value, numbers.Integral) and not isinstance(value, (bool, int)):
+        return operator.index(value)
+    return value
 
 
 def call(fn: Callable[..., R], *args: Any, **kwargs: Any) -> R:

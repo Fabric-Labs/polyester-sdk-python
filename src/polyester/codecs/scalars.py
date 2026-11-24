@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import numbers
-import operator
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 from polyester.codecs.pure_bridge import FractionalDigitsError as FractionalDigitsError
-from polyester.codecs.pure_bridge import call, pure
+from polyester.codecs.pure_bridge import call, exact_index, pure
 from polyester.errors import PolyesterValidationError
 
 UINT64_MAX = 2**64 - 1
@@ -34,15 +32,7 @@ def market_id(value: object, label: str) -> int:
     return call(pure._market_id, _exact_index(value), label)
 
 
-def _exact_index(value: object) -> object:
-    """A non-``int`` exact integer (NumPy's) as the plain ``int`` it is.
-
-    numbers.Integral, not __index__: a float subclass may implement __index__
-    and would select market 8 for 8.9. The shared rules take a plain int.
-    """
-    if isinstance(value, numbers.Integral) and not isinstance(value, (bool, int)):
-        return operator.index(value)
-    return value
+_exact_index = exact_index
 
 
 def market_ids(values: object, label: str) -> list[int]:

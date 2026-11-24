@@ -435,12 +435,10 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
         apart; ``TRIGGER_NOT_FOUND`` also names an ID that is none of the
         account's triggers, so the helper leaves it out.
         """
-        built = call(
-            pure._cancel_trigger,
-            trigger_id,
-            self._resolve_sub_account_id(sub_account_id, account=account),
-        )
-        request = message(built, CancelTriggerRequest())
+        # The ID is checked before the account scope, as before.
+        built = call(pure._cancel_trigger, trigger_id)
+        scope = self._resolve_sub_account_id(sub_account_id, account=account)
+        request = message(call(pure._account, built, scope), CancelTriggerRequest())
         return await unary_auth_decoded(
             self._transport,
             TriggersServiceClient,

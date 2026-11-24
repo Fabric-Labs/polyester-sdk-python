@@ -11,6 +11,7 @@ refused as invalid.
 
 from __future__ import annotations
 
+import numbers
 import operator
 from decimal import Decimal
 from pathlib import Path
@@ -227,3 +228,137 @@ def test_a_decimal_too_long_for_int_is_invalid(field: str) -> None:
         pure.market({**MARKET, "symbolId": "1" * 5000})
     assert pure.market({**MARKET, "symbolId": "7"}).symbol_id == 7
     assert Decimal("1")  # the decimal module stays the money type
+
+
+class Int64:
+    """An exact integer that is not an ``int``, as NumPy's ``int64`` is: a
+    registered :class:`numbers.Integral` with ``__index__``."""
+
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    def __index__(self) -> int:
+        return self._value
+
+    def __repr__(self) -> str:
+        return f"Int64({self._value})"
+
+
+numbers.Integral.register(Int64)
+
+
+def _exact_integers() -> list[Any]:
+    kinds: list[Any] = [Int64]
+    try:
+        import numpy
+
+        kinds.append(numpy.int64)
+    except ImportError:
+        pass
+    return kinds
+
+
+_TWAP = {"symbol": "BTC-USDT", "trigger_type": "twap", "side": "buy", "qty": "3"}
+_LADDER = {
+    "symbol": "BTC-USDT",
+    "trigger_type": "ladder",
+    "side": "buy",
+    "qty": "2",
+    "ladder_price_min": "90",
+    "ladder_price_max": "100",
+}
+
+
+def _sdk_exact_integer_calls(kind: Any) -> list[tuple[str, Any, Any]]:
+    """(name, SDK call, expected request fields) where the SDK takes any exact integer."""
+    return [
+        (
+            "trigger modify symbol_id",
+            lambda c: c.triggers.modify(trigger_id=42, symbol_id=kind(7), trigger_price="1"),
+            {"triggerId": "42", "symbolId": 7, "triggerPriceTicks": "1000000000"},
+        ),
+        (
+            "order cancel symbol_id",
+            lambda c: c.orders.cancel(key=OrderId(42), symbol_id=kind(7)),
+            {"orderId": "42", "symbolId": 7},
+        ),
+        (
+            "twap duration",
+            lambda c: c.triggers.create(
+                **_TWAP, twap_duration_ms=kind(60_000), twap_slice_interval_ms=5_000
+            ),
+            {"durationMs": "60000", "sliceIntervalMs": "5000"},
+        ),
+        (
+            "twap interval",
+            lambda c: c.triggers.create(
+                **_TWAP, twap_duration_ms=60_000, twap_slice_interval_ms=kind(5_000)
+            ),
+            {"durationMs": "60000", "sliceIntervalMs": "5000"},
+        ),
+        (
+            "ladder levels",
+            lambda c: c.triggers.create(**_LADDER, ladder_levels=kind(5)),
+            {"levels": 5},
+        ),
+    ]
+
+
+@pytest.mark.parametrize("kind", _exact_integers(), ids=lambda kind: kind.__name__)
+async def test_the_sdk_takes_exact_integers_that_are_not_ints(kind: Any) -> None:
+    """An ID, count or duration may be any numbers.Integral (NumPy's): the SDK
+    passes its value to the shared rules, which take plain ints."""
+    async with sdk_client() as client:
+        for name, call, expected in _sdk_exact_integer_calls(kind):
+            sdk = await sdk_outcome(lambda call=call: call(client))
+            assert sdk.error is None, (name, sdk.error)
+            sent = json_format.MessageToDict(sdk.request)
+            strategy = sent.get("trigger", {})
+            fields = {**sent, **strategy.get("twap", {}), **strategy.get("ladder", {})}
+            assert {key: fields[key] for key in expected} == expected, name
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        (
+            lambda c, v: c.triggers.modify(trigger_id=42, symbol_id=v, trigger_price="1"),
+            "triggers.modify symbol_id must be an integer market ID, not {}",
+        ),
+        (
+            lambda c, v: c.orders.cancel(key=OrderId(42), symbol_id=v),
+            "cancel symbol_id must be an integer market ID, not {}",
+        ),
+        (
+            lambda c, v: c.triggers.create(
+                **_TWAP, twap_duration_ms=v, twap_slice_interval_ms=5_000
+            ),
+            "twap_duration_ms must be an integer, not {}",
+        ),
+        (
+            lambda c, v: c.triggers.create(**_LADDER, ladder_levels=v),
+            "ladder_levels must be an integer, not {}",
+        ),
+    ],
+)
+async def test_floats_and_bools_stay_refused(call: Any, message: str) -> None:
+    async with sdk_client() as client:
+        for value in (7.0, True):
+            sdk = await sdk_outcome(lambda value=value: call(client, value))
+            assert isinstance(sdk.error, PolyesterValidationError)
+            assert str(sdk.error) == message.format(type(value).__name__)
+
+
+async def test_a_cancel_checks_its_target_before_its_account_scope() -> None:
+    async with sdk_client() as client:
+        refused = await sdk_outcome(lambda: client.triggers.cancel(trigger_id=0, account={}))
+        assert str(refused.error) == "trigger_id must be a non-zero ID, not 0"
+        refused = await sdk_outcome(lambda: client.orders.cancel(key=OrderId(0), account={}))
+        assert str(refused.error) == "order_id must be a non-zero ID, not 0"
+        # A valid target with a bad scope is still refused for the scope.
+        for call in (
+            lambda: client.triggers.cancel(trigger_id=7, account={}),
+            lambda: client.orders.cancel(key=OrderId(7), account={}),
+        ):
+            refused = await sdk_outcome(call)
+            assert "account dict requires" in str(refused.error)

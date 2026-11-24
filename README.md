@@ -2606,6 +2606,52 @@ request = pure.orders.create(
 `Price` and `Quantity` do in the SDK: a price or quantity bound to another pair
 is refused.
 
+## Order and trigger decoders for restricted runtimes
+
+`polyester/pure_models.py` decodes an order or a trigger in canonical
+proto-JSON (as `MessageToDict` writes an `orders.v1.Order` or a
+`triggers.v1.Trigger`, defaults left out or written) into models with the
+fields of the SDK's `Order` and `Trigger`: the same names, types and values,
+with nested attached risk, fee total, lineage, origin and trigger details.
+Prices and quantities are `pure.py`'s `Price` and `Quantity`, bound to the
+pair as the SDK binds them; enums are the SDK's lower-case names (a value
+newer than the file reads as its number, as in the SDK); a trigger's times are
+aware `datetime`s, an order's nanosecond times decimal strings and
+`avg_price` a `Decimal`. A bot handed the proto-JSON of an order or a trigger
+gets the objects an SDK user gets. It is one self-contained file, standard
+library only, with no I/O, clock or entropy, under 24 KB; a test decodes a
+generated matrix of orders and triggers with it and with the SDK and requires
+the same models, field for field.
+
+A host runs it after `polyester/pure.py`, in the same namespace (it is
+`importlib.resources.files("polyester") / "pure_models.py"` in the wheel). It
+takes `pure.py`'s types from `polyester` as it loads, and its one top-level
+name is `polyester_models`, so names the host or the bot define afterwards,
+`polyester` itself included, do not change the decoders.
+
+`polyester_models.order(data, pair)` and `polyester_models.trigger(data,
+pair)` take the proto-JSON dict and the pair as `GetSpotConfig` serves it (or
+`polyester.market(pair)`); without a pair the values are unbound, as the SDK
+reads them without its catalogs. A message for another pair is refused with
+`ValueError`; one that names no pair is decoded unbound.
+
+```py
+pair = {"symbol": "BTC-USDT", "symbolId": 1, "baseQuantityScale": 8, "quoteQuantityScale": 6}
+
+
+def on_order(data):
+    order = polyester_models.order(data, pair)
+    if order.status == "filled" and order.side == "buy":
+        # Bound to the pair: the builders take the decoded quantity as it is.
+        return polyester.orders.create(
+            pair, side="sell", order_type="limit", qty=order.cum_qty, price="70000"
+        )
+```
+
+The models are `polyester_models.Order`, `Trigger` and the nested types, named
+as in `polyester.models`. They hold fields only: the SDK's helper methods,
+such as `Order.cum_quote()`, are not part of the file.
+
 ## Sync client
 
 The sync `Polyester` client exposes the same service tree and constructor

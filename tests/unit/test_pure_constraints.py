@@ -133,30 +133,33 @@ def _static(node: ast.AST) -> bool:
     return False
 
 
-def _annotation_ok(node: ast.AST) -> bool:
+def _annotation_ok(node: ast.AST, names: frozenset[str] = frozenset()) -> bool:
+    """Builtin types, and ``names``: types the file itself binds."""
     if isinstance(node, ast.Constant) and node.value is None:
         return True
     if isinstance(node, ast.Name):
-        return node.id in BUILTIN_TYPES
+        return node.id in BUILTIN_TYPES or node.id in names
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _annotation_ok(node.left) and _annotation_ok(node.right)
+        return _annotation_ok(node.left, names) and _annotation_ok(node.right, names)
     if isinstance(node, ast.Subscript):
         inner = node.slice.elts if isinstance(node.slice, ast.Tuple) else [node.slice]
-        return _annotation_ok(node.value) and all(_annotation_ok(item) for item in inner)
+        return _annotation_ok(node.value, names) and all(
+            _annotation_ok(item, names) for item in inner
+        )
     return False
 
 
-def _factory(tree: ast.Module) -> ast.FunctionDef | None:
-    """``def polyester(...): ...`` then ``polyester = polyester()``, and nothing else."""
+def _factory(tree: ast.Module, name: str = "polyester") -> ast.FunctionDef | None:
+    """``def <name>(...): ...`` then ``<name> = <name>()``, and nothing else."""
     body = tree.body
     if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
         body = body[1:]
     if (
         len(body) == 2
         and isinstance(body[0], ast.FunctionDef)
-        and body[0].name == "polyester"
+        and body[0].name == name
         and not body[0].decorator_list
-        and ast.unparse(body[1]) == "polyester = polyester()"
+        and ast.unparse(body[1]) == f"{name} = {name}()"
     ):
         return body[0]
     return None
@@ -167,17 +170,20 @@ def _builds_scope(node: ast.stmt) -> bool:
     return ast.unparse(node) == "_scope = locals()"
 
 
-def problems(source: str) -> list[str]:
+def problems(
+    source: str, name: str = "polyester", annotation_names: frozenset[str] = frozenset()
+) -> list[str]:
     """Every construct in ``source`` the restricted runtime does not take, and
-    every top-level name but ``polyester``."""
+    every top-level name but ``name``. ``annotation_names`` are the types,
+    beyond builtin ones, an annotation may name."""
     tree = ast.parse(source)
     found: list[str] = []
-    factory = _factory(tree)
+    factory = _factory(tree, name)
     if factory is None:
-        found.append("top level is not one polyester() factory and its call")
+        found.append(f"top level is not one {name}() factory and its call")
         return found
     found += _builtin_bindings(factory)
-    found += _builtin_scopes(source)
+    found += _builtin_scopes(source, name)
     direct = {id(node) for node in factory.body}
     for node in ast.walk(factory):
         if isinstance(node, BANNED_NODES):
@@ -216,7 +222,7 @@ def problems(source: str) -> list[str]:
                 if arg.annotation is not None:
                     found.append(f"annotated argument {arg.arg} at line {node.lineno}")
         elif isinstance(node, ast.AnnAssign):
-            if not _annotation_ok(node.annotation):
+            if not _annotation_ok(node.annotation, annotation_names):
                 found.append(f"annotation beyond builtin types: {_at(node)}")
         elif isinstance(node, ast.Name):
             if node.id in BANNED_NAMES:
@@ -296,7 +302,10 @@ def _builtin_bindings(factory: ast.FunctionDef) -> list[str]:
         node.id
         for stmt in factory.body
         for node in ast.walk(stmt)
-        if isinstance(node, ast.Name) and hasattr(builtins, node.id)
+        # A read: a dataclass field named ``id`` binds the name, it reads no builtin.
+        if isinstance(node, ast.Name)
+        and isinstance(node.ctx, ast.Load)
+        and hasattr(builtins, node.id)
     }
     found += [
         f"builtin {name} read from the shared namespace: bind it" for name in sorted(used - bound)
@@ -305,14 +314,14 @@ def _builtin_bindings(factory: ast.FunctionDef) -> list[str]:
     return found
 
 
-def _builtin_scopes(source: str) -> list[str]:
+def _builtin_scopes(source: str, name: str = "polyester") -> list[str]:
     """Each read of a builtin name inside the factory resolves to the factory's
     binding (or to a function's own local), never to the shared namespace. A
     class body that assigns a name reads it from the shared namespace, not the
     factory (``int = int`` there is whatever global ``int`` the bot bound); a
     method named ``format`` that the class body never reads is harmless."""
     top = symtable.symtable(source, "pure.py", "exec")
-    factory = next(table for table in top.get_children() if table.get_name() == "polyester")
+    factory = next(table for table in top.get_children() if table.get_name() == name)
     found: list[str] = []
     for name in set(factory.get_identifiers()) & BUILTINS:
         symbol = factory.lookup(name)

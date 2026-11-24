@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import json
+import operator
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -38,6 +39,10 @@ import json as _rt_json
 def _rt_decode(value):
   if isinstance(value, list) and value and value[0] == "$D":
     return _rt_Decimal(value[1])
+  if isinstance(value, list) and value and value[0] == "$PR":
+    return polyester.Price(value[1], value[2])
+  if isinstance(value, list) and value and value[0] == "$QR":
+    return polyester.Quantity(value[1], value[2], value[3], value[4], value[5])
   if isinstance(value, list) and value and value[0] == "$P":
     return polyester.Price.from_ticks(value[1], symbol=value[2])
   if isinstance(value, list) and value and value[0] == "$Q":
@@ -65,7 +70,7 @@ def _rt_build(builder, args, now, market):
     return polyester.triggers.create_oco(market, **args)
   if builder == "triggers.modify":
     return polyester.triggers.modify(market, **args)
-  return polyester.triggers.cancel(**args)
+  return polyester.triggers.cancel(market, **args)
 
 
 def _rt_run(cases, now_text):
@@ -87,13 +92,19 @@ _rt_run(rt_cases, rt_now)
 
 def _encode(value: Any) -> Any:
     """A case argument as plain data either interpreter takes as input."""
+    if isinstance(value, int) and type(value) not in (int, bool):
+        # The runtime has no int subclasses: its value, as the SDK reads it.
+        return operator.index(value)
+    if isinstance(value, Key):
+        return ["$C" if value.client else "$K", _encode(value.value)]
     if isinstance(value, Decimal):
         return ["$D", str(value)]
     if isinstance(value, P):
-        return ["$P", value.ticks, value.symbol]
+        return ["$PR" if value.raw else "$P", _encode(value.ticks), value.symbol]
     if isinstance(value, Q):
         domain = "order_quote" if value.quote else "order_base"
-        return ["$Q", value.scaled, value.scale, domain, value.symbol, value.symbol_id]
+        tag = "$QR" if value.raw else "$Q"
+        return [tag, _encode(value.scaled), value.scale, domain, value.symbol, value.symbol_id]
     if isinstance(value, Key):
         return ["$C" if value.client else "$K", value.value]
     if isinstance(value, Expires):
@@ -124,7 +135,8 @@ def matrix() -> list[list[Any]]:
     ):
         cases.append(["triggers.modify", _encode(args), True])
         cases.append(["triggers.modify", _encode(args), False])
-        cases.append(["triggers.cancel", _encode({"trigger_id": args["trigger_id"]}), False])
+        for market in (True, False):
+            cases.append(["triggers.cancel", _encode({"trigger_id": args["trigger_id"]}), market])
     return cases
 
 

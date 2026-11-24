@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 from polyester.catalogs import CatalogManager
-from polyester.codecs.scalars import market_id, market_ids
+from polyester.codecs.pure_bridge import call, pure
+from polyester.codecs.scalars import market_ids
 from polyester.errors import PolyesterValidationError
 
 
@@ -17,32 +20,14 @@ def resolve_symbol_id(
     Given both, they must name one market: a name that is not the catalog's
     name for the ID, or that the catalog maps to another ID, is refused.
     """
-    if symbol_id is not None:
-        explicit = market_id(symbol_id, f"{label} symbol_id")
-        if explicit == 0:
-            raise PolyesterValidationError(
-                f"{label} symbol_id must be non-zero when explicitly supplied"
-            )
-        if symbol and catalogs is not None:
-            canonical = catalogs.symbol_for_symbol_id(explicit)
-            named = catalogs.symbol_id_for_symbol(symbol)
-            if (canonical is not None and symbol != canonical) or (
-                named is not None and named != explicit
-            ):
-                raise PolyesterValidationError(
-                    f"{label} symbol mismatch: {symbol!r} does not match "
-                    f"symbol_id {explicit}" + (f" ({canonical})" if canonical else "")
-                )
-        return explicit
-    if symbol and catalogs is not None:
-        resolved = catalogs.symbol_id_for_symbol(symbol)
-        if resolved is not None:
-            return resolved
-    if symbol is None:
-        raise PolyesterValidationError(f"{label} requires symbol or symbol_id")
-    raise PolyesterValidationError(
-        f"Unknown symbol {symbol!r}; call get_spot_config first or pass symbol_id"
-    )
+    return call(pure._resolve_symbol_id, symbol, symbol_id, label, catalog_lookup(catalogs))
+
+
+def catalog_lookup(catalogs: CatalogManager | None) -> tuple[Any, Any] | None:
+    """The catalogs as the shared resolver reads them: (ID of a name, name of an ID)."""
+    if catalogs is None:
+        return None
+    return (catalogs.symbol_id_for_symbol, catalogs.symbol_for_symbol_id)
 
 
 def resolve_order_identity(
@@ -101,16 +86,7 @@ def check_optional_symbol(symbol: object, *, label: str = "symbol filter") -> st
     match every market. It needs no catalogs, so a call checks it before
     awaiting them.
     """
-    if symbol is None:
-        return None
-    if not isinstance(symbol, str):
-        raise PolyesterValidationError(f"{label} must be a symbol string")
-    normalized = symbol.strip()
-    if not normalized:
-        raise PolyesterValidationError(
-            f"{label} must not be blank; leave it out to match every market"
-        )
-    return normalized
+    return call(pure._optional_symbol, symbol, label)
 
 
 def resolve_symbol_ids(

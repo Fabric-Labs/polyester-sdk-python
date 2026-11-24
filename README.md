@@ -2570,7 +2570,9 @@ inside it, so names the host or the bot define afterwards do not change the
 builders. `polyester.VERSION` is the SDK version it ships with.
 
 Each builder takes the pair as `GetSpotConfig` serves it (or
-`polyester.market(pair)`) and the SDK method's keyword arguments, and returns
+`polyester.market(pair)`; a scale proto-JSON leaves out is 0, and the fields the
+builders do not use, such as the tick, step and minimums the server enforces,
+are ignored) and the SDK method's keyword arguments, and returns
 the request as a canonical proto-JSON dict. A refusal raises `ValueError`
 (`polyester.ValidationError`) with the SDK's message; in CPython it also
 carries the server's `code` and field `violations`. The host fills what

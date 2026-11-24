@@ -24,6 +24,7 @@ from tests.unit.pure_equivalence import (
     Key,
     P,
     Q,
+    WeirdInt,
     assert_same,
     materialize,
     now_utc,
@@ -35,6 +36,7 @@ from tests.unit.test_pure_create_equivalence import _RISK_VARIANTS
 
 _UNSET = object()
 _KEYS = [
+    Key(WeirdInt(7)),
     Key("2gX"),
     Key(5),
     Key(2**64 - 1),
@@ -56,6 +58,9 @@ _KEYS = [
     None,
 ]
 _PRICES = [
+    P(WeirdInt(5)),
+    P(1.5, raw=True),
+    P(-1, raw=True),
     "100",
     "100.5",
     "0",
@@ -77,6 +82,8 @@ _PRICES = [
     True,
 ]
 _QTYS = [
+    Q(WeirdInt(10)),
+    Q(1.5, raw=True),
     "1",
     "0.00000001",
     "0.000000001",
@@ -131,11 +138,12 @@ MODIFY_MUTATIONS: list[tuple[str, Any]] = [
 CANCEL_BASES: dict[str, dict[str, Any]] = {
     "order_id": dict(key=Key("2gX")),
     "client_id": dict(key=Key("bot-1", client=True)),
+    "both": dict(key=Key("2gX"), symbol=SYMBOL, symbol_id=7),
 }
 CANCEL_MUTATIONS: list[tuple[str, Any]] = [
     *[("key", value) for value in _KEYS],
-    *[("symbol", value) for value in (SYMBOL, "ETH-USDT", "")],
-    ("symbol_id", 7),
+    *[("symbol", value) for value in (SYMBOL, "ETH-USDT", "", " BTC-USDT ")],
+    *[("symbol_id", value) for value in (7, 8, 0, -1, 7.9, "7", WeirdInt(7))],
 ]
 
 OCO_BASES: dict[str, dict[str, Any]] = {
@@ -182,9 +190,19 @@ TRIGGER_MODIFY_BASES: dict[str, dict[str, Any]] = {
     "price": dict(trigger_id="2gX", trigger_price="95"),
     "trailing": dict(trigger_id=99, trailing_distance_bps=40, max_slippage_ticks=0),
     "activation": dict(trigger_id="2gX", activation_price="0", max_slippage_bps=0),
+    "by_name": dict(trigger_id=42, trigger_price="1", symbol=SYMBOL),
+    "by_id": dict(trigger_id=42, trigger_price=P(5, symbol=SYMBOL), symbol_id=7),
+    "by_both": dict(
+        trigger_id=42, activation_price=P(5, symbol=SYMBOL), symbol=SYMBOL, symbol_id=7
+    ),
 }
 TRIGGER_MODIFY_MUTATIONS: list[tuple[str, Any]] = [
-    *[("trigger_id", value) for value in ("2gX", 1, 0, "1", "0OIl", "", -1, 2**64, True, 1.5)],
+    *[
+        ("trigger_id", value)
+        for value in ("2gX", 1, 0, "1", "0OIl", "", -1, 2**64, True, 1.5, WeirdInt(42))
+    ],
+    *[("symbol", value) for value in (SYMBOL, " BTC-USDT ", "ETH-USDT", "", "  ", 5, _UNSET)],
+    *[("symbol_id", value) for value in (7, 8, 0, -1, 7.9, "7", True, WeirdInt(7), _UNSET)],
     *[("trigger_price", value) for value in [*_PRICES, None]],
     *[("activation_price", value) for value in [*_PRICES, None]],
     *[("trailing_distance_ticks", value) for value in (5, "6", 0, -1, True, None)],
@@ -254,25 +272,39 @@ async def test_triggers_create_oco_matches_the_sdk(
     assert_same(sdk, built, generated=(("oco.client_list_id", "oco-"),))
 
 
-@pytest.mark.parametrize(
-    "trigger_id", ["2gX", 1, 2**64 - 1, 0, "1", "0OIl", "", " 2gX", -1, 2**64, True, 1.5, None]
-)
-async def test_triggers_cancel_matches_the_sdk(client: AsyncPolyester, trigger_id: Any) -> None:
+TRIGGER_CANCEL_IDS = ["2gX", 1, 2**64 - 1, 0, "1", "0OIl", "", " 2gX", -1, 2**64, True, 1.5, None]
+
+
+@pytest.mark.parametrize("market", [MARKET, None], ids=["market", "no market"])
+@pytest.mark.parametrize("trigger_id", [*TRIGGER_CANCEL_IDS, WeirdInt(7)])
+async def test_triggers_cancel_matches_the_sdk(
+    client: AsyncPolyester, trigger_id: Any, market: Any
+) -> None:
     sdk = await sdk_outcome(lambda: client.triggers.cancel(trigger_id=trigger_id))
-    built = pure_outcome(lambda: pure.triggers.cancel(trigger_id=trigger_id))
+    built = pure_outcome(lambda: pure.triggers.cancel(market, trigger_id=trigger_id))
     assert_same(sdk, built)
 
 
-@pytest.mark.parametrize("with_market", [True, False])
-@pytest.mark.parametrize(
-    ("name", "args"), _cases(TRIGGER_MODIFY_BASES, TRIGGER_MODIFY_MUTATIONS), ids=_ids
-)
+def _trigger_modify_cases() -> list[tuple[str, dict[str, Any], bool]]:
+    """Each case with the market spec, and without it when the call names no
+    market: a name or ID resolves against the spec as the SDK resolves it
+    against its catalogs, which hold the same one pair."""
+    cases = []
+    for name, args in _cases(TRIGGER_MODIFY_BASES, TRIGGER_MODIFY_MUTATIONS):
+        cases.append((name, args, True))
+        if "symbol" not in args and "symbol_id" not in args:
+            cases.append((name, args, False))
+    return cases
+
+
+@pytest.mark.parametrize(("name", "args", "with_market"), _trigger_modify_cases(), ids=_ids)
 async def test_triggers_modify_matches_the_sdk(
     client: AsyncPolyester, name: str, args: dict, with_market: bool
 ) -> None:
     now = now_utc()
     sdk_args = materialize(args, sdk=True, now=now)
-    if with_market:
+    if with_market and "symbol" not in args and "symbol_id" not in args:
+        # The spec names the market, as symbol= does for the SDK.
         sdk_args["symbol"] = SYMBOL
     sdk = await sdk_outcome(lambda: client.triggers.modify(**sdk_args))
     built = pure_outcome(

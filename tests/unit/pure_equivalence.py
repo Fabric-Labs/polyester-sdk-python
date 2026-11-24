@@ -61,6 +61,7 @@ class P:
 
     ticks: Any
     symbol: str | None = None
+    raw: bool = False  # the plain constructor, which checks nothing
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class Q:
     quote: bool = False
     symbol: str | None = None
     symbol_id: int | None = None
+    raw: bool = False
 
 
 @dataclass(frozen=True)
@@ -92,16 +94,25 @@ class Key:
 def materialize(value: Any, *, sdk: bool, now: datetime) -> Any:
     if isinstance(value, P):
         cls = Price if sdk else pure.Price
+        if value.raw:
+            return cls(value.ticks, value.symbol)
         return cls.from_ticks(value.ticks, symbol=value.symbol)
     if isinstance(value, Q):
         if sdk:
             domain = QuantityDomain.ORDER_QUOTE if value.quote else QuantityDomain.ORDER_BASE
+            if value.raw:
+                return Quantity(value.scaled, value.scale, domain, value.symbol, value.symbol_id)
             return Quantity.from_scaled(
                 value.scaled,
                 scale=value.scale,
                 domain=domain,
                 symbol=value.symbol,
                 symbol_id=value.symbol_id,
+            )
+        if value.raw:
+            domain_name = "order_quote" if value.quote else "order_base"
+            return pure.Quantity(
+                value.scaled, value.scale, domain_name, value.symbol, value.symbol_id
             )
         return pure.Quantity.from_scaled(
             value.scaled,
@@ -123,6 +134,19 @@ def materialize(value: Any, *, sdk: bool, now: datetime) -> Any:
     return value
 
 
+class WeirdInt(int):
+    """An int whose operators lie about its value; its true value is operator.index's."""
+
+    def __neg__(self) -> int:
+        return -9
+
+    def __int__(self) -> int:
+        return 1
+
+    def __index__(self) -> int:
+        return 3
+
+
 class _Sent(Exception):
     def __init__(self, request: Message) -> None:
         super().__init__("captured")
@@ -130,7 +154,7 @@ class _Sent(Exception):
 
 
 @asynccontextmanager
-async def sdk_client() -> AsyncIterator[AsyncPolyester]:
+async def sdk_client(catalog: dict[str, Any] | None = None) -> AsyncIterator[AsyncPolyester]:
     """A client whose unary calls raise the request they would send."""
 
     async def capture(_transport: Any, _client: Any, _call: Any, request: Any, _decoder: Any):
@@ -146,7 +170,7 @@ async def sdk_client() -> AsyncIterator[AsyncPolyester]:
         api_private_key=creds.private_key,
         hydrate_catalogs=False,
     )
-    client.catalogs.hydrate_spot_config(CATALOG)
+    client.catalogs.hydrate_spot_config(catalog or CATALOG)
 
     async def loaded() -> None:
         return None

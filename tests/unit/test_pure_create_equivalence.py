@@ -24,6 +24,7 @@ from tests.unit.pure_equivalence import (
     Expires,
     P,
     Q,
+    WeirdInt,
     assert_same,
     materialize,
     now_utc,
@@ -205,6 +206,11 @@ ORDER_MUTATIONS: list[tuple[str, Any]] = [
             Q(50_000_000, symbol_id=9),
             Q(0),
             Q(50_000_000, quote=True, scale=6),
+            Q(WeirdInt(50_000_000)),
+            Q(1.5, raw=True),
+            Q(-1, raw=True),
+            Q("1", raw=True),
+            "1" * 5000,
             None,
         )
     ],
@@ -225,6 +231,11 @@ ORDER_MUTATIONS: list[tuple[str, Any]] = [
             P(10, symbol=SYMBOL),
             100,
             1.5,
+            P(WeirdInt(10)),
+            P(1.5, raw=True),
+            P(-5, raw=True),
+            P(True, raw=True),
+            "1" * 5000,
             None,
         )
     ],
@@ -259,7 +270,7 @@ ORDER_MUTATIONS: list[tuple[str, Any]] = [
     ],
     *[("fee_asset", v) for v in ("quote", "base", "BASE", "usd", 1)],
     *[("self_trade_prevention_mode", v) for v in ("expire_taker", "DECREMENT", "cancel", 1)],
-    *[("max_slippage_ticks", v) for v in (5, "5", 0, -1, True, 2**63, " 5", 1.0)],
+    *[("max_slippage_ticks", v) for v in (5, "5", 0, -1, True, 2**63, " 5", 1.0, WeirdInt(5))],
     *[("max_slippage_bps", v) for v in (1, 9999, 10000, 0, 10001, "50", True)],
     *[("market_client_ref_price", v) for v in ("100", "0", P(5), 1.5, "1.0000000001")],
     *[("display_qty", v) for v in ("0.1", "0", Q(10_000_000), 0.1, "0.000000001")],
@@ -281,7 +292,7 @@ ORDER_MUTATIONS: list[tuple[str, Any]] = [
     ],
     *[("attached_risk", v) for v in _RISK_VARIANTS],
     *[("symbol", v) for v in (SYMBOL, "ETH-USDT", "")],
-    *[("symbol_id", v) for v in (7, 8, 0, -1, 2**32, "7", True, 7.0)],
+    *[("symbol_id", v) for v in (7, 8, 0, -1, 2**32, "7", True, 7.0, WeirdInt(7))],
     ("unexpected", 1),
 ]
 
@@ -390,12 +401,23 @@ TRIGGER_MUTATIONS: list[tuple[str, Any]] = [
             Q(10, scale=6),
             Q(10, symbol="ETH-USDT"),
             Q(-1),
+            Q(WeirdInt(10)),
+            Q(2.5, raw=True),
             "abc",
         )
     ],
     *[
         ("trigger_price", v)
-        for v in ("100", "0", "100.0000000001", P(7), P(7, symbol="ETH-USDT"), 1.5, 100, None)
+        for v in (
+            "100",
+            "0",
+            "100.0000000001",
+            P(7),
+            P(7, symbol="ETH-USDT"),
+            P(7.5, raw=True),
+            1.5,
+            None,
+        )
     ],
     *[("order_type", v) for v in ("limit", "market", "LIMIT", "stop", 1, None)],
     *[("limit_price", v) for v in ("50", "0", "1.0000000001", P(3), 2.5, None)],
@@ -409,11 +431,14 @@ TRIGGER_MUTATIONS: list[tuple[str, Any]] = [
     *[("activation_price", v) for v in ("100", "130", "0", P(1), None)],
     *[("max_slippage_ticks", v) for v in (5, 0, "3", -2)],
     *[("max_slippage_bps", v) for v in (1, 9999, 10000, 10001, 0, "x")],
-    *[("twap_duration_ms", v) for v in (1000, 999, "60000", 60_000.0, True, 2**63, None)],
+    *[
+        ("twap_duration_ms", v)
+        for v in (1000, 999, "60000", 60_000.0, True, 2**63, None, WeirdInt(9000))
+    ],
     *[("twap_slice_interval_ms", v) for v in (100, 99, 120_000, "5000", None)],
     *[("ladder_price_min", v) for v in ("95", "100", "0", P(1), None)],
     *[("ladder_price_max", v) for v in ("200", "90", "0", None)],
-    *[("ladder_levels", v) for v in (2, 100, 1, 101, "5", 5.0, None)],
+    *[("ladder_levels", v) for v in (2, 100, 1, 101, "5", 5.0, None, WeirdInt(5))],
     *[("ladder_distribution", v) for v in ("linear", "LINEAR", "geometric")],
     *[("symbol", v) for v in (SYMBOL, "ETH-USDT", "")],
 ]

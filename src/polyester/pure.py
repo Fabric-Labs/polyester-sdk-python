@@ -2,7 +2,8 @@
 
 The SDK builds its order, trigger and OCO requests with this file; its README
 ("Request builders for restricted runtimes") documents it. Its one top-level
-name is ``polyester``. Formatted with ``ruff format --config indent-width=2``.
+name is ``polyester``. Formatted with
+``ruff format --config indent-width=2 --line-length 120``.
 """
 
 
@@ -42,7 +43,6 @@ def polyester():
   _B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   _UTC = _timezone.utc
 
-  # Codes the server answers for the same refusal.
   _BAD_PRICE = "ERROR_CODE_BAD_PRICE"
   _CLIENT_LIST_ID_INVALID = "ERROR_CODE_CLIENT_LIST_ID_INVALID"
   _CLIENT_TRIGGER_ID_INVALID = "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID"
@@ -66,7 +66,6 @@ def polyester():
     _PRICE_TICK_SIZE: ("tick_size", "price does not align with the pair tick size"),
   }
 
-  # Wire enum names.
   _SIDES = {"buy": "BUY", "sell": "SELL"}
   _ORDER_TYPES = {"limit": "LIMIT", "market": "MARKET"}
   _TIFS = {"gtc": "GTC", "ioc": "IOC", "fok": "FOK", "gtd": "GTD"}
@@ -97,8 +96,6 @@ def polyester():
     "twap": "TWAP",
     "ladder": "LADDER",
   }
-
-  # Refusals
 
   def _err(message, code=None, violations=None, fractional=False):
     exc = ValueError(message)
@@ -143,14 +140,12 @@ def polyester():
     return type(value).__name__
 
   def _int(value):
-    # A plain int of the true value: int.__neg__, unlike int(), ignores an
-    # int subclass's __int__.
-    return -(-value)
+    # A plain int of the true value, as operator.index gives it: range()
+    # reads an int subclass's own value, whatever it overrides.
+    return value if type(value) is int else range(value).stop
 
   def _shown(text):
     return text if len(text) <= _MAX_SHOWN else f"{text[:_MAX_SHOWN]}... ({len(text)} characters)"
-
-  # Scalars
 
   def _scale(scale, field="scale"):
     if isinstance(scale, bool) or not isinstance(scale, int):
@@ -180,9 +175,7 @@ def polyester():
     if significant + abs(exponent) <= _MAX_SHOWN:
       shown = _trim_zeros(format(raw, "f"))
     if -exponent > scale:
-      raise _err(
-        f"{field} supports at most {scale} decimal places: {_shown(shown)}", fractional=True
-      )
+      raise _err(f"{field} supports at most {scale} decimal places: {_shown(shown)}", fractional=True)
     if significant + exponent + scale > _MAX_SCALED_DIGITS:
       raise _err(f"{field} is too large: {_shown(shown)}")
 
@@ -220,7 +213,10 @@ def polyester():
     whole, _, frac = _trim_zeros(raw).partition(".")
     if len(frac) > scale:
       return False, None, "precision"
-    return True, int(whole + frac + "0" * (scale - len(frac)) or "0"), None
+    try:
+      return True, int(whole + frac + "0" * (scale - len(frac)) or "0"), None
+    except ValueError:  # more digits than int() reads
+      return False, None, "invalid"
 
   def _to_scaled(raw, scale, field):
     _scale(scale, f"{field} scale")
@@ -229,9 +225,7 @@ def polyester():
     if ok:
       return scaled
     if reason == "precision":
-      raise _err(
-        f"{field} supports at most {scale} decimal places: {_shown(text)}", fractional=True
-      )
+      raise _err(f"{field} supports at most {scale} decimal places: {_shown(text)}", fractional=True)
     raise _err(f"{field} must be a valid decimal string")
 
   def _parse_price_ticks(raw, field="price"):
@@ -262,7 +256,6 @@ def polyester():
     return _format_scaled(scaled, _scale(scale))
 
   def _ascii_int(value):
-    # int() also reads other scripts' digits ("٥" is 5).
     if not value.isascii():
       raise ValueError("not an ASCII integer")
     return int(value)
@@ -412,11 +405,7 @@ def polyester():
   def _client_list_id(value, field="client_list_id"):
     if not isinstance(value, str):
       raise _err(f"{field} must be a string", _CLIENT_LIST_ID_INVALID)
-    return _coded(
-      _CLIENT_LIST_ID_INVALID, _check_correlation_id, value, field, _CLIENT_LIST_ID_MAX_LEN
-    )
-
-  # Time
+    return _coded(_CLIENT_LIST_ID_INVALID, _check_correlation_id, value, field, _CLIENT_LIST_ID_MAX_LEN)
 
   def _aware(value, field):
     if isinstance(value, _datetime):
@@ -437,10 +426,7 @@ def polyester():
     raise _err(f"expires_at must be an RFC3339 UTC timestamp string, not {_type_name(value)}")
 
   def _rfc3339(value):
-    text = (
-      f"{value.year:04d}-{value.month:02d}-{value.day:02d}T"
-      f"{value.hour:02d}:{value.minute:02d}:{value.second:02d}"
-    )
+    text = f"{value.year:04d}-{value.month:02d}-{value.day:02d}T{value.hour:02d}:{value.minute:02d}:{value.second:02d}"
     micros = value.microsecond
     if micros % 1000:
       text += f".{micros:06d}"
@@ -468,14 +454,6 @@ def polyester():
       raise _err("expires_at must be between 1 second and 30 days after validation")
     return _rfc3339(parsed)
 
-  # Money
-
-  class _QuantityDomain:
-    ORDER_BASE = "order_base"
-    ORDER_QUOTE = "order_quote"
-    ASSET = "asset"
-    LEDGER_E18 = "ledger_e18"
-
   def _is(value, kind):
     # A price, quantity or transfer amount names its kind, so the SDK's slotted
     # types are read as this file's own.
@@ -492,6 +470,15 @@ def polyester():
     if not allow_u128 and value > _INT64_MAX:
       raise _err(f"{field} exceeds int64 range")
     return value
+
+  def _typed_int(value, field):
+    # A Price or Quantity built directly is unchecked: its value must be the int
+    # the wire field takes; the field's own checks follow.
+    if isinstance(value, bool) or not isinstance(value, int):
+      raise _err(f"{field} must be an int")
+    if value > _INT64_MAX:
+      raise _err(f"{field} exceeds int64 range")
+    return _int(value)
 
   def _price_from_ticks(ticks, *, symbol=None):
     return Price(_require_scaled_int(ticks, "ticks"), symbol)
@@ -518,9 +505,7 @@ def polyester():
     if price.symbol is not None and symbol is not None and price.symbol != symbol:
       raise _err(f"price symbol mismatch: value is for {price.symbol}, destination is {symbol}")
 
-  def _quantity_from_scaled(
-    scaled, *, scale=None, domain="order_base", symbol=None, symbol_id=None
-  ):
+  def _quantity_from_scaled(scaled, *, scale=None, domain="order_base", symbol=None, symbol_id=None):
     value = _require_scaled_int(scaled, "scaled")
     if domain not in ("order_base", "order_quote"):
       raise _err("Quantity domain must be order_base or order_quote")
@@ -529,9 +514,7 @@ def polyester():
     return Quantity(value, scale, domain, symbol, symbol_id)
 
   def _quote_quantity_from_scaled(scaled, scale, *, symbol=None, symbol_id=None):
-    return _quantity_from_scaled(
-      scaled, scale=scale, domain="order_quote", symbol=symbol, symbol_id=symbol_id
-    )
+    return _quantity_from_scaled(scaled, scale=scale, domain="order_quote", symbol=symbol, symbol_id=symbol_id)
 
   def _quote_quantity_from_decimal(raw, scale, *, symbol=None, symbol_id=None):
     scaled = _parse_qty_scaled(raw, scale, "quote amount")
@@ -575,19 +558,14 @@ def polyester():
     if qty.symbol is not None and symbol is not None and qty.symbol != symbol:
       raise _err(f"quantity symbol mismatch: value is for {qty.symbol}, destination is {symbol}")
     if qty.symbol_id is not None and symbol_id is not None and qty.symbol_id != symbol_id:
-      raise _err(
-        f"quantity symbol_id mismatch: value is for {qty.symbol_id}, destination is {symbol_id}"
-      )
+      raise _err(f"quantity symbol_id mismatch: value is for {qty.symbol_id}, destination is {symbol_id}")
 
   def _resolve_price_ticks(value, field="price", symbol=None, positive=False):
     if _is(value, "price"):
       _price_compatible(value, symbol)
-      ticks = value.ticks
+      ticks = _typed_int(value.ticks, f"{field}.ticks")
     elif isinstance(value, (int, float, bool)):
-      raise _err(
-        f"{field} must be a decimal string, Decimal, or Price "
-        "(use Price.from_ticks for scaled ints)"
-      )
+      raise _err(f"{field} must be a decimal string, Decimal, or Price (use Price.from_ticks for scaled ints)")
     else:
       ticks = _parse_price_ticks(value, field)
     if positive and ticks <= 0:
@@ -597,23 +575,19 @@ def polyester():
   def _resolve_qty(value, scale, field, symbol, symbol_id, quote):
     if _is(value, "quantity"):
       if quote and value.scale is None:
-        raise _err(
-          "quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal"
-        )
+        raise _err("quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal")
       domain = "order_quote" if quote else "order_base"
       _quantity_compatible(value, domain, scale, symbol, symbol_id)
-      if value.scaled <= 0:
+      scaled = _typed_int(value.scaled, f"{field}.scaled")
+      if scaled <= 0:
         raise _err(f"{field} must be positive")
-      return value.scaled
+      return scaled
     if _is(value, "asset_amount"):
       target = "order quote" if quote else "order/trigger"
       raise _err(f"{field} expects Quantity ({target}), not AssetAmount")
     if isinstance(value, (int, float, bool)):
       hint = "from_quote_scaled" if quote else "from_scaled"
-      raise _err(
-        f"{field} must be a decimal string, Decimal, or Quantity "
-        f"(use Quantity.{hint} for scaled ints)"
-      )
+      raise _err(f"{field} must be a decimal string, Decimal, or Quantity (use Quantity.{hint} for scaled ints)")
     scaled = _parse_qty_scaled(value, scale, field)
     if scaled > _INT64_MAX:
       raise _err(f"{field} exceeds int64 range")
@@ -636,13 +610,9 @@ def polyester():
     for value in present:
       if _is(value, "quantity"):
         if value.scale is None:
-          raise _err(
-            "quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal"
-          )
+          raise _err("quote amount scale is required; use Quantity.from_quote_scaled/from_quote_decimal")
         if value.scale != scale:
-          raise _err(
-            f"quantity scale mismatch: value scale is {value.scale}, destination is {scale}"
-          )
+          raise _err(f"quantity scale mismatch: value scale is {value.scale}, destination is {scale}")
     return scale if present else 0
 
   def _codec_scale(value, quantity_scale):
@@ -650,21 +620,22 @@ def polyester():
       return quantity_scale
     if _is(value, "quantity"):
       return value.scale if value.scale is not None else 0
-    raise _err(
-      "decimal quantity encoding requires an explicit quantity_scale resolved from catalogs"
-    )
-
-  # Market
+    raise _err("decimal quantity encoding requires an explicit quantity_scale resolved from catalogs")
 
   def _spec_field(spec, snake, camel):
     value = spec.get(snake)
     return spec.get(camel) if value is None else value
 
-  def _spec_int(spec, snake, camel, low, high):
+  def _spec_int(spec, snake, camel, low, high, default=None):
     value = _spec_field(spec, snake, camel)
     if value is None:
-      raise _err(f"market {snake} is required")
+      # Proto-JSON leaves a 0 out: a scale left out is 0.
+      if default is None:
+        raise _err(f"market {snake} is required")
+      return default
     if isinstance(value, str) and _DECIMAL_INTEGER.fullmatch(value) is not None:
+      if len(value) > 20:
+        raise _err(f"market {snake} {_shown(value)} is outside {low}..{high}")
       value = int(value)
     if isinstance(value, bool) or not isinstance(value, int):
       raise _err(f"market {snake} must be an integer")
@@ -673,26 +644,15 @@ def polyester():
       raise _err(f"market {snake} {value} is outside {low}..{high}")
     return value
 
-  def _spec_decimal(spec, snake, camel):
-    value = _spec_field(spec, snake, camel)
-    if value is None or value == "":
-      return ""
-    if not isinstance(value, str) or not _STRICT_DECIMAL.match(value):
-      raise _err(f"market {snake} must be a decimal string")
-    return value
-
   @_dataclass(frozen=True)
   class Market:
-    """One pair as GetSpotConfig serves it; binds prices and quantities to it."""
+    """A GetSpotConfig pair (other fields are ignored: the server enforces tick, step and
+    minimums); binds prices and quantities to it."""
 
     symbol: str
     symbol_id: int
     base_quantity_scale: int
     quote_quantity_scale: int
-    tick_size: str = ""
-    step_size: str = ""
-    min_qty_base: str = ""
-    min_notional_quote: str = ""
 
     def price(self, value):
       return Price(_resolve_price_ticks(value, "price", self.symbol), self.symbol)
@@ -708,7 +668,6 @@ def polyester():
       return Quantity(scaled, scale, "order_quote", self.symbol, self.symbol_id)
 
   def _market(spec):
-    """A Market from a GetSpotConfig pair (snake_case or proto-JSON keys)."""
     if isinstance(spec, Market):
       return spec
     if not isinstance(spec, dict):
@@ -719,41 +678,80 @@ def polyester():
     return Market(
       symbol,
       _spec_int(spec, "symbol_id", "symbolId", 1, _UINT32_MAX),
-      _spec_int(spec, "base_quantity_scale", "baseQuantityScale", 0, _MAX_SCALE),
-      _spec_int(spec, "quote_quantity_scale", "quoteQuantityScale", 0, _MAX_SCALE),
-      _spec_decimal(spec, "tick_size", "tickSize"),
-      _spec_decimal(spec, "step_size", "stepSize"),
-      _spec_decimal(spec, "min_qty_base", "minQtyBase"),
-      _spec_decimal(spec, "min_notional_quote", "minNotionalQuote"),
+      _spec_int(spec, "base_quantity_scale", "baseQuantityScale", 0, _MAX_SCALE, 0),
+      _spec_int(spec, "quote_quantity_scale", "quoteQuantityScale", 0, _MAX_SCALE, 0),
     )
 
-  def _symbol_id_for(market, symbol, symbol_id, label):
-    if symbol is None and symbol_id is None:
-      return market.symbol_id
+  def _lookup(market):
+    # (id of a name, name of an ID): the SDK's catalogs, or one market.
+    return (
+      lambda symbol: market.symbol_id if symbol == market.symbol else None,
+      lambda symbol_id: market.symbol if symbol_id == market.symbol_id else None,
+    )
+
+  def _resolve_symbol_id(symbol, symbol_id, label, lookup):
     if symbol_id is not None:
       explicit = _market_id(symbol_id, f"{label} symbol_id")
       if explicit == 0:
         raise _err(f"{label} symbol_id must be non-zero when explicitly supplied")
-      canonical = market.symbol if explicit == market.symbol_id else None
-      if symbol and (
-        (canonical is not None and symbol != canonical)
-        or (symbol == market.symbol and explicit != market.symbol_id)
-      ):
-        raise _err(
-          f"{label} symbol mismatch: {symbol!r} does not match symbol_id {explicit}"
-          + (f" ({canonical})" if canonical else "")
-        )
+      if symbol and lookup is not None:
+        canonical, named = lookup[1](explicit), lookup[0](symbol)
+        if (canonical is not None and symbol != canonical) or (named is not None and named != explicit):
+          raise _err(
+            f"{label} symbol mismatch: {symbol!r} does not match symbol_id {explicit}"
+            + (f" ({canonical})" if canonical else "")
+          )
       return explicit
-    if symbol and symbol == market.symbol:
-      return market.symbol_id
+    if symbol and lookup is not None:
+      resolved = lookup[0](symbol)
+      if resolved is not None:
+        return resolved
+    if symbol is None:
+      raise _err(f"{label} requires symbol or symbol_id")
     raise _err(f"Unknown symbol {symbol!r}; call get_spot_config first or pass symbol_id")
+
+  def _symbol_id_for(market, symbol, symbol_id, label):
+    if symbol is None and symbol_id is None:
+      return market.symbol_id
+    return _resolve_symbol_id(symbol, symbol_id, label, _lookup(market))
+
+  def _optional_symbol(symbol, label):
+    if symbol is None:
+      return None
+    if not isinstance(symbol, str):
+      raise _err(f"{label} must be a symbol string")
+    if not symbol.strip():
+      raise _err(f"{label} must not be blank; leave it out to match every market")
+    return symbol.strip()
+
+  def _control_symbol_id(symbol, symbol_id, label, lookup):
+    symbol = _optional_symbol(symbol, f"{label} symbol")
+    if symbol is None and symbol_id is None:
+      return 0
+    return _resolve_symbol_id(symbol, symbol_id, label, lookup)
+
+  def _bound_market(symbol_id, prices, lookup, label):
+    bound = [price for price in prices if _is(price, "price") and price.symbol is not None]
+    if not symbol_id or not bound:
+      return None
+    name = lookup[1](symbol_id) if lookup is not None else None
+    if name is None:
+      raise _err(
+        f"{label} cannot check a price bound to {bound[0].symbol} against symbol_id "
+        f"{symbol_id}: the market is not in the catalogs; hydrate catalogs or pass an "
+        "unbound price"
+      )
+    return name
+
+  def _account(request, sub_account_id):
+    if sub_account_id is not None:
+      request["subaccountId"] = str(_id_to_int(sub_account_id, "sub_account_id"))
+    return request
 
   def _host_owned(**values):
     for name in values:
       if values[name] is not None:
         raise _err(f"{name} is assigned by the host; leave it out")
-
-  # Orders
 
   def _first(data, *names):
     for name in names:
@@ -791,9 +789,7 @@ def polyester():
   def _stp_mode(value):
     key = value.lower() if isinstance(value, str) else ""
     if key not in _STP_MODES:
-      raise _err(
-        "self_trade_prevention_mode must be expire_taker, expire_maker, expire_both, or decrement"
-      )
+      raise _err("self_trade_prevention_mode must be expire_taker, expire_maker, expire_both, or decrement")
     return _STP_MODES[key]
 
   _CREATE_ORDER_FIELDS = (
@@ -804,19 +800,13 @@ def polyester():
   _DECIMAL_FIELDS = "qty max_quote_debit quote_proceeds display_qty price market_client_ref_price"
 
   def _wire_int(value):
-    return (
-      isinstance(value, int)
-      and not isinstance(value, bool)
-      and (_INT64_MIN <= value <= _UINT64_MAX)
-    )
+    return isinstance(value, int) and not isinstance(value, bool) and (_INT64_MIN <= value <= _UINT64_MAX)
 
   def _create_types_ok(data):
     for name in ("side", "order_type"):
       if not isinstance(data.get(name), str):
         return False
-    for (
-      name
-    ) in "symbol tif client_order_id expires_at fee_asset self_trade_prevention_mode".split():
+    for name in "symbol tif client_order_id expires_at fee_asset self_trade_prevention_mode".split():
       if data.get(name) is not None and not isinstance(data[name], str):
         return False
     for name in ("symbol_id", "max_slippage_ticks", "max_slippage_bps"):
@@ -841,10 +831,7 @@ def polyester():
   def _refuse_float_amounts(request):
     for name in _DECIMAL_FIELDS.split():
       if isinstance(request.get(name), float):
-        raise _err(
-          f"{name} must be a decimal string, Decimal, or typed scaled value "
-          "(floats are not allowed)"
-        )
+        raise _err(f"{name} must be a decimal string, Decimal, or typed scaled value (floats are not allowed)")
     return request
 
   def _order_intent(request, quantity_scale=None, quote_quantity_scale=None, now=None):
@@ -887,8 +874,7 @@ def polyester():
       field = "max_quote_debit" if debit is not None else "quote_proceeds"
       if quote_quantity_scale is None:
         raise _err(
-          f"quote quantity scale is required for {field}; "
-          "await client.wait_for_catalogs() or pass quote_quantity_scale"
+          f"quote quantity scale is required for {field}; await client.wait_for_catalogs() or pass quote_quantity_scale"
         )
       scaled = _resolve_quote_qty_scaled(
         debit if debit is not None else proceeds, quote_quantity_scale, field, symbol, symbol_id
@@ -904,7 +890,6 @@ def polyester():
         raise _err("sell orders must use fee_asset=quote", _FEE_ASSET_NOT_ALLOWED)
       intent["feeAsset"] = _FEE_ASSETS[fee_asset]
     if request.get("self_trade_prevention_mode") is not None:
-      # Attached take-profit, stop-loss and trailing-stop exits use it too.
       intent["selfTradePreventionMode"] = _stp_mode(request["self_trade_prevention_mode"])
     price, price_ticks = request.get("price"), None
     if price is not None:
@@ -929,10 +914,7 @@ def polyester():
       if order_type == "market":
         raise _err("peg is only valid for limit orders: a market order cannot carry a peg")
       if debit is not None or proceeds is not None:
-        raise _err(
-          "peg is only valid with qty: quote sizing (max_quote_debit or "
-          "quote_proceeds) cannot carry a peg"
-        )
+        raise _err("peg is only valid with qty: quote sizing (max_quote_debit or quote_proceeds) cannot carry a peg")
       intent["peg"] = peg
     post_only = request.get("post_only")
     slip_ticks, slip_bps = request.get("max_slippage_ticks"), request.get("max_slippage_bps")
@@ -944,10 +926,7 @@ def polyester():
       if post_only:
         raise _err("post_only is only valid for limit GTC or GTD orders")
       if price is not None:
-        raise _err(
-          "price is not valid for market orders; "
-          "use market_client_ref_price for a reservation reference"
-        )
+        raise _err("price is not valid for market orders; use market_client_ref_price for a reservation reference")
       market = {}
       if ref_price is not None:
         ticks = _resolve_price_ticks(ref_price, "market_client_ref_price", symbol)
@@ -957,9 +936,7 @@ def polyester():
       if slip_ticks is not None:
         market["maxSlippageTicks"] = str(_tick_count(slip_ticks, "max_slippage_ticks"))
       elif slip_bps is not None:
-        market["maxSlippageBps"] = _bps(
-          slip_bps, "max_slippage_bps", False, _max_slippage_bps_for_side(side)
-        )
+        market["maxSlippageBps"] = _bps(slip_bps, "max_slippage_bps", False, _max_slippage_bps_for_side(side))
       intent["marketIoc"] = market
     else:
       if slip_ticks is not None or slip_bps is not None:
@@ -989,10 +966,7 @@ def polyester():
     if value is None:
       return 0
     if request.get("order_type") != "limit" or tif not in ("gtc", "gtd"):
-      raise _err(
-        "display_qty is only valid for limit GTC or GTD orders: market, IOC and "
-        "FOK orders have no display"
-      )
+      raise _err("display_qty is only valid for limit GTC or GTD orders: market, IOC and FOK orders have no display")
     return _resolve_qty_scaled(
       value,
       _codec_scale(value, quantity_scale),
@@ -1019,15 +993,9 @@ def polyester():
       raise _err("peg offset_ticks must be an integer")
     if not _INT64_MIN <= offset <= _INT64_MAX:
       raise _err("peg offset_ticks is outside int64 range")
-    return _put(
-      {"reference": _PEG_REFERENCES[key]}, "offsetTicks", str(_int(offset)) if offset else ""
-    )
+    return _put({"reference": _PEG_REFERENCES[key]}, "offsetTicks", str(_int(offset)) if offset else "")
 
-  # Attached risk
-
-  _RISK_POLICY_KEYS = (
-    "take_profit takeProfit stop_loss stopLoss trailing_stop trailingStop oco".split()
-  )
+  _RISK_POLICY_KEYS = "take_profit takeProfit stop_loss stopLoss trailing_stop trailingStop oco".split()
   _RISK_LEG_KEYS = (
     "trigger_price triggerPrice order_type orderType limit_price limitPrice trigger_price_source "
     "triggerPriceSource trigger_price_ticks triggerPriceTicks child"
@@ -1109,9 +1077,7 @@ def polyester():
     if not isinstance(data, dict):
       raise _err(f"{field} must be an object")
     _reject_unknown(data, _RISK_LEG_KEYS, field)
-    source = _price_source(
-      _first(data, "trigger_price_source", "triggerPriceSource"), f"{field}.trigger_price_source"
-    )
+    source = _price_source(_first(data, "trigger_price_source", "triggerPriceSource"), f"{field}.trigger_price_source")
     path = f"{risk_field}.{field}"
     trigger_price = _first(data, "trigger_price", "triggerPrice")
     ticks = _first(data, "trigger_price_ticks", "triggerPriceTicks")
@@ -1160,15 +1126,11 @@ def polyester():
     if dist_ticks is None and dist_bps is None:
       raise _err("trailing_stop requires trailing_distance_ticks or trailing_distance_bps")
     if dist_ticks is not None and dist_bps is not None:
-      raise _err(
-        "trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps"
-      )
+      raise _err("trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps")
     stop = _put(
       {},
       "triggerPriceSource",
-      _price_source(
-        _first(data, "trigger_price_source", "triggerPriceSource"), f"{field}.trigger_price_source"
-      ),
+      _price_source(_first(data, "trigger_price_source", "triggerPriceSource"), f"{field}.trigger_price_source"),
     )
     # A refused value carries the code a standalone trailing stop answers.
     if dist_ticks is not None:
@@ -1176,19 +1138,14 @@ def polyester():
         _coded(_TRAILING_DISTANCE_INVALID, _tick_count, dist_ticks, "trailing_distance_ticks")
       )
     else:
-      stop["trailingDistanceBps"] = _coded(
-        _TRAILING_DISTANCE_INVALID, _bps, dist_bps, "trailing_distance_bps"
-      )
+      stop["trailingDistanceBps"] = _coded(_TRAILING_DISTANCE_INVALID, _bps, dist_bps, "trailing_distance_bps")
     slip_ticks = _first(data, "max_slippage_ticks", "maxSlippageTicks")
     slip_bps = _first(data, "max_slippage_bps", "maxSlippageBps")
     if slip_ticks is not None and slip_bps is not None:
       raise _err("trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps")
     if slip_ticks is not None:
-      stop["maxSlippageTicks"] = str(
-        _coded(_SLIPPAGE_TICKS_INVALID, _tick_count, slip_ticks, "max_slippage_ticks")
-      )
+      stop["maxSlippageTicks"] = str(_coded(_SLIPPAGE_TICKS_INVALID, _tick_count, slip_ticks, "max_slippage_ticks"))
     if slip_bps is not None:
-      # An attached trailing stop takes at most 9999 bps on either side.
       stop["maxSlippageBps"] = _slippage_bps(slip_bps, _MAX_SELL_BPS)
     activation = _first(data, "activation_price", "activationPrice")
     active = _first(data, "activation_price_ticks", "activationPriceTicks")
@@ -1268,9 +1225,7 @@ def polyester():
       _put(risk, "oco", oco)
     for key, leg in (("take_profit", take_profit), ("stop_loss", stop_loss)):
       if leg is not None:
-        risk[_camel(key)] = _risk_leg(
-          leg, key, symbol, risk_field, _TRIGGER_PRICE_INVALID, _BAD_PRICE
-        )
+        risk[_camel(key)] = _risk_leg(leg, key, symbol, risk_field, _TRIGGER_PRICE_INVALID, _BAD_PRICE)
     if trailing is not None:
       stop = _trailing_stop(trailing, symbol, risk_field)
       if side == "sell" and "limitPriceTicks" not in stop:
@@ -1300,8 +1255,6 @@ def polyester():
       return {}
     # No side here: the server applies the trailing stop's side rule.
     return _risk_policy(new_attached_risk, symbol, None, "new_attached_risk")
-
-  # Order keys, modify and cancel
 
   @_dataclass(frozen=True)
   class OrderId:
@@ -1363,9 +1316,7 @@ def polyester():
 
   def _new_price_ticks(value, symbol):
     _refuse_non_positive(value, "new_price")
-    ticks = _grid(
-      _PRICE_TICK_SIZE, "new_price_ticks", _resolve_price_ticks, value, "new_price", symbol
-    )
+    ticks = _grid(_PRICE_TICK_SIZE, "new_price_ticks", _resolve_price_ticks, value, "new_price", symbol)
     return _positive(ticks, "new_price")
 
   def _new_qty_scaled(value, quantity_scale, symbol, symbol_id):
@@ -1397,23 +1348,15 @@ def polyester():
     quantity_scale=None,
     clear_attached_risk=False,
   ):
-    if (
-      new_price is None
-      and new_qty is None
-      and new_attached_risk is None
-      and clear_attached_risk is False
-    ):
-      raise _err(
-        "modify requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk"
-      )
+    if new_price is None and new_qty is None and new_attached_risk is None and clear_attached_risk is False:
+      raise _err("modify requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk")
     risk = _replacement_risk(new_attached_risk, clear_attached_risk, symbol)
     if symbol_id <= 0:
       raise _err("modify requires a resolved symbol_id")
     request = _put({}, "requestId", _optional_request_id(request_id))
     request["symbolId"] = int(symbol_id)
     request.update(_order_key(key, "modify"))
-    if sub_account_id is not None:
-      request["subaccountId"] = str(_id_to_int(sub_account_id, "sub_account_id"))
+    _account(request, sub_account_id)
     if new_price is not None:
       request["newPriceTicks"] = str(_new_price_ticks(new_price, symbol))
     if new_qty is not None:
@@ -1429,8 +1372,6 @@ def polyester():
       request["newAttachedRisk"] = risk
     return request
 
-  # Triggers
-
   def _trigger_type_key(trigger_type):
     key = trigger_type.lower().replace("-", "_") if isinstance(trigger_type, str) else ""
     if key not in _TRIGGER_TYPES:
@@ -1440,9 +1381,7 @@ def polyester():
   def _market_slippage(slip_ticks, slip_bps, max_bps):
     market = {}
     if slip_ticks is not None:
-      market["maxSlippageTicks"] = str(
-        _coded(_SLIPPAGE_TICKS_INVALID, _tick_count, slip_ticks, "max_slippage_ticks")
-      )
+      market["maxSlippageTicks"] = str(_coded(_SLIPPAGE_TICKS_INVALID, _tick_count, slip_ticks, "max_slippage_ticks"))
     elif slip_bps is not None:
       market["maxSlippageBps"] = _slippage_bps(slip_bps, max_bps)
     return market
@@ -1451,9 +1390,7 @@ def polyester():
     ticks = _coded(_BAD_PRICE, _resolve_price_ticks, limit_price, "limit_price", symbol, True)
     return {"priceTicks": str(ticks)}
 
-  def _conditional_child(
-    side, order_type, tif, limit_price, post_only, symbol, slip_ticks, slip_bps
-  ):
+  def _conditional_child(side, order_type, tif, limit_price, post_only, symbol, slip_ticks, slip_bps):
     if order_type == "market":
       if post_only:
         raise _err("post_only is only valid for limit GTC executions")
@@ -1542,15 +1479,11 @@ def polyester():
         raise _err(f"{option} applies only to {' or '.join(supported)}")
     if post_only and kind in ("trailing_stop", "twap"):
       raise _err("post_only applies only to limit GTC stops or ladder")
-    if limit_price is not None and (
-      kind == "ladder" or (kind != "trailing_stop" and child_type == "market")
-    ):
+    if limit_price is not None and (kind == "ladder" or (kind != "trailing_stop" and child_type == "market")):
       raise _err("limit_price applies only to limit children or a buy trailing_stop")
     sliced = kind == "ladder" or (kind == "twap" and child_type == "limit")
     if sliced and (max_slippage_ticks is not None or max_slippage_bps is not None):
-      raise _err(
-        "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop"
-      )
+      raise _err("max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop")
     if tif is not None and (not isinstance(tif, str) or tif.lower() not in ("gtc", "ioc", "fok")):
       raise _err("tif must be one of 'gtc', 'ioc', or 'fok'")
     tif = tif.lower() if tif is not None else None
@@ -1559,15 +1492,11 @@ def polyester():
       if tif not in (None, "gtc"):
         raise _err("tif must be gtc for ladder or twap limit slices")
     elif (kind == "trailing_stop" or child_type == "market") and tif not in (None, "ioc"):
-      raise _err(
-        f"tif={tif} applies only to limit children: a market child or a trailing_stop executes IOC"
-      )
+      raise _err(f"tif={tif} applies only to limit children: a market child or a trailing_stop executes IOC")
     if kind == "trailing_stop" and side == "sell" and child_type == "limit":
       raise _err("order_type=limit applies only to buy trailing_stop children")
     wire_side = _SIDES[side]
-    qty_scaled = _coded(
-      _TRIGGER_QTY_INVALID, _resolve_qty_scaled, qty, quantity_scale, "qty", symbol, symbol_id
-    )
+    qty_scaled = _coded(_TRIGGER_QTY_INVALID, _resolve_qty_scaled, qty, quantity_scale, "qty", symbol, symbol_id)
     intent = {"symbolId": symbol_id, "qtyScaled": str(qty_scaled)}
     if client_trigger_id is not None:
       intent["clientTriggerId"] = _client_trigger_id(client_trigger_id)
@@ -1575,7 +1504,6 @@ def polyester():
       fee = fee_asset.lower()
       if fee not in _FEE_ASSETS:
         raise _err("fee_asset must be quote or base")
-      # A sell pays its fee in quote, whatever the strategy.
       if side == "sell" and fee != "quote":
         raise _err("a sell trigger must use fee_asset=quote", _FEE_ASSET_NOT_ALLOWED)
       intent["feeAsset"] = _FEE_ASSETS[fee]
@@ -1588,9 +1516,7 @@ def polyester():
       # Left out, it is 0 on the wire, which the contract refuses.
       if trigger_price is None:
         raise _err(f"trigger_price is required for a {kind}", _TRIGGER_PRICE_INVALID)
-      ticks = _coded(
-        _TRIGGER_PRICE_INVALID, _resolve_price_ticks, trigger_price, "trigger_price", symbol, True
-      )
+      ticks = _coded(_TRIGGER_PRICE_INVALID, _resolve_price_ticks, trigger_price, "trigger_price", symbol, True)
       strategy = {"triggerPriceTicks": str(ticks), "side": wire_side}
       strategy["child"] = _conditional_child(
         side,
@@ -1640,13 +1566,10 @@ def polyester():
       )
     intent[_camel(kind)] = strategy
     request = {"trigger": intent}
-    if sub_account_id is not None:
-      request["subaccountId"] = str(_id_to_int(sub_account_id, "sub_account_id"))
+    _account(request, sub_account_id)
     return request
 
-  def _trailing_trigger(
-    stop, side, symbol, limit_price, dist_ticks, dist_bps, activation, slip_ticks, slip_bps
-  ):
+  def _trailing_trigger(stop, side, symbol, limit_price, dist_ticks, dist_bps, activation, slip_ticks, slip_bps):
     # A buy trailing stop needs its maximum price, the most its child pays
     # per unit; a sell one takes none.
     most = 0
@@ -1661,10 +1584,7 @@ def polyester():
         )
       stop["limitPriceTicks"] = str(most)
     elif limit_price is not None:
-      raise _err(
-        "trailing_stop with side=sell does not take limit_price; "
-        "the maximum price applies to buys only"
-      )
+      raise _err("trailing_stop with side=sell does not take limit_price; the maximum price applies to buys only")
     if dist_ticks is not None and dist_bps is not None:
       raise _err("set at most one of trailing_distance_ticks or trailing_distance_bps")
     if slip_ticks is not None and slip_bps is not None:
@@ -1674,9 +1594,7 @@ def polyester():
         _coded(_TRAILING_DISTANCE_INVALID, _tick_count, dist_ticks, "trailing_distance_ticks")
       )
     if dist_bps is not None:
-      stop["trailingDistanceBps"] = _coded(
-        _TRAILING_DISTANCE_INVALID, _bps, dist_bps, "trailing_distance_bps"
-      )
+      stop["trailingDistanceBps"] = _coded(_TRAILING_DISTANCE_INVALID, _bps, dist_bps, "trailing_distance_bps")
     if activation is not None:
       active = _coded(
         _ACTIVATION_PRICE_INVALID,
@@ -1689,22 +1607,17 @@ def polyester():
       stop["activationPriceTicks"] = str(active)
       if side == "buy" and most < active:
         raise _err("trailing_stop with side=buy requires limit_price at least activation_price")
-    # Every trailing stop takes at most 9999 bps.
     stop.update(_market_slippage(slip_ticks, None, _MAX_SELL_BPS))
     if slip_bps is not None:
       stop["maxSlippageBps"] = _slippage_bps(slip_bps, _MAX_SELL_BPS)
 
-  def _twap(
-    wire_side, side, child_type, symbol, limit_price, duration, interval, slip_ticks, slip_bps
-  ):
+  def _twap(wire_side, side, child_type, symbol, limit_price, duration, interval, slip_ticks, slip_bps):
     # Left out, either is 0 on the wire, which the contract refuses.
     if duration is None:
       raise _err("twap_duration_ms is required for a twap", _TWAP_DURATION_INVALID)
     if interval is None:
       raise _err("twap_slice_interval_ms is required for a twap", _TWAP_INTERVAL_INVALID)
-    duration = _coded(
-      _TWAP_DURATION_INVALID, _exact_integer, duration, "twap_duration_ms", *_TWAP_DURATION_MS
-    )
+    duration = _coded(_TWAP_DURATION_INVALID, _exact_integer, duration, "twap_duration_ms", *_TWAP_DURATION_MS)
     interval = _coded(
       _TWAP_INTERVAL_INVALID,
       _exact_integer,
@@ -1715,7 +1628,6 @@ def polyester():
     if interval > duration:
       raise _err("twap_slice_interval_ms must not exceed twap_duration_ms", _TWAP_INTERVAL_INVALID)
     twap = {"side": wire_side, "durationMs": str(duration), "sliceIntervalMs": str(interval)}
-    # A TWAP slice is market IOC or limit GTC.
     if child_type == "limit":
       twap["limitGtc"] = _child_price(limit_price, symbol) if limit_price is not None else {}
       return twap
@@ -1730,9 +1642,7 @@ def polyester():
     bounds = []
     for name, price in (("ladder_price_min", price_min), ("ladder_price_max", price_max)):
       bounds.append(
-        None
-        if price is None
-        else _coded(_TRIGGER_PRICE_INVALID, _resolve_price_ticks, price, name, symbol, True)
+        None if price is None else _coded(_TRIGGER_PRICE_INVALID, _resolve_price_ticks, price, name, symbol, True)
       )
     low, high = bounds
     # Both are required: a bound left out is 0 on the wire.
@@ -1740,14 +1650,10 @@ def polyester():
       missing = "ladder_price_min" if low is None else "ladder_price_max"
       raise _err(f"{missing} is required for a ladder", _TRIGGER_PRICE_INVALID)
     if low >= high:
-      raise _err(
-        "ladder_price_min must be strictly less than ladder_price_max", _TRIGGER_PRICE_INVALID
-      )
+      raise _err("ladder_price_min must be strictly less than ladder_price_max", _TRIGGER_PRICE_INVALID)
     if levels is None:
       raise _err("ladder_levels is required for a ladder", _LADDER_LEVELS_INVALID)
-    levels = _coded(
-      _LADDER_LEVELS_INVALID, _exact_integer, levels, "ladder_levels", *_LADDER_LEVELS
-    )
+    levels = _coded(_LADDER_LEVELS_INVALID, _exact_integer, levels, "ladder_levels", *_LADDER_LEVELS)
     ladder = {
       "side": wire_side,
       "priceMinTicks": str(low),
@@ -1789,16 +1695,11 @@ def polyester():
       raise _err("set at most one of trailing_distance_ticks or trailing_distance_bps")
     if max_slippage_ticks is not None and max_slippage_bps is not None:
       raise _err("set at most one of max_slippage_ticks or max_slippage_bps")
-    request = _put(
-      {"triggerId": str(_id_to_int(trigger_id, "trigger_id"))}, "symbolId", int(symbol_id)
-    )
-    if sub_account_id is not None:
-      request["subaccountId"] = str(_id_to_int(sub_account_id, "sub_account_id"))
+    request = _put({"triggerId": str(_id_to_int(trigger_id, "trigger_id"))}, "symbolId", int(symbol_id))
+    _account(request, sub_account_id)
     if trigger_price is not None:
       request["triggerPriceTicks"] = str(
-        _coded(
-          _TRIGGER_PRICE_INVALID, _resolve_price_ticks, trigger_price, "trigger_price", symbol, True
-        )
+        _coded(_TRIGGER_PRICE_INVALID, _resolve_price_ticks, trigger_price, "trigger_price", symbol, True)
       )
     if trailing_distance_ticks is not None:
       request["trailingDistanceTicks"] = str(
@@ -1849,9 +1750,7 @@ def polyester():
     side = side.lower() if isinstance(side, str) else ""
     if side not in ("buy", "sell"):
       raise _err("side must be buy or sell")
-    qty_scaled = _coded(
-      _TRIGGER_QTY_INVALID, _resolve_qty_scaled, qty, quantity_scale, "qty", symbol, symbol_id
-    )
+    qty_scaled = _coded(_TRIGGER_QTY_INVALID, _resolve_qty_scaled, qty, quantity_scale, "qty", symbol, symbol_id)
     intent = {"symbolId": symbol_id, "side": _SIDES[side], "qtyScaled": str(qty_scaled)}
     if client_list_id is not None:
       intent["clientListId"] = _client_list_id(client_list_id)
@@ -1863,40 +1762,27 @@ def polyester():
           "or expire_both; decrement is not supported on an OCO"
         )
       intent["selfTradePreventionMode"] = mode
-    # Each leg is encoded as an attached take-profit or stop-loss leg.
     for key, leg in (("take_profit", take_profit), ("stop_loss", stop_loss)):
       intent[_camel(key)] = _risk_leg(leg, key, symbol, "oco", _TRIGGER_PRICE_INVALID, _BAD_PRICE)
     request = {"oco": intent}
-    if sub_account_id is not None:
-      request["subaccountId"] = str(_id_to_int(sub_account_id, "sub_account_id"))
+    _account(request, sub_account_id)
     return request
-
-  # Builders
 
   def _orders_create(market, now=None, **kwargs):
     """CreateOrderRequest proto-JSON for ``orders.create``'s arguments."""
     pair = _market(market)
-    _host_owned(
-      sub_account_id=kwargs.get("sub_account_id"), client_order_id=kwargs.get("client_order_id")
-    )
+    _host_owned(sub_account_id=kwargs.get("sub_account_id"), client_order_id=kwargs.get("client_order_id"))
     if isinstance(kwargs.get("expires_at"), _timedelta):
       kwargs["expires_at"] = _rfc3339(_aware(now, "now").astimezone(_UTC) + kwargs["expires_at"])
     request = _normalize_create(kwargs)
     symbol, symbol_id = request["symbol"], request["symbol_id"]
     resolved = _symbol_id_for(pair, symbol, symbol_id, "orders.create")
     if resolved != pair.symbol_id:
-      raise _err(
-        f"orders.create quantity scale is unavailable for symbol_id {resolved}; hydrate catalogs"
-      )
+      raise _err(f"orders.create quantity scale is unavailable for symbol_id {resolved}; hydrate catalogs")
     if symbol is not None and symbol != pair.symbol:
-      raise _err(
-        f"orders.create symbol mismatch: {symbol!r} does not match "
-        f"symbol_id {resolved} ({pair.symbol})"
-      )
+      raise _err(f"orders.create symbol mismatch: {symbol!r} does not match symbol_id {resolved} ({pair.symbol})")
     scale = _value_scale(pair.base_quantity_scale, request["qty"], request["display_qty"])
-    quote = _quote_value_scale(
-      pair.quote_quantity_scale, request["max_quote_debit"], request["quote_proceeds"]
-    )
+    quote = _quote_value_scale(pair.quote_quantity_scale, request["max_quote_debit"], request["quote_proceeds"])
     request["symbol"], request["symbol_id"] = pair.symbol, resolved
     return {"order": _order_intent(request, scale, quote, now)}
 
@@ -1913,30 +1799,34 @@ def polyester():
   ):
     """ModifyOrderRequest proto-JSON for ``orders.modify``'s arguments."""
     pair = _market(market)
-    _host_owned(
-      sub_account_id=sub_account_id, request_id=request_id, new_client_order_id=new_client_order_id
-    )
+    _host_owned(sub_account_id=sub_account_id, request_id=request_id, new_client_order_id=new_client_order_id)
     symbol_id = _symbol_id_for(pair, symbol, None, "orders.modify")
     scale = _value_scale(pair.base_quantity_scale, new_qty)
-    return _modify_order(
-      pair.symbol, symbol_id, key, new_qty=new_qty, quantity_scale=scale, **changes
-    )
+    return _modify_order(pair.symbol, symbol_id, key, new_qty=new_qty, quantity_scale=scale, **changes)
+
+  def _cancel_order(key, symbol_id=None, sub_account_id=None):
+    request = _order_key(key, "cancel")
+    if symbol_id is not None:
+      _put(request, "symbolId", _market_id(symbol_id, "cancel symbol_id"))
+    _account(request, sub_account_id)
+    return request
+
+  def _cancel_trigger(trigger_id, sub_account_id=None):
+    request = {"triggerId": str(_id_to_int(trigger_id, "trigger_id"))}
+    _account(request, sub_account_id)
+    return request
 
   def _orders_cancel(market=None, *, key, symbol=None, symbol_id=None, sub_account_id=None):
     """CancelOrderRequest proto-JSON; with a market, ``symbolId`` names it."""
     _host_owned(sub_account_id=sub_account_id)
     if symbol is not None and symbol_id is not None:
       raise _err("cancel accepts only one of symbol or symbol_id")
-    if market is not None:
-      pair = _market(market)
-      symbol_id = _symbol_id_for(pair, symbol, symbol_id, "cancel")
-      if symbol_id != pair.symbol_id:
-        raise _err(f"cancel symbol_id {symbol_id} is not the market's ({pair.symbol_id})")
-    elif symbol is not None:
-      raise _err(f"Unknown symbol {symbol!r}; call get_spot_config first or pass symbol_id")
-    elif symbol_id is not None:
-      symbol_id = _market_id(symbol_id, "cancel symbol_id")
-    return _put(_order_key(key, "cancel"), "symbolId", symbol_id)
+    pair = None if market is None else _market(market)
+    if symbol is not None:
+      symbol_id = _resolve_symbol_id(symbol, None, "cancel", pair and _lookup(pair))
+    elif symbol_id is None and pair is not None:
+      symbol_id = pair.symbol_id
+    return _cancel_order(key, symbol_id)
 
   def _triggers_create(
     market,
@@ -1993,22 +1883,27 @@ def polyester():
       self_trade_prevention_mode=self_trade_prevention_mode,
     )
 
-  def _triggers_cancel(*, trigger_id, sub_account_id=None):
-    """CancelTriggerRequest proto-JSON."""
+  def _triggers_cancel(market=None, *, trigger_id, sub_account_id=None):
+    """CancelTriggerRequest proto-JSON; the request names no market."""
     _host_owned(sub_account_id=sub_account_id)
-    return {"triggerId": str(_id_to_int(trigger_id, "trigger_id"))}
+    if market is not None:
+      _market(market)
+    return _cancel_trigger(trigger_id)
 
-  def _triggers_modify(market=None, *, trigger_id, sub_account_id=None, **patch):
-    """ModifyTriggerRequest proto-JSON. With a market ``symbolId`` names it and
-    a Price bound to another market is refused; without one the trigger's own
-    market applies."""
+  def _triggers_modify(market=None, *, trigger_id, symbol=None, symbol_id=None, sub_account_id=None, **patch):
+    """ModifyTriggerRequest proto-JSON. ``symbolId`` names the market given, or
+    ``symbol`` / ``symbol_id``; with neither the trigger's own market applies.
+    A Price bound to another market is refused."""
     _host_owned(sub_account_id=sub_account_id)
-    if market is None:
-      return _modify_trigger(trigger_id, **patch)
-    pair = _market(market)
-    return _modify_trigger(trigger_id, pair.symbol_id, pair.symbol, **patch)
-
-  # Namespace
+    pair = None if market is None else _market(market)
+    lookup = None if pair is None else _lookup(pair)
+    if pair is not None and symbol is None and symbol_id is None:
+      resolved = pair.symbol_id
+    else:
+      resolved = _control_symbol_id(symbol, symbol_id, "triggers.modify", lookup)
+    prices = (patch.get("trigger_price"), patch.get("activation_price"))
+    name = _bound_market(resolved, prices, lookup, "triggers.modify")
+    return _modify_trigger(trigger_id, resolved, name, **patch)
 
   class _Orders:
     create = _orders_create
@@ -2031,7 +1926,6 @@ def polyester():
     _sdk = _scope
     VERSION = _VERSION
     ValidationError = ValueError
-    QuantityDomain = _QuantityDomain
     Price = _types[0]
     Quantity = _types[1]
     OrderId = _types[2]

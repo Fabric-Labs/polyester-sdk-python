@@ -1386,8 +1386,11 @@ class BatchReplaceAdmissionItem(msgspec.Struct, kw_only=True, omit_defaults=True
     code: str = ""
     rate_limit: RateLimitDetail | None = None
     action_taken: str = ""
-    # Field violations a rejection names, in the order the server sent them;
-    # empty for an accepted item or a rejection that names no field.
+    # Field violations a rejection names, in the order the server sent them,
+    # as the request item names them and without its index (for example
+    # ``new_attached_risk.stop_loss`` or ``order_id``; REST:
+    # ``newAttachedRisk.stopLoss``): the item is ``item_index``. Empty for an
+    # accepted item or a rejection that names no field.
     violations: list[OrderFieldViolation] = []
     # On a duplicate-client-order-ID rejection: the order that already holds
     # the client order ID, when known; empty otherwise.
@@ -1453,8 +1456,12 @@ class BatchCreateResultItem(msgspec.Struct, kw_only=True, omit_defaults=True):
     take_profit_trigger_id: str = ""
     stop_loss_trigger_id: str = ""
     trailing_stop_trigger_id: str = ""
-    # Field violations a rejection names, in the order the server sent them;
-    # empty for an accepted item or a rejection that names no field.
+    # Field violations a rejection names, in the order the server sent them,
+    # as a CreateOrderRequest carrying the item would, under ``order`` and
+    # without the item's index (for example ``order.limit_gtc.price_ticks``;
+    # REST: ``order.limitGtc.price``): the item is this result's position in
+    # ``results``. Empty for an accepted item or a rejection that names no
+    # field.
     violations: list[OrderFieldViolation] = []
     # An accepted item's quote sizing echoed back, scaled by the pair's quote
     # quantity scale: a BUY's all-in budget or a SELL's proceeds target.

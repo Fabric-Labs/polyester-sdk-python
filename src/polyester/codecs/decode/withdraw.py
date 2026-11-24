@@ -20,6 +20,7 @@ _VALIDATION_CODE_LABELS = {
     int(withdraw_pb2.POLYESTER_SMART_ACCOUNT): "polyester_smart_account",
     int(withdraw_pb2.TOKEN_CONTRACT): "token_contract",
     int(withdraw_pb2.DENYLISTED_ADDRESS): "denylisted_address",
+    int(withdraw_pb2.SWAP_DEPOSIT_ADDRESS): "swap_deposit_address",
 }
 
 

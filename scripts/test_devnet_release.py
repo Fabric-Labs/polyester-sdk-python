@@ -465,6 +465,44 @@ class StampTest(unittest.TestCase):
         with self.assertRaisesRegex(dr.ReleaseError, "expected one _VERSION"):
             dr.stamp_python(self.dir, "0.35.0.dev1")
 
+    @unittest.skipUnless(ECOSYSTEM == "python", "Python package manifest")
+    def test_stamp_python_keeps_the_indent_of_a_nested_version(self) -> None:
+        shutil.copy(ROOT / "pyproject.toml", self.dir)
+        package = self.dir / dr.python_package_dir(ROOT)
+        package.mkdir(parents=True)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "_version.py", package)
+        (package / "pure.py").write_text(
+            'def polyester():\n  import re\n\n  _VERSION = "0.1.0"\n  _OTHER = "0.1.0"\n'
+        )
+        dr.stamp_python(self.dir, "0.35.0.dev20261117093000")
+        self.assertEqual(
+            (package / "pure.py").read_text(),
+            'def polyester():\n  import re\n\n  _VERSION = "0.35.0.dev20261117093000"\n'
+            '  _OTHER = "0.1.0"\n',
+        )
+        (package / "pure.py").write_text('_VERSION = "0.1.0"\n\ndef f():\n  _VERSION = "0.1.0"\n')
+        with self.assertRaisesRegex(dr.ReleaseError, "expected one _VERSION .*found 2"):
+            dr.stamp_python(self.dir, "0.35.0.dev1")
+
+    @unittest.skipUnless(ECOSYSTEM == "python", "Python package manifest")
+    def test_stamp_python_stamps_the_real_single_file_builders(self) -> None:
+        shutil.copy(ROOT / "pyproject.toml", self.dir)
+        package = self.dir / dr.python_package_dir(ROOT)
+        package.mkdir(parents=True)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "_version.py", package)
+        shutil.copy(ROOT / dr.python_package_dir(ROOT) / "pure.py", package)
+        before = (package / "pure.py").read_text().splitlines()
+        version = "0.35.0.dev20261117093000"
+        self.assertEqual(dr.stamp_python(self.dir, version)[-1], package / "pure.py")
+        after = (package / "pure.py").read_text().splitlines()
+        [(old, new)] = [(a, b) for a, b in zip(before, after, strict=True) if a != b]
+        self.assertEqual(new, f'{old.split("_VERSION")[0]}_VERSION = "{version}"')
+        spec = importlib.util.spec_from_file_location("stamped_pure", package / "pure.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.polyester.VERSION, version)
+
     @unittest.skipUnless(ECOSYSTEM == "rust", "Rust package manifest")
     def test_stamp_rust_changes_manifest_and_own_lock_entry(self) -> None:
         shutil.copy(ROOT / "Cargo.toml", self.dir)

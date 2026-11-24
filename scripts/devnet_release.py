@@ -351,12 +351,13 @@ def stamp_python(root: Path, version: str) -> list[Path]:
         raise ReleaseError(f"expected one __version__ in {package}, found {count}")
     package.write_text(stamped, encoding="utf-8")
     stamped_paths = [pyproject, package]
-    # The single-file request builders (pure.py) carry the version too.
+    # The single-file request builders (pure.py) carry the version too, as an
+    # indented _VERSION inside their factory function; keep that indent.
     pure = package.with_name("pure.py")
     if pure.exists():
         stamped, count = re.subn(
-            r'^_VERSION\s*=\s*"[^"]*"\s*$',
-            f'_VERSION = "{version}"',
+            r'^([ \t]*)_VERSION\s*=\s*"[^"]*"[ \t]*$',
+            lambda match: f'{match.group(1)}_VERSION = "{version}"',
             pure.read_text(encoding="utf-8"),
             flags=re.MULTILINE,
         )

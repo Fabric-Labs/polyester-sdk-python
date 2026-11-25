@@ -5,6 +5,7 @@ import hashlib
 import os
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, NoReturn
 from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
@@ -93,38 +94,77 @@ class _SigningTimestampAllocator:
         """
         return self._try_next()
 
-    async def next_async(self) -> int:
-        """Allocate with bounded, cooperative backpressure."""
+    async def next_async(self, time_left: Callable[[], float] | None = None) -> int:
+        """Allocate with bounded, cooperative backpressure.
+
+        The wait for capacity ends after ``_MAX_SIGNING_BACKPRESSURE_SECONDS``
+        with :class:`PolyesterRateLimitError`. ``time_left`` reads the seconds
+        left before a request's deadline from the request itself; once none is
+        left the wait ends with ``TimeoutError``, whether or not the cap came
+        first. A waiter that leaves, cancelled or out of time, takes no
+        timestamp.
+        """
+        loop = asyncio.get_running_loop()
+        cap_ends_at = loop.time() + _MAX_SIGNING_BACKPRESSURE_SECONDS
+
+        def out_of_time() -> Exception | None:
+            if time_left is not None and time_left() <= 0:
+                return TimeoutError("the request deadline passed before signing")
+            if loop.time() >= cap_ends_at:
+                return _SigningCapReached()
+            return None
+
+        if time_left is not None and time_left() <= 0:
+            raise TimeoutError("the request deadline passed before signing")
+        wait_seconds = _MAX_SIGNING_BACKPRESSURE_SECONDS
+        if time_left is not None:
+            wait_seconds = min(wait_seconds, time_left())
+        deadline_first = wait_seconds < _MAX_SIGNING_BACKPRESSURE_SECONDS
 
         async def allocate() -> int:
-            loop = asyncio.get_running_loop()
             gate = self._enter_async_gate(loop)
             try:
                 async with gate.lock:
                     while True:
                         try:
-                            return self._try_next()
+                            return self._try_next(out_of_time)
                         except PolyesterRateLimitError as exc:
                             await asyncio.sleep(exc.retry_after or 0.001)
             finally:
                 self._leave_async_gate(loop, gate)
 
+        # In the caller's own task, not asyncio.wait_for's: on Python 3.11
+        # wait_for runs it in a task of its own and, when that task finishes on
+        # the turn the caller is cancelled, returns its timestamp and drops the
+        # cancellation, so a cancelled request would still be signed and sent.
         try:
-            return await asyncio.wait_for(
-                allocate(),
-                timeout=_MAX_SIGNING_BACKPRESSURE_SECONDS,
-            )
-        except TimeoutError as exc:
+            async with asyncio.timeout(wait_seconds):
+                return await allocate()
+        except (TimeoutError, _SigningCapReached) as exc:
+            # The timeout's own expiry, or the check made when taking a timestamp.
+            if deadline_first or (time_left is not None and time_left() <= 0):
+                if isinstance(exc, TimeoutError):
+                    raise
+                raise TimeoutError("the request deadline passed before signing") from exc
             raise PolyesterRateLimitError(
                 "signing timestamp capacity exhausted; retry after clock advances",
                 retry_after=0.001,
             ) from exc
 
-    def _try_next(self) -> int:
+    def _try_next(self, out_of_time: Callable[[], Exception | None] | None = None) -> int:
+        """Take the next timestamp, or fail with retryable capacity backpressure.
+
+        ``out_of_time`` says why a waiter may no longer take one: it is checked
+        under the lock, right before the timestamp is taken, so a waiter whose
+        time ran out while it waited (a loop that resumed late, or another
+        thread holding the lock) raises its error and changes nothing.
+        """
         now = time.time_ns() // 1_000_000
         if now < 0:
             raise PolyesterTransportError("system clock is before UNIX_EPOCH")
         with self._lock:
+            if out_of_time is not None and (error := out_of_time()) is not None:
+                raise error
             candidate = max(now, self._last_timestamp_ms + 1)
             if candidate <= now + MAX_SIGNING_FUTURE_SKEW_MS:
                 self._last_timestamp_ms = candidate
@@ -134,6 +174,10 @@ class _SigningTimestampAllocator:
             "signing timestamp capacity exhausted; retry after clock advances",
             retry_after=wait_seconds,
         )
+
+
+class _SigningCapReached(Exception):
+    """A wait for signing capacity reached ``_MAX_SIGNING_BACKPRESSURE_SECONDS``."""
 
 
 _ALLOCATORS: dict[str, _SigningTimestampAllocator] = {}
@@ -348,8 +392,34 @@ async def sign_request_async(
 
     ``recv_window_ms`` works as for :func:`sign_request`.
     """
+    return await _sign_request_async(
+        credentials,
+        method=method,
+        url=url,
+        body=body,
+        timestamp_ms=timestamp_ms,
+        recv_window_ms=recv_window_ms,
+    )
+
+
+async def _sign_request_async(
+    credentials: ApiKeyCredentials,
+    *,
+    method: str,
+    url: str,
+    body: bytes,
+    timestamp_ms: str | None = None,
+    recv_window_ms: int | None = None,
+    time_left: Callable[[], float] | None = None,
+) -> dict[str, str]:
+    """:func:`sign_request_async` for a request with a deadline.
+
+    ``time_left`` reads the seconds left before the request's deadline (see
+    ``_SigningTimestampAllocator.next_async``); ``TimeoutError`` means it ran
+    out first, and nothing was signed.
+    """
     validate_recv_window_ms(recv_window_ms)
-    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async())
+    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async(time_left))
     return _sign_request_at_timestamp(
         credentials,
         method=method,

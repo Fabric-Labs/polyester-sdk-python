@@ -1,14 +1,31 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from functools import partial
 
+from connectrpc.code import Code
 from connectrpc.codec import Codec
+from connectrpc.errors import ConnectError
 from connectrpc.interceptor import UnaryInterceptor
 from connectrpc.request import RequestContext
 from google.protobuf.message import Message
 
-from polyester.auth import ApiKeyCredentials, sign_request_async
+from polyester.auth import ApiKeyCredentials, _sign_request_async
 from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
+
+# The request deadline the Connect protocol sends the server, in milliseconds.
+_CONNECT_TIMEOUT_HEADER = "connect-timeout-ms"
+
+
+def _seconds_left(ctx: RequestContext) -> float:
+    """The seconds left before the request's deadline, by its own clock."""
+    remaining_ms = ctx.timeout_ms()
+    return 0.0 if remaining_ms is None else remaining_ms / 1000
+
+
+def _deadline_exceeded() -> ConnectError:
+    """The error connectrpc raises when a request's deadline passes in flight."""
+    return ConnectError(Code.DEADLINE_EXCEEDED, "Request timed out")
 
 
 class UserAgentUnaryInterceptor(UnaryInterceptor):
@@ -25,7 +42,13 @@ class UserAgentUnaryInterceptor(UnaryInterceptor):
 
 
 class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
-    """Attach Polyester API-key headers to generated Connect unary calls."""
+    """Attach Polyester API-key headers to generated Connect unary calls.
+
+    The request's deadline starts before signing, so a wait for signing
+    capacity (see ``_SigningTimestampAllocator``) spends its time: the wait
+    ends at the deadline as the transport's own timeout does, before anything
+    is sent, and the server is given only the time that is left.
+    """
 
     def __init__(
         self,
@@ -49,12 +72,23 @@ class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
         info = ctx.method()
         url = f"{self._base_url}/{info.service_name}/{info.name}"
         body = self._codec.encode(request)
-        headers = await sign_request_async(
-            self._credentials,
-            method=ctx.http_method(),
-            url=url,
-            body=body,
-            recv_window_ms=self._recv_window_ms,
-        )
-        ctx.request_headers().update(headers)
+        try:
+            headers = await _sign_request_async(
+                self._credentials,
+                method=ctx.http_method(),
+                url=url,
+                body=body,
+                recv_window_ms=self._recv_window_ms,
+                time_left=None if ctx.timeout_ms() is None else partial(_seconds_left, ctx),
+            )
+        except TimeoutError as exc:
+            raise _deadline_exceeded() from exc
+        request_headers = ctx.request_headers()
+        request_headers.update(headers)
+        remaining_ms = ctx.timeout_ms()
+        if remaining_ms is not None:
+            if remaining_ms <= 0:
+                raise _deadline_exceeded()
+            if _CONNECT_TIMEOUT_HEADER in request_headers:
+                request_headers[_CONNECT_TIMEOUT_HEADER] = str(max(1, int(remaining_ms)))
         return await call_next(request, ctx)

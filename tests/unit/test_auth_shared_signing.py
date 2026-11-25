@@ -14,9 +14,12 @@ import gc
 import os
 import random
 import threading
+import time
 import types
 import uuid
 import weakref
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -28,6 +31,7 @@ from polyester.auth import (
     sign_request,
     sign_request_async,
 )
+from polyester.errors import PolyesterRateLimitError
 
 # An obviously fake Ed25519 seed (0xa0, 0xa1, ...).
 SYNTHETIC_SEED = bytes(range(0xA0, 0xC0))
@@ -276,3 +280,258 @@ def test_seeded_interleavings_of_independent_credentials(clock: FakeClock, seed:
     assert len(set(timestamps)) == expected
     assert min(timestamps) >= start_ms
     assert max(timestamps) <= clock.now_ms + MAX_SIGNING_FUTURE_SKEW_MS
+
+
+def _fill_signing_capacity(creds: ApiKeyCredentials) -> int:
+    """Take every timestamp the frozen clock allows; return the last one."""
+    allocator = creds._timestamp_allocator
+    while True:
+        try:
+            last = allocator.next()
+        except PolyesterRateLimitError:
+            return last
+
+
+def _deadline_in(seconds: float) -> Callable[[], float]:
+    """A request deadline ``seconds`` from now, read as the time left."""
+    end = time.monotonic() + seconds
+    return lambda: end - time.monotonic()
+
+
+async def test_a_request_deadline_bounds_the_capacity_wait(clock: FakeClock) -> None:
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    last = _fill_signing_capacity(creds)
+    assert last == clock.now_ms + MAX_SIGNING_FUTURE_SKEW_MS
+
+    # The frozen clock never frees capacity, so only the deadline ends the wait;
+    # the allocator's own cap would end it after ten seconds.
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    with pytest.raises(TimeoutError):
+        await allocator.next_async(_deadline_in(0.05))
+    assert loop.time() - started < 2.0
+    # The expired waiter left the queue and took no timestamp.
+    assert not allocator._async_gates
+    clock.advance(1)
+    assert await allocator.next_async(_deadline_in(1.0)) == last + 1
+
+
+async def test_an_expired_deadline_takes_no_timestamp(clock: FakeClock) -> None:
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    with pytest.raises(TimeoutError):
+        await allocator.next_async(lambda: 0.0)
+    with pytest.raises(TimeoutError):
+        await allocator.next_async(lambda: -0.001)
+    assert not allocator._async_gates
+    assert await allocator.next_async(_deadline_in(1.0)) == clock.now_ms
+
+
+async def test_the_capacity_cap_still_ends_a_longer_deadline(
+    clock: FakeClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(auth_module, "_MAX_SIGNING_BACKPRESSURE_SECONDS", 0.05)
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    _fill_signing_capacity(creds)
+    with pytest.raises(PolyesterRateLimitError):
+        await allocator.next_async(_deadline_in(5.0))
+    assert not allocator._async_gates
+
+
+@pytest.mark.parametrize("cancelled", [0, 1], ids=["holder", "queued"])
+async def test_a_cancelled_waiter_leaves_the_queue_without_a_timestamp(
+    clock: FakeClock, cancelled: int
+) -> None:
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    last = _fill_signing_capacity(creds)
+    loop = asyncio.get_running_loop()
+
+    # The first waiter holds the loop's gate and retries; the others queue on it.
+    waiters = [asyncio.create_task(allocator.next_async(_deadline_in(5.0))) for _ in range(3)]
+    # Yield until all three wait; how many turns that takes varies by version.
+    for _ in range(100):
+        gate = allocator._async_gates.get(loop)
+        if gate is not None and gate.users == 3:
+            break
+        await asyncio.sleep(0)
+    assert gate is not None and gate.users == 3
+
+    waiters[cancelled].cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiters[cancelled]
+    assert gate.users == 2
+
+    clock.advance(2)
+    remaining = [task for index, task in enumerate(waiters) if index != cancelled]
+    assert await asyncio.gather(*remaining) == [last + 1, last + 2]
+    assert not allocator._async_gates
+
+
+class _SteppedLoop(asyncio.SelectorEventLoop):
+    """An event loop whose clock the test moves forward."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.offset = 0.0
+
+    def time(self) -> float:
+        return super().time() + self.offset
+
+
+def test_a_waiter_resumed_past_its_deadline_takes_no_timestamp(clock: FakeClock) -> None:
+    """A loop that resumes late runs a waiter's retry and its timeout together.
+
+    One timestamp is freed, then the request's and the loop's clocks move past
+    the waiter's 100 ms deadline, so its 1 ms retry and its timeout are due on
+    the same turn. The retry must not take the timestamp: the request is out of time,
+    and the waiter queued behind it needs that timestamp.
+    """
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    last = _fill_signing_capacity(creds)
+    loop = _SteppedLoop()
+    try:
+        # The request's own clock: 100 ms left until the test moves it.
+        left = [0.1]
+
+        async def queue() -> tuple[asyncio.Future[int], asyncio.Future[int]]:
+            urgent = asyncio.ensure_future(allocator.next_async(lambda: left[0]))
+            patient = asyncio.ensure_future(allocator.next_async(_deadline_in(5.0)))
+            # The urgent waiter holds the gate and sleeps between retries.
+            for _ in range(100):
+                gate = allocator._async_gates.get(asyncio.get_running_loop())
+                if gate is not None and gate.users == 2:
+                    break
+                await asyncio.sleep(0)
+            return urgent, patient
+
+        urgent, patient = loop.run_until_complete(queue())
+        clock.advance(1)
+        left[0] -= 0.2
+        loop.offset += 0.2
+        with pytest.raises(TimeoutError):
+            loop.run_until_complete(urgent)
+        assert loop.run_until_complete(patient) == last + 1
+        assert not allocator._async_gates
+    finally:
+        loop.close()
+
+
+def _queue_one_waiter(
+    loop: _SteppedLoop, allocator: auth_module._SigningTimestampAllocator, left: list[float]
+) -> asyncio.Future[int]:
+    """Start a waiter whose request has ``left[0]`` seconds left; return it waiting."""
+
+    async def queue() -> asyncio.Future[int]:
+        waiter = asyncio.ensure_future(allocator.next_async(lambda: left[0]))
+        for _ in range(100):
+            gate = allocator._async_gates.get(asyncio.get_running_loop())
+            if gate is not None and gate.users == 1:
+                break
+            await asyncio.sleep(0)
+        return waiter
+
+    return loop.run_until_complete(queue())
+
+
+def test_a_waiter_resumed_past_its_deadline_and_the_cap_takes_no_timestamp(
+    clock: FakeClock,
+) -> None:
+    """A deadline longer than the ten-second cap is still the request's to end."""
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    last = _fill_signing_capacity(creds)
+    loop = _SteppedLoop()
+    left = [10.1]
+    try:
+        waiter = _queue_one_waiter(loop, allocator, left)
+        clock.advance(1)
+        left[0] -= 10.2
+        loop.offset += 10.2
+        with pytest.raises(TimeoutError):
+            loop.run_until_complete(waiter)
+        assert not allocator._async_gates
+    finally:
+        loop.close()
+    assert allocator._last_timestamp_ms == last
+    assert allocator.next() == last + 1
+
+
+def test_a_waiter_past_the_cap_with_time_left_takes_no_timestamp(clock: FakeClock) -> None:
+    """The cap ends the wait as capacity backpressure while the request has time."""
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    last = _fill_signing_capacity(creds)
+    loop = _SteppedLoop()
+    left = [60.0]
+    try:
+        waiter = _queue_one_waiter(loop, allocator, left)
+        clock.advance(1)
+        left[0] -= 10.2
+        loop.offset += 10.2
+        with pytest.raises(PolyesterRateLimitError):
+            loop.run_until_complete(waiter)
+        assert not allocator._async_gates
+    finally:
+        loop.close()
+    assert allocator._last_timestamp_ms == last
+    assert allocator.next() == last + 1
+
+
+class _HeldLock:
+    """The allocator's lock, held by another thread at one acquisition."""
+
+    def __init__(self, inner: Any, held_at: int) -> None:
+        self._inner = inner
+        self._held_at = held_at
+        self._acquisitions = 0
+        self.reached = threading.Event()
+        self.release = threading.Event()
+
+    def __enter__(self) -> Any:
+        self._acquisitions += 1
+        if self._acquisitions == self._held_at:
+            self.reached.set()
+            assert self.release.wait(5)
+        return self._inner.__enter__()
+
+    def __exit__(self, *exc: Any) -> Any:
+        return self._inner.__exit__(*exc)
+
+
+def test_a_request_out_of_time_while_the_lock_is_held_takes_no_timestamp(
+    clock: FakeClock,
+) -> None:
+    """The deadline passes while another thread holds the allocator's lock.
+
+    The waiter has time when it starts and when it takes its turn at the gate;
+    its deadline passes while it waits for the allocator's lock, which the
+    timestamp is taken under (its second acquisition, after the gate's).
+    """
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    before = allocator._last_timestamp_ms
+    held = _HeldLock(allocator._lock, held_at=2)
+    allocator._lock = held  # type: ignore[assignment]
+    left = [1.0]
+    outcome: list[BaseException | int] = []
+
+    def sign() -> None:
+        try:
+            outcome.append(asyncio.run(allocator.next_async(lambda: left[0])))
+        except BaseException as exc:
+            outcome.append(exc)
+
+    worker = threading.Thread(target=sign)
+    worker.start()
+    assert held.reached.wait(5)
+    left[0] = -0.001
+    held.release.set()
+    worker.join(5)
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], TimeoutError), outcome
+    assert allocator._last_timestamp_ms == before
+    assert not allocator._async_gates

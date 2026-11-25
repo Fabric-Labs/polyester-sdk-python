@@ -53,6 +53,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_DUST_BALANCE_CHANGED: _ClassVar[ErrorCode]
     ERROR_CODE_DUST_CONVERSION_FAILED: _ClassVar[ErrorCode]
     ERROR_CODE_BATCH_TOO_MANY_SOURCES: _ClassVar[ErrorCode]
+    ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED: _ClassVar[ErrorCode]
 
 class InternalTransferStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -67,6 +68,7 @@ class InternalTransferBatchStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrap
     BATCH_REFUSED: _ClassVar[InternalTransferBatchStatus]
     BATCH_PROCESSING: _ClassVar[InternalTransferBatchStatus]
     BATCH_ACCEPTED: _ClassVar[InternalTransferBatchStatus]
+    BATCH_ABANDONED: _ClassVar[InternalTransferBatchStatus]
 
 class InternalTransferBatchLegStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -112,6 +114,7 @@ ERROR_CODE_DUST_TARGET_UNAVAILABLE: ErrorCode
 ERROR_CODE_DUST_BALANCE_CHANGED: ErrorCode
 ERROR_CODE_DUST_CONVERSION_FAILED: ErrorCode
 ERROR_CODE_BATCH_TOO_MANY_SOURCES: ErrorCode
+ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED: ErrorCode
 INTERNAL_TRANSFER_STATUS_UNSPECIFIED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_ACCEPTED: InternalTransferStatus
 INTERNAL_TRANSFER_STATUS_REJECTED: InternalTransferStatus
@@ -120,6 +123,7 @@ BATCH_STATUS_UNSPECIFIED: InternalTransferBatchStatus
 BATCH_REFUSED: InternalTransferBatchStatus
 BATCH_PROCESSING: InternalTransferBatchStatus
 BATCH_ACCEPTED: InternalTransferBatchStatus
+BATCH_ABANDONED: InternalTransferBatchStatus
 LEG_STATUS_UNSPECIFIED: InternalTransferBatchLegStatus
 LEG_PROCESSING: InternalTransferBatchLegStatus
 LEG_CREDITED: InternalTransferBatchLegStatus
@@ -252,6 +256,22 @@ class GetInternalTransferBatchRequest(_message.Message):
     def __init__(self, request_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
 
 class GetInternalTransferBatchResponse(_message.Message):
+    __slots__ = ("request_id", "status", "legs")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    LEGS_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    status: InternalTransferBatchStatus
+    legs: _containers.RepeatedCompositeFieldContainer[InternalTransferBatchLegResult]
+    def __init__(self, request_id: _Optional[str] = ..., status: _Optional[_Union[InternalTransferBatchStatus, str]] = ..., legs: _Optional[_Iterable[_Union[InternalTransferBatchLegResult, _Mapping]]] = ...) -> None: ...
+
+class AbandonInternalTransferBatchRequest(_message.Message):
+    __slots__ = ("idempotency_key",)
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    idempotency_key: str
+    def __init__(self, idempotency_key: _Optional[str] = ...) -> None: ...
+
+class AbandonInternalTransferBatchResponse(_message.Message):
     __slots__ = ("request_id", "status", "legs")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]

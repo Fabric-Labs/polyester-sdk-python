@@ -99,36 +99,35 @@ class _SigningTimestampAllocator:
 
         The wait for capacity ends after ``_MAX_SIGNING_BACKPRESSURE_SECONDS``
         with :class:`PolyesterRateLimitError`. ``time_left`` reads the seconds
-        left before a request's deadline from the request itself; when less is
-        left than that cap, the deadline ends the wait instead, with
-        ``TimeoutError``. A waiter that leaves, cancelled or out of time, takes
-        no timestamp.
+        left before a request's deadline from the request itself; once none is
+        left the wait ends with ``TimeoutError``, whether or not the cap came
+        first. A waiter that leaves, cancelled or out of time, takes no
+        timestamp.
         """
         loop = asyncio.get_running_loop()
-        deadline_left: Callable[[], float] | None = None
+        cap_ends_at = loop.time() + _MAX_SIGNING_BACKPRESSURE_SECONDS
+
+        def out_of_time() -> Exception | None:
+            if time_left is not None and time_left() <= 0:
+                return TimeoutError("the request deadline passed before signing")
+            if loop.time() >= cap_ends_at:
+                return _SigningCapReached()
+            return None
+
+        if time_left is not None and time_left() <= 0:
+            raise TimeoutError("the request deadline passed before signing")
         wait_seconds = _MAX_SIGNING_BACKPRESSURE_SECONDS
         if time_left is not None:
-            left = time_left()
-            if left < _MAX_SIGNING_BACKPRESSURE_SECONDS:
-                if left <= 0:
-                    raise TimeoutError("the request deadline passed before signing")
-                deadline_left = time_left
-                wait_seconds = left
+            wait_seconds = min(wait_seconds, time_left())
+        deadline_first = wait_seconds < _MAX_SIGNING_BACKPRESSURE_SECONDS
 
         async def allocate() -> int:
             gate = self._enter_async_gate(loop)
             try:
                 async with gate.lock:
                     while True:
-                        # The request's deadline decides, checked just before a
-                        # timestamp is taken: a loop that resumes late can run
-                        # this retry after the deadline passed but before
-                        # wait_for acts on it, and Python 3.11's wait_for then
-                        # returns what the retry took.
-                        if deadline_left is not None and deadline_left() <= 0:
-                            raise TimeoutError("the request deadline passed before signing")
                         try:
-                            return self._try_next()
+                            return self._try_next(out_of_time)
                         except PolyesterRateLimitError as exc:
                             await asyncio.sleep(exc.retry_after or 0.001)
             finally:
@@ -136,19 +135,31 @@ class _SigningTimestampAllocator:
 
         try:
             return await asyncio.wait_for(allocate(), timeout=wait_seconds)
-        except TimeoutError as exc:
-            if deadline_left is not None:
-                raise
+        except (TimeoutError, _SigningCapReached) as exc:
+            # wait_for's own expiry, or the check made when taking a timestamp.
+            if deadline_first or (time_left is not None and time_left() <= 0):
+                if isinstance(exc, TimeoutError):
+                    raise
+                raise TimeoutError("the request deadline passed before signing") from exc
             raise PolyesterRateLimitError(
                 "signing timestamp capacity exhausted; retry after clock advances",
                 retry_after=0.001,
             ) from exc
 
-    def _try_next(self) -> int:
+    def _try_next(self, out_of_time: Callable[[], Exception | None] | None = None) -> int:
+        """Take the next timestamp, or fail with retryable capacity backpressure.
+
+        ``out_of_time`` says why a waiter may no longer take one: it is checked
+        under the lock, right before the timestamp is taken, so a waiter whose
+        time ran out while it waited (a loop that resumed late, or another
+        thread holding the lock) raises its error and changes nothing.
+        """
         now = time.time_ns() // 1_000_000
         if now < 0:
             raise PolyesterTransportError("system clock is before UNIX_EPOCH")
         with self._lock:
+            if out_of_time is not None and (error := out_of_time()) is not None:
+                raise error
             candidate = max(now, self._last_timestamp_ms + 1)
             if candidate <= now + MAX_SIGNING_FUTURE_SKEW_MS:
                 self._last_timestamp_ms = candidate
@@ -158,6 +169,10 @@ class _SigningTimestampAllocator:
             "signing timestamp capacity exhausted; retry after clock advances",
             retry_after=wait_seconds,
         )
+
+
+class _SigningCapReached(Exception):
+    """A wait for signing capacity reached ``_MAX_SIGNING_BACKPRESSURE_SECONDS``."""
 
 
 _ALLOCATORS: dict[str, _SigningTimestampAllocator] = {}

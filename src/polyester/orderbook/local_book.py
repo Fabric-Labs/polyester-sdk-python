@@ -29,10 +29,13 @@ def levels_from_proto_levels(
     price_attr: str = "price_ticks",
     qty_attr: str = "qty_scaled",
 ) -> BookSide:
+    from polyester.codecs.decode.invariants import qty_scaled_from_response
+
     book: BookSide = {}
     for level in levels or []:
+        # A negative quantity is corrupt, not a missing one.
+        qty = qty_scaled_from_response(getattr(level, qty_attr), field=f"PriceLevel.{qty_attr}")
         price = int(getattr(level, price_attr))
-        qty = int(getattr(level, qty_attr))
         if price <= 0:
             raise PolyesterValidationError("orderbook level has invalid or missing price")
         if qty <= 0:

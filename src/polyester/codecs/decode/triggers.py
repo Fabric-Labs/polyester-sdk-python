@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from polyester.codecs.decode.common import require_id
-from polyester.codecs.decode.invariants import paired_ts_ns, ts_ns_string_from_response
+from polyester.codecs.decode.invariants import (
+    paired_ts_ns,
+    qty_scaled_from_response,
+    ts_ns_string_from_response,
+)
 from polyester.codecs.decode.orders import (
     OrderScales,
     PairSymbols,
@@ -188,7 +192,9 @@ def _trigger_details(
                 # Match Rust/TS: only surface executed qty when the wire value is set.
                 executed_qty=(
                     Quantity.from_scaled(
-                        executed_scaled,
+                        qty_scaled_from_response(
+                            executed_scaled, field="Trigger.twap_state.executed_qty_scaled"
+                        ),
                         scale=quantity_scale,
                         symbol=symbol,
                         symbol_id=symbol_id,
@@ -218,7 +224,9 @@ def _trigger_details(
                 outcome=_ladder_outcome(int(ladder.outcome)),
                 executed_qty=(
                     Quantity.from_scaled(
-                        executed_scaled,
+                        qty_scaled_from_response(
+                            executed_scaled, field="Trigger.ladder_state.executed_qty_scaled"
+                        ),
                         scale=quantity_scale,
                         symbol=symbol,
                         symbol_id=symbol_id,
@@ -386,7 +394,7 @@ def trigger_from_proto(
         order_type=cfg.order_type,
         time_in_force=cfg.time_in_force,
         qty=Quantity.from_scaled(
-            int(msg.qty_scaled),
+            qty_scaled_from_response(msg.qty_scaled, field="Trigger.qty_scaled"),
             scale=quantity_scale,
             symbol=symbol or None,
             symbol_id=int(msg.symbol_id),

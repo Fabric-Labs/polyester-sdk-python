@@ -10,6 +10,7 @@ from google.protobuf.message import Message
 
 from polyester.codecs.decode.balances import ledger_amount
 from polyester.codecs.decode.invariants import (
+    qty_scaled_from_response,
     ts_ns_string_from_response,
 )
 from polyester.codecs.decode.lifecycle import (
@@ -260,7 +261,10 @@ def decode_market_trade(
         is_buy=bool(_field(data, "isBuy", "is_buy", default=False)),
         price=Price.from_ticks(int(price_raw), symbol=symbol) if int(price_raw) else None,
         qty=Quantity.from_scaled(
-            int(qty_raw), scale=quantity_scale, symbol=symbol, symbol_id=symbol_id
+            qty_scaled_from_response(qty_raw, field="MarketTrade.qty_scaled"),
+            scale=quantity_scale,
+            symbol=symbol,
+            symbol_id=symbol_id,
         ),
         ts_ns=ts_ns_string_from_response(
             _field(data, "tsNs", "ts_ns", default=0) or 0,
@@ -374,14 +378,16 @@ def decode_market_overview_entry(data: dict[str, Any]) -> MarketOverviewEntry:
         return Price.from_ticks(value, symbol=symbol or None) if value else None
 
     def book_side(side: str) -> tuple[Price | None, Quantity | None]:
-        # An empty side sends neither its price nor its quantity.
+        # An empty side sends neither its price nor its quantity. A negative
+        # quantity is refused whether or not the side has a price.
+        scaled = qty_scaled_from_response(
+            _field(data, f"best{side.title()}QtyScaled", f"best_{side}_qty_scaled", default=0) or 0,
+            field=f"MarketOverview.best_{side}_qty_scaled",
+        )
         best = price(f"best{side.title()}Ticks", f"best_{side}_ticks")
         if best is None:
             return None, None
-        scaled = _field(data, f"best{side.title()}QtyScaled", f"best_{side}_qty_scaled", default=0)
-        return best, Quantity.from_scaled(
-            int(scaled or 0), symbol=symbol or None, symbol_id=symbol_id
-        )
+        return best, Quantity.from_scaled(scaled, symbol=symbol or None, symbol_id=symbol_id)
 
     def ts_ns(*keys: str) -> str:
         return ts_ns_string_from_response(
@@ -780,7 +786,9 @@ def decode_trigger(data: dict[str, Any]) -> Trigger:
         )
     symbol = str(_field(data, "symbol", default="") or "")
     symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
-    qty_raw = int(_field(data, "qtyScaled", "qty_scaled", default=0) or 0)
+    qty_raw = qty_scaled_from_response(
+        _field(data, "qtyScaled", "qty_scaled", default=0) or 0, field="Trigger.qty_scaled"
+    )
     return Trigger(
         trigger_id=_id_str(_field(data, "triggerId", "trigger_id")),
         symbol_id=symbol_id,

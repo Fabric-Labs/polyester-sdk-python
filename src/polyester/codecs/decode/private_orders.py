@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from polyester.codecs.decode.invariants import qty_scaled_from_response
 from polyester.codecs.decode.orders import (
     OrderScales,
     PairSymbols,
@@ -54,7 +55,10 @@ def _fill_from_proto(
         ordinal=int(msg.ordinal),
         role=proto_enum_name(private_ws_pb2.Fill.Role, msg.role),
         qty=Quantity.from_scaled(
-            int(msg.qty_scaled), scale=quantity_scale, symbol=symbol, symbol_id=symbol_id or None
+            qty_scaled_from_response(msg.qty_scaled, field="OrderEvent.fill.qty_scaled"),
+            scale=quantity_scale,
+            symbol=symbol,
+            symbol_id=symbol_id or None,
         ),
         price=Price.from_ticks(int(msg.price_ticks), symbol=symbol) if msg.price_ticks else None,
     )

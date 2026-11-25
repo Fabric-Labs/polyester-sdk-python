@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from polyester.codecs.decode.invariants import qty_scaled_from_response
 from polyester.codecs.orderbook import require_served_tier
 from polyester.codecs.proto_helpers import optional_timestamp
 from polyester.gen.orderbook.v1 import orderbook_pb2
@@ -16,7 +17,9 @@ def orderbook_level_from_proto(
 ) -> OrderbookLevel:
     return format_orderbook_level(
         price_ticks=int(msg.price_ticks),
-        qty_scaled=int(msg.qty_scaled),
+        # A negative quantity is corrupt, not a missing one: refuse it before
+        # the level's own checks refuse an omitted (0) price or quantity.
+        qty_scaled=qty_scaled_from_response(msg.qty_scaled, field="PriceLevel.qty_scaled"),
         quantity_scale=quantity_scale,
         symbol=symbol,
         symbol_id=symbol_id,

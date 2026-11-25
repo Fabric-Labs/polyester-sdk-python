@@ -204,10 +204,10 @@ def test_orderbook_omitted_level_quantity_is_still_missing() -> None:
     ("message", "field"),
     [
         (
-            orders_read_pb2.Order(order_id=1, symbol_id=3, orig_qty_scaled=-1),
+            orders_read_pb2.Order(order_id=1, symbol_id=7, orig_qty_scaled=-1),
             "Order.orig_qty_scaled",
         ),
-        (triggers_pb2.Trigger(trigger_id=1, symbol_id=3, qty_scaled=-1), "Trigger.qty_scaled"),
+        (triggers_pb2.Trigger(trigger_id=1, symbol_id=7, qty_scaled=-1), "Trigger.qty_scaled"),
     ],
 )
 def test_restricted_runtime_decoders_name_the_field(message: Any, field: str) -> None:

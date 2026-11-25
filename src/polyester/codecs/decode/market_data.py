@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from polyester.codecs.decode.invariants import ts_ns_string_from_response
+from polyester.codecs.decode.invariants import qty_scaled_from_response, ts_ns_string_from_response
 from polyester.codecs.proto_helpers import proto_enum_name
 from polyester.codecs.scalars import format_price_ticks, format_qty_scaled
 from polyester.errors import PolyesterTransportError, PolyesterValidationError
@@ -61,7 +61,10 @@ def market_trade_from_proto(
         is_buy=bool(msg.is_buy),
         price=Price.from_ticks(int(msg.price_ticks), symbol=symbol),
         qty=Quantity.from_scaled(
-            int(msg.qty_scaled), scale=quantity_scale, symbol=symbol, symbol_id=symbol_id
+            qty_scaled_from_response(msg.qty_scaled, field="MarketTrade.qty_scaled"),
+            scale=quantity_scale,
+            symbol=symbol,
+            symbol_id=symbol_id,
         ),
         ts_ns=ts_ns_string_from_response(
             msg.ts_ns,

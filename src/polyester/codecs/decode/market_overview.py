@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from polyester.catalogs import CatalogManager
-from polyester.codecs.decode.invariants import ts_ns_string_from_response
+from polyester.codecs.decode.invariants import qty_scaled_from_response, ts_ns_string_from_response
 from polyester.codecs.proto_helpers import has_field, proto_enum_name
 from polyester.codecs.scalars import format_qty_scaled
 from polyester.gen.marketdata.v1 import marketdata_pb2
@@ -54,13 +54,16 @@ def _book_side(
     scale: int | None,
     symbol: str | None,
     symbol_id: int,
+    field: str,
 ) -> tuple[Price | None, Quantity | None]:
     """The best price of one book side and the base quantity at it; both
-    ``None`` when that side is empty."""
+    ``None`` when that side is empty. A negative quantity is refused whether
+    or not the side has a price."""
+    scaled = qty_scaled_from_response(qty_scaled, field=field)
     if not ticks:
         return None, None
     return Price.from_ticks(int(ticks), symbol=symbol), Quantity.from_scaled(
-        int(qty_scaled), scale=scale, symbol=symbol, symbol_id=symbol_id
+        scaled, scale=scale, symbol=symbol, symbol_id=symbol_id
     )
 
 
@@ -131,6 +134,7 @@ def market_overview_entry_from_proto(
         scale=base_scale,
         symbol=symbol or None,
         symbol_id=symbol_id,
+        field="MarketOverview.best_bid_qty_scaled",
     )
     best_ask, best_ask_qty = _book_side(
         msg.best_ask_ticks,
@@ -138,6 +142,7 @@ def market_overview_entry_from_proto(
         scale=base_scale,
         symbol=symbol or None,
         symbol_id=symbol_id,
+        field="MarketOverview.best_ask_qty_scaled",
     )
     return MarketOverviewEntry(
         symbol_id=symbol_id,

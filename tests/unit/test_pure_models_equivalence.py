@@ -290,7 +290,7 @@ def test_values_are_bound_to_the_market() -> None:
         ({}, "BTC-USDT", "market must be a GetSpotConfig pair dict, not str"),
         ({"expireAt": "2026-11-24T12:00:00+01:00"}, None, "timestamp must be an RFC 3339 UTC"),
         ({"priceTicks": "-1"}, None, "ticks must be non-negative"),
-        ({"cumQtyScaled": "-1"}, None, "scaled must be non-negative"),
+        ({"cumQtyScaled": "-1"}, None, "Order.cum_qty_scaled: negative quantity -1"),
     ],
 )
 def test_refusals(data: Any, market: Any, message: str) -> None:

@@ -55,3 +55,18 @@ def paired_ts_ns(msg: Any, ts_ns_field: str, ts_field: str) -> int | None:
     ts = getattr(msg, ts_field)
     nanos = int(ts.seconds) * 1_000_000_000 + int(ts.nanos)
     return nanos if nanos > 0 else None
+
+
+def qty_scaled_from_response(value: Any, *, field: str) -> int:
+    """A quantity's scaled wire value, such as ``Order.orig_qty_scaled``.
+
+    0 is a zero quantity: a plain proto3 quantity the wire omits is 0 too. A
+    negative value, which no quantity can be, breaks the response contract:
+    it raises :class:`PolyesterResponseContractError` whose ``context`` is
+    ``field``, never the :class:`~polyester.errors.PolyesterValidationError`
+    of a caller's own bad input.
+    """
+    scaled = int(value)
+    if scaled < 0:
+        raise PolyesterResponseContractError(field, f"negative quantity {scaled}")
+    return scaled

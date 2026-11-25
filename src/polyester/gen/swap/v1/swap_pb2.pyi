@@ -28,6 +28,8 @@ class SwapStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PARTIALLY_COMPLETED: _ClassVar[SwapStatus]
     FAILED: _ClassVar[SwapStatus]
     RECONCILING: _ClassVar[SwapStatus]
+    CANCELING: _ClassVar[SwapStatus]
+    CANCELED: _ClassVar[SwapStatus]
 
 class SwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -42,6 +44,7 @@ class SwapReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MINIMUM_NOT_MET: _ClassVar[SwapReason]
     MAX_ORDER_QUANTITY: _ClassVar[SwapReason]
     INTERMEDIATE_BELOW_MINIMUM: _ClassVar[SwapReason]
+    USER_CANCELED: _ClassVar[SwapReason]
 
 class SwapOrderStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -68,6 +71,8 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SWAP_NOT_PERMITTED: _ClassVar[ErrorCode]
     SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
     DIRECTION_UNSUPPORTED: _ClassVar[ErrorCode]
+    SWAP_ALREADY_FINAL: _ClassVar[ErrorCode]
+    SWAP_NOT_CANCELABLE: _ClassVar[ErrorCode]
 SIDE_UNSPECIFIED: Side
 BUY: Side
 SELL: Side
@@ -77,6 +82,8 @@ COMPLETED: SwapStatus
 PARTIALLY_COMPLETED: SwapStatus
 FAILED: SwapStatus
 RECONCILING: SwapStatus
+CANCELING: SwapStatus
+CANCELED: SwapStatus
 REASON_UNSPECIFIED: SwapReason
 INSUFFICIENT_BALANCE: SwapReason
 PRICE_PROTECTION: SwapReason
@@ -88,6 +95,7 @@ EXPIRED: SwapReason
 MINIMUM_NOT_MET: SwapReason
 MAX_ORDER_QUANTITY: SwapReason
 INTERMEDIATE_BELOW_MINIMUM: SwapReason
+USER_CANCELED: SwapReason
 ORDER_STATUS_UNSPECIFIED: SwapOrderStatus
 PLACING: SwapOrderStatus
 PLACED: SwapOrderStatus
@@ -108,6 +116,8 @@ SUBACCOUNT_INACTIVE: ErrorCode
 SWAP_NOT_PERMITTED: ErrorCode
 SERVICE_UNAVAILABLE: ErrorCode
 DIRECTION_UNSUPPORTED: ErrorCode
+SWAP_ALREADY_FINAL: ErrorCode
+SWAP_NOT_CANCELABLE: ErrorCode
 
 class SwapTerms(_message.Message):
     __slots__ = ("subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18", "execution")
@@ -255,6 +265,7 @@ class SwapSlice(_message.Message):
         REFUSED: _ClassVar[SwapSlice.Reason]
         INSUFFICIENT_LIQUIDITY: _ClassVar[SwapSlice.Reason]
         EXECUTION_ENDED: _ClassVar[SwapSlice.Reason]
+        CANCELED: _ClassVar[SwapSlice.Reason]
     SLICE_REASON_UNSPECIFIED: SwapSlice.Reason
     SLOT_MISSED: SwapSlice.Reason
     DEADLINE_REACHED: SwapSlice.Reason
@@ -265,6 +276,7 @@ class SwapSlice(_message.Message):
     REFUSED: SwapSlice.Reason
     INSUFFICIENT_LIQUIDITY: SwapSlice.Reason
     EXECUTION_ENDED: SwapSlice.Reason
+    CANCELED: SwapSlice.Reason
     INDEX_FIELD_NUMBER: _ClassVar[int]
     PLANNED_AT_FIELD_NUMBER: _ClassVar[int]
     EXECUTED_AT_FIELD_NUMBER: _ClassVar[int]
@@ -308,7 +320,7 @@ class SwapProgress(_message.Message):
     def __init__(self, completed_slices: _Optional[int] = ..., total_slices: _Optional[int] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deadline: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., slices: _Optional[_Iterable[_Union[SwapSlice, _Mapping]]] = ..., slices_truncated: _Optional[bool] = ...) -> None: ...
 
 class Swap(_message.Message):
-    __slots__ = ("swap_id", "idempotency_key", "subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18", "min_amount_out_e18", "status", "reason", "is_terminal", "executed_amount_e18", "unspent_amount_e18", "received_amount_e18", "orders", "created_at", "execution", "intermediate_asset_id", "intermediate_remainder_e18", "legs", "progress")
+    __slots__ = ("swap_id", "idempotency_key", "subaccount_id", "source_asset_id", "destination_asset_id", "amount_e18", "min_amount_out_e18", "status", "reason", "is_terminal", "executed_amount_e18", "unspent_amount_e18", "received_amount_e18", "orders", "created_at", "execution", "intermediate_asset_id", "intermediate_remainder_e18", "legs", "progress", "cancel_requested_at")
     SWAP_ID_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
@@ -329,6 +341,7 @@ class Swap(_message.Message):
     INTERMEDIATE_REMAINDER_E18_FIELD_NUMBER: _ClassVar[int]
     LEGS_FIELD_NUMBER: _ClassVar[int]
     PROGRESS_FIELD_NUMBER: _ClassVar[int]
+    CANCEL_REQUESTED_AT_FIELD_NUMBER: _ClassVar[int]
     swap_id: int
     idempotency_key: str
     subaccount_id: int
@@ -349,7 +362,8 @@ class Swap(_message.Message):
     intermediate_remainder_e18: _u128_pb2.U128
     legs: _containers.RepeatedCompositeFieldContainer[SwapLeg]
     progress: SwapProgress
-    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., source_asset_id: _Optional[int] = ..., destination_asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., min_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., status: _Optional[_Union[SwapStatus, str]] = ..., reason: _Optional[_Union[SwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., executed_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., unspent_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., orders: _Optional[_Iterable[_Union[SwapOrder, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., execution: _Optional[_Union[Execution, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., intermediate_remainder_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[SwapLeg, _Mapping]]] = ..., progress: _Optional[_Union[SwapProgress, _Mapping]] = ...) -> None: ...
+    cancel_requested_at: _timestamp_pb2.Timestamp
+    def __init__(self, swap_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., source_asset_id: _Optional[int] = ..., destination_asset_id: _Optional[int] = ..., amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., min_amount_out_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., status: _Optional[_Union[SwapStatus, str]] = ..., reason: _Optional[_Union[SwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., executed_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., unspent_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., received_amount_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., orders: _Optional[_Iterable[_Union[SwapOrder, _Mapping]]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., execution: _Optional[_Union[Execution, _Mapping]] = ..., intermediate_asset_id: _Optional[int] = ..., intermediate_remainder_e18: _Optional[_Union[_u128_pb2.U128, _Mapping]] = ..., legs: _Optional[_Iterable[_Union[SwapLeg, _Mapping]]] = ..., progress: _Optional[_Union[SwapProgress, _Mapping]] = ..., cancel_requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class QuoteSwapRequest(_message.Message):
     __slots__ = ("terms", "max_slippage_bps")
@@ -396,6 +410,38 @@ class GetSwapResponse(_message.Message):
     SWAP_FIELD_NUMBER: _ClassVar[int]
     swap: Swap
     def __init__(self, swap: _Optional[_Union[Swap, _Mapping]] = ...) -> None: ...
+
+class CancelSwapRequest(_message.Message):
+    __slots__ = ("swap_id",)
+    SWAP_ID_FIELD_NUMBER: _ClassVar[int]
+    swap_id: int
+    def __init__(self, swap_id: _Optional[int] = ...) -> None: ...
+
+class CancelSwapResponse(_message.Message):
+    __slots__ = ("swap",)
+    SWAP_FIELD_NUMBER: _ClassVar[int]
+    swap: Swap
+    def __init__(self, swap: _Optional[_Union[Swap, _Mapping]] = ...) -> None: ...
+
+class ListSwapsRequest(_message.Message):
+    __slots__ = ("subaccount_id", "open_only", "limit", "page_token")
+    SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
+    OPEN_ONLY_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    subaccount_id: int
+    open_only: bool
+    limit: int
+    page_token: str
+    def __init__(self, subaccount_id: _Optional[int] = ..., open_only: _Optional[bool] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
+
+class ListSwapsResponse(_message.Message):
+    __slots__ = ("swaps", "next_page_token")
+    SWAPS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    swaps: _containers.RepeatedCompositeFieldContainer[Swap]
+    next_page_token: str
+    def __init__(self, swaps: _Optional[_Iterable[_Union[Swap, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
     __slots__ = ("code", "swap_id", "min_amount_e18", "max_amount_e18")

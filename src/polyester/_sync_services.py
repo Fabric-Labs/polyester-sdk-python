@@ -651,6 +651,7 @@ class SyncSystemService(_SyncService):
 class SyncInternalTransfersService(_SyncService):
     """``Polyester`` view of :class:`~polyester.services.AsyncInternalTransfersService`."""
 
+    abandon_batch = call(AsyncInternalTransfersService.abandon_batch)
     batch_create = call(AsyncInternalTransfersService.batch_create)
     create = call(AsyncInternalTransfersService.create)
     get_batch = call(AsyncInternalTransfersService.get_batch)

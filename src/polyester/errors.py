@@ -141,6 +141,14 @@ ORDER_PERMISSION_REFUSAL_CODES = frozenset(
 # request with the same idempotency key still returns the accepted withdrawal.
 ROUTE_SUSPENDED = "ERROR_CODE_ROUTE_SUSPENDED"
 
+# transfer.v1.ErrorCode of an internal transfer batch whose idempotency key was
+# abandoned with ``internal_transfers.abandon_batch`` before any batch was
+# submitted under it (38; REST 400 ``IDEMPOTENCY_KEY_ABANDONED``, ConnectRPC
+# ``failed_precondition``). Nothing moved under the key and nothing ever will.
+# Final for that key, not retryable: submit the batch under a new idempotency
+# key.
+IDEMPOTENCY_KEY_ABANDONED = "ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED"
+
 # chain.withdraw.v1.ErrorCode of a withdrawal, or an auto-withdraw destination,
 # whose destination address is a deposit address issued for a Quick Swap (51;
 # REST ``DESTINATION_SWAP_DEPOSIT_ADDRESS``). Such an address is never a
@@ -707,6 +715,13 @@ def is_route_suspended(err: BaseException) -> bool:
     submit a new request once the route's ``withdrawal_status`` is
     ``"normal"`` again."""
     return isinstance(err, PolyesterApiError) and err.code == ROUTE_SUSPENDED
+
+
+def is_idempotency_key_abandoned(err: BaseException) -> bool:
+    """Whether ``err`` refuses an internal transfer batch because its
+    idempotency key was abandoned (:data:`IDEMPOTENCY_KEY_ABANDONED`). Nothing
+    moved under the key; final: submit the batch under a new key."""
+    return isinstance(err, PolyesterApiError) and err.code == IDEMPOTENCY_KEY_ABANDONED
 
 
 def is_destination_swap_deposit_address(err: BaseException) -> bool:

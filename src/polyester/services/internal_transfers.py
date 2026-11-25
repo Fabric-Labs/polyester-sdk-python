@@ -217,6 +217,13 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         batch; any other batch answers ``ERROR_CODE_NOT_FOUND``, as an unknown
         one does. ``request_id`` is the decimal string the batch carries: 1 to
         39 ASCII digits without a leading zero.
+
+        It reads by request ID only, so the answer must echo that ID: one that
+        names another batch, or none, raises
+        :class:`~polyester.errors.PolyesterResponseContractError`. An abandoned
+        key has no request ID and never answers this read;
+        :meth:`abandon_batch` with the key reads it (``"abandoned"``, with no
+        ``request_id`` and no legs).
         """
         checked = _batch_request_id(request_id)
         return await unary_auth_decoded(

@@ -1831,7 +1831,9 @@ SDK notes:
 - **Several Trading → Trading transfers at once:**
   `client.internal_transfers.batch_create(legs=[...], idempotency_key=...)` moves
   legs together under one idempotency key and one MFA check: every leg is credited,
-  or none moves (see below).
+  or none moves, and `client.internal_transfers.abandon_batch(idempotency_key=...)`
+  makes sure a batch whose answer was lost either is answered or never moves
+  (see below).
 - **Dust:** `client.dust_conversions` converts Trading balances too small to trade into one
   target asset (see below).
 - **Balance history:** `client.balances.get_balance_history(range="7d")` returns one
@@ -1996,6 +1998,17 @@ if batch.status == "processing":
     batch = await client.internal_transfers.wait_batch(request_id=batch.request_id)
 print(batch.status, [(leg.leg_index, leg.status, leg.transfer_id) for leg in batch.legs])
 ```
+
+To give up a batch whose outcome you never learned, abandon its key with
+`internal_transfers.abandon_batch(idempotency_key=...)`. If a batch was
+submitted under the key, it answers that batch, as `get_batch` reads it, and
+changes nothing. Otherwise its `status` is `"abandoned"`, with no `request_id`
+and no legs: nothing moved under the key and nothing ever will. A later
+`batch_create` under that key, a retry included, raises `PolyesterApiError`
+for which `is_idempotency_key_abandoned(err)` is true
+(`ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED`); it is final and not retryable, so
+submit under a new key. Abandoning needs `INTERNAL_TRANSFER` on the API key's
+policy but no MFA, and calling it again with the same key is always safe.
 
 ### Dust conversion
 

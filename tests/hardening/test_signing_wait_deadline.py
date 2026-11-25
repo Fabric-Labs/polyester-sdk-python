@@ -28,7 +28,14 @@ import polyester.auth as auth_module
 from polyester import AsyncPolyester, Polyester
 from polyester.auth import ApiKeyCredentials, sign_request_async
 from polyester.errors import PolyesterRateLimitError, PolyesterTimeoutError
-from tests.hardening_support import HttpScript, MockHttpServer, ParsedRequest, make_test_credentials
+from polyester.gen.auth.v1 import auth_pb2
+from tests.hardening_support import (
+    HttpScript,
+    MockHttpServer,
+    ParsedRequest,
+    connect_proto_response,
+    make_test_credentials,
+)
 
 FROZEN_MS = 1_800_000_000_000
 ME_PATH = "/auth.v1.AuthService/Me"
@@ -265,3 +272,60 @@ def test_sync_request_deadline_bounds_the_signing_wait(
     assert not creds._timestamp_allocator._async_gates
     clock.advance(1)
     assert asyncio.run(_next_timestamp(creds)) == last + 1
+
+
+class _SteppedLoop(asyncio.SelectorEventLoop):
+    """An event loop whose clock the test moves forward."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.offset = 0.0
+
+    def time(self) -> float:
+        return super().time() + self.offset
+
+
+def test_a_call_cancelled_as_capacity_frees_is_not_sent(clock: _FrozenSigningClock) -> None:
+    """Cancelled on the turn a timestamp frees up, a call sends nothing.
+
+    The call waits for signing capacity. Its caller's cancellation and the
+    waiter's retry, with a timestamp free, come due on the same turn of the
+    loop. The call must end cancelled, take no timestamp and send nothing: a
+    cancelled mutation must never reach the server.
+    """
+    creds = _credentials()
+    allocator = creds._timestamp_allocator
+    loop = _SteppedLoop()
+    try:
+
+        async def start() -> tuple[MockHttpServer, AsyncPolyester, asyncio.Task[object]]:
+            body = auth_pb2.MeResponse(account_id=7).SerializeToString()
+            http = await MockHttpServer.spawn(lambda _req: connect_proto_response(body))
+            client = _async_client(http.base_url, creds, 5.0)
+            call = asyncio.ensure_future(client.auth.me())
+            # The call waits for capacity, retrying every millisecond.
+            for _ in range(100):
+                gate = allocator._async_gates.get(asyncio.get_running_loop())
+                if gate is not None and gate.users == 1:
+                    break
+                await asyncio.sleep(0)
+            return http, client, call
+
+        last = _occupy_signing_capacity(creds)
+        http, client, call = loop.run_until_complete(start())
+        # The cancellation is scheduled first; then the clock moves so that it
+        # and the waiter's retry, with a timestamp free, come due together.
+        loop.call_at(loop.time() + 0.005, call.cancel)
+        clock.advance(1)
+        loop.offset += 0.01
+        with pytest.raises(asyncio.CancelledError):
+            loop.run_until_complete(call)
+        # Let anything the cancelled call left running finish.
+        loop.run_until_complete(asyncio.sleep(0.2))
+        sent = http.request_count
+        loop.run_until_complete(client.aclose())
+        loop.run_until_complete(http.aclose())
+    finally:
+        loop.close()
+    assert sent == 0, "the cancelled call was sent"
+    assert allocator._last_timestamp_ms == last, "the cancelled call took a timestamp"

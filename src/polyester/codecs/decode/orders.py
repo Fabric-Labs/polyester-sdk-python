@@ -10,6 +10,7 @@ from polyester.codecs.decode.balances import u128_from_proto
 from polyester.codecs.decode.common import require_id
 from polyester.codecs.decode.invariants import (
     paired_ts_ns,
+    qty_scaled_from_response,
     ts_ns_from_response,
     ts_ns_string_from_response,
 )
@@ -113,6 +114,7 @@ def pair_symbol(symbols: PairSymbols | None, symbol_id: int) -> str | None:
 def _qty(
     scaled: int,
     *,
+    field: str,
     symbol: str | None,
     symbol_id: int,
     scale: int | None = None,
@@ -121,7 +123,7 @@ def _qty(
     # The market is required: a quantity without it passes compatible_with
     # for any other market.
     return Quantity.from_scaled(
-        int(scaled),
+        qty_scaled_from_response(scaled, field=field),
         scale=scale,
         domain=domain,
         symbol=symbol or None,
@@ -133,11 +135,12 @@ def _price(ticks: int, *, symbol: str | None) -> Price:
     return Price.from_ticks(int(ticks), symbol=symbol or None)
 
 
-def _resolved_base_qty(scaled: int, market: OrderMarket) -> Quantity:
+def _resolved_base_qty(scaled: int, market: OrderMarket, *, field: str) -> Quantity:
     """A create, preview or batch item's resolved base quantity, bound to the
     market the order was sent to."""
     return _qty(
         scaled,
+        field=field,
         symbol=market.symbol,
         symbol_id=market.symbol_id,
         scale=market.quantity_scale,
@@ -384,8 +387,8 @@ def order_from_proto(
         else None
     )
 
-    def qty(scaled: int) -> Quantity:
-        return _qty(scaled, symbol=symbol, symbol_id=symbol_id, scale=quantity_scale)
+    def qty(scaled: int, field: str) -> Quantity:
+        return _qty(scaled, field=field, symbol=symbol, symbol_id=symbol_id, scale=quantity_scale)
 
     return PublicOrder(
         order_id=format_uint64_id(msg.order_id),
@@ -395,12 +398,12 @@ def order_from_proto(
         status=status,
         order_type=proto_enum_name(orders_pb2.OrderType, msg.order_type) or None,
         tif=proto_enum_name(orders_pb2.TimeInForce, msg.time_in_force) or None,
-        orig_qty=qty(msg.orig_qty_scaled),
-        cum_qty=qty(msg.cum_qty_scaled),
-        inherited_cum_qty=qty(msg.inherited_cum_qty_scaled),
-        leaves_qty=qty(msg.leaves_qty_scaled),
-        display_qty=qty(msg.display_qty_scaled),
-        hidden_qty=qty(msg.hidden_qty_scaled),
+        orig_qty=qty(msg.orig_qty_scaled, "Order.orig_qty_scaled"),
+        cum_qty=qty(msg.cum_qty_scaled, "Order.cum_qty_scaled"),
+        inherited_cum_qty=qty(msg.inherited_cum_qty_scaled, "Order.inherited_cum_qty_scaled"),
+        leaves_qty=qty(msg.leaves_qty_scaled, "Order.leaves_qty_scaled"),
+        display_qty=qty(msg.display_qty_scaled, "Order.display_qty_scaled"),
+        hidden_qty=qty(msg.hidden_qty_scaled, "Order.hidden_qty_scaled"),
         price=_price(msg.price_ticks, symbol=symbol) if msg.price_ticks else None,
         avg_px=_price(msg.avg_price_ticks, symbol=symbol) if msg.avg_price_ticks else None,
         created_ts_ns=ts_ns_string_from_response(
@@ -466,7 +469,7 @@ def order_from_proto(
                     else "0"
                 ),
                 is_rebate=bool(msg.fee_total.is_rebate),
-                qty=qty(msg.fee_total.qty_scaled),
+                qty=qty(msg.fee_total.qty_scaled, "OrderFeeTotal.qty_scaled"),
             )
             if has_field(msg, "fee_total")
             else None
@@ -514,7 +517,13 @@ def user_trade_from_proto(
         side=proto_enum_name(orders_pb2.Side, msg.side),
         is_maker=bool(msg.is_maker),
         price=_price(msg.price_ticks, symbol=symbol) if msg.price_ticks else None,
-        qty=_qty(msg.qty_scaled, symbol=symbol, symbol_id=symbol_id, scale=quantity_scale),
+        qty=_qty(
+            msg.qty_scaled,
+            field="UserTrade.qty_scaled",
+            symbol=symbol,
+            symbol_id=symbol_id,
+            scale=quantity_scale,
+        ),
         fee_amount_e18=(
             u128_from_proto(msg.fee_amount_e18) if msg.HasField("fee_amount_e18") else "0"
         ),
@@ -641,7 +650,10 @@ def order_mutation_from_proto(msg, *, market: OrderMarket | None) -> OrderMutati
             raise PolyesterResponseContractError("CreateOrder", "missing order_id")
     elif message_name == "CancelOrderResponse" and (not msg.order_id or not status):
         raise PolyesterResponseContractError("CancelOrder", "missing order_id or status")
-    resolved = int(getattr(msg, "resolved_base_qty_scaled", 0) or 0)
+    resolved = qty_scaled_from_response(
+        getattr(msg, "resolved_base_qty_scaled", 0) or 0,
+        field=f"{message_name}.resolved_base_qty_scaled",
+    )
     if resolved and market is None:
         raise ValueError(f"decoding a {message_name} resolved quantity needs the order's market")
     return OrderMutationResult(
@@ -650,7 +662,9 @@ def order_mutation_from_proto(msg, *, market: OrderMarket | None) -> OrderMutati
         client_order_id=client_order_id,
         resolved_base_qty_scaled=str(resolved) if resolved else "",
         resolved_base_qty=(
-            _resolved_base_qty(resolved, market) if resolved and market is not None else None
+            _resolved_base_qty(resolved, market, field=f"{message_name}.resolved_base_qty_scaled")
+            if resolved and market is not None
+            else None
         ),
         submitted_max_quote_debit_scaled=_optional_scaled(msg, "submitted_max_quote_debit_scaled"),
         submitted_quote_proceeds_scaled=_optional_scaled(msg, "submitted_quote_proceeds_scaled"),
@@ -739,7 +753,13 @@ def preview_order_from_proto(
             "PreviewOrder", "successful response is missing evaluated_at"
         )
     has_resolved = msg.HasField("resolved_base_qty_scaled")
-    resolved_scaled = int(msg.resolved_base_qty_scaled) if has_resolved else 0
+    resolved_scaled = (
+        qty_scaled_from_response(
+            msg.resolved_base_qty_scaled, field="PreviewOrderResponse.resolved_base_qty_scaled"
+        )
+        if has_resolved
+        else 0
+    )
     return PreviewOrderResult(
         admissible=bool(msg.admissible) if msg.HasField("admissible") else None,
         rejection=(
@@ -749,7 +769,9 @@ def preview_order_from_proto(
         ),
         resolved_base_qty_scaled=str(resolved_scaled) if has_resolved else "",
         resolved_base_qty=(
-            _resolved_base_qty(resolved_scaled, market)
+            _resolved_base_qty(
+                resolved_scaled, market, field="PreviewOrderResponse.resolved_base_qty_scaled"
+            )
             if has_resolved and market.quantity_scale is not None
             else None
         ),
@@ -1016,7 +1038,10 @@ def _batch_create_result_item(item, market: OrderMarket) -> BatchCreateResultIte
     # Each item carries exactly one accepted/rejected outcome.
     if item.HasField("accepted"):
         require_id("BatchCreateOrders", "order_id", item.accepted.order_id)
-        resolved = int(item.accepted.resolved_base_qty_scaled)
+        resolved = qty_scaled_from_response(
+            item.accepted.resolved_base_qty_scaled,
+            field="BatchCreateResultItem.accepted.resolved_base_qty_scaled",
+        )
         return BatchCreateResultItem(
             status="accepted",
             order_id=format_uint64_id(item.accepted.order_id),
@@ -1032,7 +1057,13 @@ def _batch_create_result_item(item, market: OrderMarket) -> BatchCreateResultIte
             ),
             resolved_base_qty_scaled=str(resolved) if resolved else "",
             resolved_base_qty=(
-                _resolved_base_qty(resolved, market) if resolved else None
+                _resolved_base_qty(
+                    resolved,
+                    market,
+                    field="BatchCreateResultItem.accepted.resolved_base_qty_scaled",
+                )
+                if resolved
+                else None
             ),
         )
     if item.HasField("rejected"):

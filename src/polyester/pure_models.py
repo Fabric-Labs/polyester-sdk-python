@@ -218,6 +218,13 @@ def polyester_models(
   def _num(data, key):
     return int(data.get(key, 0))
 
+  def _qty_scaled(value, field):
+    # The SDK's refusal of a negative quantity, naming the field.
+    scaled = int(value)
+    if scaled < 0:
+      raise ValueError(f"{field}: negative quantity {scaled}")
+    return scaled
+
   def _id(value):
     # The SDK's public ID, and "0" for 0.
     value = _parse_id(int(value), "id")
@@ -376,11 +383,12 @@ def polyester_models(
     scale = spec.base_quantity_scale if spec else None
     symbol_id = _num(data, "symbolId")
 
-    def qty(value):
-      return _Quantity.from_scaled(int(value), scale=scale, symbol=symbol, symbol_id=symbol_id or None)
+    def qty(value, field):
+      scaled = _qty_scaled(value, field)
+      return _Quantity.from_scaled(scaled, scale=scale, symbol=symbol, symbol_id=symbol_id or None)
 
-    def quantity(key):
-      return qty(data.get(key, 0))
+    def quantity(key, field):
+      return qty(data.get(key, 0), field)
 
     attached = _attached_risk(data["attachedRisk"], symbol) if "attachedRisk" in data else None
     lineage = data.get("lineage")
@@ -396,7 +404,9 @@ def polyester_models(
 
     def fee(total):
       amount = str(_u128(total["amountE18"])) if "amountE18" in total else "0"
-      return OrderFeeTotal(amount, bool(total.get("isRebate", False)), qty(total.get("qtyScaled", 0)))
+      return OrderFeeTotal(
+        amount, bool(total.get("isRebate", False)), qty(total.get("qtyScaled", 0), "OrderFeeTotal.qty_scaled")
+      )
 
     # Read in the SDK's order, so a refusal names the same first bad value.
     return Order(
@@ -407,12 +417,12 @@ def polyester_models(
       status=_label(data.get("status", 0)),
       order_type=_or_none(data.get("orderType", 0)),
       tif=_or_none(data.get("timeInForce", 0)),
-      orig_qty=quantity("origQtyScaled"),
-      cum_qty=quantity("cumQtyScaled"),
-      inherited_cum_qty=quantity("inheritedCumQtyScaled"),
-      leaves_qty=quantity("leavesQtyScaled"),
-      display_qty=quantity("displayQtyScaled"),
-      hidden_qty=quantity("hiddenQtyScaled"),
+      orig_qty=quantity("origQtyScaled", "Order.orig_qty_scaled"),
+      cum_qty=quantity("cumQtyScaled", "Order.cum_qty_scaled"),
+      inherited_cum_qty=quantity("inheritedCumQtyScaled", "Order.inherited_cum_qty_scaled"),
+      leaves_qty=quantity("leavesQtyScaled", "Order.leaves_qty_scaled"),
+      display_qty=quantity("displayQtyScaled", "Order.display_qty_scaled"),
+      hidden_qty=quantity("hiddenQtyScaled", "Order.hidden_qty_scaled"),
       price=_price(data, "priceTicks", symbol),
       avg_px=_price(data, "avgPriceTicks", symbol),
       created_ts_ns=_ts_ns(data, "createdTsNs"),
@@ -443,11 +453,11 @@ def polyester_models(
       quote_quantity_scale=spec.quote_quantity_scale if spec else None,
     )
 
-  def _executed(data, scale, symbol, symbol_id):
+  def _executed(data, scale, symbol, symbol_id, field):
     scaled = _num(data, "executedQtyScaled")
     if not scaled:
       return None
-    return _Quantity.from_scaled(scaled, scale=scale, symbol=symbol, symbol_id=symbol_id)
+    return _Quantity.from_scaled(_qty_scaled(scaled, field), scale=scale, symbol=symbol, symbol_id=symbol_id)
 
   def _details(data, scale, symbol, symbol_id):
     if "stop" in data:
@@ -484,7 +494,7 @@ def polyester_models(
           _num(twap, "twapSliceIntervalMs"),
           _num(twap, "sliceIdx"),
           _num(twap, "sliceCount"),
-          _executed(twap, scale, symbol, symbol_id),
+          _executed(twap, scale, symbol, symbol_id, "Trigger.twap_state.executed_qty_scaled"),
         ),
       )
     if "ladderState" in data:
@@ -497,7 +507,7 @@ def polyester_models(
           _num(ladder, "ladderLevels"),
           _label(ladder.get("ladderDistribution", 0)),
           _num(ladder, "executedLevels"),
-          _executed(ladder, scale, symbol, symbol_id),
+          _executed(ladder, scale, symbol, symbol_id, "Trigger.ladder_state.executed_qty_scaled"),
           _num(ladder, "requestedLevels"),
           _num(ladder, "placedLevels"),
           _num(ladder, "rejectedLevels"),
@@ -601,7 +611,9 @@ def polyester_models(
       parent_order_id=_id_or_empty(data, "parentOrderId"),
       order_list_id=_id_or_empty(data, "orderListId"),
       client_list_id=data.get("clientListId", ""),
-      qty=_Quantity.from_scaled(_num(data, "qtyScaled"), scale=scale, symbol=symbol, symbol_id=symbol_id),
+      qty=_Quantity.from_scaled(
+        _qty_scaled(_num(data, "qtyScaled"), "Trigger.qty_scaled"), scale=scale, symbol=symbol, symbol_id=symbol_id
+      ),
       fee_asset=_label(data.get("feeAsset", 0)),
       self_trade_prevention_mode=_label(data.get("selfTradePreventionMode", 0)),
       client_trigger_id=data.get("clientTriggerId", ""),

@@ -14,7 +14,11 @@ from polyester.codecs.decode.resolve import resolved_accounts_from_proto
 from polyester.codecs.decode.transfers import ledger_transfer_from_proto, transfers_list_from_proto
 from polyester.codecs.decode.withdraw import withdraw_intent_from_proto
 from polyester.codecs.scalars import format_id
-from polyester.errors import PolyesterTransportError, PolyesterValidationError
+from polyester.errors import (
+    PolyesterResponseContractError,
+    PolyesterTransportError,
+    PolyesterValidationError,
+)
 from polyester.gen.auth.v1 import api_keys_pb2, resolve_pb2
 from polyester.gen.chain.deposit.v1 import deposit_pb2
 from polyester.gen.chain.withdraw.v1 import withdraw_pb2
@@ -187,7 +191,7 @@ def test_orderbook_from_proto() -> None:
 
 @pytest.mark.parametrize(
     ("price_ticks", "qty_scaled"),
-    [(0, 1), (1, 0), (-1, 1), (1, -1)],
+    [(0, 1), (1, 0), (-1, 1)],
 )
 def test_orderbook_from_proto_rejects_missing_or_invalid_levels(
     price_ticks: int, qty_scaled: int
@@ -197,4 +201,13 @@ def test_orderbook_from_proto_rejects_missing_or_invalid_levels(
         bids=[orderbook_pb2.PriceLevel(price_ticks=price_ticks, qty_scaled=qty_scaled)],
     )
     with pytest.raises(PolyesterValidationError):
+        orderbook_from_proto(msg, symbol="BTC-USD", depth=1, quantity_scale=8)
+
+
+def test_orderbook_from_proto_refuses_a_negative_level_quantity_as_a_contract_violation() -> None:
+    msg = orderbook_pb2.GetOrderBookResponse(
+        depth=depth_tier_pb2.DEPTH_1,
+        bids=[orderbook_pb2.PriceLevel(price_ticks=1, qty_scaled=-1)],
+    )
+    with pytest.raises(PolyesterResponseContractError, match="PriceLevel.qty_scaled: negative"):
         orderbook_from_proto(msg, symbol="BTC-USD", depth=1, quantity_scale=8)

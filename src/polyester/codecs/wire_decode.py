@@ -786,6 +786,16 @@ def decode_trigger(data: dict[str, Any]) -> Trigger:
         )
     symbol = str(_field(data, "symbol", default="") or "")
     symbol_id = int(_field(data, "symbolId", "symbol_id", default=0) or 0)
+    # This read carries no runtime details, but a negative executed quantity
+    # in them breaks the contract all the same: refuse it as the protobuf
+    # decode does, which reads them before the trigger's own quantity.
+    for camel, snake in (("twapState", "twap_state"), ("ladderState", "ladder_state")):
+        state = _field(data, camel, snake)
+        if isinstance(state, dict):
+            qty_scaled_from_response(
+                _field(state, "executedQtyScaled", "executed_qty_scaled", default=0) or 0,
+                field=f"Trigger.{snake}.executed_qty_scaled",
+            )
     qty_raw = qty_scaled_from_response(
         _field(data, "qtyScaled", "qty_scaled", default=0) or 0, field="Trigger.qty_scaled"
     )

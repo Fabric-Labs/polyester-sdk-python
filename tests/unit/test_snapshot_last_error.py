@@ -1,4 +1,4 @@
-"""POLY-3746: SnapshotThenStream surfaces refresh errors and clears on success."""
+"""SnapshotThenStream surfaces refresh errors and clears on success."""
 
 from __future__ import annotations
 

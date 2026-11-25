@@ -1,4 +1,4 @@
-"""POLY-9228: catalog startup through an HTTPS proxy that drops or stalls a read.
+"""Catalog startup through an HTTPS proxy that drops or stalls a read.
 
 A local HTTPS API (a test CA's certificate, HTTP/1.1 keep-alive) sits behind a local
 HTTP CONNECT proxy, and the client's pyqwest transports trust the test CA and use the
@@ -668,7 +668,7 @@ async def test_deposit_addresses_and_withdrawals_do_not_wait_for_the_funding_con
                 quantity="1",
                 amount_scale=6,
                 payload_signature=b"\x01" * 65,
-                idempotency_key="poly-9228-control",
+                idempotency_key="catalog-startup-control",
                 nonce=1,
                 deadline_ts_sec=4_102_444_800,
             ),

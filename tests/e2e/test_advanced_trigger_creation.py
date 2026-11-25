@@ -59,7 +59,7 @@ async def _create_then_cleanup(client, symbol: str, **create_kwargs):
     """
     created = await client.triggers.create(symbol=symbol, **create_kwargs)
     assert created.trigger_id
-    # Admission response synthesizes "accepted" (POLY-3701); not "created".
+    # Admission response synthesizes "accepted", not "created".
     assert created.status == "accepted"
     with contextlib.suppress(PolyesterApiError):
         await client.triggers.cancel(trigger_id=created.trigger_id)

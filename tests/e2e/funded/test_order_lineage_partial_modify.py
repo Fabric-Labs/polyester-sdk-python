@@ -1,4 +1,4 @@
-"""POLY-4708: predecessor fills survive ModifyOrder on a partially filled limit."""
+"""Predecessor fills survive ModifyOrder on a partially filled limit."""
 
 from __future__ import annotations
 
@@ -304,7 +304,7 @@ async def test_partial_fill_modify_keeps_predecessor_execution_history(
         assert history.order.cum_qty.scaled >= first_fill_qty
         history_match_ids = {trade.match_id for trade in history.trades if trade.match_id}
         assert history.trades, (
-            "POLY-4708: GetOrder history is empty after replacing a partially filled order"
+            "GetOrder history is empty after replacing a partially filled order"
         )
         if first_match_ids:
             assert first_match_ids <= history_match_ids, (

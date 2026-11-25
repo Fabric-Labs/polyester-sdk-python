@@ -1,7 +1,7 @@
 """Trigger create refusals Python already applies: no GTD child, positive TWAP ticks.
 
-POLY-8758 and POLY-8748 were found in the Go and Rust encoders; these cases
-pin the same rules here.
+Both were found in the Go and Rust encoders; these cases pin the same rules
+here.
 """
 
 from __future__ import annotations
@@ -57,19 +57,19 @@ def _create(**kwargs: Any):
 
 
 @pytest.mark.parametrize("strategy", list(STRATEGIES))
-def test_poly_8758_gtd_is_refused_for_every_trigger_strategy(strategy: str) -> None:
+def test_gtd_is_refused_for_every_trigger_strategy(strategy: str) -> None:
     _create(**STRATEGIES[strategy])
     with pytest.raises(PolyesterValidationError, match="tif must be"):
         _create(**STRATEGIES[strategy], tif="gtd")
 
 
 @pytest.mark.parametrize("ticks", [-5, 0])
-def test_poly_8748_twap_market_refuses_nonpositive_slippage_ticks(ticks: int) -> None:
+def test_twap_market_refuses_nonpositive_slippage_ticks(ticks: int) -> None:
     with pytest.raises(PolyesterValidationError, match="max_slippage_ticks"):
         _create(**STRATEGIES["twap-market"], max_slippage_ticks=ticks)
 
 
-def test_poly_8748_twap_market_sends_a_positive_tick_cap() -> None:
+def test_twap_market_sends_a_positive_tick_cap() -> None:
     proto = _create(**STRATEGIES["twap-market"], max_slippage_ticks=1)
     assert proto.trigger.twap.market_ioc.max_slippage_ticks == 1
     assert not _create(**STRATEGIES["twap-market"]).trigger.twap.market_ioc.HasField(

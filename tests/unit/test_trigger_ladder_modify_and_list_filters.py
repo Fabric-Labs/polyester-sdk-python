@@ -1,14 +1,14 @@
 """Trigger create, modify and list follow the contract before sending.
 
-POLY-9423: a ladder places LINEAR limit-GTC orders only, so an explicit
+A ladder places LINEAR limit-GTC orders only, so an explicit
 ``order_type="market"`` on a ladder is refused before sending, never sent as
 a limit ladder. A ladder without an order type, or with ``"limit"``, works.
 
-POLY-9426: ``triggers.modify`` takes ``max_slippage_bps`` 0 to 10000, as the
+``triggers.modify`` takes ``max_slippage_bps`` 0 to 10000, as the
 contract does: a buy stop-loss or take-profit with a market child accepts
 10000, and the server refuses it for sells and trailing stops.
 
-POLY-9433: ``triggers.list`` filters by ``trigger_type`` and
+``triggers.list`` filters by ``trigger_type`` and
 ``parent_order_id``, as ``ListTriggersRequest`` does.
 """
 
@@ -47,7 +47,7 @@ LADDER = {
 }
 
 
-# --- POLY-9423 ladder order type -----------------------------------------------
+# --- Ladder order type ---------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_stop_loss_without_an_order_type_is_still_a_market_child() -> None
     assert child.market_ioc.max_slippage_bps == 100
 
 
-# --- POLY-9426 modify slippage bound -------------------------------------------
+# --- Modify slippage bound -----------------------------------------------------
 
 
 @pytest.mark.parametrize("bps", [0, 1, 9999, 10000])
@@ -148,7 +148,7 @@ async def test_create_and_modify_accept_the_same_buy_cap() -> None:
     )
 
 
-# --- POLY-9433 list filters -----------------------------------------------------
+# --- List filters --------------------------------------------------------------
 
 
 async def _list(**kwargs: object) -> triggers_pb2.ListTriggersRequest:

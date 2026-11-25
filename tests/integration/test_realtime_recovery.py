@@ -1,4 +1,4 @@
-"""Live verification for POLY-3624 recovery hooks (devnet Centrifugo + Connect)."""
+"""Live verification for realtime recovery hooks (devnet Centrifugo + Connect)."""
 
 from __future__ import annotations
 

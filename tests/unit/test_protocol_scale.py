@@ -1,4 +1,4 @@
-"""POLY-3746: MAX_PROTOCOL_SCALE rejects pathological scales (no huge zfill/10**scale)."""
+"""MAX_PROTOCOL_SCALE rejects pathological scales (no huge zfill/10**scale)."""
 
 from __future__ import annotations
 

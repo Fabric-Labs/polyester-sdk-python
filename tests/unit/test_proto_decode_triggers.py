@@ -128,7 +128,7 @@ def test_get_trigger_from_proto() -> None:
 
 def test_trigger_mutation_from_proto() -> None:
     # CreateTriggerResponse no longer carries a status field; decode synthesizes
-    # "accepted" (POLY-3701).
+    # "accepted".
     msg = triggers_pb2.CreateTriggerResponse(trigger_id=9)
     result = trigger_mutation_from_proto(msg)
     assert result.trigger_id == format_id(9)

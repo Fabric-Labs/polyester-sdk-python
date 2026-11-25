@@ -1,14 +1,13 @@
 """Typed trigger reads keep every slippage cap and name the pair.
 
-POLY-9396: a market TWAP's per-slice cap (``configuration.twap.market_ioc``)
+A market TWAP's per-slice cap (``configuration.twap.market_ioc``)
 reads back on the top-level ``max_slippage`` / ``max_slippage_bps``, with its
 exact variant, and an unset cap stays unset (the pair's default).
 
-POLY-9425: a trailing stop's cap reads back on the same top-level fields, as a
-stop-loss or take-profit market child's does; ``details.trailing`` is
-unchanged.
+A trailing stop's cap reads back on the same top-level fields, as a stop-loss
+or take-profit market child's does; ``details.trailing`` is unchanged.
 
-POLY-9424: with the catalogs loaded, ``triggers.get``, ``triggers.list`` and
+With the catalogs loaded, ``triggers.get``, ``triggers.list`` and
 the trigger stream fill ``symbol`` from ``symbol_id``; without them it stays
 empty.
 

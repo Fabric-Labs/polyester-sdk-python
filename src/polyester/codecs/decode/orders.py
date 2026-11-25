@@ -639,7 +639,7 @@ def order_mutation_from_proto(msg, *, market: OrderMarket | None) -> OrderMutati
     """
     client_order_id = getattr(msg, "client_order_id", "") or ""
     message_name = msg.DESCRIPTOR.name
-    # CreateOrderResponse no longer carries a status field (POLY-3701): reaching
+    # CreateOrderResponse no longer carries a status field: reaching
     # the client means the order was admitted, so synthesize "accepted".
     if message_name == "CancelOrderResponse":
         status = _cancel_order_status(msg.status)

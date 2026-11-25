@@ -1,4 +1,4 @@
-"""Calldata encoders for on-chain Funding ops (POLY-3569).
+"""Calldata encoders for on-chain Funding ops.
 
 Selectors and shapes must stay aligned with TypeScript
 ``TRADING_GATEWAY_DEPOSIT_ABI`` / ``FUNDING_ACCOUNT_WITHDRAW_TO_CHAIN_ABI``.

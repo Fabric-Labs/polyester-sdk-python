@@ -1,4 +1,4 @@
-"""POLY-3746: catalog hydrate rejects u64→u32 truncation and scales > 36."""
+"""Catalog hydrate rejects u64→u32 truncation and scales > 36."""
 
 from __future__ import annotations
 

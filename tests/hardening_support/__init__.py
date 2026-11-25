@@ -1,4 +1,4 @@
-"""Local mock HTTP/WS servers for POLY-3746 L2 tests."""
+"""Local mock HTTP/WS servers for the public-API L2 hardening tests."""
 
 from __future__ import annotations
 

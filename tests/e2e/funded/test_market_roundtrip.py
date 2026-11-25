@@ -36,8 +36,8 @@ def _maker_credentials() -> tuple[str, str] | None:
     return key_id, private_key
 
 
-def _poly3028_skip(reason: str) -> None:
-    pytest.skip(f"possible POLY-3028 backend reserve blocker: {reason}")
+def _skip_reserve_blocker(reason: str) -> None:
+    pytest.skip(f"possible server-side balance reserve blocker: {reason}")
 
 
 def _fee_amount_e18_to_asset_scaled(fee_e18: str, asset_scale: int) -> int:
@@ -206,16 +206,16 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         try:
             buy_detail = await wait_for_terminal_order(live_client, buy_cid, timeout=20)
         except AssertionError as exc:
-            _poly3028_skip(f"buy terminal wait: {exc}")
+            _skip_reserve_blocker(f"buy terminal wait: {exc}")
 
         buy_order = buy_detail.order
         assert buy_order is not None
         assert buy_order.status in {"filled", "canceled", "rejected"}
         if buy_order.cum_qty is None:
-            _poly3028_skip(f"buy produced no fill (status={buy_order.status})")
+            _skip_reserve_blocker(f"buy produced no fill (status={buy_order.status})")
         filled = buy_order.cum_qty.scaled
         if filled <= 0:
-            _poly3028_skip("buy produced no fill (cum_qty<=0)")
+            _skip_reserve_blocker("buy produced no fill (cum_qty<=0)")
         buy_projection = await live_client.orders.wait_for_order_trades_complete(
             key=ClientOrderId(buy_cid),
             timeout=20,
@@ -277,7 +277,7 @@ async def test_market_buy_sell_roundtrip_carries_filled_qty(
         try:
             sell_detail = await wait_for_terminal_order(live_client, sell_cid, timeout=20)
         except AssertionError as exc:
-            _poly3028_skip(f"sell terminal wait: {exc}")
+            _skip_reserve_blocker(f"sell terminal wait: {exc}")
 
         sell_order = sell_detail.order
         assert sell_order is not None

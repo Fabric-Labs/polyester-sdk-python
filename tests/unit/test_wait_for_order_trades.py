@@ -1,4 +1,4 @@
-"""POLY-3746: wait_for_order_trades_complete polls until trade qtys match cum_qty."""
+"""wait_for_order_trades_complete polls until trade qtys match cum_qty."""
 
 from __future__ import annotations
 

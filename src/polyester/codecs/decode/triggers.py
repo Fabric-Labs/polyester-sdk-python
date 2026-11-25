@@ -476,7 +476,7 @@ def trigger_mutation_from_proto(
     | triggers_pb2.PauseTriggerResponse
     | triggers_pb2.ResumeTriggerResponse,
 ) -> TriggerMutationResult:
-    # CreateTriggerResponse no longer carries a status field (POLY-3701):
+    # CreateTriggerResponse no longer carries a status field:
     # reaching the client means the trigger was admitted, so synthesize
     # "accepted". Cancel/Modify/Pause/Resume still return a status enum.
     require_id(msg.DESCRIPTOR.name.removesuffix("Response"), "trigger_id", msg.trigger_id)

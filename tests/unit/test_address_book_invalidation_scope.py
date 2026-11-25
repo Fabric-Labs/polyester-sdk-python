@@ -1,4 +1,4 @@
-"""POLY-9020: address-book invalidations keep the full account scope.
+"""Address-book invalidations keep the full account scope.
 
 A sub-account's change names the sub-account and its scope type, so a client
 can tell which address book to refresh; a root change names only the root.

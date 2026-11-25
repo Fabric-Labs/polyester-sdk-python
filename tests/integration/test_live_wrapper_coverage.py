@@ -1,4 +1,5 @@
-"""Live API-key coverage for POLY-4996 wrappers.
+"""Live API-key coverage for the volume, candle, cancel-all, ladder, TWAP,
+social-verification, withdraw and transfer wrappers.
 
 Read-only / dry-run plus targeted mutations (TWAP/ladder create+cancel,
 impossible withdraw/transfer) that clean up their own rows.
@@ -351,7 +352,7 @@ async def test_withdraw_error_detail_from_impossible_funding_move(
         await live_client.withdraw.create_api_key_to_funding(
             asset_id=asset_id,
             quantity=_IMPOSSIBLE_WITHDRAW_QTY,
-            idempotency_key=unique_client_order_id("poly4996-wd"),
+            idempotency_key=unique_client_order_id("wrapper-wd"),
         )
     except (PolyesterApiError, PolyesterAuthError) as exc:
         _assert_typed_money_error(exc, label="withdraw.create_api_key_to_funding")
@@ -384,7 +385,7 @@ async def test_transfer_error_detail_from_unknown_destination(
             asset_id=asset_id,
             quantity="0.000001",
             destination_smart_account_address=_DEAD_SMART_ACCOUNT,
-            idempotency_key=unique_client_order_id("poly4996-xfer"),
+            idempotency_key=unique_client_order_id("wrapper-xfer"),
         )
     except (PolyesterApiError, PolyesterAuthError) as exc:
         _assert_typed_money_error(exc, label="internal_transfers.create")

@@ -1,4 +1,4 @@
-"""A sub-account update says when the caller lost access (POLY-9397).
+"""A sub-account update says when the caller lost access.
 
 ``auth.v1.Subaccount.removed`` tells the caller to drop a sub-account it can no
 longer access; the role is then ``SUBACCOUNT_ROLE_UNSPECIFIED``. A role or

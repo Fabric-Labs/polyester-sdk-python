@@ -60,7 +60,7 @@ def _catalogs() -> CatalogManager:
     return catalogs
 
 
-# POLY-8785
+# Order-book price buckets finer than a micro unit.
 def test_orderbook_price_buckets_keep_sub_micro_increments() -> None:
     catalogs = _catalogs()
     assert catalogs.orderbook_price_buckets_for_symbol("BONK-USDT") == [
@@ -79,7 +79,7 @@ def test_orderbook_price_buckets_keep_sub_micro_increments() -> None:
     ]
 
 
-# POLY-8784
+# Volume history sends each selected pair once and keeps its pair limit.
 class _VolumeCapture:
     def __init__(self) -> None:
         self.ids: list[list[int]] = []
@@ -130,7 +130,7 @@ def _overview_response() -> mo.ListMarketOverviewResponse:
     )
 
 
-# POLY-8786
+# The JSON overview decoder matches the protobuf decoder.
 @pytest.mark.parametrize("snake_case", [False, True])
 def test_json_overview_decoder_matches_the_protobuf_decoder(snake_case: bool) -> None:
     response = _overview_response()
@@ -143,7 +143,7 @@ def test_json_overview_decoder_matches_the_protobuf_decoder(snake_case: bool) ->
     assert decoded.next_page_token == expected.next_page_token == "opaque"
 
 
-# POLY-8789
+# Market overview sparklines.
 def _sparkline_response() -> mo.ListMarketOverviewResponse:
     return mo.ListMarketOverviewResponse(
         markets=[
@@ -220,7 +220,7 @@ async def test_managed_subscription_keeps_snapshot_sparklines_and_enriches_live_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Live publications carry no sparklines: a live row keeps the snapshot's,
-    # and is decoded with its symbol and display volume (POLY-8783 parity).
+    # and is decoded with its symbol and display volume, as a snapshot row is.
     monkeypatch.setattr(market_overview, "AsyncSnapshotThenStreamSubscription", _CapturingStream)
     catalogs = _catalogs()
     service = AsyncMarketOverviewService(MagicMock(), catalogs=catalogs, realtime=MagicMock())

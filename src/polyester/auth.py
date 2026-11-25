@@ -133,10 +133,15 @@ class _SigningTimestampAllocator:
             finally:
                 self._leave_async_gate(loop, gate)
 
+        # In the caller's own task, not asyncio.wait_for's: on Python 3.11
+        # wait_for runs it in a task of its own and, when that task finishes on
+        # the turn the caller is cancelled, returns its timestamp and drops the
+        # cancellation, so a cancelled request would still be signed and sent.
         try:
-            return await asyncio.wait_for(allocate(), timeout=wait_seconds)
+            async with asyncio.timeout(wait_seconds):
+                return await allocate()
         except (TimeoutError, _SigningCapReached) as exc:
-            # wait_for's own expiry, or the check made when taking a timestamp.
+            # The timeout's own expiry, or the check made when taking a timestamp.
             if deadline_first or (time_left is not None and time_left() <= 0):
                 if isinstance(exc, TimeoutError):
                     raise

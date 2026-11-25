@@ -22,7 +22,8 @@ _spec.loader.exec_module(cpd)
 
 # Built at run time, so this file holds no tracker reference itself.
 TICKET = "POLY" + "-" + "1234"
-SOURCE = "src/polyester/orders.py"
+MR = "!" + "4537"
+SOURCE = "src/orders.txt"
 FAILURE = f"{SOURCE}:1: contains an internal tracker reference"
 
 
@@ -36,24 +37,32 @@ class TicketReferenceTest(unittest.TestCase):
                 path.write_bytes(content)
             return cpd.ticket_references(root, files)
 
+    def assert_refused(self, *lines: str) -> None:
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertEqual(self.check({SOURCE: (line + "\n").encode()}), [FAILURE])
+
+    def assert_accepted(self, *lines: str) -> None:
+        for line in lines:
+            with self.subTest(line=line):
+                self.assertEqual(self.check({SOURCE: (line + "\n").encode()}), [])
+
     def test_refuses_a_ticket_reference_in_a_source_file(self) -> None:
-        failures = self.check({SOURCE: f'"""Orders."""\n\n# {TICKET}: keep it.\n'.encode()})
+        failures = self.check({SOURCE: f"Orders.\n\n# {TICKET}: keep it.\n".encode()})
         self.assertEqual(failures, [f"{SOURCE}:3: contains an internal tracker reference"])
 
     def test_refuses_any_case(self) -> None:
-        failures = self.check({SOURCE: f'key = "{TICKET.lower()}-control"\n'.encode()})
-        self.assertEqual(failures, [FAILURE])
+        self.assert_refused(f'key = "{TICKET.lower()}-control"')
 
     def test_refuses_a_ticket_reference_in_a_path(self) -> None:
-        name = f"tests/unit/test_{TICKET.lower().replace('-', '_')}.py"
-        self.assertEqual(
-            self.check({name: b"\n"}), [f"{name}: path contains an internal tracker reference"]
-        )
+        name = f"tests/{TICKET.lower().replace('-', '_')}.py"
+        failure = f"{name}: path contains an internal tracker reference"
+        self.assertEqual(self.check({name: b"\n"}), [failure])
 
     def test_refuses_every_numbered_form(self) -> None:
-        for text in (
+        self.assert_refused(
             "def test_" + "poly" + "_8471_since_is_inclusive(): ...",
-            "def test_" + "ticket" + "8583_zero_price(): ...",
+            "fn " + "ticket" + "_8583_zero_price() {}",
             'key = "' + "poly" + '4996-wd"',
             "POLY" + "_1234",
             # Short numbers are tickets too, hyphenated or not.
@@ -64,27 +73,59 @@ class TicketReferenceTest(unittest.TestCase):
             # with 1305, and its hyphenated form, are tickets.
             "Poly" + "13050",
             "POLY" + "-1305",
-        ):
-            with self.subTest(text=text):
-                self.assertEqual(self.check({SOURCE: (text + "\n").encode()}), [FAILURE])
+        )
 
-    def test_refuses_other_tracker_keys_and_merge_requests(self) -> None:
-        for text in (
+    def test_refuses_other_project_keys_in_any_case(self) -> None:
+        self.assert_refused(
             "# see " + "CHAIN" + "-17",
             "# see " + "ODY" + "-204",
-            "# see " + "ZIP" + "-9",
+            "// see " + "ZIP" + "-9",
             "# see " + "HULY" + "-3",
             "# see " + "ADMIN" + "-55",
-            "# fixed by " + "!" + "4537",
-            "# (" + "!" + "123)",
-        ):
-            with self.subTest(text=text):
-                self.assertEqual(self.check({SOURCE: (text + "\n").encode()}), [FAILURE])
+            "# fixed in " + "ody" + "-456",
+            "// tracked as " + "huly" + "-789",
+            "(" + "Chain" + "-17)",
+            "/// " + "zip" + "-9: keep the memo",
+        )
+
+    def test_refuses_a_merge_request_in_prose(self) -> None:
+        self.assert_refused(
+            "# fixed by " + MR,
+            "// fixed by " + MR + ".",
+            "/// See " + MR + " for the history.",
+            "//! " + MR + ": keep the order",
+            "# " + MR,
+            MR + " moved this check here.",
+            "  * landed in " + MR,
+            "Reverted " + MR + " and " + "!" + "4538.",
+        )
+
+    def test_accepts_a_unary_operator_on_a_number(self) -> None:
+        self.assert_accepted(
+            "const COMPLEMENT: i64 = !" + "1024;",
+            "let mask = !" + "1024 & bits;",
+            "let mask = bits & !" + "1024;",
+            "    | !" + "1024,",
+            "call(a, !" + "1024)",
+            "call( !" + "1024)",
+            "let pair = [ !" + "1024, !" + "2048];",
+            "Foo { mask: !" + "1024 }",
+            "match x { _ => !" + "1024 }",
+            "    return !" + "1024;",
+            "    break !" + "1024;",
+            "if !" + "1024 == x {}",
+            "match !" + "1024 { _ => () }",
+            "let r = &mut !" + "1024;",
+            "0.. !" + "1024",
+            "/// let mask = !" + "1024;",
+            "x !" + "= 1024",
+        )
 
     def test_ignores_generated_code_and_binary_files(self) -> None:
+        generated = cpd.GENERATED_PREFIXES[0] + "orders/v1/orders.txt"
         failures = self.check(
             {
-                "src/polyester/gen/orders/v1/orders_pb2.py": f"# {TICKET}\n".encode(),
+                generated: f"# {TICKET}\n".encode(),
                 "testdata/blob.bin": b"\xff\xfe" + TICKET.encode(),
                 # Valid UTF-8, but binary as Git reads it: it holds a NUL byte.
                 "testdata/image.bin": b"\x00" + TICKET.encode() + b"\x00",
@@ -99,23 +140,22 @@ class TicketReferenceTest(unittest.TestCase):
 
     def test_a_nul_byte_past_the_sniffed_prefix_leaves_a_text_file(self) -> None:
         content = b"a" * cpd.BINARY_SNIFF_BYTES + b"\n# " + TICKET.encode() + b"\n\x00"
-        self.assertEqual(
-            self.check({"big.txt": content}), ["big.txt:2: contains an internal tracker reference"]
-        )
+        failure = "big.txt:2: contains an internal tracker reference"
+        self.assertEqual(self.check({"big.txt": content}), [failure])
 
     def test_accepts_text_without_a_tracker_reference(self) -> None:
-        failures = self.check(
-            {
-                "README.md": b"Polyester SDK, POLYESTER_API_URL, poly-market, POLY- alone, "
-                b"a setup ticket, HTTP 404, UTF-8, EIP-712, ERC-20, CVE-2024-1234, "
-                b"RFC-5737, TEST-NET-1, SHA-256, LICENSE-2.0, 0.1.0a23.\n",
-                "src/polyester/crypto.py": b"# ChaCha20-Poly1305\nPOLY1305 = 1\n"
-                b"if a != 100 and not b: pass\n",
-                "docs/guide.md": b"![diagram](img.png) Hello!100 times? a!=123\n",
-                "testdata/index.tsv": b"14-depth-chain-00.bin\tdepth-chain\n",
-            }
+        self.assert_accepted(
+            "Polyester SDK, POLYESTER_API_URL, poly-market, POLY- alone, a setup ticket.",
+            "HTTP 404, 429 and 503; status=400; UTF-8, EIP-712, ERC-20, SHA-256.",
+            "CVE-2024-1234, GHSA-4v7x-pqxf-cx7m, RFC-5737, TEST-NET-1, LICENSE-2.0.",
+            "Versions 0.1.0a23, 0.1.0-alpha.45, v1.90.0, py3-none-any, x86_64-linux-1.",
+            "14-depth-chain-00.bin\tserver\tDepthSnapshot\tdepth-chain",
+            "25-depth-levels-chain-00.bin\tdepth-levels-chain",
+            "the chain-agnostic decoder, an admin-scoped key, gzip-9, mod_zip-2",
+            "# ChaCha20-Poly1305, POLY1305 = 1, poly1305.Sum(&tag)",
+            "if a != 100 and not b: pass",
+            "![diagram](img.png) Hello!100 times? a!=123",
         )
-        self.assertEqual(failures, [])
 
     def test_markdown_refuses_a_finding_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

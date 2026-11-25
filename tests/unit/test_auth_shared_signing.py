@@ -359,3 +359,50 @@ async def test_a_cancelled_waiter_leaves_the_queue_without_a_timestamp(
     remaining = [task for index, task in enumerate(waiters) if index != cancelled]
     assert await asyncio.gather(*remaining) == [last + 1, last + 2]
     assert not allocator._async_gates
+
+
+class _SteppedLoop(asyncio.SelectorEventLoop):
+    """An event loop whose clock the test moves forward."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.offset = 0.0
+
+    def time(self) -> float:
+        return super().time() + self.offset
+
+
+def test_a_waiter_resumed_past_its_deadline_takes_no_timestamp(clock: FakeClock) -> None:
+    """A loop that resumes late runs a waiter's retry and its timeout together.
+
+    One timestamp is freed, then the loop's clock moves past the waiter's
+    100 ms deadline, so its 1 ms retry and its timeout are due on the same
+    turn. The retry must not take the timestamp: the request is out of time,
+    and the waiter queued behind it needs that timestamp.
+    """
+    creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
+    allocator = creds._timestamp_allocator
+    last = _fill_signing_capacity(creds)
+    loop = _SteppedLoop()
+    try:
+
+        async def queue() -> tuple[asyncio.Future[int], asyncio.Future[int]]:
+            urgent = asyncio.ensure_future(allocator.next_async(timeout=0.1))
+            patient = asyncio.ensure_future(allocator.next_async(timeout=5.0))
+            # The urgent waiter holds the gate and sleeps between retries.
+            for _ in range(100):
+                gate = allocator._async_gates.get(asyncio.get_running_loop())
+                if gate is not None and gate.users == 2:
+                    break
+                await asyncio.sleep(0)
+            return urgent, patient
+
+        urgent, patient = loop.run_until_complete(queue())
+        clock.advance(1)
+        loop.offset += 0.2
+        with pytest.raises(TimeoutError):
+            loop.run_until_complete(urgent)
+        assert loop.run_until_complete(patient) == last + 1
+        assert not allocator._async_gates
+    finally:
+        loop.close()

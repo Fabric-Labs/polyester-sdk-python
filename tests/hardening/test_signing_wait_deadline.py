@@ -21,6 +21,7 @@ import types
 import uuid
 from collections.abc import Iterator
 
+import connectrpc.request
 import pytest
 
 import polyester.auth as auth_module
@@ -160,9 +161,23 @@ async def test_many_waiters_each_end_at_their_own_deadline(
     assert await _next_timestamp(creds) == last + 1
 
 
+class _ContextClock:
+    """The clock connectrpc keeps a request's deadline by, held by the test."""
+
+    def __init__(self) -> None:
+        self.now = 1024.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+
 async def test_server_deadline_is_what_remains_after_signing(
-    clock: _FrozenSigningClock,
+    clock: _FrozenSigningClock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    context_clock = _ContextClock()
+    monkeypatch.setattr(
+        connectrpc.request, "time", types.SimpleNamespace(monotonic=context_clock.monotonic)
+    )
     timeouts: list[str] = []
 
     def handle(req: ParsedRequest) -> HttpScript:
@@ -172,19 +187,17 @@ async def test_server_deadline_is_what_remains_after_signing(
 
     http = await MockHttpServer.spawn(handle)
     creds = _credentials()
-    timeout = 2.0
-    client = _async_client(http.base_url, creds, timeout)
-    loop = asyncio.get_running_loop()
+    client = _async_client(http.base_url, creds, 2.0)
     try:
         _occupy_signing_capacity(creds)
-        started = loop.time()
-        released: list[float] = []
 
         def release() -> None:
-            released.append(loop.time())
+            # 1.25 s of the request's 2 s pass while it waits; then a
+            # timestamp is free.
+            context_clock.now += 1.25
             clock.advance(1)
 
-        loop.call_later(0.3, release)
+        asyncio.get_running_loop().call_later(0.05, release)
         async with asyncio.timeout(GUARD):
             with pytest.raises(Exception):  # noqa: B017 - the answer is a 404
                 await client.auth.me()
@@ -192,9 +205,7 @@ async def test_server_deadline_is_what_remains_after_signing(
         await client.aclose()
         await http.aclose()
 
-    assert len(timeouts) == 1
-    waited_ms = (released[0] - started) * 1000
-    assert int(timeouts[0]) <= timeout * 1000 - waited_ms + 1
+    assert timeouts == ["750"]
 
 
 class _ThreadedApi:

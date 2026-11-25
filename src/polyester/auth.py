@@ -5,6 +5,7 @@ import hashlib
 import os
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, NoReturn
 from urllib.parse import parse_qsl, quote_from_bytes, unquote_to_bytes, urlsplit
@@ -93,21 +94,39 @@ class _SigningTimestampAllocator:
         """
         return self._try_next()
 
-    async def next_async(self, timeout: float | None = None) -> int:
+    async def next_async(self, time_left: Callable[[], float] | None = None) -> int:
         """Allocate with bounded, cooperative backpressure.
 
         The wait for capacity ends after ``_MAX_SIGNING_BACKPRESSURE_SECONDS``
-        with :class:`PolyesterRateLimitError`. ``timeout``, the time left before
-        a request's deadline, ends it sooner with ``TimeoutError``. A waiter
-        that leaves, cancelled or out of time, takes no timestamp.
+        with :class:`PolyesterRateLimitError`. ``time_left`` reads the seconds
+        left before a request's deadline from the request itself; when less is
+        left than that cap, the deadline ends the wait instead, with
+        ``TimeoutError``. A waiter that leaves, cancelled or out of time, takes
+        no timestamp.
         """
+        loop = asyncio.get_running_loop()
+        deadline_left: Callable[[], float] | None = None
+        wait_seconds = _MAX_SIGNING_BACKPRESSURE_SECONDS
+        if time_left is not None:
+            left = time_left()
+            if left < _MAX_SIGNING_BACKPRESSURE_SECONDS:
+                if left <= 0:
+                    raise TimeoutError("the request deadline passed before signing")
+                deadline_left = time_left
+                wait_seconds = left
 
         async def allocate() -> int:
-            loop = asyncio.get_running_loop()
             gate = self._enter_async_gate(loop)
             try:
                 async with gate.lock:
                     while True:
+                        # The request's deadline decides, checked just before a
+                        # timestamp is taken: a loop that resumes late can run
+                        # this retry after the deadline passed but before
+                        # wait_for acts on it, and Python 3.11's wait_for then
+                        # returns what the retry took.
+                        if deadline_left is not None and deadline_left() <= 0:
+                            raise TimeoutError("the request deadline passed before signing")
                         try:
                             return self._try_next()
                         except PolyesterRateLimitError as exc:
@@ -115,16 +134,11 @@ class _SigningTimestampAllocator:
             finally:
                 self._leave_async_gate(loop, gate)
 
-        if timeout is not None and timeout < _MAX_SIGNING_BACKPRESSURE_SECONDS:
-            if timeout <= 0:
-                raise TimeoutError("the request deadline passed before signing")
-            return await asyncio.wait_for(allocate(), timeout=timeout)
         try:
-            return await asyncio.wait_for(
-                allocate(),
-                timeout=_MAX_SIGNING_BACKPRESSURE_SECONDS,
-            )
+            return await asyncio.wait_for(allocate(), timeout=wait_seconds)
         except TimeoutError as exc:
+            if deadline_left is not None:
+                raise
             raise PolyesterRateLimitError(
                 "signing timestamp capacity exhausted; retry after clock advances",
                 retry_after=0.001,
@@ -376,15 +390,16 @@ async def _sign_request_async(
     body: bytes,
     timestamp_ms: str | None = None,
     recv_window_ms: int | None = None,
-    timeout: float | None = None,
+    time_left: Callable[[], float] | None = None,
 ) -> dict[str, str]:
-    """:func:`sign_request_async` waiting at most ``timeout`` seconds for capacity.
+    """:func:`sign_request_async` for a request with a deadline.
 
-    A request passes the time left before its deadline; ``TimeoutError`` means
-    it ran out first, and nothing was signed.
+    ``time_left`` reads the seconds left before the request's deadline (see
+    ``_SigningTimestampAllocator.next_async``); ``TimeoutError`` means it ran
+    out first, and nothing was signed.
     """
     validate_recv_window_ms(recv_window_ms)
-    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async(timeout))
+    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async(time_left))
     return _sign_request_at_timestamp(
         credentials,
         method=method,

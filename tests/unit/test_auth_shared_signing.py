@@ -14,9 +14,11 @@ import gc
 import os
 import random
 import threading
+import time
 import types
 import uuid
 import weakref
+from collections.abc import Callable
 
 import pytest
 
@@ -289,6 +291,12 @@ def _fill_signing_capacity(creds: ApiKeyCredentials) -> int:
             return last
 
 
+def _deadline_in(seconds: float) -> Callable[[], float]:
+    """A request deadline ``seconds`` from now, read as the time left."""
+    end = time.monotonic() + seconds
+    return lambda: end - time.monotonic()
+
+
 async def test_a_request_deadline_bounds_the_capacity_wait(clock: FakeClock) -> None:
     creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
     allocator = creds._timestamp_allocator
@@ -300,23 +308,23 @@ async def test_a_request_deadline_bounds_the_capacity_wait(clock: FakeClock) -> 
     loop = asyncio.get_running_loop()
     started = loop.time()
     with pytest.raises(TimeoutError):
-        await allocator.next_async(timeout=0.05)
+        await allocator.next_async(_deadline_in(0.05))
     assert loop.time() - started < 2.0
     # The expired waiter left the queue and took no timestamp.
     assert not allocator._async_gates
     clock.advance(1)
-    assert await allocator.next_async(timeout=1.0) == last + 1
+    assert await allocator.next_async(_deadline_in(1.0)) == last + 1
 
 
 async def test_an_expired_deadline_takes_no_timestamp(clock: FakeClock) -> None:
     creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
     allocator = creds._timestamp_allocator
     with pytest.raises(TimeoutError):
-        await allocator.next_async(timeout=0)
+        await allocator.next_async(lambda: 0.0)
     with pytest.raises(TimeoutError):
-        await allocator.next_async(timeout=-0.001)
+        await allocator.next_async(lambda: -0.001)
     assert not allocator._async_gates
-    assert await allocator.next_async(timeout=1.0) == clock.now_ms
+    assert await allocator.next_async(_deadline_in(1.0)) == clock.now_ms
 
 
 async def test_the_capacity_cap_still_ends_a_longer_deadline(
@@ -327,7 +335,7 @@ async def test_the_capacity_cap_still_ends_a_longer_deadline(
     allocator = creds._timestamp_allocator
     _fill_signing_capacity(creds)
     with pytest.raises(PolyesterRateLimitError):
-        await allocator.next_async(timeout=5.0)
+        await allocator.next_async(_deadline_in(5.0))
     assert not allocator._async_gates
 
 
@@ -341,7 +349,7 @@ async def test_a_cancelled_waiter_leaves_the_queue_without_a_timestamp(
     loop = asyncio.get_running_loop()
 
     # The first waiter holds the loop's gate and retries; the others queue on it.
-    waiters = [asyncio.create_task(allocator.next_async(timeout=5.0)) for _ in range(3)]
+    waiters = [asyncio.create_task(allocator.next_async(_deadline_in(5.0))) for _ in range(3)]
     # Yield until all three wait; how many turns that takes varies by version.
     for _ in range(100):
         gate = allocator._async_gates.get(loop)
@@ -375,9 +383,9 @@ class _SteppedLoop(asyncio.SelectorEventLoop):
 def test_a_waiter_resumed_past_its_deadline_takes_no_timestamp(clock: FakeClock) -> None:
     """A loop that resumes late runs a waiter's retry and its timeout together.
 
-    One timestamp is freed, then the loop's clock moves past the waiter's
-    100 ms deadline, so its 1 ms retry and its timeout are due on the same
-    turn. The retry must not take the timestamp: the request is out of time,
+    One timestamp is freed, then the request's and the loop's clocks move past
+    the waiter's 100 ms deadline, so its 1 ms retry and its timeout are due on
+    the same turn. The retry must not take the timestamp: the request is out of time,
     and the waiter queued behind it needs that timestamp.
     """
     creds = ApiKeyCredentials(key_id=fresh_key_id(), private_key=SYNTHETIC_SEED)
@@ -385,10 +393,12 @@ def test_a_waiter_resumed_past_its_deadline_takes_no_timestamp(clock: FakeClock)
     last = _fill_signing_capacity(creds)
     loop = _SteppedLoop()
     try:
+        # The request's own clock: 100 ms left until the test moves it.
+        left = [0.1]
 
         async def queue() -> tuple[asyncio.Future[int], asyncio.Future[int]]:
-            urgent = asyncio.ensure_future(allocator.next_async(timeout=0.1))
-            patient = asyncio.ensure_future(allocator.next_async(timeout=5.0))
+            urgent = asyncio.ensure_future(allocator.next_async(lambda: left[0]))
+            patient = asyncio.ensure_future(allocator.next_async(_deadline_in(5.0)))
             # The urgent waiter holds the gate and sleeps between retries.
             for _ in range(100):
                 gate = allocator._async_gates.get(asyncio.get_running_loop())
@@ -399,6 +409,7 @@ def test_a_waiter_resumed_past_its_deadline_takes_no_timestamp(clock: FakeClock)
 
         urgent, patient = loop.run_until_complete(queue())
         clock.advance(1)
+        left[0] -= 0.2
         loop.offset += 0.2
         with pytest.raises(TimeoutError):
             loop.run_until_complete(urgent)

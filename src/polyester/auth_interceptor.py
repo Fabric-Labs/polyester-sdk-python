@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from functools import partial
 
 from connectrpc.code import Code
 from connectrpc.codec import Codec
@@ -14,6 +15,12 @@ from polyester.user_agent import USER_AGENT, USER_AGENT_HEADER
 
 # The request deadline the Connect protocol sends the server, in milliseconds.
 _CONNECT_TIMEOUT_HEADER = "connect-timeout-ms"
+
+
+def _seconds_left(ctx: RequestContext) -> float:
+    """The seconds left before the request's deadline, by its own clock."""
+    remaining_ms = ctx.timeout_ms()
+    return 0.0 if remaining_ms is None else remaining_ms / 1000
 
 
 def _deadline_exceeded() -> ConnectError:
@@ -65,7 +72,6 @@ class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
         info = ctx.method()
         url = f"{self._base_url}/{info.service_name}/{info.name}"
         body = self._codec.encode(request)
-        remaining_ms = ctx.timeout_ms()
         try:
             headers = await _sign_request_async(
                 self._credentials,
@@ -73,7 +79,7 @@ class ApiKeyAuthUnaryInterceptor(UnaryInterceptor):
                 url=url,
                 body=body,
                 recv_window_ms=self._recv_window_ms,
-                timeout=None if remaining_ms is None else remaining_ms / 1000,
+                time_left=None if ctx.timeout_ms() is None else partial(_seconds_left, ctx),
             )
         except TimeoutError as exc:
             raise _deadline_exceeded() from exc

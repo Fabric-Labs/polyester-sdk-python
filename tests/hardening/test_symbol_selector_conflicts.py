@@ -1,4 +1,4 @@
-"""POLY-9238: a method given both ``symbol`` and ``symbol_id`` must not let one win.
+"""A method given both ``symbol`` and ``symbol_id`` must not let one win.
 
 ``orders.list_history(symbol="LTC-USDT", symbol_id=1)`` sent ``symbol_id=[1]`` and
 returned BTC-USDT history under the LTC-USDT label; so did an unknown name paired with

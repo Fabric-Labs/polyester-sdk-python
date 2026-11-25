@@ -74,7 +74,7 @@ async def capture_transport():
 
 
 @pytest.mark.parametrize("since", [None, 0, 1_793_922_052_911_123, 2**64 - 1])
-async def test_poly_8471_since_is_inclusive_microsecond_lower_bound(since):
+async def test_since_is_inclusive_microsecond_lower_bound(since):
     async with capture_transport() as (transport, requests):
         await AsyncTransfersService(transport, None).list(since=since)
     assert len(requests) == 1
@@ -139,7 +139,7 @@ def test_transfers_request_keeps_an_explicit_zero_upper_bound_apart_from_none():
 
 
 @pytest.mark.parametrize("since", [-1, -(2**100), 2**64, 1.5, "5", True, False])
-async def test_poly_8471_invalid_since_is_rejected_before_transport(since):
+async def test_invalid_since_is_rejected_before_transport(since):
     async with capture_transport() as (transport, requests):
         with pytest.raises(PolyesterValidationError, match="since"):
             await AsyncTransfersService(transport, None).list(since=since)
@@ -148,7 +148,7 @@ async def test_poly_8471_invalid_since_is_rejected_before_transport(since):
 
 @pytest.mark.parametrize("destination", ["destination_account_id", "destination_subaccount_id"])
 @pytest.mark.parametrize("address", [None, "", " \t "])
-async def test_poly_8468_python_never_overwrites_a_valid_recipient(destination, address):
+async def test_python_never_overwrites_a_valid_recipient(destination, address):
     async with capture_transport() as (transport, requests):
         service = AsyncInternalTransfersService(transport, CatalogManager(), None)
         kwargs = {destination: format_id(42), "destination_smart_account_address": address}
@@ -160,7 +160,7 @@ async def test_poly_8468_python_never_overwrites_a_valid_recipient(destination, 
 
 
 @pytest.mark.parametrize("address", ["", " \t ", "0xlocal"])
-async def test_poly_8468_python_address_only_rejects_blanks(address):
+async def test_python_address_only_rejects_blanks(address):
     async with capture_transport() as (transport, requests):
         service = AsyncInternalTransfersService(transport, CatalogManager(), None)
         kwargs = {"destination_smart_account_address": address}
@@ -201,7 +201,7 @@ WITHDRAW_BASE = dict(
         {"account": "42", "sub_account_id": "43"},
     ],
 )
-async def test_poly_8474_api_key_withdraw_rejects_explicit_selectors(method, selectors):
+async def test_api_key_withdraw_rejects_explicit_selectors(method, selectors):
     async with capture_transport() as (transport, requests):
         service = AsyncWithdrawService(transport, "42")
         kwargs = dict(WITHDRAW_BASE)
@@ -214,7 +214,7 @@ async def test_poly_8474_api_key_withdraw_rejects_explicit_selectors(method, sel
 
 @pytest.mark.parametrize("method", ["create_to_funding", "create_to_external_chain"])
 @pytest.mark.parametrize("default", [None, "42"])
-async def test_poly_8474_omitted_selectors_use_authenticated_key_scope(method, default):
+async def test_omitted_selectors_use_authenticated_key_scope(method, default):
     async with capture_transport() as (transport, requests):
         kwargs = dict(WITHDRAW_BASE)
         if method == "create_to_external_chain":
@@ -245,7 +245,7 @@ async def test_poly_8474_omitted_selectors_use_authenticated_key_scope(method, d
         ({"account": {"subaccountId": format_id(44)}}, 44),
     ],
 )
-async def test_poly_8474_wallet_withdraw_still_encodes_scope(selectors, expected):
+async def test_wallet_withdraw_still_encodes_scope(selectors, expected):
     async with capture_transport() as (transport, requests):
         await AsyncWithdrawService(transport, format_id(42)).create_wallet_trading_withdraw(
             action="to_funding",
@@ -286,7 +286,7 @@ async def trigger_write(service, operation, fields):
 
 @pytest.mark.parametrize("operation", ["modify", "trailing_stop", "stop_loss", "twap"])
 @pytest.mark.parametrize("bps", [50, 0])
-async def test_poly_8513_competing_slippage_rejected_before_transport(operation, bps):
+async def test_competing_slippage_rejected_before_transport(operation, bps):
     async with capture_transport() as (transport, requests):
         with pytest.raises(PolyesterValidationError, match="at most one of max_slippage"):
             await trigger_write(
@@ -296,7 +296,7 @@ async def test_poly_8513_competing_slippage_rejected_before_transport(operation,
 
 
 @pytest.mark.parametrize("operation", ["modify", "trailing_stop"])
-async def test_poly_8513_competing_distance_rejected_before_transport(operation):
+async def test_competing_distance_rejected_before_transport(operation):
     async with capture_transport() as (transport, requests):
         with pytest.raises(
             PolyesterValidationError, match="trailing_distance_ticks.*trailing_distance_bps"
@@ -321,7 +321,7 @@ async def test_poly_8513_competing_distance_rejected_before_transport(operation)
         ("trailing_distance_bps", 50, "trailing_distance"),
     ],
 )
-async def test_poly_8513_single_fields_round_trip_including_modify_zero(
+async def test_single_fields_round_trip_including_modify_zero(
     operation, field, value, oneof
 ):
     async with capture_transport() as (transport, requests):

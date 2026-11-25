@@ -1,4 +1,4 @@
-"""POLY-3549: catalog scale must not invent 8 for unhydrated symbols."""
+"""Catalog scale must not invent 8 for unhydrated symbols."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""POLY-9019: market overview rows keep the 24h range, top of book and times.
+"""Market overview rows keep the 24h range, top of book and times.
 
 Every path that builds ``MarketOverviewEntry`` (``list``, the live
 subscription, the protobuf decoder and the JSON decoder) exposes the 24h high

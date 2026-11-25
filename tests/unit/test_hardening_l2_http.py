@@ -1,4 +1,4 @@
-"""POLY-3746 L1 helper-level regressions (private fetch_rt_token / local stall HTTP).
+"""L1 helper-level regressions (private fetch_rt_token / local stall HTTP).
 
 Public-API L2 coverage lives in ``tests/hardening/test_hardening_l2.py``.
 """

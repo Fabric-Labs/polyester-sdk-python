@@ -1,4 +1,4 @@
-"""POLY-9127: methods that name a market wait for construction-time catalog hydration.
+"""Methods that name a market wait for construction-time catalog hydration.
 
 A local Connect server holds ``GetSpotConfig`` open until the test releases it, so
 each call is made while hydration is still running. No timing is involved: the call
@@ -399,7 +399,7 @@ async def test_zipped_asset_supply_waits_for_the_scales_it_decodes_with(fail: bo
         task = await harness.start(lambda c, _s: c.zipper.subscribe_zipped_asset_supply())
         assert not task.done(), "the supply stream started before the funding config loaded"
         harness.release(fail=fail)
-        # POLY-9228: the stream waits for the funding config, not the spot config.
+        # The stream waits for the funding config, not the spot config.
         expected = PolyesterCatalogHydrationError if fail else _Reached
         with pytest.raises(expected, match="funding config" if fail else ""):
             await asyncio.wait_for(task, 10)

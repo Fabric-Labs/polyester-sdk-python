@@ -1,4 +1,4 @@
-"""POLY-8563 review: the publication age is never negative, read from any thread.
+"""The publication age is never negative, read from any thread.
 
 The sync handle reads the age from the caller's thread while the client loop records
 publications. Reading the clock before the last publication's time let a publication

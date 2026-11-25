@@ -1,4 +1,4 @@
-"""POLY-3746: JSON-RPC body cap + envelope validation."""
+"""JSON-RPC body cap + envelope validation."""
 
 from __future__ import annotations
 

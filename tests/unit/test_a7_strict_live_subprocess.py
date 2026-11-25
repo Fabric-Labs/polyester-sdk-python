@@ -1,4 +1,4 @@
-"""POLY-3746 A7: STRICT_LIVE + missing/malformed credentials fail via subprocess."""
+"""A7: STRICT_LIVE + missing/malformed credentials fail via subprocess."""
 
 from __future__ import annotations
 

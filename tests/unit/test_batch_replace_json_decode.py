@@ -1,4 +1,4 @@
-"""POLY-8998: the public JSON batch-replace decoder keeps item rejection details.
+"""The public JSON batch-replace decoder keeps item rejection details.
 
 ``decode_batch_replace_result`` decodes each item's field violations (and
 the rate-limit detail and action taken beside them) as the protobuf path

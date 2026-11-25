@@ -1,4 +1,4 @@
-"""POLY-3746 L2 integration tests via public SDK APIs + local mock HTTP/WS.
+"""L2 integration tests via public SDK APIs + local mock HTTP/WS.
 
 These exercise production paths (subscribe_proto, JsonRpcClient, wait_for_catalogs,
 wait_for_order_trades_complete, balances.list, Quantity/place scale resolution)

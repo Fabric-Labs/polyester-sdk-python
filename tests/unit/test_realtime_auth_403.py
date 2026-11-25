@@ -1,4 +1,4 @@
-"""POLY-3746: realtime token 403 maps to structured auth/permission error."""
+"""Realtime token 403 maps to structured auth/permission error."""
 
 from __future__ import annotations
 

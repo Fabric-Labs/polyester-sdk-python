@@ -1,9 +1,9 @@
 """Typed reads keep contract fields the server sends.
 
-* Each address-book view entry keeps its own ``revision`` (POLY-9893).
-* An API key keeps its policy, IP allowlist, expiry and public key (POLY-9894).
+* Each address-book view entry keeps its own ``revision``.
+* An API key keeps its policy, IP allowlist, expiry and public key.
 * An order keeps the ``batch_request_id`` of the batch replace that admitted
-  it (POLY-9896).
+  it.
 
 The reads go through the public services over both wire formats, and through
 the realtime decoders for the streams.
@@ -58,7 +58,7 @@ async def _client(responses: dict[str, Message], json_wire: bool) -> tuple[Async
     return client, http
 
 
-# --- POLY-9893: address-book view entry revisions -------------------------
+# --- Address-book view entry revisions ------------------------------------
 
 
 def _external(entry_id: int, revision: int) -> address_book_pb2.ExternalAddressBookEntry:
@@ -137,7 +137,7 @@ async def test_address_book_view_entries_keep_their_own_revision(json_wire: bool
         assert entry.revision == generic[entry.address_book_entry_id]
 
 
-# --- POLY-9894: API-key policy, IP allowlist, expiry, public key -----------
+# --- API-key policy, IP allowlist, expiry, public key ---------------------
 
 _PUBLIC_KEY = bytes(range(32))
 
@@ -231,7 +231,7 @@ def test_api_key_stream_keeps_policy_allowlist_and_expiry(
     _assert_absent(decode_api_key_bytes(_absent_key().SerializeToString()))
 
 
-# --- POLY-9896: order batch_request_id -------------------------------------
+# --- Order batch_request_id -----------------------------------------------
 
 _BATCH_CASES = [(7, "8"), (18_446_744_073_709_551_614, "jpXCZedGfVP"), (0, "")]
 

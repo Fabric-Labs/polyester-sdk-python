@@ -1,4 +1,4 @@
-"""POLY-9018: sync client methods called from a client callback.
+"""Sync client methods called from a client callback.
 
 A ``SyncSubscription`` closed from a callback stops delivery at once and
 returns without waiting on the client loop it is running on. Every other sync

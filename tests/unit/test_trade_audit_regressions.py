@@ -38,7 +38,7 @@ def _create_trailing(**overrides: int):
     return create_trigger_to_proto(**kwargs)
 
 
-def test_poly_4684_attached_trailing_slippage_bps_is_capped() -> None:
+def test_attached_trailing_slippage_bps_is_capped() -> None:
     risk_policy_from_dict(
         {"trailing_stop": {"trailing_distance_bps": 100, "max_slippage_bps": 9_999}}
     )
@@ -48,12 +48,12 @@ def test_poly_4684_attached_trailing_slippage_bps_is_capped() -> None:
         )
 
 
-def test_poly_4684_standalone_trailing_slippage_cap_is_retained() -> None:
+def test_standalone_trailing_slippage_cap_is_retained() -> None:
     _create_trailing(max_slippage_bps=9_999)
     with pytest.raises(PolyesterValidationError, match="max_slippage_bps.*1.*9999"):
         _create_trailing(max_slippage_bps=10_000)
     # Modify takes the contract's 0 to 10000 and the server decides by side
-    # and type (POLY-9426): a trailing stop answers MAX_SLIPPAGE_INVALID.
+    # and type: a trailing stop answers MAX_SLIPPAGE_INVALID.
     assert (
         modify_trigger_to_proto(
             trigger_id="2", symbol_id=1, max_slippage_bps=10_000
@@ -68,7 +68,7 @@ def test_poly_4684_standalone_trailing_slippage_cap_is_retained() -> None:
     )
 
 
-def test_poly_4686_batch_create_rejects_duplicate_nonempty_client_order_ids() -> None:
+def test_batch_create_rejects_duplicate_nonempty_client_order_ids() -> None:
     with pytest.raises(PolyesterValidationError, match="duplicate client_order_id.*duplicate"):
         batch_create_orders_to_proto(
             items=[_batch_item("duplicate"), _batch_item("duplicate")],
@@ -76,7 +76,7 @@ def test_poly_4686_batch_create_rejects_duplicate_nonempty_client_order_ids() ->
         )
 
 
-def test_poly_4686_batch_create_allows_empty_or_omitted_client_order_ids() -> None:
+def test_batch_create_allows_empty_or_omitted_client_order_ids() -> None:
     proto = batch_create_orders_to_proto(
         items=[_batch_item(), _batch_item(""), _batch_item()],
         quantity_scale=8,
@@ -84,7 +84,7 @@ def test_poly_4686_batch_create_allows_empty_or_omitted_client_order_ids() -> No
     assert [item.client_order_id for item in proto.items] == ["", "", ""]
 
 
-def test_poly_4687_attached_risk_preserves_fired_leg_runtime_state_and_ids() -> None:
+def test_attached_risk_preserves_fired_leg_runtime_state_and_ids() -> None:
     # The current orders_read contract names the successfully fired terminal state COMPLETED.
     state = orders_read_pb2.AttachedRiskLegState(
         status=orders_read_pb2.AttachedRiskLegState.COMPLETED,
@@ -118,7 +118,7 @@ def test_poly_4687_attached_risk_preserves_fired_leg_runtime_state_and_ids() -> 
     assert order.attached_risk.take_profit.state.child_order_id == format_id(42)
 
 
-def test_poly_4687_malformed_response_preserves_stop_loss_and_trailing_stop() -> None:
+def test_malformed_response_preserves_stop_loss_and_trailing_stop() -> None:
     msg = orders_read_pb2.Order(
         order_id=1,
         symbol_id=1,
@@ -170,7 +170,7 @@ def _state_only_leg(status: int, *, seed: int) -> orders_read_pb2.AttachedRiskLe
     )
 
 
-def test_poly_4687_state_only_take_profit_is_preserved_without_fabricated_policy() -> None:
+def test_state_only_take_profit_is_preserved_without_fabricated_policy() -> None:
     order = order_from_proto(
         orders_read_pb2.Order(
             order_id=1,
@@ -200,7 +200,7 @@ def test_poly_4687_state_only_take_profit_is_preserved_without_fabricated_policy
     assert state.child_order_id == format_id(201)
 
 
-def test_poly_4687_state_only_stop_loss_is_preserved_without_fabricated_policy() -> None:
+def test_state_only_stop_loss_is_preserved_without_fabricated_policy() -> None:
     order = order_from_proto(
         orders_read_pb2.Order(
             order_id=1,
@@ -230,7 +230,7 @@ def test_poly_4687_state_only_stop_loss_is_preserved_without_fabricated_policy()
     assert state.child_order_id == format_id(202)
 
 
-def test_poly_4687_state_only_trailing_is_preserved_with_stop_loss() -> None:
+def test_state_only_trailing_is_preserved_with_stop_loss() -> None:
     order = order_from_proto(
         orders_read_pb2.Order(
             order_id=1,
@@ -267,7 +267,7 @@ def test_poly_4687_state_only_trailing_is_preserved_with_stop_loss() -> None:
     assert state.child_order_id == format_id(204)
 
 
-def test_poly_4688_stale_reset_does_not_rewind_newer_snapshot() -> None:
+def test_stale_reset_does_not_rewind_newer_snapshot() -> None:
     bids = {100: 5}
     asks = {200: 3}
 
@@ -293,7 +293,7 @@ def test_poly_4688_stale_reset_does_not_rewind_newer_snapshot() -> None:
     ("seq_start", "seq_end", "expected_seq"),
     [("100", "100", 100), ("99", "101", 101), ("101", "102", 102)],
 )
-def test_poly_4688_reset_sequence_boundary_semantics(
+def test_reset_sequence_boundary_semantics(
     seq_start: str, seq_end: str, expected_seq: int
 ) -> None:
     bids = {100: 5}
@@ -322,19 +322,19 @@ def test_poly_4688_reset_sequence_boundary_semantics(
 
 
 @pytest.mark.parametrize("value", [0, 10_001, 10**12])
-def test_poly_4689_attached_trailing_distance_bps_validates_before_proto(value: int) -> None:
+def test_attached_trailing_distance_bps_validates_before_proto(value: int) -> None:
     with pytest.raises(PolyesterValidationError, match="trailing_distance_bps.*1.*10000"):
         risk_policy_from_dict({"trailing_stop": {"trailing_distance_bps": value}})
 
 
 @pytest.mark.parametrize("value", [0, 10_001, 10**12])
-def test_poly_4689_standalone_create_distance_bps_is_capped(value: int) -> None:
+def test_standalone_create_distance_bps_is_capped(value: int) -> None:
     with pytest.raises(PolyesterValidationError, match="trailing_distance_bps.*1.*10000"):
         _create_trailing(trailing_distance_bps=value)
 
 
 @pytest.mark.parametrize("value", [0, 10_001, 10**12])
-def test_poly_4689_standalone_modify_distance_bps_is_capped(value: int) -> None:
+def test_standalone_modify_distance_bps_is_capped(value: int) -> None:
     # The contract takes 1 to 10000 on modify too: 0 does not clear a distance.
     with pytest.raises(PolyesterValidationError, match="trailing_distance_bps.*1.*10000"):
         modify_trigger_to_proto(trigger_id="2", symbol_id=1, trailing_distance_bps=value)
@@ -344,7 +344,7 @@ def test_poly_4689_standalone_modify_distance_bps_is_capped(value: int) -> None:
     ("price_min", "price_max"),
     [("52000", "48000"), ("50000", "50000")],
 )
-def test_poly_4695_ladder_requires_strictly_increasing_resolved_prices(
+def test_ladder_requires_strictly_increasing_resolved_prices(
     price_min: str, price_max: str
 ) -> None:
     with pytest.raises(PolyesterValidationError, match="ladder_price_min.*less than.*max"):

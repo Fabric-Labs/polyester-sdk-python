@@ -1,9 +1,9 @@
 """Batch rejection details, unresolved cancel IDs, TWAP fire prices and sell caps.
 
-POLY-8960: each rejected batch item keeps the server's field violations.
-POLY-8920: a rejected batch cancel that resolved no order keeps its ID empty.
-POLY-8959: a TWAP slice sent without a fire price keeps it absent.
-POLY-8961: a sell TWAP market slice takes at most 9999 bps; a buy, 10000.
+* Each rejected batch item keeps the server's field violations.
+* A rejected batch cancel that resolved no order keeps its ID empty.
+* A TWAP slice sent without a fire price keeps it absent.
+* A sell TWAP market slice takes at most 9999 bps; a buy, 10000.
 """
 
 from __future__ import annotations

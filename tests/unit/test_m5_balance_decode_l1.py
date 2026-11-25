@@ -1,4 +1,4 @@
-"""POLY-3746 M5 L1: direct decoder preserves scaled ledger integers (not L2)."""
+"""M5 L1: direct decoder preserves scaled ledger integers (not L2)."""
 
 from __future__ import annotations
 

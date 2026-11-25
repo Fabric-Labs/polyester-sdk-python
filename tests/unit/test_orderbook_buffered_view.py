@@ -1,4 +1,4 @@
-"""POLY-9098: a snapshot applied with the deltas buffered behind it adds one view.
+"""A snapshot applied with the deltas buffered behind it adds one view.
 
 The snapshot answer is held back, so the deltas the server publishes right after the
 subscribe are buffered. Applying them is one book state. A view for the snapshot, plus

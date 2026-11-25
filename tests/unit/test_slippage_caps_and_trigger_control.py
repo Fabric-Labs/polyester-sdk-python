@@ -126,7 +126,7 @@ def test_buy_trailing_stop_limit_price_must_reach_activation_price() -> None:
 
 
 def test_trigger_modify_caps_slippage_at_10000_and_zero_clears() -> None:
-    # The contract's modify bound is 0 to 10000 (POLY-9426); the server
+    # The contract's modify bound is 0 to 10000; the server
     # refuses 10000 for a sell or a trailing stop.
     assert modify_trigger_to_proto(trigger_id="2", max_slippage_bps=10_000).max_slippage_bps == (
         10_000

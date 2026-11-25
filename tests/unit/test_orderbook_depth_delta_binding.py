@@ -1,4 +1,4 @@
-"""Order-book depth, delta and market-binding regressions (POLY-8581/8583/8586/8588)."""
+"""Order-book depth, delta and market-binding regressions."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def _book(**overrides):
     return build_orderbook_data(**args)
 
 
-# POLY-8581: a negative depth is invalid caller input, not a slice from the end.
+# A negative depth is invalid caller input, not a slice from the end.
 @pytest.mark.parametrize("depth", [-1, -2])
 @pytest.mark.parametrize("populated", [False, True])
 def test_build_orderbook_data_refuses_negative_depth(depth: int, populated: bool) -> None:
@@ -70,8 +70,8 @@ def _delta(bids=(), asks=(), *, start="10", end="11", reset=False) -> OrderBookD
     )
 
 
-# POLY-8583: a positive quantity at price zero can't be rendered, so the whole
-# delta fails closed like any malformed delta.
+# A positive quantity at price zero can't be rendered, so the whole delta
+# fails closed like any malformed delta.
 @pytest.mark.parametrize(
     "delta",
     [
@@ -195,7 +195,7 @@ def _assert_bound(levels, symbol: str) -> None:
             level.qty.compatible_with(symbol="BTC-USDT", scale=8)
 
 
-# POLY-8588: book levels keep the market they were read for.
+# Book levels keep the market they were read for.
 async def test_snapshot_levels_are_bound_to_their_market(monkeypatch) -> None:
     service, _ = _snapshot_service(monkeypatch, levels=2)
     book = await service.get(symbol="LTC-USDT", depth=5)

@@ -1,4 +1,4 @@
-"""POLY-9228: no member of an error's chain prints a credential.
+"""No member of an error's chain prints a credential.
 
 An answer, or a transport error, can quote a URL with userinfo, such as a
 proxy's. The SDK's own message was redacted, but the exceptions it chains for

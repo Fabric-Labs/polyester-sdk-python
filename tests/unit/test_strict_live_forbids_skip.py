@@ -1,4 +1,4 @@
-"""POLY-3746 A7: POLYESTER_TEST_STRICT_LIVE flips skip → fail."""
+"""A7: POLYESTER_TEST_STRICT_LIVE flips skip → fail."""
 
 from __future__ import annotations
 

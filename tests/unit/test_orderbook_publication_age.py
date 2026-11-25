@@ -1,4 +1,4 @@
-"""POLY-8563: a stalled publisher must be distinguishable from a quiet market.
+"""A stalled publisher must be distinguishable from a quiet market.
 
 The server republishes every book about every 30 s, so the time since the stream's
 last publication tells them apart; the managed book reports it.

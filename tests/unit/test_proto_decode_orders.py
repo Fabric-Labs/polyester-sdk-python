@@ -292,7 +292,7 @@ def test_modify_order_from_proto_action_taken_enum() -> None:
 
 def test_order_mutation_from_proto_create_includes_client_order_id() -> None:
     # CreateOrderResponse no longer carries a status field; decode synthesizes
-    # "accepted" (POLY-3701).
+    # "accepted".
     msg = orders_pb2.CreateOrderResponse(
         order_id=42,
         client_order_id="coid-1",

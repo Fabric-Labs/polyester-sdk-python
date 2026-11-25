@@ -1,6 +1,6 @@
-"""POLY-3746: wait_for_catalogs fails closed when hydration fails.
+"""wait_for_catalogs fails closed when hydration fails.
 
-POLY-9228: it raises ``PolyesterCatalogHydrationError`` naming the spot config,
+It raises ``PolyesterCatalogHydrationError`` naming the spot config,
 with the failure as ``__cause__`` (the error ``catalogs_last_error`` holds).
 """
 

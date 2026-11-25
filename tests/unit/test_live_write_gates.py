@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WRITE_TESTS = [
     "tests/integration/test_address_book.py::test_address_book_create_update_new_tags_round_trip",
     "tests/integration/test_address_book.py::test_social_verification_start_accepts_at_handle",
-    "tests/integration/test_poly4996.py::test_social_verification_discord_without_handle",
+    "tests/integration/test_live_wrapper_coverage.py::test_social_verification_discord_without_handle",
 ]
 
 # The read-only live tier of scripts/test_all.sh.

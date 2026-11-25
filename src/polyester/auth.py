@@ -93,8 +93,14 @@ class _SigningTimestampAllocator:
         """
         return self._try_next()
 
-    async def next_async(self) -> int:
-        """Allocate with bounded, cooperative backpressure."""
+    async def next_async(self, timeout: float | None = None) -> int:
+        """Allocate with bounded, cooperative backpressure.
+
+        The wait for capacity ends after ``_MAX_SIGNING_BACKPRESSURE_SECONDS``
+        with :class:`PolyesterRateLimitError`. ``timeout``, the time left before
+        a request's deadline, ends it sooner with ``TimeoutError``. A waiter
+        that leaves, cancelled or out of time, takes no timestamp.
+        """
 
         async def allocate() -> int:
             loop = asyncio.get_running_loop()
@@ -109,6 +115,10 @@ class _SigningTimestampAllocator:
             finally:
                 self._leave_async_gate(loop, gate)
 
+        if timeout is not None and timeout < _MAX_SIGNING_BACKPRESSURE_SECONDS:
+            if timeout <= 0:
+                raise TimeoutError("the request deadline passed before signing")
+            return await asyncio.wait_for(allocate(), timeout=timeout)
         try:
             return await asyncio.wait_for(
                 allocate(),
@@ -348,8 +358,33 @@ async def sign_request_async(
 
     ``recv_window_ms`` works as for :func:`sign_request`.
     """
+    return await _sign_request_async(
+        credentials,
+        method=method,
+        url=url,
+        body=body,
+        timestamp_ms=timestamp_ms,
+        recv_window_ms=recv_window_ms,
+    )
+
+
+async def _sign_request_async(
+    credentials: ApiKeyCredentials,
+    *,
+    method: str,
+    url: str,
+    body: bytes,
+    timestamp_ms: str | None = None,
+    recv_window_ms: int | None = None,
+    timeout: float | None = None,
+) -> dict[str, str]:
+    """:func:`sign_request_async` waiting at most ``timeout`` seconds for capacity.
+
+    A request passes the time left before its deadline; ``TimeoutError`` means
+    it ran out first, and nothing was signed.
+    """
     validate_recv_window_ms(recv_window_ms)
-    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async())
+    timestamp = timestamp_ms or str(await credentials._timestamp_allocator.next_async(timeout))
     return _sign_request_at_timestamp(
         credentials,
         method=method,

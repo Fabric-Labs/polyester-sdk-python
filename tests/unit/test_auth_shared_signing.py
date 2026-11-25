@@ -342,9 +342,13 @@ async def test_a_cancelled_waiter_leaves_the_queue_without_a_timestamp(
 
     # The first waiter holds the loop's gate and retries; the others queue on it.
     waiters = [asyncio.create_task(allocator.next_async(timeout=5.0)) for _ in range(3)]
-    await asyncio.sleep(0)
-    gate = allocator._async_gates[loop]
-    assert gate.users == 3
+    # Yield until all three wait; how many turns that takes varies by version.
+    for _ in range(100):
+        gate = allocator._async_gates.get(loop)
+        if gate is not None and gate.users == 3:
+            break
+        await asyncio.sleep(0)
+    assert gate is not None and gate.users == 3
 
     waiters[cancelled].cancel()
     with pytest.raises(asyncio.CancelledError):

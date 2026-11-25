@@ -1161,9 +1161,12 @@ class InternalTransferBatchResult(msgspec.Struct, kw_only=True, omit_defaults=Tr
     accepted or refused: read it with ``internal_transfers.get_batch`` or
     ``wait_batch``) or ``"refused"`` (nothing moved, and nothing will under
     this idempotency key; the legs that caused it carry ``error_code``).
+    ``"abandoned"``, which only ``internal_transfers.abandon_batch`` answers,
+    means no batch was ever submitted under the idempotency key and none ever
+    will be: nothing moved, ``request_id`` is "" and ``legs`` is empty.
     ``request_id`` is the batch's identifier, "" when it was refused before it
-    was accepted for processing. ``legs`` holds one result per requested leg,
-    in request order.
+    was accepted for processing or its key was abandoned. ``legs`` holds one
+    result per requested leg, in request order.
     """
 
     request_id: str = ""

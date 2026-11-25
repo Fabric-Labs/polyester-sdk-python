@@ -30,6 +30,9 @@ class InternalTransferService(Protocol):
     async def get_internal_transfer_batch(self, request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferBatchRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferBatchResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def abandon_internal_transfer_batch(self, request: transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class InternalTransferServiceASGIApplication(ConnectASGIApplication[InternalTransferService]):
     def __init__(self, service: InternalTransferService | AsyncGenerator[InternalTransferService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -75,6 +78,16 @@ class InternalTransferServiceASGIApplication(ConnectASGIApplication[InternalTran
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_internal_transfer_batch,
+                ),
+                "/transfer.v1.InternalTransferService/AbandonInternalTransferBatch": Endpoint.unary(
+                    method=MethodInfo(
+                        name="AbandonInternalTransferBatch",
+                        service_name="transfer.v1.InternalTransferService",
+                        input=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest,
+                        output=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.abandon_internal_transfer_batch,
                 ),
             },
             interceptors=interceptors,
@@ -170,6 +183,26 @@ class InternalTransferServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def abandon_internal_transfer_batch(
+        self,
+        request: transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="AbandonInternalTransferBatch",
+                service_name="transfer.v1.InternalTransferService",
+                input=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest,
+                output=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -182,6 +215,8 @@ class InternalTransferServiceSync(Protocol):
     def batch_create_internal_transfers(self, request: transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.BatchCreateInternalTransfersResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_internal_transfer_batch(self, request: transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferBatchRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferBatchResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def abandon_internal_transfer_batch(self, request: transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest, ctx: RequestContext) -> transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -228,6 +263,16 @@ class InternalTransferServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_internal_transfer_batch,
+                ),
+                "/transfer.v1.InternalTransferService/AbandonInternalTransferBatch": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="AbandonInternalTransferBatch",
+                        service_name="transfer.v1.InternalTransferService",
+                        input=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest,
+                        output=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.abandon_internal_transfer_batch,
                 ),
             },
             interceptors=interceptors,
@@ -317,6 +362,26 @@ class InternalTransferServiceClientSync(ConnectClientSync):
                 service_name="transfer.v1.InternalTransferService",
                 input=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferBatchRequest,
                 output=transfer_dot_v1_dot_internal__transfer__pb2.GetInternalTransferBatchResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def abandon_internal_transfer_batch(
+        self,
+        request: transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="AbandonInternalTransferBatch",
+                service_name="transfer.v1.InternalTransferService",
+                input=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchRequest,
+                output=transfer_dot_v1_dot_internal__transfer__pb2.AbandonInternalTransferBatchResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

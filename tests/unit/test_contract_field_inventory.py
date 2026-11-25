@@ -105,6 +105,9 @@ MESSAGES = [
     "auth.v1.ActivityItem",
     "marketdata.v1.GetIndexPriceCandlesRequest",
     "marketdata.v1.GetIndexPriceCandlesResponse",
+    # Public contract da1aa89 (0.93.11).
+    "transfer.v1.AbandonInternalTransferBatchRequest",
+    "transfer.v1.AbandonInternalTransferBatchResponse",
 ]
 
 METHODS = {
@@ -116,6 +119,7 @@ METHODS = {
     "statements.cancel_export": AsyncStatementsService.cancel_export,
     "statements.get_export_download_url": AsyncStatementsService.get_export_download_url,
     "internal_transfers.get_batch": AsyncInternalTransfersService.get_batch,
+    "internal_transfers.abandon_batch": AsyncInternalTransfersService.abandon_batch,
     "sub_accounts.list_account_activity": AsyncSubAccountsService.list_account_activity,
     "dust_conversions.list_balances": AsyncDustConversionsService.list_balances,
     "dust_conversions.quote": AsyncDustConversionsService.quote,

@@ -12,6 +12,7 @@ from polyester.codecs.contract_limits import (
     contract_string_pattern,
 )
 from polyester.codecs.decode.internal_transfers import (
+    internal_transfer_batch_from_abandon,
     internal_transfer_batch_from_proto,
     internal_transfer_from_proto,
 )
@@ -21,6 +22,7 @@ from polyester.codecs.withdraw import str_to_u128_proto
 from polyester.errors import PolyesterError, PolyesterValidationError
 from polyester.gen.transfer.v1.internal_transfer_connect import InternalTransferServiceClient
 from polyester.gen.transfer.v1.internal_transfer_pb2 import (
+    AbandonInternalTransferBatchRequest,
     BatchCreateInternalTransfersRequest,
     CreateInternalTransferRequest,
     GetInternalTransferBatchRequest,
@@ -44,6 +46,9 @@ from polyester.types.money import AssetAmount
 BATCH_MIN_LEGS = contract_repeated_items_min(BatchCreateInternalTransfersRequest, "legs")
 BATCH_IDEMPOTENCY_KEY_MIN_LEN, BATCH_IDEMPOTENCY_KEY_MAX_LEN = contract_string_length(
     BatchCreateInternalTransfersRequest, "idempotency_key"
+)
+ABANDON_IDEMPOTENCY_KEY_MIN_LEN, ABANDON_IDEMPOTENCY_KEY_MAX_LEN = contract_string_length(
+    AbandonInternalTransferBatchRequest, "idempotency_key"
 )
 BATCH_REQUEST_ID_MIN_LEN, BATCH_REQUEST_ID_MAX_LEN = contract_string_length(
     GetInternalTransferBatchRequest, "request_id"
@@ -140,6 +145,14 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         which is safe either way: it returns the batch's state, or admits it
         once. A ``RATE_LIMIT_EXCEEDED`` refusal without a retry delay means the
         batch outweighs the account's burst: split it instead of retrying.
+
+        To give the batch up instead, :meth:`abandon_batch` with the key
+        answers the batch if one was submitted, or makes sure none ever will
+        be. A key that was abandoned is refused with
+        :class:`~polyester.errors.PolyesterApiError` for which
+        :func:`~polyester.errors.is_idempotency_key_abandoned` is true
+        (``ERROR_CODE_IDEMPOTENCY_KEY_ABANDONED``): nothing moved under it, and
+        it is not retryable; submit the batch under a new key.
         """
         if not isinstance(idempotency_key, str) or not (
             BATCH_IDEMPOTENCY_KEY_MIN_LEN <= len(idempotency_key) <= BATCH_IDEMPOTENCY_KEY_MAX_LEN
@@ -204,6 +217,13 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
         batch; any other batch answers ``ERROR_CODE_NOT_FOUND``, as an unknown
         one does. ``request_id`` is the decimal string the batch carries: 1 to
         39 ASCII digits without a leading zero.
+
+        It reads by request ID only, so the answer must echo that ID: one that
+        names another batch, or none, raises
+        :class:`~polyester.errors.PolyesterResponseContractError`. An abandoned
+        key has no request ID and never answers this read;
+        :meth:`abandon_batch` with the key reads it (``"abandoned"``, with no
+        ``request_id`` and no legs).
         """
         checked = _batch_request_id(request_id)
         return await unary_auth_decoded(
@@ -214,6 +234,52 @@ class AsyncInternalTransfersService(ScopedSubAccountMixin, BaseService):
             lambda msg: internal_transfer_batch_from_proto(
                 msg, request_id=checked, operation="GetInternalTransferBatch"
             ),
+        )
+
+    async def abandon_batch(self, *, idempotency_key: str) -> InternalTransferBatchResult:
+        """Make the absence of a batch under an idempotency key final
+        (``AbandonInternalTransferBatch``), for example after a
+        :meth:`batch_create` whose answer was lost and that may never have
+        reached the server.
+
+        If a batch was submitted under the key, it answers that batch's outcome
+        (``"accepted"``, ``"processing"`` or ``"refused"``, as
+        :meth:`get_batch` reads it) and changes nothing. Otherwise it records
+        the key as abandoned and answers status ``"abandoned"``, with no
+        ``request_id`` and no legs: no funds moved under the key and none ever
+        will. Every later :meth:`batch_create` under the key, a retry included,
+        is then refused with :class:`~polyester.errors.PolyesterApiError` for
+        which :func:`~polyester.errors.is_idempotency_key_abandoned` is true,
+        and every later abandon of it answers ``"abandoned"`` again. A create
+        and an abandon that race on one key end in exactly one of the two
+        outcomes.
+
+        The key is scoped as :meth:`batch_create` scopes it, to the API key.
+        The key's policy must grant ``INTERNAL_TRANSFER``, and to answer an
+        existing batch also the read permission on every source account of the
+        batch, refused as :meth:`get_batch` refuses it. It needs no MFA, as it
+        never moves funds, and counts as one batch create against the rate
+        limit. Calling it again with the same key is always safe: an error
+        whose outcome is unknown
+        (:func:`~polyester.errors.mutation_outcome_unknown`, such as a server
+        failure or a timeout) is resolved by calling it again with the same
+        key. ``idempotency_key`` is 1 to 128 characters, sent exactly as given.
+        """
+        if not isinstance(idempotency_key, str) or not (
+            ABANDON_IDEMPOTENCY_KEY_MIN_LEN
+            <= len(idempotency_key)
+            <= ABANDON_IDEMPOTENCY_KEY_MAX_LEN
+        ):
+            raise PolyesterValidationError(
+                f"abandon_batch requires an idempotency_key of {ABANDON_IDEMPOTENCY_KEY_MIN_LEN} "
+                f"to {ABANDON_IDEMPOTENCY_KEY_MAX_LEN} characters, as batch_create sent it"
+            )
+        return await unary_auth_decoded(
+            self._transport,
+            InternalTransferServiceClient,
+            lambda client, req: client.abandon_internal_transfer_batch(req),
+            AbandonInternalTransferBatchRequest(idempotency_key=idempotency_key),
+            internal_transfer_batch_from_abandon,
         )
 
     async def wait_batch(

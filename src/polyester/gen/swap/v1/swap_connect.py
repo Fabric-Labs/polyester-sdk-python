@@ -27,6 +27,12 @@ class SwapService(Protocol):
     async def get_swap(self, request: swap_dot_v1_dot_swap__pb2.GetSwapRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.GetSwapResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def cancel_swap(self, request: swap_dot_v1_dot_swap__pb2.CancelSwapRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.CancelSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def list_swaps(self, request: swap_dot_v1_dot_swap__pb2.ListSwapsRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.ListSwapsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
 
 class SwapServiceASGIApplication(ConnectASGIApplication[SwapService]):
     def __init__(self, service: SwapService | AsyncGenerator[SwapService], *, interceptors: Iterable[Interceptor]=(), read_max_bytes: int | None = None, compressions: Iterable[Compression] | None = None, codecs: Iterable[Codec] | None = None) -> None:
@@ -62,6 +68,26 @@ class SwapServiceASGIApplication(ConnectASGIApplication[SwapService]):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=svc.get_swap,
+                ),
+                "/swap.v1.SwapService/CancelSwap": Endpoint.unary(
+                    method=MethodInfo(
+                        name="CancelSwap",
+                        service_name="swap.v1.SwapService",
+                        input=swap_dot_v1_dot_swap__pb2.CancelSwapRequest,
+                        output=swap_dot_v1_dot_swap__pb2.CancelSwapResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.cancel_swap,
+                ),
+                "/swap.v1.SwapService/ListSwaps": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ListSwaps",
+                        service_name="swap.v1.SwapService",
+                        input=swap_dot_v1_dot_swap__pb2.ListSwapsRequest,
+                        output=swap_dot_v1_dot_swap__pb2.ListSwapsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=svc.list_swaps,
                 ),
             },
             interceptors=interceptors,
@@ -137,6 +163,46 @@ class SwapServiceClient(ConnectClient):
             timeout_ms=timeout_ms,
         )
 
+    async def cancel_swap(
+        self,
+        request: swap_dot_v1_dot_swap__pb2.CancelSwapRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_v1_dot_swap__pb2.CancelSwapResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelSwap",
+                service_name="swap.v1.SwapService",
+                input=swap_dot_v1_dot_swap__pb2.CancelSwapRequest,
+                output=swap_dot_v1_dot_swap__pb2.CancelSwapResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def list_swaps(
+        self,
+        request: swap_dot_v1_dot_swap__pb2.ListSwapsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_v1_dot_swap__pb2.ListSwapsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListSwaps",
+                service_name="swap.v1.SwapService",
+                input=swap_dot_v1_dot_swap__pb2.ListSwapsRequest,
+                output=swap_dot_v1_dot_swap__pb2.ListSwapsResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
 
 
 
@@ -147,6 +213,10 @@ class SwapServiceSync(Protocol):
     def create_swap(self, request: swap_dot_v1_dot_swap__pb2.CreateSwapRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.CreateSwapResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_swap(self, request: swap_dot_v1_dot_swap__pb2.GetSwapRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.GetSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def cancel_swap(self, request: swap_dot_v1_dot_swap__pb2.CancelSwapRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.CancelSwapResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def list_swaps(self, request: swap_dot_v1_dot_swap__pb2.ListSwapsRequest, ctx: RequestContext) -> swap_dot_v1_dot_swap__pb2.ListSwapsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
 
@@ -183,6 +253,26 @@ class SwapServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.UNKNOWN,
                     ),
                     function=service.get_swap,
+                ),
+                "/swap.v1.SwapService/CancelSwap": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="CancelSwap",
+                        service_name="swap.v1.SwapService",
+                        input=swap_dot_v1_dot_swap__pb2.CancelSwapRequest,
+                        output=swap_dot_v1_dot_swap__pb2.CancelSwapResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.cancel_swap,
+                ),
+                "/swap.v1.SwapService/ListSwaps": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ListSwaps",
+                        service_name="swap.v1.SwapService",
+                        input=swap_dot_v1_dot_swap__pb2.ListSwapsRequest,
+                        output=swap_dot_v1_dot_swap__pb2.ListSwapsResponse,
+                        idempotency_level=IdempotencyLevel.UNKNOWN,
+                    ),
+                    function=service.list_swaps,
                 ),
             },
             interceptors=interceptors,
@@ -252,6 +342,46 @@ class SwapServiceClientSync(ConnectClientSync):
                 service_name="swap.v1.SwapService",
                 input=swap_dot_v1_dot_swap__pb2.GetSwapRequest,
                 output=swap_dot_v1_dot_swap__pb2.GetSwapResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def cancel_swap(
+        self,
+        request: swap_dot_v1_dot_swap__pb2.CancelSwapRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_v1_dot_swap__pb2.CancelSwapResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="CancelSwap",
+                service_name="swap.v1.SwapService",
+                input=swap_dot_v1_dot_swap__pb2.CancelSwapRequest,
+                output=swap_dot_v1_dot_swap__pb2.CancelSwapResponse,
+                idempotency_level=IdempotencyLevel.UNKNOWN,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def list_swaps(
+        self,
+        request: swap_dot_v1_dot_swap__pb2.ListSwapsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> swap_dot_v1_dot_swap__pb2.ListSwapsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ListSwaps",
+                service_name="swap.v1.SwapService",
+                input=swap_dot_v1_dot_swap__pb2.ListSwapsRequest,
+                output=swap_dot_v1_dot_swap__pb2.ListSwapsResponse,
                 idempotency_level=IdempotencyLevel.UNKNOWN,
             ),
             headers=headers,

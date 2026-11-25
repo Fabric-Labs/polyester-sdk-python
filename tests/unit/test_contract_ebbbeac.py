@@ -158,6 +158,22 @@ def test_read_statements_permission_values_read_by_name() -> None:
     assert api.actions == sub.actions == ["read_balances", "read_statements"]
 
 
+def test_fork_strategies_permission_reads_by_name() -> None:
+    # The API-key actions of ForkStrategy and ReturnBotFunds.
+    actions = [
+        policies_pb2.READ_STRATEGIES,
+        policies_pb2.FORK_STRATEGIES,
+        policies_pb2.RETURN_STRATEGY_BOT_FUNDS,
+    ]
+    api = api_policy_from_proto(policies_pb2.ApiPolicyView(id=1, actions=actions))
+    sub = subaccount_policy_from_proto(policies_pb2.SubaccountPolicyView(id=1, actions=actions))
+    assert (
+        api.actions
+        == sub.actions
+        == ["read_strategies", "fork_strategies", "return_strategy_bot_funds"]
+    )
+
+
 def test_api_key_reads_keep_policy_public_key_creator_and_microseconds() -> None:
     created = datetime(2026, 11, 12, 16, 48, 15, 912958, tzinfo=UTC)
     key = api_key_from_get_proto(

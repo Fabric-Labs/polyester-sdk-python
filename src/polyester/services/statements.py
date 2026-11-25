@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
+from typing import Literal
 
 from polyester.codecs.contract_limits import (
     contract_string_length,
@@ -26,6 +27,9 @@ from polyester.errors import (
 from polyester.gen.ledger.read.v1 import statement_export_pb2 as export_pb2
 from polyester.gen.ledger.read.v1.statement_export_connect import StatementExportServiceClient
 from polyester.models.statements import (
+    STATEMENT_EXPORT_TYPE_ACCOUNT_STATEMENT,
+    STATEMENT_EXPORT_TYPE_BALANCES,
+    STATEMENT_EXPORT_TYPE_LEDGER,
     StatementExport,
     StatementExportDownloadUrl,
     StatementExportsPage,
@@ -52,6 +56,13 @@ _EXPORT_PAGE_TOKEN_MAX_LEN = contract_string_length(
 EXPORT_MAX_PERIOD = timedelta(hours=8784)
 # An export in one of these statuses never changes again.
 EXPORT_FINAL_STATUSES = frozenset({"ready", "failed", "expired", "canceled"})
+# The file types a create may ask for. The contract refuses the unspecified
+# type, so there is no default.
+_EXPORT_TYPES = {
+    STATEMENT_EXPORT_TYPE_ACCOUNT_STATEMENT: export_pb2.ACCOUNT_STATEMENT,
+    STATEMENT_EXPORT_TYPE_LEDGER: export_pb2.LEDGER,
+    STATEMENT_EXPORT_TYPE_BALANCES: export_pb2.BALANCES,
+}
 _EXPORT_POLL_INITIAL = 1.0
 _EXPORT_POLL_MAX = 15.0
 
@@ -59,7 +70,8 @@ _EXPORT_POLL_MAX = 15.0
 class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
     """Account statements (``ledger.read.v1.StatementExportService``): an
     account's balance movements for a period, produced in the background as
-    one CSV file, for reconciliation and tax reporting.
+    one CSV file, an account statement, a ledger or the account's balances,
+    for reconciliation and tax reporting.
 
     Signed like the other ledger reads; an API key needs ``READ_STATEMENTS``
     on its policy (``READ_BALANCES`` does not grant it). A statement covers
@@ -76,6 +88,7 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
     async def create_export(
         self,
         *,
+        type: Literal["account_statement", "ledger", "balances"],
         start_time: datetime,
         end_time: datetime,
         idempotency_key: str,
@@ -86,6 +99,20 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         """Ask for the whole statement of ``start_time`` (inclusive) to
         ``end_time`` (exclusive) as one CSV file, produced in the background
         (``StatementExportService/CreateStatementExport``).
+
+        ``type`` is the kind of file, and is required:
+        ``STATEMENT_EXPORT_TYPE_ACCOUNT_STATEMENT`` (``"account_statement"``,
+        one row per entry with its fees), ``STATEMENT_EXPORT_TYPE_LEDGER``
+        (``"ledger"``, one row per transfer leg) or
+        ``STATEMENT_EXPORT_TYPE_BALANCES`` (``"balances"``, one row per account
+        bucket and asset with its opening and closing balance). Every type has
+        the same period, asset filter, limits and lifecycle. A balances period
+        must also start inside the account history: an earlier start raises
+        :class:`~polyester.errors.PolyesterStatementHistoryUnavailableError`,
+        whose ``history_available_from`` says where to start. Any other value raises
+        :class:`PolyesterValidationError` before sending, and repeating an
+        ``idempotency_key`` with another type is refused with
+        ``ERROR_CODE_IDEMPOTENCY_KEY_REUSED``.
 
         The period must be non-empty and at most ``EXPORT_MAX_PERIOD`` (366
         days); both times are timezone-aware ``datetime`` objects, sent exact
@@ -107,6 +134,13 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
         is final; the file is downloaded over REST (see
         :class:`~polyester.models.StatementExport`).
         """
+        export_type = _EXPORT_TYPES.get(type) if isinstance(type, str) else None
+        if export_type is None:
+            raise PolyesterValidationError(
+                f"type must be {STATEMENT_EXPORT_TYPE_ACCOUNT_STATEMENT!r}, "
+                f"{STATEMENT_EXPORT_TYPE_LEDGER!r} or {STATEMENT_EXPORT_TYPE_BALANCES!r}, "
+                f"not {type!r}"
+            )
         start_ts = datetime_to_timestamp(start_time, "start_time")
         end_ts = datetime_to_timestamp(end_time, "end_time")
         # The span, never start_time + 366 days: that overflows near year 9999.
@@ -126,7 +160,9 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
                 f"{EXPORT_IDEMPOTENCY_KEY_MAX_LEN} characters: letters, digits, '.', '_', ':' "
                 "or '-'"
             )
-        request = export_pb2.CreateStatementExportRequest(idempotency_key=idempotency_key)
+        request = export_pb2.CreateStatementExportRequest(
+            type=export_type, idempotency_key=idempotency_key
+        )
         request.start_time.CopyFrom(start_ts)
         request.end_time.CopyFrom(end_ts)
         if asset_id is not None:

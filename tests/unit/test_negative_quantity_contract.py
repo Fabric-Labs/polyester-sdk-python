@@ -32,6 +32,7 @@ from polyester.codecs.wire_decode import (
     decode_market_overview_entry,
     decode_market_trade,
     decode_trigger,
+    decode_triggers_list,
 )
 from polyester.errors import PolyesterResponseContractError, PolyesterValidationError
 from polyester.gen.marketdata.v1 import marketdata_pb2
@@ -178,6 +179,25 @@ def test_trigger_refuses_a_negative_executed_quantity(state: str) -> None:
     msg = triggers_pb2.Trigger(trigger_id=1, symbol_id=3, qty_scaled=100)
     getattr(msg, state).executed_qty_scaled = -2
     _refused(lambda: trigger_from_proto(msg), f"Trigger.{state}.executed_qty_scaled", -2)
+
+
+@pytest.mark.parametrize(
+    ("key", "field"),
+    [
+        ("twapState", "Trigger.twap_state.executed_qty_scaled"),
+        ("ladderState", "Trigger.ladder_state.executed_qty_scaled"),
+        ("twap_state", "Trigger.twap_state.executed_qty_scaled"),
+        ("ladder_state", "Trigger.ladder_state.executed_qty_scaled"),
+    ],
+)
+def test_json_trigger_refuses_a_negative_executed_quantity(key: str, field: str) -> None:
+    """The proto-JSON trigger and trigger list refuse it as the protobuf decode does."""
+    data = {"triggerId": "1", "symbolId": 3, "qtyScaled": "100", key: {"executedQtyScaled": "-2"}}
+    _refused(lambda: decode_trigger(data), field, -2)
+    _refused(lambda: decode_triggers_list({"triggers": [data]}), field, -2)
+    # A zero or omitted executed quantity is not reported, and still decodes.
+    for executed in ({"executedQtyScaled": "0"}, {}):
+        assert decode_trigger({**data, key: executed}).qty.scaled == 100
 
 
 @pytest.mark.parametrize("price_ticks", [101, 0])

@@ -23,6 +23,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from polyester import models as sdk_models
 from polyester.codecs.proto_helpers import timestamp_to_rfc3339
+from polyester.errors import PolyesterResponseContractError
 from polyester.gen.orders.v1 import orders_read_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from tests.unit import pure_models_support as support
@@ -296,6 +297,32 @@ def test_values_are_bound_to_the_market() -> None:
 def test_refusals(data: Any, market: Any, message: str) -> None:
     with pytest.raises(ValueError, match="^" + message.replace("(", r"\(")):
         MODELS.order(data, market)
+
+
+@pytest.mark.parametrize(
+    ("state", "message"),
+    [
+        ("twap_state", "Trigger.twap_state.executed_qty_scaled: negative quantity -2"),
+        ("ladder_state", "Trigger.ladder_state.executed_qty_scaled: negative quantity -2"),
+        (None, "Trigger.qty_scaled: negative quantity -2"),
+    ],
+)
+def test_negative_trigger_quantities_are_refused_alike(state: str | None, message: str) -> None:
+    """The protobuf decode, this file and the proto-JSON trigger decode refuse
+    a negative trigger quantity, nested executed quantities included, with the
+    same message."""
+    from polyester.codecs.wire_decode import decode_trigger
+
+    trigger = triggers_pb2.Trigger(trigger_id=1, symbol_id=SYMBOL_ID, qty_scaled=100)
+    if state is None:
+        trigger.qty_scaled = -2
+    else:
+        getattr(trigger, state).executed_qty_scaled = -2
+    for bound in (True, False):
+        assert sdk_decode(trigger, bound) == ("error", message)
+        assert file_decode(MODELS, trigger, bound) == ("error", message)
+    with pytest.raises(PolyesterResponseContractError, match="^" + message + "$"):
+        decode_trigger(support.to_dict(trigger))
 
 
 def test_a_trigger_for_another_market_is_refused() -> None:

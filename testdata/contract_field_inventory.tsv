@@ -164,6 +164,7 @@ ledger.read.v1.CreateStatementExportRequest.end_time	covered	statements.create_e
 ledger.read.v1.CreateStatementExportRequest.idempotency_key	covered	statements.create_export idempotency_key
 ledger.read.v1.CreateStatementExportRequest.start_time	covered	statements.create_export start_time
 ledger.read.v1.CreateStatementExportRequest.subaccount_id	covered	statements.create_export account, sub_account_id
+ledger.read.v1.CreateStatementExportRequest.type	covered	statements.create_export type
 ledger.read.v1.CreateStatementExportResponse.export	covered	StatementExport
 ledger.read.v1.GetBalanceHistoryResponse.bucket	covered	BalanceHistory.bucket
 ledger.read.v1.GetBalanceHistoryResponse.end_ts_sec	covered	BalanceHistory.end_ts_sec
@@ -198,6 +199,10 @@ ledger.read.v1.StatementExport.ready_at	covered	StatementExport.ready_at
 ledger.read.v1.StatementExport.start_time	covered	StatementExport.start_time
 ledger.read.v1.StatementExport.status	covered	StatementExport.status
 ledger.read.v1.StatementExport.subaccount_id	covered	StatementExport.subaccount_id
+ledger.read.v1.StatementExport.type	covered	StatementExport.type
+ledger.read.v1.StatementExport.history_available_from	covered	StatementExport.history_available_from
+ledger.read.v1.ErrorDetail.code	covered	PolyesterApiError.code
+ledger.read.v1.ErrorDetail.history_available_from	covered	PolyesterStatementHistoryUnavailableError.history_available_from
 marketdata.v1.AssetMarketFlag.as_of	covered	AssetMarketFlag.as_of
 marketdata.v1.AssetMarketFlag.source	covered	AssetMarketFlag.source
 marketdata.v1.AssetMarketStats.circulating_supply	covered	AssetMarketStats.circulating_supply

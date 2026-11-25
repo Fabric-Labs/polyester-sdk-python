@@ -79,7 +79,9 @@ def _activity(client: Any, name: str, value: Any) -> Any:
 
 def _export(client: Any, name: str, value: Any) -> Any:
     times = {"start_time": _AWARE, "end_time": _LATER, name: value}
-    return client.statements.create_export(idempotency_key="export-1", **times)
+    return client.statements.create_export(
+        type="account_statement", idempotency_key="export-1", **times
+    )
 
 
 def _since(method: str) -> Call:
@@ -300,7 +302,10 @@ async def test_statement_export_near_year_9999_is_sent_not_overflowed(
         # The window check used to add 366 days to start_time: OverflowError.
         with pytest.raises(Exception) as caught:
             await client.statements.create_export(
-                start_time=start, end_time=start + timedelta(hours=1), idempotency_key="k"
+                type="ledger",
+                start_time=start,
+                end_time=start + timedelta(hours=1),
+                idempotency_key="k",
             )
     assert not isinstance(caught.value, OverflowError | PolyesterValidationError)
     assert len(seen) == 1

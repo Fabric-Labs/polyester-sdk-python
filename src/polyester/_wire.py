@@ -35,6 +35,7 @@ from polyester.errors import (
     AUTH_TIMESTAMP_SKEW,
     ORDER_PERMISSION_REFUSAL_CODES,
     REQUEST_TOO_LARGE,
+    STATEMENT_HISTORY_UNAVAILABLE,
     TIMESTAMP_SKEW,
     PolyesterApiError,
     PolyesterAuthError,
@@ -45,6 +46,7 @@ from polyester.errors import (
     PolyesterRouteNotFoundError,
     PolyesterServerError,
     PolyesterSessionRequiredError,
+    PolyesterStatementHistoryUnavailableError,
     PolyesterSubaccountOwnerRoleLockedError,
     PolyesterTimeoutError,
     PolyesterTimestampSkewError,
@@ -637,6 +639,16 @@ def _map_connect_error(exc: ConnectError):
                 if "UNAUTHENTICATED" in code_name or "PERMISSION" in code_name:
                     return PolyesterAuthError(
                         error_message, code=code_name, status_code=_auth_status(exc)
+                    )
+                if code_name == STATEMENT_HISTORY_UNAVAILABLE:
+                    return PolyesterStatementHistoryUnavailableError(
+                        error_message,
+                        raw=unpacked,
+                        history_available_from=(
+                            unpacked.history_available_from.ToDatetime(tzinfo=UTC)
+                            if unpacked.HasField("history_available_from")
+                            else None
+                        ),
                     )
                 return PolyesterApiError(error_message, code=code_name)
     code = exc.code.value

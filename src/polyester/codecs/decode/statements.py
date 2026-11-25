@@ -39,6 +39,7 @@ def statement_export_from_proto(msg: export_pb2.StatementExport, operation: str)
         end_time=optional_timestamp(msg, "end_time"),
         asset_id=int(msg.asset_id),
         idempotency_key=msg.idempotency_key,
+        type=_label(export_pb2.StatementExportType, int(msg.type), ""),
         status=_label(
             export_pb2.StatementExportStatus, int(msg.status), "STATEMENT_EXPORT_STATUS_"
         ),
@@ -53,6 +54,7 @@ def statement_export_from_proto(msg: export_pb2.StatementExport, operation: str)
             int(msg.failure_reason),
             "STATEMENT_EXPORT_FAILURE_REASON_",
         ),
+        history_available_from=optional_timestamp(msg, "history_available_from"),
     )
 
 

@@ -158,7 +158,6 @@ from polyester.models.statements import (
 from polyester.models.sub_accounts import (
     ActivityActor,
     ActivityItem,
-    CreateSubaccountResult,
     GetSubaccountResult,
     SubAccount,
     SubAccountActivityEvent,
@@ -343,7 +342,6 @@ __all__ = [
     "CreateOrderParams",
     "CreateOrderRequest",
     "CreateOrderResult",
-    "CreateSubaccountResult",
     "DepositWithdrawConfig",
     "DepositAddress",
     "DepositAddressesList",

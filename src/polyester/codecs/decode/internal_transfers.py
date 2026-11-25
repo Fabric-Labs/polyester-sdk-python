@@ -140,7 +140,8 @@ def _batch_leg_from_proto(
 
 def internal_transfer_batch_from_proto(
     msg: internal_transfer_pb2.BatchCreateInternalTransfersResponse
-    | internal_transfer_pb2.GetInternalTransferBatchResponse,
+    | internal_transfer_pb2.GetInternalTransferBatchResponse
+    | internal_transfer_pb2.AbandonInternalTransferBatchResponse,
     *,
     leg_count: int | None = None,
     request_id: str | None = None,
@@ -187,3 +188,25 @@ def internal_transfer_batch_from_proto(
                 operation, f"{status} batch has a {leg.status} leg {leg.leg_index}"
             )
     return InternalTransferBatchResult(request_id=msg.request_id, status=status, legs=legs)
+
+
+def internal_transfer_batch_from_abandon(
+    msg: internal_transfer_pb2.AbandonInternalTransferBatchResponse,
+) -> InternalTransferBatchResult:
+    """Decode an ``AbandonInternalTransferBatch`` answer.
+
+    ``BATCH_ABANDONED`` is status ``"abandoned"`` with no ``request_id`` and
+    no legs: nothing moved under the key and nothing ever will. Any other
+    answer is the batch submitted under the key, checked as
+    :func:`internal_transfer_batch_from_proto` checks a read. An abandoned
+    answer with a ``request_id`` or legs breaks the contract.
+    """
+    operation = "AbandonInternalTransferBatch"
+    if msg.status != internal_transfer_pb2.BATCH_ABANDONED:
+        return internal_transfer_batch_from_proto(msg, operation=operation)
+    if msg.request_id or msg.legs:
+        raise PolyesterResponseContractError(
+            operation,
+            f"abandoned batch has request_id {msg.request_id!r} and {len(msg.legs)} legs",
+        )
+    return InternalTransferBatchResult(status="abandoned", legs=[])

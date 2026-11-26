@@ -344,7 +344,8 @@ class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
     account history moved later than its start after it was created:
     ``history_available_from`` then says where a new export must start: the
     earliest acceptable ``start_time``, rounded up to the next microsecond
-    when the server's instant has sub-microsecond digits. ""
+    when the server's instant has sub-microsecond digits; ``None`` when no
+    ``datetime`` represents that. ""
     when the server names none; ``"UNKNOWN(n)"`` for a value this SDK does
     not know.
 

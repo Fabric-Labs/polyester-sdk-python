@@ -113,20 +113,25 @@ def optional_timestamp_ceil(message: Message, field_name: str) -> datetime | Non
     For a lower bound, such as the earliest acceptable start of a period: a
     time with sub-microsecond digits reads as the next microsecond, never one
     before it, so passing it back is accepted. Without such digits it is
-    exact, as :func:`optional_timestamp` reads it.
+    exact, as :func:`optional_timestamp` reads it. ``None`` too when no
+    ``datetime`` represents it: rounded up, it is past the year 9999.
     """
     if not has_field(message, field_name):
         return None
     value = getattr(message, field_name)
-    return _EPOCH + timedelta(
-        seconds=int(value.seconds), microseconds=_ceil_microseconds(int(value.nanos))
-    )
+    try:
+        return _EPOCH + timedelta(
+            seconds=int(value.seconds), microseconds=_ceil_microseconds(int(value.nanos))
+        )
+    except OverflowError:
+        return None
 
 
 def rfc3339_ceil(text: object) -> datetime | None:
     """An RFC 3339 time with up to nine fractional digits as an aware UTC
     datetime rounded up to the microsecond, as :func:`optional_timestamp_ceil`
-    rounds; ``None`` for anything else."""
+    rounds; ``None`` for anything else, and for an instant no ``datetime``
+    represents once in UTC and rounded up."""
     if not isinstance(text, str):
         return None
     match = _RFC3339.fullmatch(text.strip())
@@ -139,7 +144,10 @@ def rfc3339_ceil(text: object) -> datetime | None:
     except ValueError:
         return None
     nanos = int((fraction or "").ljust(9, "0"))
-    return base.astimezone(UTC) + timedelta(microseconds=_ceil_microseconds(nanos))
+    try:
+        return base.astimezone(UTC) + timedelta(microseconds=_ceil_microseconds(nanos))
+    except OverflowError:
+        return None
 
 
 def optional_timestamp(message: Message, field_name: str) -> datetime | None:

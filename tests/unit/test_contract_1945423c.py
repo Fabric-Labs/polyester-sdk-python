@@ -1408,3 +1408,70 @@ async def test_rest_problem_of_another_code_is_not_a_history_refusal() -> None:
     err = await _raised(_problem(409, body), _create_balances)
     assert isinstance(err, PolyesterApiError)
     assert not isinstance(err, PolyesterStatementHistoryUnavailableError)
+
+
+# No representable safe start: rounded up, or once in UTC, the instant is
+# past what a datetime holds. history_available_from is then None, and the
+# typed refusal or the export is still returned.
+_MAX_TIMESTAMP = Timestamp(seconds=253402300799, nanos=999999999)
+
+
+@pytest.mark.parametrize(
+    "member",
+    ["9999-12-31T23:59:59.999999999Z", "9999-12-31T23:30:00-01:00", "0001-01-01T00:30:00+01:00"],
+)
+async def test_rest_history_problem_out_of_range_has_no_start(member) -> None:
+    body = dict(_HISTORY_PROBLEM, historyAvailableFrom=member)
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.code == STATEMENT_HISTORY_UNAVAILABLE
+    assert err.history_available_from is None
+
+
+async def test_connect_history_refusal_at_the_max_timestamp_has_no_start() -> None:
+    answer = _connect_error(
+        "failed_precondition",
+        _LEDGER,
+        ledger_read_pb2.ErrorDetail(
+            code=ledger_read_pb2.ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+            history_available_from=_MAX_TIMESTAMP,
+        ),
+        400,
+    )
+    err = await _raised(answer, _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.history_available_from is None
+
+
+async def test_failed_export_at_the_max_timestamp_reads_without_a_start() -> None:
+    reply = export_pb2.GetStatementExportResponse(
+        export=_export(
+            type=export_pb2.BALANCES,
+            status=export_pb2.STATEMENT_EXPORT_STATUS_FAILED,
+            failure_reason=export_pb2.STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+            history_available_from=_MAX_TIMESTAMP,
+        )
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert (export.status, export.failure_reason) == ("failed", "history_unavailable")
+    assert export.history_available_from is None
+
+
+# historyAvailableFrom is an optional problem extension: a member of any
+# other JSON type never breaks the code mapping, for the history code or any
+# other.
+@pytest.mark.parametrize(
+    "member", [1795618502, {"seconds": 1795618502}, None, ["2026-11-25T14:55:02Z"], True]
+)
+@pytest.mark.parametrize("code", ["STATEMENT_HISTORY_UNAVAILABLE", "IDEMPOTENCY_KEY_REUSED"])
+async def test_rest_problem_with_a_non_string_history_member_keeps_its_code(member, code) -> None:
+    body = dict(_HISTORY_PROBLEM, code=code, historyAvailableFrom=member)
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterApiError), repr(err)
+    assert err.code == "ERROR_CODE_" + code
+    if code == "STATEMENT_HISTORY_UNAVAILABLE":
+        assert isinstance(err, PolyesterStatementHistoryUnavailableError)
+        assert err.history_available_from is None
+    else:
+        assert not isinstance(err, PolyesterStatementHistoryUnavailableError)

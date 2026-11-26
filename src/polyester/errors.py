@@ -605,7 +605,8 @@ class PolyesterStatementHistoryUnavailableError(PolyesterApiError):
     aware UTC datetime. A ``datetime`` holds microseconds, so an instant with
     sub-microsecond digits is rounded up to the next microsecond, never down,
     and passing it back as ``start_time`` is accepted. ``None`` when the
-    server did not name it. Nothing was created: create the export again
+    server did not name it, or named an instant no ``datetime`` represents
+    once rounded up (past the year 9999). Nothing was created: create the export again
     with a ``start_time`` at or after it. :func:`is_retryable_error` reports
     ``False``, since the same request is refused the same way.
     """

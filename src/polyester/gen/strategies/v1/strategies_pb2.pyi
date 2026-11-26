@@ -56,6 +56,12 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     LISTING_CAP_REACHED: _ClassVar[ErrorCode]
     USERNAME_REQUIRED: _ClassVar[ErrorCode]
     PUBLISH_LIMIT_REACHED: _ClassVar[ErrorCode]
+    LISTING_HELD: _ClassVar[ErrorCode]
+    CANNOT_REPORT_OWN_LISTING: _ClassVar[ErrorCode]
+    REPORT_LIMIT_REACHED: _ClassVar[ErrorCode]
+    FUNDING_SOURCE_IS_BOT: _ClassVar[ErrorCode]
+    BOT_NOT_STOPPED: _ClassVar[ErrorCode]
+    NOTHING_TO_RETURN: _ClassVar[ErrorCode]
 
 class NotBacktestableReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -87,6 +93,13 @@ class StopMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     KEEP_ORDERS: _ClassVar[StopMode]
     CANCEL_ORDERS: _ClassVar[StopMode]
 
+class BotFundsReturnStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    BOT_FUNDS_RETURN_STATUS_UNSPECIFIED: _ClassVar[BotFundsReturnStatus]
+    RETURN_PROCESSING: _ClassVar[BotFundsReturnStatus]
+    RETURN_COMPLETED: _ClassVar[BotFundsReturnStatus]
+    RETURN_NOTHING_MOVED: _ClassVar[BotFundsReturnStatus]
+
 class StrategyTag(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     TAG_UNSPECIFIED: _ClassVar[StrategyTag]
@@ -97,6 +110,15 @@ class StrategyTag(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MARKET_MAKING: _ClassVar[StrategyTag]
     ARBITRAGE: _ClassVar[StrategyTag]
     SIGNALS: _ClassVar[StrategyTag]
+
+class ReportReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    REPORT_REASON_UNSPECIFIED: _ClassVar[ReportReason]
+    MISLEADING_RESULTS: _ClassVar[ReportReason]
+    HARMFUL_CODE: _ClassVar[ReportReason]
+    SPAM: _ClassVar[ReportReason]
+    COPIED_WITHOUT_CREDIT: _ClassVar[ReportReason]
+    OTHER: _ClassVar[ReportReason]
 ERROR_UNSPECIFIED: ErrorCode
 VERSION_NOT_FOUND: ErrorCode
 BACKTEST_NOT_FOUND: ErrorCode
@@ -137,6 +159,12 @@ LISTING_NOT_FOUND: ErrorCode
 LISTING_CAP_REACHED: ErrorCode
 USERNAME_REQUIRED: ErrorCode
 PUBLISH_LIMIT_REACHED: ErrorCode
+LISTING_HELD: ErrorCode
+CANNOT_REPORT_OWN_LISTING: ErrorCode
+REPORT_LIMIT_REACHED: ErrorCode
+FUNDING_SOURCE_IS_BOT: ErrorCode
+BOT_NOT_STOPPED: ErrorCode
+NOTHING_TO_RETURN: ErrorCode
 NOT_BACKTESTABLE_REASON_UNSPECIFIED: NotBacktestableReason
 REACTS_TO_TRADES_OR_QUOTES: NotBacktestableReason
 READS_SOCIAL_SIGNALS: NotBacktestableReason
@@ -155,6 +183,10 @@ HIGH: EvidenceGrade
 STOP_UNSPECIFIED: StopMode
 KEEP_ORDERS: StopMode
 CANCEL_ORDERS: StopMode
+BOT_FUNDS_RETURN_STATUS_UNSPECIFIED: BotFundsReturnStatus
+RETURN_PROCESSING: BotFundsReturnStatus
+RETURN_COMPLETED: BotFundsReturnStatus
+RETURN_NOTHING_MOVED: BotFundsReturnStatus
 TAG_UNSPECIFIED: StrategyTag
 TREND: StrategyTag
 MEAN_REVERSION: StrategyTag
@@ -163,6 +195,12 @@ DCA: StrategyTag
 MARKET_MAKING: StrategyTag
 ARBITRAGE: StrategyTag
 SIGNALS: StrategyTag
+REPORT_REASON_UNSPECIFIED: ReportReason
+MISLEADING_RESULTS: ReportReason
+HARMFUL_CODE: ReportReason
+SPAM: ReportReason
+COPIED_WITHOUT_CREDIT: ReportReason
+OTHER: ReportReason
 
 class BotCapDetail(_message.Message):
     __slots__ = ("vip_tier", "bot_cap", "bots", "next_vip_tier", "next_bot_cap")
@@ -957,7 +995,7 @@ class GetDeployProposalResponse(_message.Message):
     def __init__(self, proposal_id: _Optional[int] = ..., summary: _Optional[_Union[DeployProposalSummary, _Mapping]] = ..., status: _Optional[_Union[DeployStatus, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., funding_subaccount_label: _Optional[str] = ...) -> None: ...
 
 class Bot(_message.Message):
-    __slots__ = ("bot_id", "name", "subaccount_id", "status", "status_reason", "version_id", "last_decision_at", "created_at", "quote_asset", "markets", "funding", "uptime_ratio", "running_since", "pause_reason", "activity")
+    __slots__ = ("bot_id", "name", "subaccount_id", "status", "status_reason", "version_id", "last_decision_at", "created_at", "quote_asset", "markets", "funding", "uptime_ratio", "running_since", "pause_reason", "activity", "strategy_id", "revision")
     class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         STATUS_UNSPECIFIED: _ClassVar[Bot.Status]
@@ -999,6 +1037,8 @@ class Bot(_message.Message):
     RUNNING_SINCE_FIELD_NUMBER: _ClassVar[int]
     PAUSE_REASON_FIELD_NUMBER: _ClassVar[int]
     ACTIVITY_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     bot_id: int
     name: str
     subaccount_id: int
@@ -1014,7 +1054,9 @@ class Bot(_message.Message):
     running_since: _timestamp_pb2.Timestamp
     pause_reason: Bot.PauseReason
     activity: _containers.RepeatedCompositeFieldContainer[BotActivityHour]
-    def __init__(self, bot_id: _Optional[int] = ..., name: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ..., status_reason: _Optional[str] = ..., version_id: _Optional[str] = ..., last_decision_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., quote_asset: _Optional[str] = ..., markets: _Optional[_Iterable[str]] = ..., funding: _Optional[_Union[BotFunding, _Mapping]] = ..., uptime_ratio: _Optional[str] = ..., running_since: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pause_reason: _Optional[_Union[Bot.PauseReason, str]] = ..., activity: _Optional[_Iterable[_Union[BotActivityHour, _Mapping]]] = ...) -> None: ...
+    strategy_id: int
+    revision: int
+    def __init__(self, bot_id: _Optional[int] = ..., name: _Optional[str] = ..., subaccount_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ..., status_reason: _Optional[str] = ..., version_id: _Optional[str] = ..., last_decision_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., quote_asset: _Optional[str] = ..., markets: _Optional[_Iterable[str]] = ..., funding: _Optional[_Union[BotFunding, _Mapping]] = ..., uptime_ratio: _Optional[str] = ..., running_since: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pause_reason: _Optional[_Union[Bot.PauseReason, str]] = ..., activity: _Optional[_Iterable[_Union[BotActivityHour, _Mapping]]] = ..., strategy_id: _Optional[int] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class BotActivityHour(_message.Message):
     __slots__ = ("start", "decisions", "fills", "expired")
@@ -1110,6 +1152,50 @@ class StopBotResponse(_message.Message):
     mode: StopMode
     def __init__(self, bot: _Optional[_Union[Bot, _Mapping]] = ..., mode: _Optional[_Union[StopMode, str]] = ...) -> None: ...
 
+class BotFundsReturn(_message.Message):
+    __slots__ = ("return_id", "bot_id", "status", "assets", "requested_at", "finished_at", "held")
+    RETURN_ID_FIELD_NUMBER: _ClassVar[int]
+    BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    ASSETS_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_AT_FIELD_NUMBER: _ClassVar[int]
+    FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    HELD_FIELD_NUMBER: _ClassVar[int]
+    return_id: int
+    bot_id: int
+    status: BotFundsReturnStatus
+    assets: _containers.RepeatedCompositeFieldContainer[Money]
+    requested_at: _timestamp_pb2.Timestamp
+    finished_at: _timestamp_pb2.Timestamp
+    held: _containers.RepeatedCompositeFieldContainer[Money]
+    def __init__(self, return_id: _Optional[int] = ..., bot_id: _Optional[int] = ..., status: _Optional[_Union[BotFundsReturnStatus, str]] = ..., assets: _Optional[_Iterable[_Union[Money, _Mapping]]] = ..., requested_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., held: _Optional[_Iterable[_Union[Money, _Mapping]]] = ...) -> None: ...
+
+class ReturnBotFundsRequest(_message.Message):
+    __slots__ = ("bot_id", "idempotency_key")
+    BOT_ID_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    bot_id: int
+    idempotency_key: str
+    def __init__(self, bot_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+
+class ReturnBotFundsResponse(_message.Message):
+    __slots__ = ("funds_return",)
+    FUNDS_RETURN_FIELD_NUMBER: _ClassVar[int]
+    funds_return: BotFundsReturn
+    def __init__(self, funds_return: _Optional[_Union[BotFundsReturn, _Mapping]] = ...) -> None: ...
+
+class GetBotFundsReturnRequest(_message.Message):
+    __slots__ = ("return_id",)
+    RETURN_ID_FIELD_NUMBER: _ClassVar[int]
+    return_id: int
+    def __init__(self, return_id: _Optional[int] = ...) -> None: ...
+
+class GetBotFundsReturnResponse(_message.Message):
+    __slots__ = ("funds_return",)
+    FUNDS_RETURN_FIELD_NUMBER: _ClassVar[int]
+    funds_return: BotFundsReturn
+    def __init__(self, funds_return: _Optional[_Union[BotFundsReturn, _Mapping]] = ...) -> None: ...
+
 class GetBotResponse(_message.Message):
     __slots__ = ("bot", "money_card", "settings", "decisions", "errors")
     BOT_FIELD_NUMBER: _ClassVar[int]
@@ -1135,18 +1221,22 @@ class ListBotVersionsRequest(_message.Message):
     def __init__(self, bot_id: _Optional[int] = ..., limit: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class BotVersion(_message.Message):
-    __slots__ = ("version_id", "name", "runtime_version", "started_at", "stopped_at")
+    __slots__ = ("version_id", "name", "runtime_version", "started_at", "stopped_at", "strategy_id", "revision")
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     RUNTIME_VERSION_FIELD_NUMBER: _ClassVar[int]
     STARTED_AT_FIELD_NUMBER: _ClassVar[int]
     STOPPED_AT_FIELD_NUMBER: _ClassVar[int]
+    STRATEGY_ID_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
     version_id: str
     name: str
     runtime_version: str
     started_at: _timestamp_pb2.Timestamp
     stopped_at: _timestamp_pb2.Timestamp
-    def __init__(self, version_id: _Optional[str] = ..., name: _Optional[str] = ..., runtime_version: _Optional[str] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., stopped_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    strategy_id: int
+    revision: int
+    def __init__(self, version_id: _Optional[str] = ..., name: _Optional[str] = ..., runtime_version: _Optional[str] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., stopped_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., strategy_id: _Optional[int] = ..., revision: _Optional[int] = ...) -> None: ...
 
 class ListBotVersionsResponse(_message.Message):
     __slots__ = ("versions", "next_page_token")
@@ -1273,24 +1363,28 @@ class Strategy(_message.Message):
     def __init__(self, strategy_id: _Optional[int] = ..., name: _Optional[str] = ..., revision: _Optional[int] = ..., head_version_id: _Optional[str] = ..., valid: _Optional[bool] = ..., origin: _Optional[_Union[StrategyOrigin, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., bot: _Optional[_Union[StrategyBot, _Mapping]] = ..., markets: _Optional[_Iterable[str]] = ..., summary: _Optional[str] = ..., listing: _Optional[_Union[StrategyListing, _Mapping]] = ...) -> None: ...
 
 class StrategyListing(_message.Message):
-    __slots__ = ("listing_id", "state", "version_id", "published_at")
+    __slots__ = ("listing_id", "state", "version_id", "published_at", "hold_reason")
     class State(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         LISTING_STATE_UNSPECIFIED: _ClassVar[StrategyListing.State]
         PUBLIC: _ClassVar[StrategyListing.State]
         HIDDEN: _ClassVar[StrategyListing.State]
+        HELD: _ClassVar[StrategyListing.State]
     LISTING_STATE_UNSPECIFIED: StrategyListing.State
     PUBLIC: StrategyListing.State
     HIDDEN: StrategyListing.State
+    HELD: StrategyListing.State
     LISTING_ID_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     PUBLISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    HOLD_REASON_FIELD_NUMBER: _ClassVar[int]
     listing_id: int
     state: StrategyListing.State
     version_id: str
     published_at: _timestamp_pb2.Timestamp
-    def __init__(self, listing_id: _Optional[int] = ..., state: _Optional[_Union[StrategyListing.State, str]] = ..., version_id: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    hold_reason: str
+    def __init__(self, listing_id: _Optional[int] = ..., state: _Optional[_Union[StrategyListing.State, str]] = ..., version_id: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., hold_reason: _Optional[str] = ...) -> None: ...
 
 class StrategyBot(_message.Message):
     __slots__ = ("bot_id", "status")
@@ -1301,12 +1395,26 @@ class StrategyBot(_message.Message):
     def __init__(self, bot_id: _Optional[int] = ..., status: _Optional[_Union[Bot.Status, str]] = ...) -> None: ...
 
 class StrategyOrigin(_message.Message):
-    __slots__ = ("template_id", "duplicate")
+    __slots__ = ("template_id", "duplicate", "fork")
     TEMPLATE_ID_FIELD_NUMBER: _ClassVar[int]
     DUPLICATE_FIELD_NUMBER: _ClassVar[int]
+    FORK_FIELD_NUMBER: _ClassVar[int]
     template_id: str
     duplicate: StrategyDuplicateOrigin
-    def __init__(self, template_id: _Optional[str] = ..., duplicate: _Optional[_Union[StrategyDuplicateOrigin, _Mapping]] = ...) -> None: ...
+    fork: StrategyForkOrigin
+    def __init__(self, template_id: _Optional[str] = ..., duplicate: _Optional[_Union[StrategyDuplicateOrigin, _Mapping]] = ..., fork: _Optional[_Union[StrategyForkOrigin, _Mapping]] = ...) -> None: ...
+
+class StrategyForkOrigin(_message.Message):
+    __slots__ = ("listing_id", "title", "author_username", "source_version_id")
+    LISTING_ID_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    AUTHOR_USERNAME_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    listing_id: int
+    title: str
+    author_username: str
+    source_version_id: str
+    def __init__(self, listing_id: _Optional[int] = ..., title: _Optional[str] = ..., author_username: _Optional[str] = ..., source_version_id: _Optional[str] = ...) -> None: ...
 
 class StrategyDuplicateOrigin(_message.Message):
     __slots__ = ("source_version_id",)
@@ -1625,7 +1733,7 @@ class CommunityBacktest(_message.Message):
     def __init__(self, status: _Optional[_Union[Backtest.Status, str]] = ..., not_backtestable_reason: _Optional[_Union[NotBacktestableReason, str]] = ..., window: _Optional[_Union[TimeWindow, _Mapping]] = ..., metrics: _Optional[_Union[BacktestMetrics, _Mapping]] = ..., report: _Optional[_Union[BacktestReport, _Mapping]] = ..., failure: _Optional[str] = ...) -> None: ...
 
 class CommunityStrategySummary(_message.Message):
-    __slots__ = ("listing_id", "title", "tags", "markets", "author_username", "backtest", "published_at")
+    __slots__ = ("listing_id", "title", "tags", "markets", "author_username", "backtest", "published_at", "forks")
     LISTING_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     TAGS_FIELD_NUMBER: _ClassVar[int]
@@ -1633,6 +1741,7 @@ class CommunityStrategySummary(_message.Message):
     AUTHOR_USERNAME_FIELD_NUMBER: _ClassVar[int]
     BACKTEST_FIELD_NUMBER: _ClassVar[int]
     PUBLISHED_AT_FIELD_NUMBER: _ClassVar[int]
+    FORKS_FIELD_NUMBER: _ClassVar[int]
     listing_id: int
     title: str
     tags: _containers.RepeatedScalarFieldContainer[StrategyTag]
@@ -1640,10 +1749,21 @@ class CommunityStrategySummary(_message.Message):
     author_username: str
     backtest: CommunityBacktest
     published_at: _timestamp_pb2.Timestamp
-    def __init__(self, listing_id: _Optional[int] = ..., title: _Optional[str] = ..., tags: _Optional[_Iterable[_Union[StrategyTag, str]]] = ..., markets: _Optional[_Iterable[str]] = ..., author_username: _Optional[str] = ..., backtest: _Optional[_Union[CommunityBacktest, _Mapping]] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    forks: int
+    def __init__(self, listing_id: _Optional[int] = ..., title: _Optional[str] = ..., tags: _Optional[_Iterable[_Union[StrategyTag, str]]] = ..., markets: _Optional[_Iterable[str]] = ..., author_username: _Optional[str] = ..., backtest: _Optional[_Union[CommunityBacktest, _Mapping]] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., forks: _Optional[int] = ...) -> None: ...
+
+class CommunityForkSource(_message.Message):
+    __slots__ = ("listing_id", "title", "author_username")
+    LISTING_ID_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    AUTHOR_USERNAME_FIELD_NUMBER: _ClassVar[int]
+    listing_id: int
+    title: str
+    author_username: str
+    def __init__(self, listing_id: _Optional[int] = ..., title: _Optional[str] = ..., author_username: _Optional[str] = ...) -> None: ...
 
 class CommunityStrategy(_message.Message):
-    __slots__ = ("listing_id", "title", "description", "tags", "markets", "author_username", "published_at", "version_id", "runtime_version", "manifest", "code", "settings_form", "money_card", "flow", "backtest")
+    __slots__ = ("listing_id", "title", "description", "tags", "markets", "author_username", "published_at", "version_id", "runtime_version", "manifest", "code", "settings_form", "money_card", "flow", "backtest", "forks", "forked_from")
     LISTING_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -1659,6 +1779,8 @@ class CommunityStrategy(_message.Message):
     MONEY_CARD_FIELD_NUMBER: _ClassVar[int]
     FLOW_FIELD_NUMBER: _ClassVar[int]
     BACKTEST_FIELD_NUMBER: _ClassVar[int]
+    FORKS_FIELD_NUMBER: _ClassVar[int]
+    FORKED_FROM_FIELD_NUMBER: _ClassVar[int]
     listing_id: int
     title: str
     description: str
@@ -1674,7 +1796,9 @@ class CommunityStrategy(_message.Message):
     money_card: MoneyCard
     flow: StrategyFlow
     backtest: CommunityBacktest
-    def __init__(self, listing_id: _Optional[int] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., tags: _Optional[_Iterable[_Union[StrategyTag, str]]] = ..., markets: _Optional[_Iterable[str]] = ..., author_username: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., version_id: _Optional[str] = ..., runtime_version: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., flow: _Optional[_Union[StrategyFlow, _Mapping]] = ..., backtest: _Optional[_Union[CommunityBacktest, _Mapping]] = ...) -> None: ...
+    forks: int
+    forked_from: CommunityForkSource
+    def __init__(self, listing_id: _Optional[int] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., tags: _Optional[_Iterable[_Union[StrategyTag, str]]] = ..., markets: _Optional[_Iterable[str]] = ..., author_username: _Optional[str] = ..., published_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., version_id: _Optional[str] = ..., runtime_version: _Optional[str] = ..., manifest: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., code: _Optional[str] = ..., settings_form: _Optional[_Iterable[_Union[SettingField, _Mapping]]] = ..., money_card: _Optional[_Union[MoneyCard, _Mapping]] = ..., flow: _Optional[_Union[StrategyFlow, _Mapping]] = ..., backtest: _Optional[_Union[CommunityBacktest, _Mapping]] = ..., forks: _Optional[int] = ..., forked_from: _Optional[_Union[CommunityForkSource, _Mapping]] = ...) -> None: ...
 
 class PublishStrategyVersionRequest(_message.Message):
     __slots__ = ("strategy_id", "version_id", "title", "description", "tags", "idempotency_key")
@@ -1729,6 +1853,42 @@ class ListCommunityStrategiesResponse(_message.Message):
     strategies: _containers.RepeatedCompositeFieldContainer[CommunityStrategySummary]
     next_page_token: str
     def __init__(self, strategies: _Optional[_Iterable[_Union[CommunityStrategySummary, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class ForkStrategyRequest(_message.Message):
+    __slots__ = ("listing_id", "name", "idempotency_key")
+    LISTING_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    listing_id: int
+    name: str
+    idempotency_key: str
+    def __init__(self, listing_id: _Optional[int] = ..., name: _Optional[str] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+
+class ForkStrategyResponse(_message.Message):
+    __slots__ = ("strategy", "version")
+    STRATEGY_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    strategy: Strategy
+    version: VersionValidation
+    def __init__(self, strategy: _Optional[_Union[Strategy, _Mapping]] = ..., version: _Optional[_Union[VersionValidation, _Mapping]] = ...) -> None: ...
+
+class ReportCommunityStrategyRequest(_message.Message):
+    __slots__ = ("listing_id", "version_id", "reason", "note")
+    LISTING_ID_FIELD_NUMBER: _ClassVar[int]
+    VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    NOTE_FIELD_NUMBER: _ClassVar[int]
+    listing_id: int
+    version_id: str
+    reason: ReportReason
+    note: str
+    def __init__(self, listing_id: _Optional[int] = ..., version_id: _Optional[str] = ..., reason: _Optional[_Union[ReportReason, str]] = ..., note: _Optional[str] = ...) -> None: ...
+
+class ReportCommunityStrategyResponse(_message.Message):
+    __slots__ = ("reported_at",)
+    REPORTED_AT_FIELD_NUMBER: _ClassVar[int]
+    reported_at: _timestamp_pb2.Timestamp
+    def __init__(self, reported_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GetCommunityStrategyRequest(_message.Message):
     __slots__ = ("listing_id",)

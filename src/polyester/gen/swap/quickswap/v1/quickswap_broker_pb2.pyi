@@ -7,6 +7,7 @@ from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
 from polyester.gen.swap.quickswap.v1 import quickswap_pb2 as _quickswap_pb2
+from polyester.gen.swap.v1 import swap_pb2 as _swap_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -70,6 +71,7 @@ class PayoutStage(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STAGE_REQUESTING: _ClassVar[PayoutStage]
     STAGE_PROCESSING: _ClassVar[PayoutStage]
     STAGE_BROADCAST: _ClassVar[PayoutStage]
+    STAGE_CONVERTING: _ClassVar[PayoutStage]
 
 class PayoutStepState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -151,6 +153,7 @@ STAGE_PLANNING: PayoutStage
 STAGE_REQUESTING: PayoutStage
 STAGE_PROCESSING: PayoutStage
 STAGE_BROADCAST: PayoutStage
+STAGE_CONVERTING: PayoutStage
 PAYOUT_STEP_STATE_UNSPECIFIED: PayoutStepState
 PAYOUT_STEP_PENDING: PayoutStepState
 PAYOUT_STEP_REQUESTING: PayoutStepState
@@ -862,7 +865,7 @@ class PayoutStep(_message.Message):
     def __init__(self, asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., state: _Optional[_Union[PayoutStepState, str]] = ..., reason: _Optional[str] = ..., available: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., minimum: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., tx_hash: _Optional[str] = ..., charged_network_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., close: _Optional[_Union[PayoutClose, str]] = ..., refunded_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
 
 class Payout(_message.Message):
-    __slots__ = ("run_id", "vault_account_id", "status", "reason", "stage", "rule_version", "scheduled_for", "started_at", "finished_at", "min_usd_value", "steps")
+    __slots__ = ("run_id", "vault_account_id", "status", "reason", "stage", "rule_version", "scheduled_for", "started_at", "finished_at", "min_usd_value", "steps", "conversions")
     RUN_ID_FIELD_NUMBER: _ClassVar[int]
     VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
@@ -874,6 +877,7 @@ class Payout(_message.Message):
     FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
     MIN_USD_VALUE_FIELD_NUMBER: _ClassVar[int]
     STEPS_FIELD_NUMBER: _ClassVar[int]
+    CONVERSIONS_FIELD_NUMBER: _ClassVar[int]
     run_id: int
     vault_account_id: int
     status: PayoutStatus
@@ -885,7 +889,36 @@ class Payout(_message.Message):
     finished_at: _timestamp_pb2.Timestamp
     min_usd_value: _quickswap_pb2.TokenAmount
     steps: _containers.RepeatedCompositeFieldContainer[PayoutStep]
-    def __init__(self, run_id: _Optional[int] = ..., vault_account_id: _Optional[int] = ..., status: _Optional[_Union[PayoutStatus, str]] = ..., reason: _Optional[str] = ..., stage: _Optional[_Union[PayoutStage, str]] = ..., rule_version: _Optional[int] = ..., scheduled_for: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., min_usd_value: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., steps: _Optional[_Iterable[_Union[PayoutStep, _Mapping]]] = ...) -> None: ...
+    conversions: _containers.RepeatedCompositeFieldContainer[PayoutConversion]
+    def __init__(self, run_id: _Optional[int] = ..., vault_account_id: _Optional[int] = ..., status: _Optional[_Union[PayoutStatus, str]] = ..., reason: _Optional[str] = ..., stage: _Optional[_Union[PayoutStage, str]] = ..., rule_version: _Optional[int] = ..., scheduled_for: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., min_usd_value: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., steps: _Optional[_Iterable[_Union[PayoutStep, _Mapping]]] = ..., conversions: _Optional[_Iterable[_Union[PayoutConversion, _Mapping]]] = ...) -> None: ...
+
+class PayoutConversion(_message.Message):
+    __slots__ = ("source_asset_id", "payout_asset_id", "amount", "swap_id", "execution", "status", "reason", "is_terminal", "executed_amount", "unspent_amount", "received_amount", "skip_reason")
+    SOURCE_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    PAYOUT_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    SWAP_ID_FIELD_NUMBER: _ClassVar[int]
+    EXECUTION_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    IS_TERMINAL_FIELD_NUMBER: _ClassVar[int]
+    EXECUTED_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    UNSPENT_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    RECEIVED_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    SKIP_REASON_FIELD_NUMBER: _ClassVar[int]
+    source_asset_id: int
+    payout_asset_id: int
+    amount: _quickswap_pb2.TokenAmount
+    swap_id: int
+    execution: _swap_pb2.Execution
+    status: _swap_pb2.SwapStatus
+    reason: _swap_pb2.SwapReason
+    is_terminal: bool
+    executed_amount: _quickswap_pb2.TokenAmount
+    unspent_amount: _quickswap_pb2.TokenAmount
+    received_amount: _quickswap_pb2.TokenAmount
+    skip_reason: str
+    def __init__(self, source_asset_id: _Optional[int] = ..., payout_asset_id: _Optional[int] = ..., amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., swap_id: _Optional[int] = ..., execution: _Optional[_Union[_swap_pb2.Execution, _Mapping]] = ..., status: _Optional[_Union[_swap_pb2.SwapStatus, str]] = ..., reason: _Optional[_Union[_swap_pb2.SwapReason, str]] = ..., is_terminal: _Optional[bool] = ..., executed_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., unspent_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., received_amount: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., skip_reason: _Optional[str] = ...) -> None: ...
 
 class ListPayoutsRequest(_message.Message):
     __slots__ = ("broker", "vault_account_id", "statuses", "start_time", "end_time", "limit", "page_token")
@@ -928,7 +961,7 @@ class GetPayoutResponse(_message.Message):
     def __init__(self, payout: _Optional[_Union[Payout, _Mapping]] = ...) -> None: ...
 
 class UpcomingPayoutAsset(_message.Message):
-    __slots__ = ("asset_id", "destination_chain_id", "destination_address", "available", "payable", "held_back", "hold_reason", "minimum", "value_usd", "priced_at", "estimated_network_fee", "estimated_network_fee_sampled_at", "payable_from")
+    __slots__ = ("asset_id", "destination_chain_id", "destination_address", "available", "payable", "held_back", "hold_reason", "minimum", "value_usd", "priced_at", "estimated_network_fee", "estimated_network_fee_sampled_at", "payable_from", "conversion")
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_ADDRESS_FIELD_NUMBER: _ClassVar[int]
@@ -942,6 +975,7 @@ class UpcomingPayoutAsset(_message.Message):
     ESTIMATED_NETWORK_FEE_FIELD_NUMBER: _ClassVar[int]
     ESTIMATED_NETWORK_FEE_SAMPLED_AT_FIELD_NUMBER: _ClassVar[int]
     PAYABLE_FROM_FIELD_NUMBER: _ClassVar[int]
+    CONVERSION_FIELD_NUMBER: _ClassVar[int]
     asset_id: int
     destination_chain_id: int
     destination_address: str
@@ -955,7 +989,24 @@ class UpcomingPayoutAsset(_message.Message):
     estimated_network_fee: _quickswap_pb2.TokenAmount
     estimated_network_fee_sampled_at: _timestamp_pb2.Timestamp
     payable_from: _timestamp_pb2.Timestamp
-    def __init__(self, asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., available: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., payable: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., held_back: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., hold_reason: _Optional[str] = ..., minimum: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., priced_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., estimated_network_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., estimated_network_fee_sampled_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., payable_from: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    conversion: UpcomingPayoutConversion
+    def __init__(self, asset_id: _Optional[int] = ..., destination_chain_id: _Optional[int] = ..., destination_address: _Optional[str] = ..., available: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., payable: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., held_back: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., hold_reason: _Optional[str] = ..., minimum: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., value_usd: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., priced_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., estimated_network_fee: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., estimated_network_fee_sampled_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., payable_from: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., conversion: _Optional[_Union[UpcomingPayoutConversion, _Mapping]] = ...) -> None: ...
+
+class UpcomingPayoutConversion(_message.Message):
+    __slots__ = ("payout_asset_id", "expected_amount_out", "min_amount_out", "price_impact_bps", "execution", "skip_reason")
+    PAYOUT_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_AMOUNT_OUT_FIELD_NUMBER: _ClassVar[int]
+    MIN_AMOUNT_OUT_FIELD_NUMBER: _ClassVar[int]
+    PRICE_IMPACT_BPS_FIELD_NUMBER: _ClassVar[int]
+    EXECUTION_FIELD_NUMBER: _ClassVar[int]
+    SKIP_REASON_FIELD_NUMBER: _ClassVar[int]
+    payout_asset_id: int
+    expected_amount_out: _quickswap_pb2.TokenAmount
+    min_amount_out: _quickswap_pb2.TokenAmount
+    price_impact_bps: int
+    execution: _swap_pb2.Execution
+    skip_reason: str
+    def __init__(self, payout_asset_id: _Optional[int] = ..., expected_amount_out: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., min_amount_out: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., price_impact_bps: _Optional[int] = ..., execution: _Optional[_Union[_swap_pb2.Execution, _Mapping]] = ..., skip_reason: _Optional[str] = ...) -> None: ...
 
 class UpcomingPayout(_message.Message):
     __slots__ = ("vault_account_id", "status", "next_run_at", "rule_version", "pause", "min_usd_value", "assets", "computed_at")
@@ -1026,7 +1077,7 @@ class AssetWithoutDestination(_message.Message):
     def __init__(self, asset_id: _Optional[int] = ..., balance: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ...) -> None: ...
 
 class VaultPayoutRule(_message.Message):
-    __slots__ = ("vault_account_id", "rule_version", "enabled", "schedule", "destinations", "pause", "min_usd_value", "updated_at", "assets_without_destination")
+    __slots__ = ("vault_account_id", "rule_version", "enabled", "schedule", "destinations", "pause", "min_usd_value", "updated_at", "assets_without_destination", "payout_asset_id", "conversion_twap_duration_ms")
     VAULT_ACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     RULE_VERSION_FIELD_NUMBER: _ClassVar[int]
     ENABLED_FIELD_NUMBER: _ClassVar[int]
@@ -1036,6 +1087,8 @@ class VaultPayoutRule(_message.Message):
     MIN_USD_VALUE_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     ASSETS_WITHOUT_DESTINATION_FIELD_NUMBER: _ClassVar[int]
+    PAYOUT_ASSET_ID_FIELD_NUMBER: _ClassVar[int]
+    CONVERSION_TWAP_DURATION_MS_FIELD_NUMBER: _ClassVar[int]
     vault_account_id: int
     rule_version: int
     enabled: bool
@@ -1045,7 +1098,9 @@ class VaultPayoutRule(_message.Message):
     min_usd_value: _quickswap_pb2.TokenAmount
     updated_at: _timestamp_pb2.Timestamp
     assets_without_destination: _containers.RepeatedCompositeFieldContainer[AssetWithoutDestination]
-    def __init__(self, vault_account_id: _Optional[int] = ..., rule_version: _Optional[int] = ..., enabled: _Optional[bool] = ..., schedule: _Optional[_Union[_auto_withdraw_pb2.AutoWithdrawSchedule, _Mapping]] = ..., destinations: _Optional[_Iterable[_Union[PayoutRuleDestination, _Mapping]]] = ..., pause: _Optional[_Union[_auto_withdraw_pb2.AutoWithdrawPause, _Mapping]] = ..., min_usd_value: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., assets_without_destination: _Optional[_Iterable[_Union[AssetWithoutDestination, _Mapping]]] = ...) -> None: ...
+    payout_asset_id: int
+    conversion_twap_duration_ms: int
+    def __init__(self, vault_account_id: _Optional[int] = ..., rule_version: _Optional[int] = ..., enabled: _Optional[bool] = ..., schedule: _Optional[_Union[_auto_withdraw_pb2.AutoWithdrawSchedule, _Mapping]] = ..., destinations: _Optional[_Iterable[_Union[PayoutRuleDestination, _Mapping]]] = ..., pause: _Optional[_Union[_auto_withdraw_pb2.AutoWithdrawPause, _Mapping]] = ..., min_usd_value: _Optional[_Union[_quickswap_pb2.TokenAmount, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., assets_without_destination: _Optional[_Iterable[_Union[AssetWithoutDestination, _Mapping]]] = ..., payout_asset_id: _Optional[int] = ..., conversion_twap_duration_ms: _Optional[int] = ...) -> None: ...
 
 class ListVaultPayoutRulesRequest(_message.Message):
     __slots__ = ("broker", "vault_account_id", "limit", "page_token")

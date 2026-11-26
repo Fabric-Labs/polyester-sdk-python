@@ -14,6 +14,13 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class StatementExportType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    STATEMENT_EXPORT_TYPE_UNSPECIFIED: _ClassVar[StatementExportType]
+    ACCOUNT_STATEMENT: _ClassVar[StatementExportType]
+    LEDGER: _ClassVar[StatementExportType]
+    BALANCES: _ClassVar[StatementExportType]
+
 class StatementExportStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     STATEMENT_EXPORT_STATUS_UNSPECIFIED: _ClassVar[StatementExportStatus]
@@ -29,6 +36,11 @@ class StatementExportFailureReason(int, metaclass=_enum_type_wrapper.EnumTypeWra
     STATEMENT_EXPORT_FAILURE_REASON_UNSPECIFIED: _ClassVar[StatementExportFailureReason]
     STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE: _ClassVar[StatementExportFailureReason]
     STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE: _ClassVar[StatementExportFailureReason]
+    STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE: _ClassVar[StatementExportFailureReason]
+STATEMENT_EXPORT_TYPE_UNSPECIFIED: StatementExportType
+ACCOUNT_STATEMENT: StatementExportType
+LEDGER: StatementExportType
+BALANCES: StatementExportType
 STATEMENT_EXPORT_STATUS_UNSPECIFIED: StatementExportStatus
 STATEMENT_EXPORT_STATUS_QUEUED: StatementExportStatus
 STATEMENT_EXPORT_STATUS_PROCESSING: StatementExportStatus
@@ -39,9 +51,10 @@ STATEMENT_EXPORT_STATUS_CANCELED: StatementExportStatus
 STATEMENT_EXPORT_FAILURE_REASON_UNSPECIFIED: StatementExportFailureReason
 STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE: StatementExportFailureReason
 STATEMENT_EXPORT_FAILURE_REASON_UNAVAILABLE: StatementExportFailureReason
+STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE: StatementExportFailureReason
 
 class StatementExport(_message.Message):
-    __slots__ = ("export_id", "subaccount_id", "start_time", "end_time", "asset_id", "idempotency_key", "status", "complete_through", "movements", "bytes", "created_at", "ready_at", "expires_at", "failure_reason")
+    __slots__ = ("export_id", "subaccount_id", "start_time", "end_time", "asset_id", "idempotency_key", "status", "complete_through", "movements", "bytes", "created_at", "ready_at", "expires_at", "failure_reason", "type", "history_available_from")
     EXPORT_ID_FIELD_NUMBER: _ClassVar[int]
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     START_TIME_FIELD_NUMBER: _ClassVar[int]
@@ -56,6 +69,8 @@ class StatementExport(_message.Message):
     READY_AT_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
     FAILURE_REASON_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    HISTORY_AVAILABLE_FROM_FIELD_NUMBER: _ClassVar[int]
     export_id: int
     subaccount_id: int
     start_time: _timestamp_pb2.Timestamp
@@ -70,21 +85,25 @@ class StatementExport(_message.Message):
     ready_at: _timestamp_pb2.Timestamp
     expires_at: _timestamp_pb2.Timestamp
     failure_reason: StatementExportFailureReason
-    def __init__(self, export_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[StatementExportStatus, str]] = ..., complete_through: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., movements: _Optional[int] = ..., bytes: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ready_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., failure_reason: _Optional[_Union[StatementExportFailureReason, str]] = ...) -> None: ...
+    type: StatementExportType
+    history_available_from: _timestamp_pb2.Timestamp
+    def __init__(self, export_id: _Optional[int] = ..., subaccount_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., status: _Optional[_Union[StatementExportStatus, str]] = ..., complete_through: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., movements: _Optional[int] = ..., bytes: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., ready_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., failure_reason: _Optional[_Union[StatementExportFailureReason, str]] = ..., type: _Optional[_Union[StatementExportType, str]] = ..., history_available_from: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class CreateStatementExportRequest(_message.Message):
-    __slots__ = ("subaccount_id", "start_time", "end_time", "asset_id", "idempotency_key")
+    __slots__ = ("subaccount_id", "start_time", "end_time", "asset_id", "idempotency_key", "type")
     SUBACCOUNT_ID_FIELD_NUMBER: _ClassVar[int]
     START_TIME_FIELD_NUMBER: _ClassVar[int]
     END_TIME_FIELD_NUMBER: _ClassVar[int]
     ASSET_ID_FIELD_NUMBER: _ClassVar[int]
     IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     subaccount_id: int
     start_time: _timestamp_pb2.Timestamp
     end_time: _timestamp_pb2.Timestamp
     asset_id: int
     idempotency_key: str
-    def __init__(self, subaccount_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ...) -> None: ...
+    type: StatementExportType
+    def __init__(self, subaccount_id: _Optional[int] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., asset_id: _Optional[int] = ..., idempotency_key: _Optional[str] = ..., type: _Optional[_Union[StatementExportType, str]] = ...) -> None: ...
 
 class CreateStatementExportResponse(_message.Message):
     __slots__ = ("export",)

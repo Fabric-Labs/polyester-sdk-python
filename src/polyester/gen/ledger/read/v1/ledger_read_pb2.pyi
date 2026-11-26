@@ -1,5 +1,8 @@
+import datetime
+
 from polyester.gen.buf.validate import validate_pb2 as _validate_pb2
 from polyester.gen.gnostic.openapi.v3 import annotations_pb2 as _annotations_pb2
+from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from polyester.gen.ledger.v1 import catalog_pb2 as _catalog_pb2
 from polyester.gen.polyester.api import options_pb2 as _options_pb2
 from polyester.gen.polyester.type.v1 import u128_pb2 as _u128_pb2
@@ -59,6 +62,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_STATEMENT_EXPORT_FAILED: _ClassVar[ErrorCode]
     ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE: _ClassVar[ErrorCode]
     ERROR_CODE_STATEMENT_EXPORT_CANCELED: _ClassVar[ErrorCode]
+    ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE: _ClassVar[ErrorCode]
 RANGE_UNSPECIFIED: BalanceRange
 DAY_1: BalanceRange
 DAY_7: BalanceRange
@@ -95,6 +99,7 @@ ERROR_CODE_STATEMENT_EXPORT_EXPIRED: ErrorCode
 ERROR_CODE_STATEMENT_EXPORT_FAILED: ErrorCode
 ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE: ErrorCode
 ERROR_CODE_STATEMENT_EXPORT_CANCELED: ErrorCode
+ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE: ErrorCode
 
 class GetBalancesRequest(_message.Message):
     __slots__ = ("subaccount_id",)
@@ -395,7 +400,9 @@ class ListTransfersResponse(_message.Message):
     def __init__(self, transfers: _Optional[_Iterable[_Union[TransferRow, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code",)
+    __slots__ = ("code", "history_available_from")
     CODE_FIELD_NUMBER: _ClassVar[int]
+    HISTORY_AVAILABLE_FROM_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
+    history_available_from: _timestamp_pb2.Timestamp
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., history_available_from: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...

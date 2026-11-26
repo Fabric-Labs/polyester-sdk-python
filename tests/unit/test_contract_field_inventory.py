@@ -62,6 +62,7 @@ MESSAGES = [
     "orderbook.v1.GetOrderBookRequest",
     "orderbook.v1.GetOrderBookResponse",
     "orders.v1.ErrorDetail",
+    "ledger.read.v1.ErrorDetail",
     "transfer.v1.BatchCreateInternalTransfersRequest",
     "transfer.v1.InternalTransferBatchLeg",
     "transfer.v1.BatchCreateInternalTransfersResponse",

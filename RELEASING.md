@@ -45,10 +45,13 @@ Every push to `main` runs the devnet path. When `## Unreleased` has no entries
   for PyPI to serve it and checks again that a plain install resolves to a
   stable release.
 - **GitHub release.** One pre-release per target version, tagged
-  `v<next>-devnet`, is moved to each new build, with the `## Unreleased`
-  entries as its notes. It is never marked latest. When a target is abandoned
-  (a breaking entry moves `0.34.1` to `0.35.0`) its pre-release is removed;
-  pre-releases of versions that shipped stay.
+  `v<next>-devnet`, is moved to each new build, with the `## Unreleased` entries
+  as its notes. When they would make the notes longer than 120,000 characters
+  (GitHub refuses a release body over 125,000), the notes link `CHANGELOG.md` at
+  the snapshot's commit instead; the entries are never cut. It is never marked
+  latest. When a target is abandoned (a breaking entry moves `0.34.1` to
+  `0.35.0`) its pre-release is removed; pre-releases of versions that shipped
+  stay.
 - **One at a time.** Runs on `main` queue behind each other (`queue: max`),
   so every push is published in its turn. A re-run of a
   commit whose version PyPI already has skips the upload, and a GitHub

@@ -227,7 +227,7 @@ async def test_trades_list_wires_lineage_scope_and_transfers() -> None:
 @pytest.mark.asyncio
 async def test_orders_get_wires_execution_history_pagination() -> None:
     capture = CaptureUnary(
-        orders_read_pb2.GetOrderResponse(order=orders_read_pb2.Order(order_id=7))
+        orders_read_pb2.GetOrderResponse(order=orders_read_pb2.Order(order_id=11))
     )
     service = AsyncOrdersService(MagicMock(), _catalogs(), None)
     with patch("polyester.services.orders.unary_auth_decoded", capture):

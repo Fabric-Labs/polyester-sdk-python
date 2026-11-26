@@ -32,6 +32,7 @@ from polyester.gen.chain.lifecycle.v1.lifecycle_read_pb2 import (
 from polyester.models import LifecycleFlowsList, LifecycleFlowSummary
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded, unary_public_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto, subscribe_public_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -373,7 +374,13 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
             LifecycleReadServiceClient,
             lambda client, req: client.get_account_flow(req),
             request,
-            flow_from_get_account_flow_response,
+            echoed(
+                "GetAccountFlow",
+                "flow_id",
+                request.flow_id,
+                lambda msg: msg.flow.summary.flow_id if msg.flow.HasField("summary") else None,
+                flow_from_get_account_flow_response,
+            ),
         )
 
     async def get_flow(
@@ -394,7 +401,13 @@ class AsyncLifecycleService(ScopedSubAccountMixin, BaseService):
             LifecycleReadServiceClient,
             lambda client, req: client.get_flow_by_id(req),
             GetFlowByIdRequest(flow_id=resolved_flow_id),
-            flow_from_get_response,
+            echoed(
+                "GetFlowById",
+                "flow_id",
+                resolved_flow_id,
+                lambda msg: msg.flow.summary.flow_id if msg.flow.HasField("summary") else None,
+                flow_from_get_response,
+            ),
         )
 
     async def get_flow_by_tx(

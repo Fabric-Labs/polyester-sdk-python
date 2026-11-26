@@ -11,7 +11,10 @@ async def test_execution_pages_pin_the_returned_generation(httpserver: HTTPServe
     for token, qty in [("older-executions", 40), ("", 60)]:
         body = orders_read_pb2.GetOrderResponse(
             order=orders_read_pb2.Order(
-                order_id=9, cum_qty_scaled=100, inherited_cum_qty_scaled=40
+                order_id=9,
+                client_order_id="reused-client-id",
+                cum_qty_scaled=100,
+                inherited_cum_qty_scaled=40,
             ),
             trades=[orders_read_pb2.UserTrade(order_id=9, qty_scaled=qty)],
             next_page_token=token,

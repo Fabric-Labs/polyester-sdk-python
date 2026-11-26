@@ -15,6 +15,7 @@ from connectrpc.errors import ConnectError
 from polyester._wire import map_connect_error
 from polyester.codecs.oco import create_oco_to_proto
 from polyester.codecs.orders import create_order_to_proto
+from polyester.codecs.scalars import format_id
 from polyester.codecs.triggers import create_trigger_to_proto, modify_trigger_to_proto
 from polyester.errors import (
     PolyesterApiError,
@@ -736,7 +737,7 @@ async def test_round4_no_answer_carries_no_metadata() -> None:
     )
     try:
         with pytest.raises(Exception) as raised:
-            await client.triggers.get(trigger_id="9")
+            await client.triggers.get(trigger_id=format_id(9))
     finally:
         await client.aclose()
     from polyester.errors import PolyesterError

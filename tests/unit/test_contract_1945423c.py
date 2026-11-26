@@ -728,6 +728,7 @@ async def test_create_export_sends_the_period_and_reads_the_export() -> None:
 async def test_get_export_reads_a_failed_export() -> None:
     reply = export_pb2.GetStatementExportResponse(
         export=_export(
+            export_id=5,
             status=export_pb2.STATEMENT_EXPORT_STATUS_FAILED,
             failure_reason=export_pb2.STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE,
             ready_at=None,

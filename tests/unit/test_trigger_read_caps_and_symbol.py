@@ -28,6 +28,7 @@ from polyester import AsyncPolyester
 from polyester.catalogs import CatalogManager
 from polyester.codecs.decode.triggers import trigger_from_proto
 from polyester.codecs.realtime_decode import decode_trigger_bytes
+from polyester.codecs.scalars import format_id
 from polyester.gen.orders.v1 import orders_pb2
 from polyester.gen.triggers.v1 import triggers_pb2
 from polyester.models.trading import Trigger
@@ -182,7 +183,7 @@ async def _reads(
     if catalogs:
         client.catalogs.hydrate_spot_config({"pairs": [BTC_USDT]})
     try:
-        got = await client.triggers.get(trigger_id="21")
+        got = await client.triggers.get(trigger_id=format_id(trigger.trigger_id))
         listed = (await client.triggers.list()).triggers
         return [got, listed[0]]
     finally:

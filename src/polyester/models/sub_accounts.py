@@ -40,13 +40,6 @@ class SubAccountsList(msgspec.Struct, kw_only=True, omit_defaults=True):
     total_created: int = 0
 
 
-class CreateSubaccountResult(msgspec.Struct, kw_only=True, omit_defaults=True):
-    subaccount_id: str = ""
-    total_created: int = 0
-    smart_account_salt_nonce: int = 0
-    revision: int = 0
-
-
 class SubAccountMember(msgspec.Struct, kw_only=True, omit_defaults=True):
     account_id: str = ""
     role: str = ""

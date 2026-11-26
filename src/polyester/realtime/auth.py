@@ -11,7 +11,7 @@ from polyester._answer import attach_answer
 from polyester._problem import decode_http_problem, loads_bounded
 from polyester._redact import url_for_error, url_without_userinfo
 from polyester._redirects import redirect_refusal
-from polyester.auth import ApiKeyCredentials, sign_request_async
+from polyester.auth import ApiKeyCredentials, _sign_request_async
 from polyester.codecs.timestamp_window import timestamp_window_from_json
 from polyester.errors import (
     TIMESTAMP_SKEW,
@@ -189,12 +189,31 @@ async def signed_get(
     # malformed URL by naming it, and httpx logs the URL it requests. Only the
     # path and query are signed, so the signature is the same.
     target = url_without_userinfo(url)
-    headers = await sign_request_async(credentials, method="GET", url=target, body=b"")
+    # One absolute wall-clock deadline covers the wait for a signing timestamp,
+    # request headers and the bounded body. It starts before signing: the
+    # API key's timestamps are shared, and a burst can make signing wait for
+    # the clock. httpx per-phase timeouts alone are insufficient: slow-drip
+    # chunks can each arrive within the read timeout while the total exceeds
+    # the SDK budget.
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _client_timeout_seconds(http)
+
+    def time_left() -> float:
+        return deadline - loop.time()
+
+    try:
+        # The allocator waits at most the time left, in this task, and checks
+        # it under its lock before taking a timestamp: a request out of time,
+        # or cancelled, takes none and leaves the allocator as it was.
+        headers = await _sign_request_async(
+            credentials, method="GET", url=target, body=b"", time_left=time_left
+        )
+    except TimeoutError as exc:
+        raise PolyesterRealtimeError(f"{label}: timed out") from exc
+    if time_left() <= 0:
+        # Out of time once signed: never sent.
+        raise PolyesterRealtimeError(f"{label}: timed out")
     auth = _userinfo_auth(http, url) if target != url else None
-    # One absolute wall-clock deadline covers request headers + bounded body.
-    # httpx per-phase timeouts alone are insufficient: slow-drip chunks can each
-    # arrive within the read timeout while the total exceeds the SDK budget.
-    timeout = _client_timeout_seconds(http)
     # Each answer is recorded when its headers arrive: whatever then cuts its
     # body off, or makes its Location unreadable, the deadline included, the
     # error made from a failed answer carries its status and delay.
@@ -202,7 +221,7 @@ async def signed_get(
     answers: list[httpx.Response] = []
     recording = _answers.set(answers)
     try:
-        async with asyncio.timeout(timeout):
+        async with asyncio.timeout_at(deadline):
             # Never follow a redirect, whatever the client's own setting: it
             # would carry the signed headers to the redirect target.
             stream = (

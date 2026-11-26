@@ -371,16 +371,23 @@ def replacement_risk_policy(
     clear_attached_risk: object,
     *,
     symbol: str | None,
+    risk_field: str = "new_attached_risk",
 ) -> orders_pb2.RiskPolicy | None:
     """The ``new_attached_risk`` of a modify or a batch replace item.
 
     ``clear_attached_risk=True`` sends an empty ``RiskPolicy``, which removes
     the order's take-profit, stop-loss and trailing stop; with a
     ``new_attached_risk`` it raises. Otherwise ``None`` leaves the legs
-    unchanged, and an empty risk raises.
+    unchanged, and an empty risk raises. ``risk_field`` is the field path a
+    refusal names: ``items[i].new_attached_risk`` for an item of a whole batch
+    request.
     """
     built = call(
-        pure._replacement_risk, _risk_input(new_attached_risk), clear_attached_risk, symbol
+        pure._replacement_risk,
+        _risk_input(new_attached_risk),
+        clear_attached_risk,
+        symbol,
+        risk_field,
     )
     return None if built is None else message(built, orders_pb2.RiskPolicy())
 
@@ -394,7 +401,11 @@ def batch_replace_item_to_proto(
     quantity_scale: int,
     symbol: str | None = None,
     symbol_id: int | None = None,
+    risk_field: str = "new_attached_risk",
 ) -> orders_pb2.BatchReplaceOrderItem:
+    """One batch replace item. Refusals of its ``new_attached_risk`` name
+    ``risk_field``: the field alone by default, under the item's index when
+    :func:`batch_replace_orders_to_proto` encodes a whole request."""
     if isinstance(item, BatchReplaceItem):
         item = {
             "key": item.key,
@@ -434,7 +445,9 @@ def batch_replace_item_to_proto(
         proto.new_client_order_id = required_client_id(
             str(item["new_client_order_id"]), "new_client_order_id"
         )
-    risk = replacement_risk_policy(new_attached_risk, clear_attached_risk, symbol=symbol)
+    risk = replacement_risk_policy(
+        new_attached_risk, clear_attached_risk, symbol=symbol, risk_field=risk_field
+    )
     if risk is not None:
         proto.new_attached_risk.CopyFrom(risk)
     return proto
@@ -584,12 +597,18 @@ def batch_replace_orders_to_proto(
     )
     if sub_account_id is not None:
         proto.subaccount_id = parse_account_id(sub_account_id, "sub_account_id")
-    for item in items:
+    for index, item in enumerate(items):
         new_qty = item.new_qty if isinstance(item, BatchReplaceItem) else item.get("new_qty")
         item_scale = _codec_quantity_scale(new_qty, quantity_scale) if new_qty is not None else 0
+        # A refusal of the whole request names the item's field under its
+        # index, as the contract's FieldViolation.field_path does.
         proto.items.append(
             batch_replace_item_to_proto(
-                item, quantity_scale=item_scale, symbol=symbol, symbol_id=symbol_id
+                item,
+                quantity_scale=item_scale,
+                symbol=symbol,
+                symbol_id=symbol_id,
+                risk_field=f"items[{index}].new_attached_risk",
             )
         )
     return proto

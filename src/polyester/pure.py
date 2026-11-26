@@ -1224,8 +1224,9 @@ def polyester(
       raise _err("attached_risk must be an object or AttachedRisk")
     if not data:
       # Never dropped: the call would succeed and leave the legs as they were.
-      message = "attached_risk requires take_profit and/or a stop leg"
-      if risk_field == "new_attached_risk":
+      # A batch item's refusal names the item (items[i].new_attached_risk).
+      message = (risk_field if "[" in risk_field else "attached_risk") + " requires take_profit and/or a stop leg"
+      if risk_field.endswith("new_attached_risk"):
         message += "; to remove the order's attached risk, pass clear_attached_risk=True"
       raise _err(message)
     _reject_unknown(data, _RISK_POLICY_KEYS, "attached_risk")
@@ -1269,15 +1270,17 @@ def polyester(
       risk["trailingStop"] = stop
     return risk
 
-  def _replacement_risk(new_attached_risk, clear_attached_risk, symbol):
+  def _replacement_risk(new_attached_risk, clear_attached_risk, symbol, risk_field="new_attached_risk"):
+    # risk_field is the path refusals name: the field alone for a modify,
+    # under the item's index (items[i].new_attached_risk) for a batch item.
     if not isinstance(clear_attached_risk, bool):
       raise _err("clear_attached_risk must be a bool")
     if clear_attached_risk:
       if new_attached_risk is not None:
-        raise _err("pass new_attached_risk or clear_attached_risk=True, not both")
+        raise _err(f"pass {risk_field} or clear_attached_risk=True, not both")
       return {}
     # No side here: the server applies the trailing stop's side rule.
-    return _risk_policy(new_attached_risk, symbol, None, "new_attached_risk")
+    return _risk_policy(new_attached_risk, symbol, None, risk_field)
 
   @_dataclass(frozen=True)
   class OrderId:

@@ -1269,15 +1269,17 @@ def polyester(
       risk["trailingStop"] = stop
     return risk
 
-  def _replacement_risk(new_attached_risk, clear_attached_risk, symbol):
+  def _replacement_risk(new_attached_risk, clear_attached_risk, symbol, risk_field="new_attached_risk"):
+    # risk_field is the path refusals name: the field alone for a modify,
+    # under the item's index (items[i].new_attached_risk) for a batch item.
     if not isinstance(clear_attached_risk, bool):
       raise _err("clear_attached_risk must be a bool")
     if clear_attached_risk:
       if new_attached_risk is not None:
-        raise _err("pass new_attached_risk or clear_attached_risk=True, not both")
+        raise _err(f"pass {risk_field} or clear_attached_risk=True, not both")
       return {}
     # No side here: the server applies the trailing stop's side rule.
-    return _risk_policy(new_attached_risk, symbol, None, "new_attached_risk")
+    return _risk_policy(new_attached_risk, symbol, None, risk_field)
 
   @_dataclass(frozen=True)
   class OrderId:

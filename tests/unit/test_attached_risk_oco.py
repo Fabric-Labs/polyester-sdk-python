@@ -89,7 +89,8 @@ async def test_batch_replace_refuses_one_leg_oco_before_sending(risk: object) ->
             items=[{"key": ClientOrderId("cid-1"), "new_price": "1000", "new_attached_risk": risk}],
         )
     assert capture.calls == 0
-    _assert_oco_refusal(caught.value, "new_attached_risk")
+    # A refusal of the whole request names the item's field under its index.
+    _assert_oco_refusal(caught.value, "items[0].new_attached_risk")
 
 
 @pytest.mark.asyncio

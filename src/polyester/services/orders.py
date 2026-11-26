@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Unpack, overload
 
 import msgspec
@@ -42,7 +42,7 @@ from polyester.codecs.orders import (
     set_order_key,
 )
 from polyester.codecs.pure_bridge import call, exact_index, message, pure
-from polyester.codecs.scalars import id_to_int, market_ids
+from polyester.codecs.scalars import format_id, id_to_int, market_ids
 from polyester.errors import (
     PolyesterApiError,
     PolyesterBatchReplaceTimeoutError,
@@ -59,9 +59,11 @@ from polyester.gen.orders.v1.orders_pb2 import CancelOrderRequest
 from polyester.gen.orders.v1.orders_read_connect import OrdersReadServiceClient
 from polyester.gen.orders.v1.orders_read_pb2 import (
     GetBatchReplaceStatusRequest,
+    GetBatchReplaceStatusResponse,
     GetOpenOrdersRequest,
     GetOrderHistoryRequest,
     GetOrderRequest,
+    GetOrderResponse,
 )
 from polyester.models import (
     AttachedRisk,
@@ -88,6 +90,7 @@ from polyester.models import (
 from polyester.models.private_orders import PrivateOrdersEvent
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService, CatalogWait
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import require_realtime
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin, resolve_account_id
@@ -173,6 +176,42 @@ def _cancel_all_symbol_ids(values: object) -> list[int] | None:
             "orders.cancel_all symbol_ids must be a list of integer market IDs, not memoryview"
         )
     return market_ids(values, "orders.cancel_all symbol_ids")
+
+
+def _echoed_order(
+    request: GetOrderRequest, decode: Callable[[GetOrderResponse], GetOrderResult]
+) -> Callable[[GetOrderResponse], GetOrderResult]:
+    """``decode`` of a ``GetOrder`` reply, refused when the order it holds is
+    not the one ``request`` names, by order ID or by client order ID."""
+    if request.WhichOneof("key") == "order_id":
+        return echoed(
+            "GetOrder",
+            "order_id",
+            format_id(request.order_id),
+            lambda msg: format_id(msg.order.order_id) if msg.HasField("order") else None,
+            decode,
+        )
+    return echoed(
+        "GetOrder",
+        "client_order_id",
+        request.client_order_id,
+        lambda msg: msg.order.client_order_id if msg.HasField("order") else None,
+        decode,
+    )
+
+
+def _echoed_batch_replace_status(
+    batch_request_id: int,
+) -> Callable[[GetBatchReplaceStatusResponse], BatchReplaceStatusResult]:
+    """``batch_replace_status_from_proto``, refused when the reply names
+    another batch than ``batch_request_id``."""
+    return echoed(
+        "GetBatchReplaceStatus",
+        "batch_request_id",
+        format_id(batch_request_id),
+        lambda msg: format_id(msg.batch_request_id),
+        batch_replace_status_from_proto,
+    )
 
 
 class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
@@ -370,8 +409,11 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersReadServiceClient,
             lambda client, req: client.get_order(req),
             request,
-            functools.partial(
-                get_order_from_proto, scales=self._order_scales, symbols=self._symbol
+            _echoed_order(
+                request,
+                functools.partial(
+                    get_order_from_proto, scales=self._order_scales, symbols=self._symbol
+                ),
             ),
         )
 
@@ -914,7 +956,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
             OrdersReadServiceClient,
             lambda client, req: client.get_batch_replace_status(req),
             request,
-            batch_replace_status_from_proto,
+            _echoed_batch_replace_status(request.batch_request_id),
         )
 
     async def wait_batch_replace(
@@ -984,7 +1026,7 @@ class AsyncOrdersService(ScopedSubAccountMixin, BaseService):
                         OrdersReadServiceClient,
                         lambda client, req: client.get_batch_replace_status(req),
                         request,
-                        batch_replace_status_from_proto,
+                        _echoed_batch_replace_status(request.batch_request_id),
                     )
             except Exception as exc:
                 if read_deadline.expired():

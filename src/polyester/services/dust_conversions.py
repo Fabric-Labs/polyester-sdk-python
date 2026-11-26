@@ -27,6 +27,7 @@ from polyester.models.dust import (
     DustQuote,
 )
 from polyester.services._base import BaseService
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
 
@@ -199,7 +200,13 @@ class AsyncDustConversionsService(ScopedSubAccountMixin, BaseService):
             DustConversionServiceClient,
             lambda client, req: client.get_dust_conversion(req),
             request,
-            dust_conversion_from_get_response,
+            echoed(
+                "GetDustConversion",
+                "conversion_id",
+                request.conversion_id,
+                lambda msg: msg.conversion.conversion_id if msg.HasField("conversion") else None,
+                dust_conversion_from_get_response,
+            ),
         )
 
     async def list(

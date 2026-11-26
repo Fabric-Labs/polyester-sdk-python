@@ -7,6 +7,7 @@ import json
 import pytest
 
 from polyester import AsyncPolyester
+from polyester.codecs.scalars import format_id
 from polyester.errors import (
     PolyesterApiError,
     PolyesterAuthError,
@@ -25,7 +26,7 @@ from tests.hardening_support import (
 READS = {
     "get": (
         "/triggers.v1.TriggersService/GetTrigger",
-        lambda client: client.triggers.get(trigger_id="9"),
+        lambda client: client.triggers.get(trigger_id=format_id(9)),
         triggers.GetTriggerResponse(trigger=triggers.Trigger(trigger_id=9)),
     ),
     "list": (

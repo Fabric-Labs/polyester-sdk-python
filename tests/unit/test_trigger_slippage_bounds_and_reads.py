@@ -14,6 +14,7 @@ from polyester.codecs.orders import (
     risk_policy_from_dict,
 )
 from polyester.codecs.realtime_decode import decode_trigger_bytes
+from polyester.codecs.scalars import format_id
 from polyester.codecs.triggers import create_trigger_to_proto, modify_trigger_to_proto
 from polyester.errors import PolyesterValidationError
 from polyester.gen.orders.v1 import orders_pb2
@@ -233,7 +234,7 @@ async def test_triggers_get_and_list_keep_the_market_cap() -> None:
     service = AsyncTriggersService(MagicMock(), _catalogs(), None)
     get_capture = CaptureUnary(triggers_pb2.GetTriggerResponse(trigger=_stop_with(CAPS["bps_10"])))
     with patch(_TRIGGER_READ, get_capture):
-        got = await service.get(trigger_id="5")
+        got = await service.get(trigger_id=format_id(5))
     assert got is not None and got.max_slippage_bps == 10
 
     list_capture = CaptureUnary(

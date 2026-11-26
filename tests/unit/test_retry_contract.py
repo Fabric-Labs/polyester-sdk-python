@@ -109,7 +109,12 @@ async def test_ambiguous_errors_never_retry(httpserver, status, body):
 async def test_ambiguous_read_recovery(httpserver, operation, status, kind, body):
     import asyncio
 
-    from tests.unit.test_trigger_read_retry import GET_PATH, _service, _trigger_response
+    from tests.unit.test_trigger_read_retry import (
+        GET_PATH,
+        TRIGGER_ID,
+        _service,
+        _trigger_response,
+    )
     from tests.unit.test_wait_batch_replace import (
         BATCH_ID,
         STATUS_PATH,
@@ -129,7 +134,7 @@ async def test_ambiguous_read_recovery(httpserver, operation, status, kind, body
         )
         service, transport = _service(httpserver)
         try:
-            await service.get(trigger_id="9")
+            await service.get(trigger_id=format_id(TRIGGER_ID))
         finally:
             await transport.aclose()
     else:
@@ -252,7 +257,12 @@ async def test_client_timeout_read_recovery(operation):
     from werkzeug.wrappers import Response
 
     from tests.hardening_support import ProbeFreeHTTPServer
-    from tests.unit.test_trigger_read_retry import GET_PATH, _service, _trigger_response
+    from tests.unit.test_trigger_read_retry import (
+        GET_PATH,
+        TRIGGER_ID,
+        _service,
+        _trigger_response,
+    )
     from tests.unit.test_wait_batch_replace import (
         BATCH_ID,
         STATUS_PATH,
@@ -284,7 +294,7 @@ async def test_client_timeout_read_recovery(operation):
     transport.config = replace(transport.config, timeout=0.05)
     try:
         if operation == "trigger":
-            await service.get(trigger_id="9")
+            await service.get(trigger_id=format_id(TRIGGER_ID))
         elif operation == "wait":
             await service.wait_batch_replace(batch_request_id=format_id(BATCH_ID))
         else:

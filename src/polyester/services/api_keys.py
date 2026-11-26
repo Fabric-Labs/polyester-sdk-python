@@ -17,6 +17,7 @@ from polyester.models.auth import Ed25519Keypair
 from polyester.models.secret import Secret
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -69,7 +70,14 @@ class AsyncApiKeysService(ScopedSubAccountMixin, BaseService):
             ApiKeyServiceClient,
             lambda client, req: client.get_api_key(req),
             GetApiKeyRequest(key_id=key_id),
-            api_key_from_get_proto,
+            # The server reads the key ID with surrounding whitespace trimmed.
+            echoed(
+                "GetApiKey",
+                "key_id",
+                key_id.strip(),
+                lambda msg: msg.api_key.key_id if msg.HasField("api_key") else None,
+                api_key_from_get_proto,
+            ),
         )
 
     def generate_keypair(self) -> Ed25519Keypair:

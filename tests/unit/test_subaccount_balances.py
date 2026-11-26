@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from polyester import AUTH_TEMPORARILY_UNAVAILABLE, is_retryable_error
+from polyester.codecs.scalars import format_id
 from polyester.errors import PolyesterApiError
 from polyester.gen.auth.v1 import subaccounts_pb2
 from polyester.gen.ledger.read.v1 import ledger_read_pb2
@@ -44,7 +45,7 @@ def _response(*, with_balances: bool) -> subaccounts_pb2.GetSubaccountResponse:
 async def _get(capture: CaptureUnary, **kwargs: object):
     service = AsyncSubAccountsService(MagicMock(), None)
     with patch("polyester.services.sub_accounts.unary_auth_decoded", capture):
-        return await service.get(sub_account_id=str(SUB), **kwargs)
+        return await service.get(sub_account_id=format_id(SUB), **kwargs)
 
 
 @pytest.mark.asyncio

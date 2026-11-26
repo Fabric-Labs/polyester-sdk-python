@@ -21,7 +21,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from polyester import PolyesterValidationError, Price
 from polyester.catalogs import CatalogManager
 from polyester.codecs import format_price_ticks, parse_price_ticks
-from polyester.codecs.scalars import format_qty_scaled
+from polyester.codecs.scalars import format_id, format_qty_scaled
 from polyester.codecs.wire_decode import decode_market_trade_bytes
 from polyester.gen.marketdata.v1 import marketdata_pb2
 from polyester.gen.marketoverview.v1 import marketoverview_pb2
@@ -274,7 +274,7 @@ async def test_order_read_price_decodes_from_q9() -> None:
 
     get_capture = CaptureUnary(orders_read_pb2.GetOrderResponse(order=order))
     with patch("polyester.services.orders.unary_auth_decoded", get_capture):
-        result = await service.get(key=OrderId("5"))
+        result = await service.get(key=OrderId(format_id(5)))
     assert result.order is not None
     assert result.order.price is not None
     assert result.order.price.format() == "2420"

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from polyester import AsyncPolyester, Quantity
+from polyester.codecs.scalars import format_id
 from polyester.errors import (
     PolyesterApiError,
     PolyesterAuthError,
@@ -115,7 +116,7 @@ async def _call(
     )
     try:
         if op == "read":
-            await client.triggers.get(trigger_id="9")
+            await client.triggers.get(trigger_id=format_id(9))
         else:
             await client.orders.create(
                 symbol="BTC-USDT",

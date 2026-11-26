@@ -20,7 +20,7 @@ from polyester.codecs.decode.sub_accounts import (
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.proto_helpers import optional_datetime_to_timestamp
 from polyester.codecs.realtime_decode import decode_api_key_bytes, decode_subaccount_bytes
-from polyester.codecs.scalars import parse_account_id
+from polyester.codecs.scalars import format_id, parse_account_id
 from polyester.codecs.sub_accounts import invite_direction_from_label
 from polyester.errors import PolyesterValidationError
 from polyester.gen.auth.v1 import subaccounts_pb2
@@ -49,6 +49,7 @@ from polyester.models.sub_accounts import (
 from polyester.models.trading import ApiKeySummary
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import subscribe_account_proto
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -136,7 +137,13 @@ class AsyncSubAccountsService(ScopedSubAccountMixin, BaseService):
             SubaccountViewServiceClient,
             lambda client, req: client.get_subaccount(req),
             request,
-            get_subaccount_from_proto,
+            echoed(
+                "GetSubaccount",
+                "subaccount_id",
+                format_id(request.subaccount_id),
+                lambda msg: format_id(msg.subaccount.id) if msg.HasField("subaccount") else None,
+                get_subaccount_from_proto,
+            ),
         )
 
     async def list_members(

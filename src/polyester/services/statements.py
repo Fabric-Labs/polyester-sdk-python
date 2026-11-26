@@ -18,7 +18,7 @@ from polyester.codecs.decode.statements import (
 )
 from polyester.codecs.orders import parse_optional_subaccount_id
 from polyester.codecs.proto_helpers import datetime_to_timestamp
-from polyester.codecs.scalars import UINT32_MAX, exact_integer, id_to_int
+from polyester.codecs.scalars import UINT32_MAX, exact_integer, format_id, id_to_int
 from polyester.errors import (
     PolyesterResponseContractError,
     PolyesterValidationError,
@@ -31,6 +31,7 @@ from polyester.models.statements import (
     StatementExportsPage,
 )
 from polyester.services._base import BaseService
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._poll import poll_until_final
 from polyester.services._scope import AccountScope, ScopedSubAccountMixin
@@ -154,7 +155,13 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
             StatementExportServiceClient,
             lambda client, req: client.get_statement_export(req),
             request,
-            statement_export_from_get_response,
+            echoed(
+                "GetStatementExport",
+                "export_id",
+                format_id(request.export_id),
+                lambda msg: format_id(msg.export.export_id) if msg.HasField("export") else None,
+                statement_export_from_get_response,
+            ),
         )
 
     async def cancel_export(self, *, export_id: str) -> StatementExport:
@@ -175,7 +182,13 @@ class AsyncStatementsService(ScopedSubAccountMixin, BaseService):
             StatementExportServiceClient,
             lambda client, req: client.cancel_statement_export(req),
             request,
-            canceled_statement_export_from_proto,
+            echoed(
+                "CancelStatementExport",
+                "export_id",
+                format_id(request.export_id),
+                lambda msg: format_id(msg.export.export_id) if msg.HasField("export") else None,
+                canceled_statement_export_from_proto,
+            ),
         )
 
     async def get_export_download_url(self, *, export_id: str) -> StatementExportDownloadUrl:

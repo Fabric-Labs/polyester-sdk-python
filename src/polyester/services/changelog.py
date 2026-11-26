@@ -30,6 +30,7 @@ from polyester.models.changelog import (
     ChangelogPostSummary,
 )
 from polyester.services._base import BaseService
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_public_decoded
 from polyester.services._validation import validate_limit
 
@@ -80,7 +81,13 @@ class AsyncChangelogService(BaseService):
             ChangelogServiceClient,
             lambda client, req: client.get_post(req),
             changelog_pb2.GetPostRequest(slug=slug),
-            changelog_post_from_proto,
+            echoed(
+                "GetPost",
+                "slug",
+                slug,
+                lambda msg: msg.post.summary.slug if msg.post.HasField("summary") else None,
+                changelog_post_from_proto,
+            ),
         )
 
     async def list_deployment_groups(
@@ -118,7 +125,13 @@ class AsyncChangelogService(BaseService):
             ChangelogServiceClient,
             lambda client, req: client.get_deployment_group(req),
             changelog_pb2.GetDeploymentGroupRequest(slug=slug),
-            changelog_deployment_group_from_proto,
+            echoed(
+                "GetDeploymentGroup",
+                "slug",
+                slug,
+                lambda msg: msg.group.summary.slug if msg.group.HasField("summary") else None,
+                changelog_deployment_group_from_proto,
+            ),
         )
 
     async def iter_deployment_groups(

@@ -98,7 +98,7 @@ async def _modify(client: AsyncPolyester) -> None:
 
 
 async def _status(client: AsyncPolyester) -> None:
-    await client.orders.get_batch_replace_status(batch_request_id="42")
+    await client.orders.get_batch_replace_status(batch_request_id=format_id(42))
 
 
 async def _trigger(client: AsyncPolyester) -> None:

@@ -25,7 +25,7 @@ from polyester.codecs.orders import (
 )
 from polyester.codecs.pure_bridge import call, message, pure
 from polyester.codecs.realtime_decode import decode_trigger_bytes, decode_trigger_event_batch_bytes
-from polyester.codecs.scalars import id_to_int
+from polyester.codecs.scalars import format_id, id_to_int
 from polyester.codecs.triggers import (
     batch_cancel_triggers_to_proto,
     cancel_all_trigger_symbol_ids,
@@ -60,6 +60,7 @@ from polyester.models import (
 )
 from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
 from polyester.services._base import BaseService, CatalogWait
+from polyester.services._echo import echoed
 from polyester.services._generated import unary_auth_decoded
 from polyester.services._realtime_subscribe import (
     subscribe_account_proto,
@@ -278,8 +279,14 @@ class AsyncTriggersService(ScopedSubAccountMixin, BaseService):
             TriggersServiceClient,
             lambda client, req: client.get_trigger(req),
             request,
-            functools.partial(
-                get_trigger_from_proto, scales=self._order_scales, symbols=self._symbol
+            echoed(
+                "GetTrigger",
+                "trigger_id",
+                format_id(request.trigger_id),
+                lambda msg: format_id(msg.trigger.trigger_id) if msg.HasField("trigger") else None,
+                functools.partial(
+                    get_trigger_from_proto, scales=self._order_scales, symbols=self._symbol
+                ),
             ),
             policy=TRIGGER_READ_RETRY,
         )

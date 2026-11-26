@@ -21,7 +21,13 @@ from polyester.codecs.decode.ratelimit import (
     rate_limit_detail_from_proto,
     retry_after_seconds_from_detail,
 )
-from polyester.codecs.proto_helpers import error_code_name, format_uint64_id, u128_to_str
+from polyester.codecs.proto_helpers import (
+    error_code_name,
+    format_uint64_id,
+    optional_timestamp_ceil,
+    rfc3339_ceil,
+    u128_to_str,
+)
 from polyester.codecs.timestamp_window import (
     timestamp_window_from_json,
     timestamp_window_from_proto,
@@ -314,6 +320,14 @@ def _map_gateway_problem(exc: GatewayProblemError):
         )
     if code in ("resource_exhausted", "unknown"):
         return None
+    if _error_code_from_rest(exc.problem_code) == STATEMENT_HISTORY_UNAVAILABLE:
+        # The problem names where the account history starts, as the
+        # ConnectRPC detail's history_available_from does.
+        return PolyesterStatementHistoryUnavailableError(
+            message,
+            raw=exc.problem,
+            history_available_from=rfc3339_ceil(exc.history_available_from),
+        )
     return PolyesterApiError(
         message,
         code=_error_code_from_rest(exc.problem_code),
@@ -644,10 +658,8 @@ def _map_connect_error(exc: ConnectError):
                     return PolyesterStatementHistoryUnavailableError(
                         error_message,
                         raw=unpacked,
-                        history_available_from=(
-                            unpacked.history_available_from.ToDatetime(tzinfo=UTC)
-                            if unpacked.HasField("history_available_from")
-                            else None
+                        history_available_from=optional_timestamp_ceil(
+                            unpacked, "history_available_from"
                         ),
                     )
                 return PolyesterApiError(error_message, code=code_name)

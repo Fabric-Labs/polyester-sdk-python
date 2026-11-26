@@ -158,3 +158,10 @@ def test_balances_with_only_the_header_have_no_rows() -> None:
 def test_balances_csv_refuses_what_it_cannot_read(text: str) -> None:
     with pytest.raises(PolyesterResponseContractError):
         parse_balances_csv(text)
+
+
+def test_balances_csv_refuses_a_count_longer_than_python_converts() -> None:
+    # Digits only, but past the interpreter's int conversion limit: the
+    # parser's typed error, never a bare ValueError.
+    with pytest.raises(PolyesterResponseContractError):
+        parse_balances_csv(BALANCES_HEADER + "funding,BTC,0,1,0,1," + "9" * 5000 + "\r\n")

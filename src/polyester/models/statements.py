@@ -255,11 +255,15 @@ def parse_balances_csv(text: str) -> list[BalancesRow]:
 
 
 def _count(value: str, line: int) -> int:
-    if not value.isascii() or not value.isdigit():
-        raise PolyesterResponseContractError(
-            "StatementExportFile", f"balances line {line} has an unreadable movements {value!r}"
-        )
-    return int(value)
+    if value.isascii() and value.isdigit():
+        try:
+            return int(value)
+        except ValueError:
+            # Longer than the interpreter converts (sys.get_int_max_str_digits).
+            pass
+    raise PolyesterResponseContractError(
+        "StatementExportFile", f"balances line {line} has an unreadable movements {value[:40]!r}"
+    )
 
 
 def _csv_records(
@@ -338,7 +342,9 @@ class StatementExport(msgspec.Struct, kw_only=True, omit_defaults=True):
     partial file was deleted). The last four are final. A balances export
     also fails with ``failure_reason`` ``"history_unavailable"`` when the
     account history moved later than its start after it was created:
-    ``history_available_from`` then says where a new export must start. ""
+    ``history_available_from`` then says where a new export must start: the
+    earliest acceptable ``start_time``, rounded up to the next microsecond
+    when the server's instant has sub-microsecond digits. ""
     when the server names none; ``"UNKNOWN(n)"`` for a value this SDK does
     not know.
 

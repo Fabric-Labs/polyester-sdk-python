@@ -1333,16 +1333,16 @@ end_time=..., idempotency_key=...)` asks for it. `type` is required, with no
 default: any other value raises `PolyesterValidationError` before sending, and
 `export.type` echoes it (`"UNKNOWN(n)"` for a type newer than this SDK). A
 balances period must start inside the account history: an earlier start raises
-`PolyesterStatementHistoryUnavailableError`, whose `history_available_from` says
-where to start instead; if the history moves later before the file is produced,
-the export ends `"failed"` with `failure_reason` `"history_unavailable"` and
-`history_available_from` set. `start_time` is inclusive and `end_time`
-exclusive, both timezone-aware, at most 366 days apart. `asset_id` keeps one
-asset, and `account` / `sub_account_id` choose the account as for
-`transfers.list`, the client's default sub-account included. The
-`idempotency_key` is 1 to 64 letters, digits, `.`, `_`, `:` or `-`: repeating
-the create with it returns the same export. Every call is signed; an API key
-needs `READ_STATEMENTS`.
+`PolyesterStatementHistoryUnavailableError`, whose `history_available_from` is
+the earliest acceptable `start_time` (rounded up to the microsecond); if the
+history moves later before the file is produced, the export ends `"failed"` with
+`failure_reason` `"history_unavailable"` and `history_available_from` set.
+`start_time` is inclusive and `end_time` exclusive, both timezone-aware, at most
+366 days apart. `asset_id` keeps one asset, and `account` / `sub_account_id`
+choose the account as for `transfers.list`, the client's default sub-account
+included. The `idempotency_key` is 1 to 64 letters, digits, `.`, `_`, `:` or
+`-`: repeating the create with it returns the same export. Every call is signed;
+an API key needs `READ_STATEMENTS`.
 
 `statements.wait_export(export_id=...)` reads the export until it is final:
 `"ready"`, `"failed"` (with `failure_reason` `"too_large"`, so split the

@@ -599,10 +599,14 @@ class PolyesterStatementHistoryUnavailableError(PolyesterApiError):
     history (:data:`STATEMENT_HISTORY_UNAVAILABLE`, ConnectRPC
     ``failed_precondition``).
 
-    ``history_available_from`` is the earliest instant whose balances the
-    account history holds, an aware UTC datetime, or ``None`` when the server
-    did not name it. Nothing was created: create the export again with a
-    ``start_time`` at or after it. :func:`is_retryable_error` reports
+    ``history_available_from`` is the earliest acceptable ``start_time``: the
+    earliest instant whose balances the account history holds, read from the
+    ConnectRPC detail or the REST problem's ``historyAvailableFrom``, as an
+    aware UTC datetime. A ``datetime`` holds microseconds, so an instant with
+    sub-microsecond digits is rounded up to the next microsecond, never down,
+    and passing it back as ``start_time`` is accepted. ``None`` when the
+    server did not name it. Nothing was created: create the export again
+    with a ``start_time`` at or after it. :func:`is_retryable_error` reports
     ``False``, since the same request is refused the same way.
     """
 

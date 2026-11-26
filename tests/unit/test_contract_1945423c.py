@@ -1260,6 +1260,21 @@ async def test_create_export_sends_each_type(label, value) -> None:
     assert export.type == label
 
 
+# The published sample: nine fractional digits. A datetime holds six, so the
+# earliest acceptable start rounds up to the next microsecond: passed back as
+# start_time, it is at or after the cutoff, never 789 ns before it.
+_HISTORY_NS = Timestamp(
+    seconds=int(datetime(2026, 11, 25, 14, 55, 2, tzinfo=UTC).timestamp()), nanos=123456789
+)
+_HISTORY_CEIL = datetime(2026, 11, 25, 14, 55, 2, 123457, tzinfo=UTC)
+
+
+def _create_balances(c):
+    return c.statements.create_export(
+        type="balances", start_time=_START, end_time=_END, idempotency_key="k"
+    )
+
+
 async def test_balances_export_before_the_history_names_where_it_starts() -> None:
     available = datetime(2026, 11, 25, 14, 55, 2, 123456, tzinfo=UTC)
     answer = _connect_error(
@@ -1317,3 +1332,79 @@ async def test_failed_balances_export_reads_history_available_from() -> None:
     async with _client(_ok(plain)) as (client, _requests):
         export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
     assert export.history_available_from is None
+
+
+async def test_history_refusal_rounds_sub_microsecond_instants_up() -> None:
+    answer = _connect_error(
+        "failed_precondition",
+        _LEDGER,
+        ledger_read_pb2.ErrorDetail(
+            code=ledger_read_pb2.ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+            history_available_from=_HISTORY_NS,
+        ),
+        400,
+    )
+    err = await _raised(answer, _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError)
+    assert err.history_available_from == _HISTORY_CEIL
+    assert err.history_available_from >= _HISTORY_NS.ToDatetime(tzinfo=UTC)
+
+
+async def test_failed_balances_export_rounds_history_available_from_up() -> None:
+    reply = export_pb2.GetStatementExportResponse(
+        export=_export(
+            type=export_pb2.BALANCES,
+            status=export_pb2.STATEMENT_EXPORT_STATUS_FAILED,
+            failure_reason=export_pb2.STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+            history_available_from=_HISTORY_NS,
+        )
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert export.history_available_from == _HISTORY_CEIL
+
+
+# The REST answer, in the contract's published problem shape.
+_HISTORY_PROBLEM = {
+    "type": "https://polyester.dev/problems/statement-history-unavailable",
+    "title": "Conflict",
+    "status": 409,
+    "detail": "statement_history_unavailable: the period starts before the account history",
+    "code": "STATEMENT_HISTORY_UNAVAILABLE",
+    "historyAvailableFrom": "2026-11-25T14:55:02.123456789Z",
+}
+
+
+async def test_rest_history_problem_reads_as_the_typed_refusal() -> None:
+    err = await _raised(_problem(409, _HISTORY_PROBLEM), _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.code == STATEMENT_HISTORY_UNAVAILABLE
+    assert err.history_available_from == _HISTORY_CEIL
+    assert not is_retryable_error(err)
+
+
+@pytest.mark.parametrize(
+    ("member", "want"),
+    [
+        ("2026-11-25T14:55:02Z", datetime(2026, 11, 25, 14, 55, 2, tzinfo=UTC)),
+        ("2026-11-25T14:55:02.123456Z", datetime(2026, 11, 25, 14, 55, 2, 123456, tzinfo=UTC)),
+        ("2026-11-25T14:55:02.9999999Z", datetime(2026, 11, 25, 14, 55, 3, tzinfo=UTC)),
+        ("2026-11-25T16:55:02.5+02:00", datetime(2026, 11, 25, 14, 55, 2, 500000, tzinfo=UTC)),
+        ("yesterday", None),
+        (None, None),
+    ],
+)
+async def test_rest_history_problem_member_forms(member, want) -> None:
+    body = {k: v for k, v in _HISTORY_PROBLEM.items() if k != "historyAvailableFrom"}
+    if member is not None:
+        body["historyAvailableFrom"] = member
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.history_available_from == want
+
+
+async def test_rest_problem_of_another_code_is_not_a_history_refusal() -> None:
+    body = dict(_HISTORY_PROBLEM, code="IDEMPOTENCY_KEY_REUSED")
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterApiError)
+    assert not isinstance(err, PolyesterStatementHistoryUnavailableError)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import re
+from datetime import UTC, datetime, timedelta
 
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
 from google.protobuf.message import Message
@@ -89,6 +90,56 @@ def has_field(message: Message, field_name: str) -> bool:
         return message.HasField(field_name)
     except ValueError:
         return False
+
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+_RFC3339 = re.compile(
+    r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})",
+    re.IGNORECASE,
+)
+
+
+def _ceil_microseconds(nanos: int) -> int:
+    """``nanos`` in microseconds, rounded up: a ``datetime`` holds
+    microseconds, and rounding down would read an instant before the one
+    sent."""
+    return -(-nanos // 1000)
+
+
+def optional_timestamp_ceil(message: Message, field_name: str) -> datetime | None:
+    """The ``Timestamp`` field ``field_name`` as an aware UTC datetime rounded
+    up to the microsecond, or ``None`` when the server left it unset.
+
+    For a lower bound, such as the earliest acceptable start of a period: a
+    time with sub-microsecond digits reads as the next microsecond, never one
+    before it, so passing it back is accepted. Without such digits it is
+    exact, as :func:`optional_timestamp` reads it.
+    """
+    if not has_field(message, field_name):
+        return None
+    value = getattr(message, field_name)
+    return _EPOCH + timedelta(
+        seconds=int(value.seconds), microseconds=_ceil_microseconds(int(value.nanos))
+    )
+
+
+def rfc3339_ceil(text: object) -> datetime | None:
+    """An RFC 3339 time with up to nine fractional digits as an aware UTC
+    datetime rounded up to the microsecond, as :func:`optional_timestamp_ceil`
+    rounds; ``None`` for anything else."""
+    if not isinstance(text, str):
+        return None
+    match = _RFC3339.fullmatch(text.strip())
+    if match is None:
+        return None
+    whole, fraction, offset = match.groups()
+    offset = "+00:00" if offset.upper() == "Z" else offset
+    try:
+        base = datetime.fromisoformat(whole + offset)
+    except ValueError:
+        return None
+    nanos = int((fraction or "").ljust(9, "0"))
+    return base.astimezone(UTC) + timedelta(microseconds=_ceil_microseconds(nanos))
 
 
 def optional_timestamp(message: Message, field_name: str) -> datetime | None:

@@ -45,6 +45,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TOO_MANY_IMAGES: _ClassVar[ErrorCode]
     IMAGE_NOT_FOUND: _ClassVar[ErrorCode]
     CONVERSATION_SUBJECT_MISMATCH: _ClassVar[ErrorCode]
+    APPROVAL_RUN_ENDED: _ClassVar[ErrorCode]
 
 class MessageRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -77,6 +78,7 @@ class ApprovalStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     APPROVED: _ClassVar[ApprovalStatus]
     REJECTED: _ClassVar[ApprovalStatus]
     EXPIRED: _ClassVar[ApprovalStatus]
+    APPROVAL_CANCELLED: _ClassVar[ApprovalStatus]
 
 class MemoryKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -202,6 +204,7 @@ IMAGE_TYPE_UNSUPPORTED: ErrorCode
 TOO_MANY_IMAGES: ErrorCode
 IMAGE_NOT_FOUND: ErrorCode
 CONVERSATION_SUBJECT_MISMATCH: ErrorCode
+APPROVAL_RUN_ENDED: ErrorCode
 ROLE_UNSPECIFIED: MessageRole
 USER: MessageRole
 ASSISTANT: MessageRole
@@ -222,6 +225,7 @@ PENDING: ApprovalStatus
 APPROVED: ApprovalStatus
 REJECTED: ApprovalStatus
 EXPIRED: ApprovalStatus
+APPROVAL_CANCELLED: ApprovalStatus
 KIND_UNSPECIFIED: MemoryKind
 FACT: MemoryKind
 PLANNING_FIGURE: MemoryKind
@@ -285,10 +289,12 @@ PAUSE: TriggerChangeAction
 RESUME: TriggerChangeAction
 
 class ErrorDetail(_message.Message):
-    __slots__ = ("code",)
+    __slots__ = ("code", "pending_approval_id")
     CODE_FIELD_NUMBER: _ClassVar[int]
+    PENDING_APPROVAL_ID_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ...) -> None: ...
+    pending_approval_id: int
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., pending_approval_id: _Optional[int] = ...) -> None: ...
 
 class Conversation(_message.Message):
     __slots__ = ("conversation_id", "title", "created_at", "updated_at", "subject", "last_account")

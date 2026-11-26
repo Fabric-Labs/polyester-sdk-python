@@ -99,6 +99,12 @@ class StrategiesService(Protocol):
     async def list_bot_logs(self, request: strategies_dot_v1_dot_strategies__pb2.ListBotLogsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBotLogsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
+    async def return_bot_funds(self, request: strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def get_bot_funds_return(self, request: strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
     async def stop_bot(self, request: strategies_dot_v1_dot_strategies__pb2.StopBotRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.StopBotResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
@@ -109,6 +115,12 @@ class StrategiesService(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def list_community_strategies(self, request: strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def report_community_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+
+    async def fork_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
 
     async def get_community_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse:
@@ -390,6 +402,26 @@ class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]
                     ),
                     function=svc.list_bot_logs,
                 ),
+                "/strategies.v1.StrategiesService/ReturnBotFunds": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ReturnBotFunds",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.return_bot_funds,
+                ),
+                "/strategies.v1.StrategiesService/GetBotFundsReturn": Endpoint.unary(
+                    method=MethodInfo(
+                        name="GetBotFundsReturn",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=svc.get_bot_funds_return,
+                ),
                 "/strategies.v1.StrategiesService/StopBot": Endpoint.unary(
                     method=MethodInfo(
                         name="StopBot",
@@ -429,6 +461,26 @@ class StrategiesServiceASGIApplication(ConnectASGIApplication[StrategiesService]
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=svc.list_community_strategies,
+                ),
+                "/strategies.v1.StrategiesService/ReportCommunityStrategy": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ReportCommunityStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.report_community_strategy,
+                ),
+                "/strategies.v1.StrategiesService/ForkStrategy": Endpoint.unary(
+                    method=MethodInfo(
+                        name="ForkStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=svc.fork_strategy,
                 ),
                 "/strategies.v1.StrategiesService/GetCommunityStrategy": Endpoint.unary(
                     method=MethodInfo(
@@ -1030,6 +1082,48 @@ class StrategiesServiceClient(ConnectClient):
             use_get=use_get,
         )
 
+    async def return_bot_funds(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ReturnBotFunds",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def get_bot_funds_return(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetBotFundsReturn",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     async def stop_bot(
         self,
         request: strategies_dot_v1_dot_strategies__pb2.StopBotRequest,
@@ -1110,6 +1204,46 @@ class StrategiesServiceClient(ConnectClient):
             headers=headers,
             timeout_ms=timeout_ms,
             use_get=use_get,
+        )
+
+    async def report_community_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ReportCommunityStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    async def fork_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse:
+        return await self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ForkStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
         )
 
     async def get_community_strategy(
@@ -1193,6 +1327,10 @@ class StrategiesServiceSync(Protocol):
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_bot_logs(self, request: strategies_dot_v1_dot_strategies__pb2.ListBotLogsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListBotLogsResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def return_bot_funds(self, request: strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def get_bot_funds_return(self, request: strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def stop_bot(self, request: strategies_dot_v1_dot_strategies__pb2.StopBotRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.StopBotResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def publish_strategy_version(self, request: strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.PublishStrategyVersionResponse:
@@ -1200,6 +1338,10 @@ class StrategiesServiceSync(Protocol):
     def unpublish_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.UnpublishStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def list_community_strategies(self, request: strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ListCommunityStrategiesResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def report_community_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse:
+        raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
+    def fork_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
     def get_community_strategy(self, request: strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyRequest, ctx: RequestContext) -> strategies_dot_v1_dot_strategies__pb2.GetCommunityStrategyResponse:
         raise ConnectError(Code.UNIMPLEMENTED, "Not implemented")
@@ -1479,6 +1621,26 @@ class StrategiesServiceWSGIApplication(ConnectWSGIApplication):
                     ),
                     function=service.list_bot_logs,
                 ),
+                "/strategies.v1.StrategiesService/ReturnBotFunds": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ReturnBotFunds",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.return_bot_funds,
+                ),
+                "/strategies.v1.StrategiesService/GetBotFundsReturn": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="GetBotFundsReturn",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse,
+                        idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+                    ),
+                    function=service.get_bot_funds_return,
+                ),
                 "/strategies.v1.StrategiesService/StopBot": EndpointSync.unary(
                     method=MethodInfo(
                         name="StopBot",
@@ -1518,6 +1680,26 @@ class StrategiesServiceWSGIApplication(ConnectWSGIApplication):
                         idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
                     ),
                     function=service.list_community_strategies,
+                ),
+                "/strategies.v1.StrategiesService/ReportCommunityStrategy": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ReportCommunityStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.report_community_strategy,
+                ),
+                "/strategies.v1.StrategiesService/ForkStrategy": EndpointSync.unary(
+                    method=MethodInfo(
+                        name="ForkStrategy",
+                        service_name="strategies.v1.StrategiesService",
+                        input=strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest,
+                        output=strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse,
+                        idempotency_level=IdempotencyLevel.IDEMPOTENT,
+                    ),
+                    function=service.fork_strategy,
                 ),
                 "/strategies.v1.StrategiesService/GetCommunityStrategy": EndpointSync.unary(
                     method=MethodInfo(
@@ -2119,6 +2301,48 @@ class StrategiesServiceClientSync(ConnectClientSync):
             use_get=use_get,
         )
 
+    def return_bot_funds(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ReturnBotFunds",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ReturnBotFundsResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def get_bot_funds_return(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+        use_get: bool = False,
+    ) -> strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="GetBotFundsReturn",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.GetBotFundsReturnResponse,
+                idempotency_level=IdempotencyLevel.NO_SIDE_EFFECTS,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+            use_get=use_get,
+        )
+
     def stop_bot(
         self,
         request: strategies_dot_v1_dot_strategies__pb2.StopBotRequest,
@@ -2199,6 +2423,46 @@ class StrategiesServiceClientSync(ConnectClientSync):
             headers=headers,
             timeout_ms=timeout_ms,
             use_get=use_get,
+        )
+
+    def report_community_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ReportCommunityStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ReportCommunityStrategyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
+        )
+
+    def fork_strategy(
+        self,
+        request: strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest,
+        *,
+        headers: Headers | Mapping[str, str] | None = None,
+        timeout_ms: int | None = None,
+    ) -> strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse:
+        return self.execute_unary(
+            request=request,
+            method=MethodInfo(
+                name="ForkStrategy",
+                service_name="strategies.v1.StrategiesService",
+                input=strategies_dot_v1_dot_strategies__pb2.ForkStrategyRequest,
+                output=strategies_dot_v1_dot_strategies__pb2.ForkStrategyResponse,
+                idempotency_level=IdempotencyLevel.IDEMPOTENT,
+            ),
+            headers=headers,
+            timeout_ms=timeout_ms,
         )
 
     def get_community_strategy(

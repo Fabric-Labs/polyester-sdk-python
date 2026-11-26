@@ -65,6 +65,8 @@ class PolicyAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PROPOSE_STRATEGY_DEPLOY: _ClassVar[PolicyAction]
     READ_PNL: _ClassVar[PolicyAction]
     STOP_STRATEGIES: _ClassVar[PolicyAction]
+    FORK_STRATEGIES: _ClassVar[PolicyAction]
+    RETURN_STRATEGY_BOT_FUNDS: _ClassVar[PolicyAction]
 UNSPECIFIED: PolicyAction
 TRADE_SPOT: PolicyAction
 INTERNAL_TRANSFER: PolicyAction
@@ -112,6 +114,8 @@ DRAFT_STRATEGIES: PolicyAction
 PROPOSE_STRATEGY_DEPLOY: PolicyAction
 READ_PNL: PolicyAction
 STOP_STRATEGIES: PolicyAction
+FORK_STRATEGIES: PolicyAction
+RETURN_STRATEGY_BOT_FUNDS: PolicyAction
 
 class MarketScope(_message.Message):
     __slots__ = ()

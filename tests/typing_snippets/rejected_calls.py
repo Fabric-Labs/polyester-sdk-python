@@ -7,6 +7,8 @@ containing ``<text>``; every other statement must get none.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from polyester import AsyncPolyester, Polyester
 from polyester.models import CreateOrderRequest, OrderId, PrivateOrdersEvent
 
@@ -106,3 +108,12 @@ def sync_wrong_types(client: Polyester) -> None:
     client.sub_accounts.list_account_activity(api_key_id=34)  # E: "api_key_id"
     client.market_data.get_index_price_candles(symbol="BTC-USDT", start_time=0)  # E: "start_time"
     print(found, PrivateOrdersEvent)
+
+
+async def statement_export_without_type(client: AsyncPolyester) -> None:
+    # The type has no default: the server refuses a create without one.
+    await client.statements.create_export(  # E: "type"
+        start_time=datetime(2026, 1, 1, tzinfo=UTC),
+        end_time=datetime(2026, 2, 1, tzinfo=UTC),
+        idempotency_key="k",
+    )

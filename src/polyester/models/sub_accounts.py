@@ -33,6 +33,12 @@ class SubAccount(msgspec.Struct, kw_only=True, omit_defaults=True):
     # A role or access change does not move ``revision`` or ``updated_at``:
     # apply each update as it arrives. Reads never set it.
     removed: bool = False
+    # True once a strategy bot has held this sub-account. Never cleared, also
+    # after the bot's access ends or its policy is cleared, so it does not say
+    # which policy the sub-account has now (read ``subaccount_policy_id``).
+    # Leave such a sub-account out of the funding sources offered for a new
+    # bot: a deploy funded from it is refused.
+    strategy_bot: bool = False
 
 
 class SubAccountsList(msgspec.Struct, kw_only=True, omit_defaults=True):

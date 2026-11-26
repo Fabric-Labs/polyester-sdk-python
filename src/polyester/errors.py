@@ -141,6 +141,14 @@ ORDER_PERMISSION_REFUSAL_CODES = frozenset(
 # request with the same idempotency key still returns the accepted withdrawal.
 ROUTE_SUSPENDED = "ERROR_CODE_ROUTE_SUSPENDED"
 
+# ledger.read.v1.ErrorCode of a balances statement export whose period starts
+# before the earliest instant whose balances the account history holds (19;
+# REST 409 ``STATEMENT_HISTORY_UNAVAILABLE``, ConnectRPC
+# ``failed_precondition``). Nothing was created; raised as
+# :class:`PolyesterStatementHistoryUnavailableError`, whose
+# ``history_available_from`` is that instant. Not retryable as is.
+STATEMENT_HISTORY_UNAVAILABLE = "ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE"
+
 # transfer.v1.ErrorCode of an internal transfer batch whose idempotency key was
 # abandoned with ``internal_transfers.abandon_batch`` before any batch was
 # submitted under it (38; REST 400 ``IDEMPOTENCY_KEY_ABANDONED``, ConnectRPC
@@ -584,6 +592,34 @@ class PolyesterWithdrawError(PolyesterApiError):
         from polyester.codecs.scalars import format_scaled
 
         return Decimal(format_scaled(int(self.min_floor_e18), 18))
+
+
+class PolyesterStatementHistoryUnavailableError(PolyesterApiError):
+    """Raised when a balances statement export starts before the account
+    history (:data:`STATEMENT_HISTORY_UNAVAILABLE`, ConnectRPC
+    ``failed_precondition``).
+
+    ``history_available_from`` is the earliest acceptable ``start_time``: the
+    earliest instant whose balances the account history holds, read from the
+    ConnectRPC detail or the REST problem's ``historyAvailableFrom``, as an
+    aware UTC datetime. A ``datetime`` holds microseconds, so an instant with
+    sub-microsecond digits is rounded up to the next microsecond, never down,
+    and passing it back as ``start_time`` is accepted. ``None`` when the
+    server did not name it, or named an instant no ``datetime`` represents
+    once rounded up (past the year 9999). Nothing was created: create the export again
+    with a ``start_time`` at or after it. :func:`is_retryable_error` reports
+    ``False``, since the same request is refused the same way.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw: object | None = None,
+        history_available_from: datetime | None = None,
+    ) -> None:
+        super().__init__(message, code=STATEMENT_HISTORY_UNAVAILABLE, raw=raw)
+        self.history_available_from = history_available_from
 
 
 class PolyesterSubaccountOwnerRoleLockedError(PolyesterApiError):

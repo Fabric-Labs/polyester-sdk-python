@@ -73,6 +73,7 @@ def subaccount_from_proto(msg: subaccounts_pb2.Subaccount) -> SubAccount:
         updated_at=optional_timestamp(msg, "updated_at"),
         revision=int(msg.revision),
         removed=bool(msg.removed),
+        strategy_bot=bool(msg.strategy_bot),
     )
 
 

@@ -1323,15 +1323,26 @@ change it.
 
 ## Account statements
 
-`client.statements` produces an account's balance movements for a period as
-one CSV file in the background, for reconciliation and tax reporting.
-`statements.create_export(start_time=..., end_time=..., idempotency_key=...)`
-asks for it: `start_time` is inclusive and `end_time` exclusive, both
-timezone-aware, at most 366 days apart. `asset_id` keeps one asset, and
-`account` / `sub_account_id` choose the account as for `transfers.list`, the
-client's default sub-account included. The `idempotency_key` is 1 to 64
-letters, digits, `.`, `_`, `:` or `-`: repeating the create with it returns the
-same export. Every call is signed; an API key needs `READ_STATEMENTS`.
+`client.statements` produces an account's balance movements for a period as one
+CSV file in the background, for reconciliation and tax reporting: an account
+statement (`type="account_statement"`, one row per entry with its fees), a
+ledger (`type="ledger"`, one row per transfer leg) or the account's balances
+(`type="balances"`, one row per account bucket and asset with its opening and
+closing balance). `statements.create_export(type=..., start_time=...,
+end_time=..., idempotency_key=...)` asks for it. `type` is required, with no
+default: any other value raises `PolyesterValidationError` before sending, and
+`export.type` echoes it (`"UNKNOWN(n)"` for a type newer than this SDK). A
+balances period must start inside the account history: an earlier start raises
+`PolyesterStatementHistoryUnavailableError`, whose `history_available_from` is
+the earliest acceptable `start_time` (rounded up to the microsecond); if the
+history moves later before the file is produced, the export ends `"failed"` with
+`failure_reason` `"history_unavailable"` and `history_available_from` set.
+`start_time` is inclusive and `end_time` exclusive, both timezone-aware, at most
+366 days apart. `asset_id` keeps one asset, and `account` / `sub_account_id`
+choose the account as for `transfers.list`, the client's default sub-account
+included. The `idempotency_key` is 1 to 64 letters, digits, `.`, `_`, `:` or
+`-`: repeating the create with it returns the same export. Every call is signed;
+an API key needs `READ_STATEMENTS`.
 
 `statements.wait_export(export_id=...)` reads the export until it is final:
 `"ready"`, `"failed"` (with `failure_reason` `"too_large"`, so split the
@@ -1348,6 +1359,7 @@ which returns it `"canceled"` at once and deletes any partial file.
 from datetime import UTC, datetime
 
 export = await client.statements.create_export(
+    type="account_statement",  # or "ledger", "balances"
     start_time=datetime(2026, 1, 1, tzinfo=UTC),
     end_time=datetime(2027, 1, 1, tzinfo=UTC),
     idempotency_key="statement-2026",
@@ -1358,15 +1370,23 @@ print(export.status, export.movements, export.bytes, export.expires_at)
 
 A ready file is downloadable for 7 days. Servers and scripts download it with
 an authenticated `GET /v1/statements/exports/{export_id}/file`: `text/csv`,
-with `Range` and `If-Range` support. This SDK does not wrap the download;
-`parse_statement_csv(text)` reads the file's rows by header name, so columns a
-later release appends are ignored, and amounts, fees and balances stay exact
-decimal strings; never parse them as floats. A browser saves the file from the
-URL `statements.get_export_download_url(export_id=...)` returns: it needs no
-credentials and works for at most 60 seconds (`expires_at`), so anyone who
-holds it can download the file. It is a `Secret`: printing shows
-`[REDACTED]`; call `url.reveal()` to hand it on, and never share, store or log
-it.
+with `Range` and `If-Range` support, saved as
+`account-statement-<export_id>.csv`, `ledger-<export_id>.csv` or
+`balances-<export_id>.csv` by type. This SDK does not wrap the download;
+`parse_statement_csv(text)` reads an account statement,
+`parse_balances_csv(text)` balances (`BalancesRow`: `opening_balance`,
+`credits`, `debits`, `closing_balance`, `movements`) and
+`parse_ledger_csv(text)` a ledger (`LedgerRow`: `transfer_id`, `side` `"debit"`
+or `"credit"`, a signed `amount`, `counterparty`, `balance`). All three read
+rows by header name, so columns a later release appends are ignored, and
+amounts, fees and balances stay exact decimal strings; never parse them as
+floats. `flow_id` is the lifecycle flow linked before the export was created; a
+flow linked later shows in `transfers.list` and in a new export. A browser saves
+the file from the URL `statements.get_export_download_url(export_id=...)`
+returns: it needs no credentials and works for at most 60 seconds
+(`expires_at`), so anyone who holds it can download the file. It is a `Secret`:
+printing shows `[REDACTED]`; call `url.reveal()` to hand it on, and never share,
+store or log it.
 
 ## Price alerts (devnet)
 

@@ -89,8 +89,12 @@ class GatewayProblemError(ConnectError):
         cause_code: str = "",
         level_index: int | None = None,
         timestamp_window: object | None = None,
+        history_available_from: object | None = None,
     ) -> None:
         super().__init__(code, problem_code)
+        # A STATEMENT_HISTORY_UNAVAILABLE problem's ``historyAvailableFrom``,
+        # as sent.
+        self.history_available_from = history_available_from
         # A TIMESTAMP_SKEW problem's ``timestampWindow`` object, as sent.
         self.timestamp_window = timestamp_window
         # A refused ladder's ``causeCode`` and ``levelIndex``, when sent.
@@ -448,6 +452,7 @@ def _raise_problem(
         retry_after=retry_after,
         rate_limit=body.get("rateLimit"),
         timestamp_window=body.get("timestampWindow"),
+        history_available_from=body.get("historyAvailableFrom"),
         cause_code=cause_code if isinstance(cause_code, str) else "",
         level_index=(
             level_index

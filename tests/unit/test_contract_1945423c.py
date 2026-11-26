@@ -25,9 +25,11 @@ from polyester.errors import (
     AUTH_SOCIAL_CHANGE_LIMIT_REACHED,
     DESTINATION_SWAP_DEPOSIT_ADDRESS,
     ROUTE_SUSPENDED,
+    STATEMENT_HISTORY_UNAVAILABLE,
     PolyesterApiError,
     PolyesterRateLimitError,
     PolyesterResponseContractError,
+    PolyesterStatementHistoryUnavailableError,
     PolyesterValidationError,
     PolyesterWithdrawError,
     is_destination_swap_deposit_address,
@@ -707,10 +709,16 @@ def _export(**overrides) -> export_pb2.StatementExport:
 
 
 async def test_create_export_sends_the_period_and_reads_the_export() -> None:
-    reply = export_pb2.CreateStatementExportResponse(export=_export(subaccount_id=SUB))
+    reply = export_pb2.CreateStatementExportResponse(
+        export=_export(subaccount_id=SUB, type=export_pb2.LEDGER)
+    )
     async with _client(_ok(reply), default_sub_account_id=format_id(SUB)) as (client, requests):
         export = await client.statements.create_export(
-            start_time=_START, end_time=_END, idempotency_key="statement-2026", asset_id=7
+            type="ledger",
+            start_time=_START,
+            end_time=_END,
+            idempotency_key="statement-2026",
+            asset_id=7,
         )
     (request,) = requests
     assert request.path == "/ledger.read.v1.StatementExportService/CreateStatementExport"
@@ -718,6 +726,8 @@ async def test_create_export_sends_the_period_and_reads_the_export() -> None:
     sent = export_pb2.CreateStatementExportRequest.FromString(request.body)
     assert (sent.start_time, sent.end_time) == (_ts(_START), _ts(_END))
     assert (sent.idempotency_key, sent.asset_id, sent.subaccount_id) == ("statement-2026", 7, SUB)
+    assert sent.type == export_pb2.LEDGER
+    assert export.type == "ledger"
     assert export.export_id == format_id((1 << 63) + 9)
     assert export.subaccount_id == format_id(SUB)
     assert (export.status, export.failure_reason) == ("ready", "")
@@ -779,28 +789,53 @@ async def test_iter_exports_follows_pages() -> None:
     "call",
     [
         lambda c: c.statements.create_export(
-            start_time=_START, end_time=_START, idempotency_key="k"
+            type="account_statement", start_time=_START, end_time=_START, idempotency_key="k"
         ),
         lambda c: c.statements.create_export(
+            type="account_statement",
             start_time=_START,
             end_time=_START + timedelta(days=366, microseconds=1),
             idempotency_key="k",
         ),
         lambda c: c.statements.create_export(
-            start_time=_START, end_time=_START.replace(tzinfo=None), idempotency_key="k"
-        ),
-        lambda c: c.statements.create_export(start_time=_START, end_time=_END, idempotency_key=""),
-        lambda c: c.statements.create_export(
-            start_time=_START, end_time=_END, idempotency_key="k" * 65
-        ),
-        lambda c: c.statements.create_export(
-            start_time=_START, end_time=_END, idempotency_key="has space"
+            type="account_statement",
+            start_time=_START,
+            end_time=_START.replace(tzinfo=None),
+            idempotency_key="k",
         ),
         lambda c: c.statements.create_export(
-            start_time=_START, end_time=_END, idempotency_key="k/1"
+            type="account_statement", start_time=_START, end_time=_END, idempotency_key=""
         ),
         lambda c: c.statements.create_export(
-            start_time=_START, end_time=_END, idempotency_key="k", asset_id=True
+            type="account_statement", start_time=_START, end_time=_END, idempotency_key="k" * 65
+        ),
+        lambda c: c.statements.create_export(
+            type="account_statement", start_time=_START, end_time=_END, idempotency_key="has space"
+        ),
+        lambda c: c.statements.create_export(
+            type="account_statement", start_time=_START, end_time=_END, idempotency_key="k/1"
+        ),
+        lambda c: c.statements.create_export(
+            type="account_statement",
+            start_time=_START,
+            end_time=_END,
+            idempotency_key="k",
+            asset_id=True,
+        ),
+        lambda c: c.statements.create_export(
+            type="", start_time=_START, end_time=_END, idempotency_key="k"
+        ),
+        lambda c: c.statements.create_export(
+            type="STATEMENT_EXPORT_TYPE_UNSPECIFIED",
+            start_time=_START,
+            end_time=_END,
+            idempotency_key="k",
+        ),
+        lambda c: c.statements.create_export(
+            type="not_a_type", start_time=_START, end_time=_END, idempotency_key="k"
+        ),
+        lambda c: c.statements.create_export(
+            type=export_pb2.LEDGER, start_time=_START, end_time=_END, idempotency_key="k"
         ),
         lambda c: c.statements.get_export(export_id="1"),
         lambda c: c.statements.list_exports(limit=101),
@@ -814,11 +849,41 @@ async def test_statement_exports_refuse_what_the_contract_refuses_before_sending
     assert requests == []
 
 
+async def test_create_export_has_no_default_type() -> None:
+    # The server refuses the unspecified type, so the SDK has no default.
+    async with _client(_ok(export_pb2.CreateStatementExportResponse())) as (client, requests):
+        with pytest.raises(TypeError):
+            await client.statements.create_export(  # type: ignore[call-arg]
+                start_time=_START, end_time=_END, idempotency_key="k"
+            )
+    assert requests == []
+
+
+@pytest.mark.parametrize(
+    ("value", "label"),
+    [
+        (export_pb2.ACCOUNT_STATEMENT, "account_statement"),
+        (export_pb2.LEDGER, "ledger"),
+        (export_pb2.STATEMENT_EXPORT_TYPE_UNSPECIFIED, ""),
+        (7, "UNKNOWN(7)"),
+    ],
+)
+async def test_get_export_reads_known_and_unknown_types(value, label) -> None:
+    # More types will come: one newer than this SDK reads as UNKNOWN(n).
+    reply = export_pb2.GetStatementExportResponse(export=_export(type=value))
+    async with _client(_ok(reply)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert export.type == label
+
+
 async def test_create_export_takes_a_366_day_period() -> None:
     reply = export_pb2.CreateStatementExportResponse(export=_export())
     async with _client(_ok(reply)) as (client, requests):
         await client.statements.create_export(
-            start_time=_START, end_time=_START + timedelta(days=366), idempotency_key="a.b_c:d-1"
+            type="account_statement",
+            start_time=_START,
+            end_time=_START + timedelta(days=366),
+            idempotency_key="a.b_c:d-1",
         )
     assert len(requests) == 1
 
@@ -1171,3 +1236,242 @@ async def test_list_account_flows_refuses_out_of_contract_filters_before_sending
         with pytest.raises(PolyesterValidationError):
             await client.lifecycle.list_account_flows(**kwargs)
     assert requests == []
+
+
+# --- statement export types: balances ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("label", "value"),
+    [
+        ("account_statement", export_pb2.ACCOUNT_STATEMENT),
+        ("ledger", export_pb2.LEDGER),
+        ("balances", export_pb2.BALANCES),
+    ],
+)
+async def test_create_export_sends_each_type(label, value) -> None:
+    reply = export_pb2.CreateStatementExportResponse(export=_export(type=value))
+    async with _client(_ok(reply)) as (client, requests):
+        export = await client.statements.create_export(
+            type=label, start_time=_START, end_time=_END, idempotency_key="k"
+        )
+    (request,) = requests
+    assert export_pb2.CreateStatementExportRequest.FromString(request.body).type == value
+    assert export.type == label
+
+
+# The published sample: nine fractional digits. A datetime holds six, so the
+# earliest acceptable start rounds up to the next microsecond: passed back as
+# start_time, it is at or after the cutoff, never 789 ns before it.
+_HISTORY_NS = Timestamp(
+    seconds=int(datetime(2026, 11, 25, 14, 55, 2, tzinfo=UTC).timestamp()), nanos=123456789
+)
+_HISTORY_CEIL = datetime(2026, 11, 25, 14, 55, 2, 123457, tzinfo=UTC)
+
+
+def _create_balances(c):
+    return c.statements.create_export(
+        type="balances", start_time=_START, end_time=_END, idempotency_key="k"
+    )
+
+
+async def test_balances_export_before_the_history_names_where_it_starts() -> None:
+    available = datetime(2026, 11, 25, 14, 55, 2, 123456, tzinfo=UTC)
+    answer = _connect_error(
+        "failed_precondition",
+        _LEDGER,
+        ledger_read_pb2.ErrorDetail(
+            code=ledger_read_pb2.ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+            history_available_from=_ts(available),
+        ),
+        400,
+    )
+    err = await _raised(
+        answer,
+        lambda c: c.statements.create_export(
+            type="balances", start_time=_START, end_time=_END, idempotency_key="k"
+        ),
+    )
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError)
+    assert isinstance(err, PolyesterApiError)
+    assert err.code == STATEMENT_HISTORY_UNAVAILABLE
+    assert err.history_available_from == available
+    assert not is_retryable_error(err)
+    # Another ledger refusal stays a plain API error.
+    other = await _raised(
+        _connect_error(
+            "failed_precondition",
+            _LEDGER,
+            ledger_read_pb2.ErrorDetail(code=ledger_read_pb2.ERROR_CODE_STATEMENT_EXPORT_NOT_READY),
+            400,
+        ),
+        lambda c: c.statements.get_export_download_url(export_id=format_id(5)),
+    )
+    assert type(other) is PolyesterApiError
+
+
+async def test_failed_balances_export_reads_history_available_from() -> None:
+    available = datetime(2026, 11, 25, 14, 55, 2, tzinfo=UTC)
+    reply = export_pb2.GetStatementExportResponse(
+        export=_export(
+            type=export_pb2.BALANCES,
+            status=export_pb2.STATEMENT_EXPORT_STATUS_FAILED,
+            failure_reason=export_pb2.STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+            history_available_from=_ts(available),
+        )
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert (export.type, export.status, export.failure_reason) == (
+        "balances",
+        "failed",
+        "history_unavailable",
+    )
+    assert export.history_available_from == available
+    plain = export_pb2.GetStatementExportResponse(export=_export())
+    async with _client(_ok(plain)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert export.history_available_from is None
+
+
+async def test_history_refusal_rounds_sub_microsecond_instants_up() -> None:
+    answer = _connect_error(
+        "failed_precondition",
+        _LEDGER,
+        ledger_read_pb2.ErrorDetail(
+            code=ledger_read_pb2.ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+            history_available_from=_HISTORY_NS,
+        ),
+        400,
+    )
+    err = await _raised(answer, _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError)
+    assert err.history_available_from == _HISTORY_CEIL
+    assert err.history_available_from >= _HISTORY_NS.ToDatetime(tzinfo=UTC)
+
+
+async def test_failed_balances_export_rounds_history_available_from_up() -> None:
+    reply = export_pb2.GetStatementExportResponse(
+        export=_export(
+            type=export_pb2.BALANCES,
+            status=export_pb2.STATEMENT_EXPORT_STATUS_FAILED,
+            failure_reason=export_pb2.STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+            history_available_from=_HISTORY_NS,
+        )
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert export.history_available_from == _HISTORY_CEIL
+
+
+# The REST answer, in the contract's published problem shape.
+_HISTORY_PROBLEM = {
+    "type": "https://polyester.dev/problems/statement-history-unavailable",
+    "title": "Conflict",
+    "status": 409,
+    "detail": "statement_history_unavailable: the period starts before the account history",
+    "code": "STATEMENT_HISTORY_UNAVAILABLE",
+    "historyAvailableFrom": "2026-11-25T14:55:02.123456789Z",
+}
+
+
+async def test_rest_history_problem_reads_as_the_typed_refusal() -> None:
+    err = await _raised(_problem(409, _HISTORY_PROBLEM), _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.code == STATEMENT_HISTORY_UNAVAILABLE
+    assert err.history_available_from == _HISTORY_CEIL
+    assert not is_retryable_error(err)
+
+
+@pytest.mark.parametrize(
+    ("member", "want"),
+    [
+        ("2026-11-25T14:55:02Z", datetime(2026, 11, 25, 14, 55, 2, tzinfo=UTC)),
+        ("2026-11-25T14:55:02.123456Z", datetime(2026, 11, 25, 14, 55, 2, 123456, tzinfo=UTC)),
+        ("2026-11-25T14:55:02.9999999Z", datetime(2026, 11, 25, 14, 55, 3, tzinfo=UTC)),
+        ("2026-11-25T16:55:02.5+02:00", datetime(2026, 11, 25, 14, 55, 2, 500000, tzinfo=UTC)),
+        ("yesterday", None),
+        (None, None),
+    ],
+)
+async def test_rest_history_problem_member_forms(member, want) -> None:
+    body = {k: v for k, v in _HISTORY_PROBLEM.items() if k != "historyAvailableFrom"}
+    if member is not None:
+        body["historyAvailableFrom"] = member
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.history_available_from == want
+
+
+async def test_rest_problem_of_another_code_is_not_a_history_refusal() -> None:
+    body = dict(_HISTORY_PROBLEM, code="IDEMPOTENCY_KEY_REUSED")
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterApiError)
+    assert not isinstance(err, PolyesterStatementHistoryUnavailableError)
+
+
+# No representable safe start: rounded up, or once in UTC, the instant is
+# past what a datetime holds. history_available_from is then None, and the
+# typed refusal or the export is still returned.
+_MAX_TIMESTAMP = Timestamp(seconds=253402300799, nanos=999999999)
+
+
+@pytest.mark.parametrize(
+    "member",
+    ["9999-12-31T23:59:59.999999999Z", "9999-12-31T23:30:00-01:00", "0001-01-01T00:30:00+01:00"],
+)
+async def test_rest_history_problem_out_of_range_has_no_start(member) -> None:
+    body = dict(_HISTORY_PROBLEM, historyAvailableFrom=member)
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.code == STATEMENT_HISTORY_UNAVAILABLE
+    assert err.history_available_from is None
+
+
+async def test_connect_history_refusal_at_the_max_timestamp_has_no_start() -> None:
+    answer = _connect_error(
+        "failed_precondition",
+        _LEDGER,
+        ledger_read_pb2.ErrorDetail(
+            code=ledger_read_pb2.ERROR_CODE_STATEMENT_HISTORY_UNAVAILABLE,
+            history_available_from=_MAX_TIMESTAMP,
+        ),
+        400,
+    )
+    err = await _raised(answer, _create_balances)
+    assert isinstance(err, PolyesterStatementHistoryUnavailableError), repr(err)
+    assert err.history_available_from is None
+
+
+async def test_failed_export_at_the_max_timestamp_reads_without_a_start() -> None:
+    reply = export_pb2.GetStatementExportResponse(
+        export=_export(
+            type=export_pb2.BALANCES,
+            status=export_pb2.STATEMENT_EXPORT_STATUS_FAILED,
+            failure_reason=export_pb2.STATEMENT_EXPORT_FAILURE_REASON_HISTORY_UNAVAILABLE,
+            history_available_from=_MAX_TIMESTAMP,
+        )
+    )
+    async with _client(_ok(reply)) as (client, _requests):
+        export = await client.statements.get_export(export_id=format_id((1 << 63) + 9))
+    assert (export.status, export.failure_reason) == ("failed", "history_unavailable")
+    assert export.history_available_from is None
+
+
+# historyAvailableFrom is an optional problem extension: a member of any
+# other JSON type never breaks the code mapping, for the history code or any
+# other.
+@pytest.mark.parametrize(
+    "member", [1795618502, {"seconds": 1795618502}, None, ["2026-11-25T14:55:02Z"], True]
+)
+@pytest.mark.parametrize("code", ["STATEMENT_HISTORY_UNAVAILABLE", "IDEMPOTENCY_KEY_REUSED"])
+async def test_rest_problem_with_a_non_string_history_member_keeps_its_code(member, code) -> None:
+    body = dict(_HISTORY_PROBLEM, code=code, historyAvailableFrom=member)
+    err = await _raised(_problem(409, body), _create_balances)
+    assert isinstance(err, PolyesterApiError), repr(err)
+    assert err.code == "ERROR_CODE_" + code
+    if code == "STATEMENT_HISTORY_UNAVAILABLE":
+        assert isinstance(err, PolyesterStatementHistoryUnavailableError)
+        assert err.history_available_from is None
+    else:
+        assert not isinstance(err, PolyesterStatementHistoryUnavailableError)

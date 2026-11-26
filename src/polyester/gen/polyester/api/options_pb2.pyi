@@ -18,6 +18,7 @@ class AuthenticationMethod(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SESSION_TOKEN: _ClassVar[AuthenticationMethod]
     API_KEY: _ClassVar[AuthenticationMethod]
     BROKER_API_KEY: _ClassVar[AuthenticationMethod]
+    ADMIN_API_KEY: _ClassVar[AuthenticationMethod]
 MFA_UNSPECIFIED: MFARequirement
 MFA_RECENT: MFARequirement
 MFA_FRESH_STEP_UP: MFARequirement
@@ -26,6 +27,7 @@ AUTH_UNSPECIFIED: AuthenticationMethod
 SESSION_TOKEN: AuthenticationMethod
 API_KEY: AuthenticationMethod
 BROKER_API_KEY: AuthenticationMethod
+ADMIN_API_KEY: AuthenticationMethod
 PUBLIC_FIELD_NUMBER: _ClassVar[int]
 public: _descriptor.FieldDescriptor
 HIDDEN_FIELD_NUMBER: _ClassVar[int]

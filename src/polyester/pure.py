@@ -1224,8 +1224,9 @@ def polyester(
       raise _err("attached_risk must be an object or AttachedRisk")
     if not data:
       # Never dropped: the call would succeed and leave the legs as they were.
-      message = "attached_risk requires take_profit and/or a stop leg"
-      if risk_field == "new_attached_risk":
+      # A batch item's refusal names the item (items[i].new_attached_risk).
+      message = (risk_field if "[" in risk_field else "attached_risk") + " requires take_profit and/or a stop leg"
+      if risk_field.endswith("new_attached_risk"):
         message += "; to remove the order's attached risk, pass clear_attached_risk=True"
       raise _err(message)
     _reject_unknown(data, _RISK_POLICY_KEYS, "attached_risk")

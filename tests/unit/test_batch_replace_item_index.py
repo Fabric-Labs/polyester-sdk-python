@@ -61,3 +61,24 @@ def test_modify_still_names_the_field_alone() -> None:
         )
     [violation] = caught.value.violations
     assert violation.field_path == "new_attached_risk.trailing_stop.limit_price_ticks"
+
+
+@pytest.mark.parametrize("empty", [{}, AttachedRisk()], ids=["dict", "typed"])
+def test_batch_replace_empty_risk_names_the_item_and_keeps_the_clear_hint(empty: object) -> None:
+    with pytest.raises(PolyesterValidationError) as caught:
+        _batch(BatchReplaceItem(key=ClientOrderId("cid-1"), new_attached_risk=empty))  # type: ignore[arg-type]
+    assert str(caught.value) == (
+        "items[1].new_attached_risk requires take_profit and/or a stop leg; "
+        "to remove the order's attached risk, pass clear_attached_risk=True"
+    )
+
+
+def test_modify_empty_risk_keeps_its_message() -> None:
+    with pytest.raises(PolyesterValidationError) as caught:
+        modify_order_to_proto(
+            symbol="BTC-USDT", symbol_id=1, key=ClientOrderId("cid-1"), new_attached_risk={}
+        )
+    assert str(caught.value) == (
+        "attached_risk requires take_profit and/or a stop leg; "
+        "to remove the order's attached risk, pass clear_attached_risk=True"
+    )

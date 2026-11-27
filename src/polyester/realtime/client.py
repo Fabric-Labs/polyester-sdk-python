@@ -114,6 +114,34 @@ def enqueue_or_overflow(
         raise PolyesterRealtimeOverflowError(message) from exc
 
 
+async def next_update(queue: asyncio.Queue[Any], close: asyncio.Event) -> Any:
+    """The next update of a subscription, for any number of concurrent readers.
+
+    Readers share the updates: each one goes to one reader, which takes it from
+    the queue itself, so a reader cancelled while it waits loses none. Every
+    ending (a close, a failure, an overflow, the stream stopping) sets
+    ``close`` first and then queues the end marker ``None`` behind the updates
+    already queued, if it fits. The reader that takes the marker queues it
+    again for the next reader; a reader that takes the last update of a closed
+    queue queues it in place of one that did not fit. So every waiting reader,
+    and every later one, raises ``StopAsyncIteration`` in turn.
+    """
+    item = await queue.get()
+    if item is None:
+        close.set()
+        _post_end_marker(queue)
+        raise StopAsyncIteration
+    if close.is_set() and queue.empty():
+        _post_end_marker(queue)
+    return item
+
+
+def _post_end_marker(queue: asyncio.Queue[Any]) -> None:
+    # Called right after a take, so the queue has room for it.
+    with contextlib.suppress(asyncio.QueueFull):
+        queue.put_nowait(None)
+
+
 class AsyncSubscription(Generic[T]):
     def __init__(
         self,
@@ -199,16 +227,15 @@ class AsyncSubscription(Generic[T]):
     async def __anext__(self) -> T:
         if self._error is not None and self._queue.empty():
             raise self._error
-        if self._close.is_set() and self._queue.empty():
-            if self._error is not None:
-                raise self._error
-            raise StopAsyncIteration
-        item = await self._queue.get()
-        if item is None:
-            if self._error is not None:
-                raise self._error
-            raise StopAsyncIteration
-        return item
+        try:
+            item: T = await next_update(self._queue, self._close)
+        except StopAsyncIteration:
+            if self._error is None:
+                raise
+        else:
+            return item
+        # Raised outside the handler, so the error keeps its own cause.
+        raise self._error
 
     async def aclose(self) -> None:
         self._close.set()
@@ -519,6 +546,8 @@ class AsyncRealtimeClient:
                     signal_ready(
                         PolyesterRealtimeError("realtime subscription ended before handshake")
                     )
+                # Closed first: the end marker may not fit a full queue.
+                close.set()
                 with contextlib.suppress(Exception):
                     queue.put_nowait(None)
 

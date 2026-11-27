@@ -6,6 +6,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 
 from polyester.models import OrderbookData
+from polyester.realtime.client import next_update
 
 
 class OrderbookSubscription:
@@ -106,9 +107,6 @@ class OrderbookSubscription:
         return self
 
     async def __anext__(self) -> OrderbookData:
-        if self._close.is_set() and self._queue.empty():
-            raise StopAsyncIteration
-        item = await self._queue.get()
-        if item is None:
-            raise StopAsyncIteration
+        # Every reader ends once the subscription closes; see next_update.
+        item: OrderbookData = await next_update(self._queue, self._close)
         return item

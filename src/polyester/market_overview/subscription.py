@@ -5,6 +5,7 @@ import contextlib
 from collections.abc import AsyncIterator
 
 from polyester.models.market import MarketOverviewEntry
+from polyester.realtime.client import next_update
 
 
 class MarketOverviewSubscription:
@@ -73,9 +74,6 @@ class MarketOverviewSubscription:
         return self
 
     async def __anext__(self) -> list[MarketOverviewEntry]:
-        if self._close.is_set() and self._queue.empty():
-            raise StopAsyncIteration
-        item = await self._queue.get()
-        if item is None:
-            raise StopAsyncIteration
+        # Every reader ends once the subscription closes; see next_update.
+        item: list[MarketOverviewEntry] = await next_update(self._queue, self._close)
         return item

@@ -58,8 +58,28 @@ class OrderbookSubscription:
         stream = self._stream
         return getattr(stream, "last_error", None)
 
-    async def refresh_snapshot(self) -> None:
-        await self._stream.refresh_snapshot()
+    async def refresh_snapshot(self) -> bool:
+        """Fetch a new snapshot and merge the publications held back meanwhile.
+
+        Returns ``True`` once the refresh completed and live delivery has
+        resumed; ``last_error`` is then cleared. Returns ``False`` when the
+        refresh did not complete and resume delivery: the snapshot fetch
+        failed (``last_error`` holds the error, and ``on_error``, if given,
+        received it), or the subscription is closed or closed during the
+        refresh. A failed fetch is returned as ``False``, not raised, and the
+        SDK does not retry it; cancelling the awaiting task still raises
+        ``asyncio.CancelledError``.
+
+        Until a refresh succeeds, live publications are held back, not
+        delivered. They are merged once after a later successful refresh only
+        while the subscription stays open and its bounded recovery buffer
+        holds them: when the buffer overflows, the subscription closes with a
+        ``PolyesterRealtimeOverflowError`` in ``last_error`` (also passed to
+        ``on_error``) and the held publications are dropped. To retry, call
+        ``refresh_snapshot()`` again; once the subscription is closed,
+        subscribe again.
+        """
+        return await self._stream.refresh_snapshot()
 
     async def aclose(self) -> None:
         self._close.set()

@@ -131,6 +131,10 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         and returns False (does not raise — callers decide retry/fail-closed policy).
         """
         async with self._lock:
+            # A refresh called, or queued behind one in flight, after aclose()
+            # fetches nothing; one in flight at the close is checked below.
+            if self._disposed:
+                return False
             generation = self._generation + 1
             self._generation = generation
             with self._state_lock:

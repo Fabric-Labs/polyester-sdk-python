@@ -192,8 +192,22 @@ class AsyncMarketOverviewService(BaseService):
     ) -> MarketOverviewSubscription:
         """Snapshot-then-stream merged overview rows (TS parity).
 
-        With ``symbols``, the snapshot and every live or buffered update keep
-        only those markets; the channel itself publishes all markets.
+        ``limit`` applies only to the snapshot request, as for :meth:`list`:
+        a positive ``limit`` asks for at most that many markets, and
+        ``limit=0`` is sent as no limit, which the server reads as its
+        default, 50. It does not cap what the subscription holds or emits:
+        updates buffered while the snapshot loads are merged into it, so even
+        the first emitted view can hold more than ``limit`` markets, and every
+        later live update is merged in too. It is not a cap on the live market
+        count and not a dynamic top-N. A snapshot refresh, manual
+        (``refresh_snapshot()``) or after a reconnect, sends the same request
+        again and starts from its result.
+
+        ``symbols`` filters both the snapshot and the live updates: with it,
+        the snapshot and every live or buffered update keep only those
+        markets (the channel itself publishes all markets). Without it, every
+        market is included as its updates arrive. To follow a fixed set of
+        markets, pass ``symbols``.
         """
         realtime = require_realtime(self._realtime)
         channel = "public:spot:market_overview:updates:proto"

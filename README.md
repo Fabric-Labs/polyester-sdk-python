@@ -2424,12 +2424,15 @@ for candle in page.candles:
 ```
 
 Merged market overview stream (snapshot + live updates). The create call waits
-for the WebSocket handshake and initial snapshot. `limit` sizes only that initial
-snapshot (at most `limit` markets, as for `market_overview.list`); every live
-update is then merged in, so the subscription can hold more than `limit` markets
-as updates arrive. It is not a cap on the live market count and not a dynamic
-top-N, and a snapshot refresh (manual or after a reconnect) starts again from at
-most `limit` markets. `symbols=[...]` filters both: the snapshot and every live
+for the WebSocket handshake and initial snapshot. `limit` applies only to the
+snapshot request, as for `market_overview.list`: a positive `limit` asks for at
+most that many markets, and `limit=0` is sent as no limit, which the server reads
+as its default, 50. It does not cap what the subscription holds or emits: updates
+buffered while the snapshot loads are merged into it, so even the first emitted
+view can hold more than `limit` markets, and every later live update is merged in
+too. It is not a cap on the live market count and not a dynamic top-N, and a
+snapshot refresh (manual or after a reconnect) sends the same request again and
+starts from its result. `symbols=[...]` filters both: the snapshot and every live
 or buffered update keep only those markets. Without `symbols`, every market is
 included as its updates arrive. To follow a fixed set of markets, pass `symbols`:
 

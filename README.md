@@ -2388,12 +2388,16 @@ if book_sub.since_last_publication() > 90 and not await book_sub.refresh_snapsho
 ```
 
 `refresh_snapshot()` on an order book or Market Overview subscription returns `True`
-once the new snapshot is applied and live delivery has resumed, and `False` when no
-snapshot was applied: the fetch failed (`last_error` holds the error, and `on_error`
-received it) or the subscription was closed. It does not raise and does not retry by
-itself. Until a refresh succeeds, live publications are held back, neither delivered
-nor dropped, and merged once after the next successful snapshot: call
-`refresh_snapshot()` again to retry, or close and subscribe again.
+once the refresh completed and live delivery has resumed, and `False` when it did not:
+the snapshot fetch failed (`last_error` holds the error, and `on_error` received it) or
+the subscription is closed. A failed fetch is returned as `False`, not raised, and is
+not retried by the SDK; cancelling the awaiting task still raises
+`asyncio.CancelledError`. Until a refresh succeeds, live publications are held back,
+not delivered. They are merged once after a later successful refresh only while the
+subscription stays open and its bounded recovery buffer holds them: when the buffer
+overflows, the subscription closes with `PolyesterRealtimeOverflowError` in
+`last_error` (and `on_error`) and the held publications are dropped. Retry by calling
+`refresh_snapshot()` again; once the subscription is closed, subscribe again.
 
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.34.0
+
+Git tag: `v0.34.0`. Released 2026-11-27. Built on public contract `11e2cec`.
+
 - `MarketOverviewSubscription.refresh_snapshot()` and `OrderbookSubscription.refresh_snapshot()` return the refresh outcome, a `bool`, where they returned `None` whatever happened. `True`: the refresh completed and live delivery has resumed. `False`: it did not, because the snapshot fetch failed (`last_error` holds the error and `on_error` received it, as before) or the subscription is closed. A failed fetch is returned as `False`, not raised, and not retried by the SDK; cancelling the awaiting task still raises `asyncio.CancelledError`. Until a refresh succeeds, live publications are held back; they are merged once after a later successful refresh only while the subscription stays open and its bounded recovery buffer holds them. When the buffer overflows, the subscription closes with `PolyesterRealtimeOverflowError` and the held publications are dropped, as before. Call `refresh_snapshot()` again to retry; once the subscription is closed, subscribe again. Code that ignored the result is unaffected.
 - **Breaking:** `statements.create_export(...)` (and on the sync client) requires `type=`, the kind of file to produce: `"account_statement"` (`STATEMENT_EXPORT_TYPE_ACCOUNT_STATEMENT`), the account statement it created before, `"ledger"` (`STATEMENT_EXPORT_TYPE_LEDGER`, new) or `"balances"` (`STATEMENT_EXPORT_TYPE_BALANCES`, new). There is no default, since the server refuses a create without a type: a call without it raises `TypeError`, and any other value raises `PolyesterValidationError` before sending. Pass `type="account_statement"` to keep the file you received before. Repeating an `idempotency_key` with another type is refused with `ERROR_CODE_IDEMPOTENCY_KEY_REUSED`, as for any other changed field.
 - `StatementExport.type` (new) echoes the export's type on `create_export`, `get_export`, `cancel_export`, `wait_export`, `list_exports` and `iter_exports`; exports created before types existed read `"account_statement"`. A type newer than this SDK reads `"UNKNOWN(n)"` and never fails the read, as more types will come.

@@ -39,7 +39,7 @@ def polyester(
   from decimal import Decimal as _Decimal
   from decimal import InvalidOperation as _InvalidOperation
 
-  _VERSION = "0.33.0"
+  _VERSION = "0.34.0"
 
   _UINT64_MAX = 18446744073709551615
   _UINT32_MAX = 4294967295

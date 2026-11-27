@@ -45,6 +45,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         read_publication: Callable[[TPublication], list[TPublication]],
         apply_snapshot: Callable[[TSnapshot, list[TPublication]], None],
         apply_live_publications: Callable[[list[TPublication]], None],
+        apply_drained_publications: Callable[[list[TPublication]], None] | None = None,
         max_buffered_publications: int = 200,
         on_open: Callable[[], None] | None = None,
         on_close: Callable[[], None] | None = None,
@@ -60,6 +61,17 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         self._read_publication = read_publication
         self._apply_snapshot = apply_snapshot
         self._apply_live_publications = apply_live_publications
+        # Publications that arrive while apply_snapshot runs are drained before
+        # the stream is marked ready, as part of that snapshot's merge, and may
+        # predate it as the buffered ones may. Which path a publication takes
+        # is decided under the state lock, so one passed to
+        # apply_live_publications was dispatched live. None sends drained
+        # publications to apply_live_publications.
+        self._apply_drained_publications = (
+            apply_live_publications
+            if apply_drained_publications is None
+            else apply_drained_publications
+        )
         self._max_buffered_publications = max_buffered_publications
         self._on_open = on_open
         self._on_close = on_close
@@ -147,7 +159,7 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
                 if not next_buffered:
                     break
                 try:
-                    self._apply_live_publications(next_buffered)
+                    self._apply_drained_publications(next_buffered)
                 except Exception as exc:
                     self._fail_closed(
                         PolyesterRealtimeError(f"apply_live_publications callback failed: {exc}")

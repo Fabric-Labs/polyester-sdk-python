@@ -28,8 +28,20 @@ class MarketOverviewSubscription:
         stream = self._stream
         return getattr(stream, "last_error", None)
 
-    async def refresh_snapshot(self) -> None:
-        await self._stream.refresh_snapshot()
+    async def refresh_snapshot(self) -> bool:
+        """Fetch a new snapshot and merge the publications held back meanwhile.
+
+        Returns ``True`` once the snapshot is applied and live delivery has
+        resumed. Returns ``False`` when no snapshot was applied: the fetch
+        failed (``last_error`` holds the error, and ``on_error``, if given,
+        received it), or the subscription was closed or failed. It does not
+        raise and does not retry by itself. Until a refresh succeeds, live
+        publications are held back, neither delivered nor dropped, and merged
+        once after the next successful snapshot: call ``refresh_snapshot()``
+        again to retry, or close and subscribe again. A success clears
+        ``last_error``.
+        """
+        return await self._stream.refresh_snapshot()
 
     async def aclose(self) -> None:
         self._close.set()

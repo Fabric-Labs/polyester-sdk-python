@@ -2383,9 +2383,17 @@ method.
 book_sub = await client.orderbook.create_subscription(symbol="BTC-USDT", depth=10)
 -->
 ```python
-if book_sub.since_last_publication() > 90:
-    await book_sub.refresh_snapshot()
+if book_sub.since_last_publication() > 90 and not await book_sub.refresh_snapshot():
+    print("refresh failed, retry later:", book_sub.last_error)
 ```
+
+`refresh_snapshot()` on an order book or Market Overview subscription returns `True`
+once the new snapshot is applied and live delivery has resumed, and `False` when no
+snapshot was applied: the fetch failed (`last_error` holds the error, and `on_error`
+received it) or the subscription was closed. It does not raise and does not retry by
+itself. Until a refresh succeeds, live publications are held back, neither delivered
+nor dropped, and merged once after the next successful snapshot: call
+`refresh_snapshot()` again to retry, or close and subscribe again.
 
 `get_candles()` returns row-oriented candles newest-first (an incomplete open
 candle, when requested, is prepended). `get_candles_columns()` normalizes its

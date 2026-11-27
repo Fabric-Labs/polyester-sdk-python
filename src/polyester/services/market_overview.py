@@ -4,6 +4,7 @@ import asyncio
 import builtins
 import contextlib
 from collections.abc import Callable
+from typing import Any
 
 import msgspec
 
@@ -19,6 +20,16 @@ from polyester.codecs.scalars import market_ids
 from polyester.errors import PolyesterValidationError
 from polyester.gen.marketoverview.v1.marketoverview_connect import MarketOverviewServiceClient
 from polyester.gen.marketoverview.v1.marketoverview_pb2 import (
+    ORDER_BY_CHANGE_24H_BPS,
+    ORDER_BY_DATE_ADDED,
+    ORDER_BY_LAST_PRICE,
+    ORDER_BY_VOLUME_24H_USD,
+    SORT_ASC,
+    SORT_DESC,
+    SPARKLINE_1H,
+    SPARKLINE_1M,
+    SPARKLINE_1W,
+    SPARKLINE_24H,
     GetCurrencyConversionConfigRequest,
     GetCurrencyConversionRatesRequest,
     GetSpotVolumeHistoryRequest,
@@ -39,6 +50,32 @@ from polyester.services._generated import unary_public_decoded
 from polyester.services._realtime_subscribe import require_realtime, subscribe_public_proto
 from polyester.services._symbols import resolve_symbol_ids
 from polyester.services._validation import validate_limit
+
+# The contract's MarketOrderBy and SortDirection, by the label list() takes.
+MARKET_OVERVIEW_ORDER_BY: dict[str, Any] = {
+    "change_24h_bps": ORDER_BY_CHANGE_24H_BPS,
+    "volume_24h_usd": ORDER_BY_VOLUME_24H_USD,
+    "last_price": ORDER_BY_LAST_PRICE,
+    "date_added": ORDER_BY_DATE_ADDED,
+}
+MARKET_OVERVIEW_SORT: dict[str, Any] = {"asc": SORT_ASC, "desc": SORT_DESC}
+# The contract's SparklineInterval, by the name MarketOverviewSparkline.interval reads.
+MARKET_OVERVIEW_SPARKLINE_INTERVALS: dict[str, Any] = {
+    "SPARKLINE_1H": SPARKLINE_1H,
+    "SPARKLINE_24H": SPARKLINE_24H,
+    "SPARKLINE_1W": SPARKLINE_1W,
+    "SPARKLINE_1M": SPARKLINE_1M,
+}
+
+
+def _label(value: object, labels: dict[str, Any], field: str) -> Any:
+    """The enum value a label names; anything else is refused before sending."""
+    if not isinstance(value, str) or value not in labels:
+        raise PolyesterValidationError(
+            f"market_overview.list {field} must be one of {', '.join(sorted(labels))}, "
+            f"got {value!r}"
+        )
+    return labels[value]
 
 
 class AsyncMarketOverviewService(BaseService):
@@ -62,8 +99,45 @@ class AsyncMarketOverviewService(BaseService):
         limit: int = 50,
         page_token: str = "",
         include_sparklines: bool = False,
+        order_by: str | None = None,
+        sort: str | None = None,
+        sparkline_intervals: builtins.list[str] | None = None,
     ) -> MarketOverviewList:
+        """One page of market overview rows.
+
+        ``order_by`` is the sort key: ``"change_24h_bps"`` (absolute 24h
+        change), ``"volume_24h_usd"`` (24h USD volume; markets without a USD
+        volume sort last either way), ``"last_price"`` or ``"date_added"``
+        (listing time). ``sort`` is ``"asc"`` or ``"desc"``. Left ``None``,
+        each is not sent and the server applies its default: descending 24h
+        USD volume. ``sparkline_intervals`` picks the sparklines that
+        ``include_sparklines`` returns: ``"SPARKLINE_1H"``, ``"SPARKLINE_24H"``,
+        ``"SPARKLINE_1W"`` or ``"SPARKLINE_1M"``, as
+        ``MarketOverviewSparkline.interval`` reads them; left ``None`` or empty,
+        the server returns the 24h one. Any other value raises
+        :class:`PolyesterValidationError` before anything is sent.
+
+        ``next_page_token`` is bound to ``symbols``, ``order_by`` and ``sort``:
+        pass it back with the same ones, or the server refuses it; request the
+        first page again to change them. Each page is cut from current values,
+        so a market whose sort value changes between pages can appear twice or
+        not at all; for a consistent list, read one page with the largest
+        ``limit``.
+        """
         validated_limit = validate_limit(limit, ListMarketOverviewRequest)
+        order_by_value = (
+            None if order_by is None else _label(order_by, MARKET_OVERVIEW_ORDER_BY, "order_by")
+        )
+        sort_value = None if sort is None else _label(sort, MARKET_OVERVIEW_SORT, "sort")
+        if isinstance(sparkline_intervals, str):
+            raise PolyesterValidationError(
+                "market_overview.list sparkline_intervals must be a list of intervals, "
+                "not one string"
+            )
+        interval_values = [
+            _label(interval, MARKET_OVERVIEW_SPARKLINE_INTERVALS, "sparkline_intervals")
+            for interval in sparkline_intervals or []
+        ]
         # Rows are labelled and scaled from the catalogs; only a symbol filter needs them.
         await self._ensure_catalogs(required=bool(symbols))
         request = ListMarketOverviewRequest(
@@ -71,6 +145,11 @@ class AsyncMarketOverviewService(BaseService):
             page_token=page_token,
             include_sparklines=include_sparklines,
         )
+        if order_by_value is not None:
+            request.order_by = order_by_value
+        if sort_value is not None:
+            request.sort = sort_value
+        request.sparkline_intervals.extend(interval_values)
         resolved_ids = resolve_symbol_ids(
             self._catalogs, symbols, label="market_overview.list symbols"
         )

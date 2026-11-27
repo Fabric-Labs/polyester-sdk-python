@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `market_overview.list` takes `order_by`, `sort` and `sparkline_intervals`, the contract's `ListMarketOverviewRequest` fields 4, 5 and 7, on `AsyncPolyester` and `Polyester`. `order_by` is `"change_24h_bps"` (absolute 24h change), `"volume_24h_usd"`, `"last_price"` or `"date_added"` (listing time); `sort` is `"asc"` or `"desc"`; `sparkline_intervals` lists `"SPARKLINE_1H"`, `"SPARKLINE_24H"`, `"SPARKLINE_1W"` or `"SPARKLINE_1M"`, as `MarketOverviewSparkline.interval` reads them. Left unset, nothing is sent and the server keeps its defaults: descending 24h USD volume, and the 24h sparkline when `include_sparklines=True`. Any other value raises `PolyesterValidationError` before anything is sent. A `next_page_token` is bound to the symbols and sort it was issued for: pass it back with the same ones. Affected: `market_overview.list` (new keyword arguments).
+
 ## 0.34.0
 
 Git tag: `v0.34.0`. Released 2026-11-27. Built on public contract `11e2cec`.

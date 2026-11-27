@@ -114,6 +114,39 @@ def enqueue_or_overflow(
         raise PolyesterRealtimeOverflowError(message) from exc
 
 
+async def next_update(queue: asyncio.Queue[Any], close: asyncio.Event) -> Any:
+    """The next update of a subscription, for any number of concurrent readers.
+
+    Readers share the updates: each one goes to one reader. Updates queued
+    before the subscription ends are delivered first. Then every reader,
+    waiting or yet to come, raises ``StopAsyncIteration``: a reader waits for
+    the close as well as for an update, and the ``None`` every ending queues
+    (a close, a failure, an overflow, the stream stopping) marks the
+    subscription closed for all of them, not only for the reader that took it.
+    """
+    while True:
+        while not queue.empty():
+            item = queue.get_nowait()
+            if item is not None:
+                return item
+            close.set()
+        if close.is_set():
+            raise StopAsyncIteration
+        getter = asyncio.ensure_future(queue.get())
+        closing = asyncio.ensure_future(close.wait())
+        try:
+            await asyncio.wait((getter, closing), return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            closing.cancel()
+            # A getter cancelled before it ran leaves its update in the queue.
+            getter.cancel()
+        if getter.done() and not getter.cancelled():
+            item = getter.result()
+            if item is not None:
+                return item
+            close.set()
+
+
 class AsyncSubscription(Generic[T]):
     def __init__(
         self,
@@ -199,16 +232,15 @@ class AsyncSubscription(Generic[T]):
     async def __anext__(self) -> T:
         if self._error is not None and self._queue.empty():
             raise self._error
-        if self._close.is_set() and self._queue.empty():
-            if self._error is not None:
-                raise self._error
-            raise StopAsyncIteration
-        item = await self._queue.get()
-        if item is None:
-            if self._error is not None:
-                raise self._error
-            raise StopAsyncIteration
-        return item
+        try:
+            item: T = await next_update(self._queue, self._close)
+        except StopAsyncIteration:
+            if self._error is None:
+                raise
+        else:
+            return item
+        # Raised outside the handler, so the error keeps its own cause.
+        raise self._error
 
     async def aclose(self) -> None:
         self._close.set()

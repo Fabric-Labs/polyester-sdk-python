@@ -2516,6 +2516,13 @@ the list; a root key cannot subscribe to a sub-account's channels.
   when there is none. A trigger event is identified by
   `(trigger_id, event_type, child_seq, ts_ns)`. For your own batched channel,
   use `realtime.subscribe_proto_batch(channel, decode_batch=...)`.
+- Tasks iterating one subscription share its updates: each update goes to one
+  of them, not to all. To give every consumer every update, open one
+  subscription per consumer, or have one task read it and put each update on a
+  queue per consumer. When the subscription closes, fails or ends, every task
+  iterating it stops, and so does one that starts later: with
+  `StopAsyncIteration`, or with the terminal error of a realtime subscription
+  that failed. Updates queued before that are delivered first.
 - Subscription queues are bounded. If the consumer falls behind, the SDK raises
   `PolyesterRealtimeOverflowError` and faults the subscription; it does **not**
   silently drop updates.

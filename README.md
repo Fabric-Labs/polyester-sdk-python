@@ -2440,8 +2440,8 @@ the sort key (`"change_24h_bps"`, the absolute 24h change; `"volume_24h_usd"`;
 `"last_price"`; `"date_added"`, the listing time) and `sort` the direction
 (`"asc"` or `"desc"`); unset, the server sorts by descending 24h USD volume.
 `sparkline_intervals` picks the sparklines `include_sparklines=True` returns
-(`"SPARKLINE_1H"`, `"SPARKLINE_24H"`, `"SPARKLINE_1W"`, `"SPARKLINE_1M"`; 24h when
-unset). An unknown value raises `PolyesterValidationError` before sending. A
+(a list or tuple of `"SPARKLINE_1H"`, `"SPARKLINE_24H"`, `"SPARKLINE_1W"`,
+`"SPARKLINE_1M"`; 24h when unset). An unknown value raises `PolyesterValidationError` before sending. A
 `next_page_token` is bound to the symbols and sort it was issued for: pass it back
 with the same ones.
 

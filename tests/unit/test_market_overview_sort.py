@@ -159,3 +159,51 @@ async def test_the_sync_client_sends_the_same_fields() -> None:
     [request] = capture.requests
     assert (request.order_by, request.sort) == (mo.ORDER_BY_CHANGE_24H_BPS, mo.SORT_DESC)
     assert list(request.sparkline_intervals) == [mo.SPARKLINE_1W]
+
+
+NOT_A_LIST_OF_INTERVALS = [
+    pytest.param(0, id="zero"),
+    pytest.param(False, id="false"),
+    pytest.param(1, id="one"),
+    pytest.param({"SPARKLINE_1H": 1}, id="dict"),
+    pytest.param("SPARKLINE_1H", id="string"),
+    pytest.param({"SPARKLINE_1H"}, id="set"),
+]
+
+
+@pytest.mark.parametrize("intervals", NOT_A_LIST_OF_INTERVALS)
+async def test_sparkline_intervals_must_be_a_list_or_tuple(intervals: Any) -> None:
+    capture = _Capture()
+    http = await MockHttpServer.spawn(capture.handler)
+    client = AsyncPolyester(api_url=http.base_url, hydrate_catalogs=False)
+    try:
+        with pytest.raises(PolyesterValidationError, match="sparkline_intervals"):
+            await client.market_overview.list(
+                include_sparklines=True, sparkline_intervals=intervals
+            )
+        # A tuple of allowed values is accepted.
+        await client.market_overview.list(
+            include_sparklines=True, sparkline_intervals=("SPARKLINE_1H",)
+        )
+    finally:
+        await client.aclose()
+        await http.aclose()
+    [request] = capture.requests
+    assert list(request.sparkline_intervals) == [mo.SPARKLINE_1H]
+
+
+@pytest.mark.parametrize("intervals", NOT_A_LIST_OF_INTERVALS)
+async def test_the_sync_client_refuses_the_same_sparkline_intervals(intervals: Any) -> None:
+    capture = _Capture()
+    http = await MockHttpServer.spawn(capture.handler)
+
+    def call() -> None:
+        with Polyester(api_url=http.base_url, hydrate_catalogs=False) as client:
+            client.market_overview.list(include_sparklines=True, sparkline_intervals=intervals)
+
+    try:
+        with pytest.raises(PolyesterValidationError, match="sparkline_intervals"):
+            await asyncio.to_thread(call)
+    finally:
+        await http.aclose()
+    assert capture.requests == []

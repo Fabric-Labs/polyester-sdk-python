@@ -101,7 +101,7 @@ class AsyncMarketOverviewService(BaseService):
         include_sparklines: bool = False,
         order_by: str | None = None,
         sort: str | None = None,
-        sparkline_intervals: builtins.list[str] | None = None,
+        sparkline_intervals: builtins.list[str] | tuple[str, ...] | None = None,
     ) -> MarketOverviewList:
         """One page of market overview rows.
 
@@ -113,9 +113,10 @@ class AsyncMarketOverviewService(BaseService):
         USD volume. ``sparkline_intervals`` picks the sparklines that
         ``include_sparklines`` returns: ``"SPARKLINE_1H"``, ``"SPARKLINE_24H"``,
         ``"SPARKLINE_1W"`` or ``"SPARKLINE_1M"``, as
-        ``MarketOverviewSparkline.interval`` reads them; left ``None`` or empty,
-        the server returns the 24h one. Any other value raises
-        :class:`PolyesterValidationError` before anything is sent.
+        ``MarketOverviewSparkline.interval`` reads them, in a list or tuple;
+        left ``None`` or empty, the server returns the 24h one. Any other
+        value or container raises :class:`PolyesterValidationError` before
+        anything is sent.
 
         ``next_page_token`` is bound to ``symbols``, ``order_by`` and ``sort``:
         pass it back with the same ones, or the server refuses it; request the
@@ -129,14 +130,14 @@ class AsyncMarketOverviewService(BaseService):
             None if order_by is None else _label(order_by, MARKET_OVERVIEW_ORDER_BY, "order_by")
         )
         sort_value = None if sort is None else _label(sort, MARKET_OVERVIEW_SORT, "sort")
-        if isinstance(sparkline_intervals, str):
+        if sparkline_intervals is not None and not isinstance(sparkline_intervals, (list, tuple)):
             raise PolyesterValidationError(
-                "market_overview.list sparkline_intervals must be a list of intervals, "
-                "not one string"
+                "market_overview.list sparkline_intervals must be None or a list or tuple "
+                f"of intervals, got {sparkline_intervals!r}"
             )
         interval_values = [
             _label(interval, MARKET_OVERVIEW_SPARKLINE_INTERVALS, "sparkline_intervals")
-            for interval in sparkline_intervals or []
+            for interval in sparkline_intervals or ()
         ]
         # Rows are labelled and scaled from the catalogs; only a symbol filter needs them.
         await self._ensure_catalogs(required=bool(symbols))

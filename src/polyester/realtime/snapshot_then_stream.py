@@ -67,7 +67,11 @@ class AsyncSnapshotThenStreamSubscription(Generic[TSnapshot, TPublication]):
         # is decided under the state lock, so one passed to
         # apply_live_publications was dispatched live. None sends drained
         # publications to apply_live_publications.
-        self._apply_drained_publications = apply_drained_publications or apply_live_publications
+        self._apply_drained_publications = (
+            apply_live_publications
+            if apply_drained_publications is None
+            else apply_drained_publications
+        )
         self._max_buffered_publications = max_buffered_publications
         self._on_open = on_open
         self._on_close = on_close

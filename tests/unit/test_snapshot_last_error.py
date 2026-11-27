@@ -179,3 +179,40 @@ async def test_publications_arriving_during_apply_go_to_apply_drained_publicatio
     drained_path = "drained" if with_drained else "live"
     assert routed == [(drained_path, "during-apply", False), ("live", "after-ready", True)]
     await sub.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_falsy_apply_drained_publications_callable_still_receives_drained() -> None:
+    """Only ``None`` falls back to ``apply_live_publications``: a supplied
+    callable receives the drained publications even if it is falsy."""
+    realtime = AsyncRealtimeClient("wss://example.invalid")
+    routed: list[tuple[str, str]] = []
+    holder: dict[str, AsyncSnapshotThenStreamSubscription] = {}
+
+    class _FalsyCallback:
+        def __bool__(self) -> bool:
+            return False
+
+        def __call__(self, publications: list[str]) -> None:
+            routed.extend(("drained", publication) for publication in publications)
+
+    async def fetch_snapshot() -> str:
+        return "snap"
+
+    def apply_snapshot(_snap: str, _pending: list[str]) -> None:
+        holder["sub"]._handle_publication("during-apply")
+
+    sub = AsyncSnapshotThenStreamSubscription(
+        realtime=realtime,
+        channel="public:test",
+        decode=lambda b: b,
+        fetch_snapshot=fetch_snapshot,
+        read_publication=lambda p: [p],
+        apply_snapshot=apply_snapshot,
+        apply_live_publications=lambda ps: routed.extend(("live", p) for p in ps),
+        apply_drained_publications=_FalsyCallback(),
+    )
+    holder["sub"] = sub
+    assert await sub.refresh_snapshot() is True
+    assert routed == [("drained", "during-apply")]
+    await sub.aclose()

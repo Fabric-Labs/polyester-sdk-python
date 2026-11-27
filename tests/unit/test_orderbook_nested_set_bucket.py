@@ -149,7 +149,7 @@ async def test_the_sync_client_delivers_a_nested_set_bucket_after_the_current_vi
         assert await asyncio.to_thread(run) == [RAW, CENT, RAW]
 
 
-async def test_views_are_delivered_again_after_on_event_raises() -> None:
+async def test_a_view_queued_before_on_event_raises_is_still_delivered() -> None:
     called: list[int] = []
 
     def on_event(view: OrderbookData) -> None:
@@ -166,14 +166,17 @@ async def test_views_are_delivered_again_after_on_event_raises() -> None:
                 symbol="DOGE-USDT", depth=20, on_event=on_event
             )
             assert _bid(await anext(sub)) == RAW
+            # The callback's error reaches the set_bucket caller, as before.
             with pytest.raises(RuntimeError, match="callback failed"):
                 sub.set_bucket("0.01")
-            # The failed view and the one queued behind it are not delivered;
-            # the next change is, on both surfaces.
+            # The view it failed on is not queued, as before; the one queued
+            # from it is delivered on both surfaces, and so is the next change.
+            async with asyncio.timeout(5):
+                assert _bid(await anext(sub)) == RAW
             sub.set_bucket("0.001")
             async with asyncio.timeout(5):
                 assert _bid(await anext(sub)) == MILLI
-            assert called == [RAW, CENT, MILLI]
+            assert called == [RAW, CENT, RAW, MILLI]
             await sub.aclose()
         finally:
             await client.aclose()

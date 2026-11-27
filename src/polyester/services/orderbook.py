@@ -232,16 +232,21 @@ class AsyncOrderbookService(BaseService):
 
         def deliver() -> None:
             # The view at the head is being delivered; it leaves once both
-            # surfaces have it, and the next one, if any, goes after it. A
-            # failing on_event drops the views queued behind it, as it did the
-            # view it failed on, so the next emit delivers again.
-            try:
-                while undelivered:
+            # surfaces have it, and the next one, if any, goes after it. When
+            # on_event raises, the view it raised on is not queued, as before;
+            # the views queued behind it are still delivered, and then the
+            # first error is raised to the caller.
+            error: BaseException | None = None
+            while undelivered:
+                try:
                     deliver_one(undelivered[0])
+                except BaseException as exc:
+                    if error is None:
+                        error = exc
+                finally:
                     undelivered.popleft()
-            except BaseException:
-                undelivered.clear()
-                raise
+            if error is not None:
+                raise error
 
         def deliver_one(data: OrderbookData) -> None:
             if close.is_set():

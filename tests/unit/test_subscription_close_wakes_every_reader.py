@@ -149,3 +149,83 @@ async def test_every_subscribe_trades_reader_ends_on_close() -> None:
             assert await _outcomes(tasks) == ["ended"] * 3
         finally:
             await client.aclose()
+
+
+async def _settle(*tasks: asyncio.Task[Any]) -> None:
+    await asyncio.wait(tasks, timeout=1.0)
+    for task in tasks:
+        task.cancel()
+
+
+@pytest.mark.parametrize("make", SUBSCRIPTIONS)
+async def test_an_update_is_not_lost_when_its_reader_is_cancelled(
+    make: Callable[[], Any],
+) -> None:
+    # The update wakes the first reader, which is cancelled before it resumes.
+    sub = make()
+    first = asyncio.create_task(sub.__anext__())
+    second = asyncio.create_task(sub.__anext__())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    sub._queue.put_nowait("tail")
+    asyncio.get_running_loop().call_soon(first.cancel)
+    await asyncio.wait((first, second), timeout=0.2)
+    got = [t.result() for t in (first, second) if t.done() and not t.cancelled()]
+    assert got == ["tail"], "the update reached no reader"
+    await sub.aclose()
+    await _settle(first, second)
+
+
+async def test_an_end_marker_reaches_every_reader_when_its_reader_is_cancelled() -> None:
+    # The end marker wakes the first reader, which is cancelled before it resumes.
+    sub = _realtime()
+    readers = [asyncio.create_task(sub.__anext__()) for _ in range(3)]
+    for _ in range(5):
+        await asyncio.sleep(0)
+    sub._set_error(PolyesterRealtimeError("stream failed"))
+    sub._queue.put_nowait(None)
+    asyncio.get_running_loop().call_soon(readers[0].cancel)
+    done, pending = await asyncio.wait(readers, timeout=1.0)
+    for task in pending:
+        task.cancel()
+    assert not pending, f"{len(pending)} readers still waiting after the stream ended"
+    for task in readers[1:]:
+        with pytest.raises(PolyesterRealtimeError, match="stream failed"):
+            task.result()
+    assert sub._close.is_set()
+    with pytest.raises(PolyesterRealtimeError, match="stream failed"):
+        await asyncio.wait_for(sub.__anext__(), timeout=0.5)
+
+
+@pytest.mark.parametrize("make", SUBSCRIPTIONS)
+async def test_an_update_queued_before_close_is_delivered_before_any_reader_ends(
+    make: Callable[[], Any],
+) -> None:
+    sub = make()
+    earlier = asyncio.create_task(sub.__anext__())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    sub._queue.put_nowait("tail")
+    await sub.aclose()
+    later = asyncio.create_task(sub.__anext__())
+    await asyncio.wait((earlier, later), timeout=1.0)
+    outcomes = sorted(
+        "tail" if t.exception() is None and t.result() == "tail" else type(t.exception()).__name__
+        for t in (earlier, later)
+    )
+    assert outcomes == ["StopAsyncIteration", "tail"]
+
+
+@pytest.mark.parametrize("make", SUBSCRIPTIONS)
+async def test_a_close_on_a_full_queue_ends_readers_once_it_is_drained(
+    make: Callable[[], Any],
+) -> None:
+    # The end marker finds no room; the queued updates still come first.
+    sub = make()
+    for index in range(sub._queue.maxsize):
+        sub._queue.put_nowait(index)
+    await sub.aclose()
+    seen: list[Any] = []
+    outcomes = await asyncio.gather(_read_all(sub, seen), _read_all(sub, seen))
+    assert outcomes == ["ended", "ended"]
+    assert sorted(seen) == list(range(sub._queue.maxsize))

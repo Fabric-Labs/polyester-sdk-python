@@ -78,6 +78,11 @@ def _label(value: object, labels: dict[str, Any], field: str) -> Any:
     return labels[value]
 
 
+def _trade_ts_ns(row: MarketOverviewEntry) -> int:
+    """A row's last-trade time in nanoseconds; 0 when the market has no trade."""
+    return int(row.last_trade_ts_ns or 0)
+
+
 class AsyncMarketOverviewService(BaseService):
     def __init__(
         self,
@@ -325,10 +330,21 @@ class AsyncMarketOverviewService(BaseService):
         def matches_symbol(row: MarketOverviewEntry) -> bool:
             return not wanted_ids or row.symbol_id in wanted_ids
 
-        def apply_rows(rows: list[MarketOverviewEntry]) -> None:
+        def apply_rows(rows: list[MarketOverviewEntry], *, buffered: bool = False) -> None:
             for row in rows:
                 if matches_symbol(row):
                     previous = by_symbol_id.get(row.symbol_id)
+                    # A row buffered while the snapshot loaded may predate it: one
+                    # whose last trade is older than the row it would replace was
+                    # published before that row and does not replace it. An equal
+                    # last-trade time still does, with the index, volume and book
+                    # changes made since.
+                    if (
+                        buffered
+                        and previous is not None
+                        and _trade_ts_ns(row) < _trade_ts_ns(previous)
+                    ):
+                        continue
                     # Live publications carry no sparklines: keep the snapshot's.
                     if not row.sparklines and previous is not None and previous.sparklines:
                         row = msgspec.structs.replace(row, sparklines=previous.sparklines)
@@ -347,7 +363,13 @@ class AsyncMarketOverviewService(BaseService):
         ) -> None:
             by_symbol_id.clear()
             apply_rows(snapshot.markets)
-            apply_rows(buffered)
+            apply_rows(buffered, buffered=True)
+            emit()
+
+        def apply_drained(rows: list[MarketOverviewEntry]) -> None:
+            # Publications that arrived while the snapshot was being applied,
+            # drained before the stream is ready: they may predate it too.
+            apply_rows(rows, buffered=True)
             emit()
 
         def apply_live(rows: list[MarketOverviewEntry]) -> None:
@@ -367,6 +389,7 @@ class AsyncMarketOverviewService(BaseService):
             read_publication=lambda batch: [row for row in batch.markets if matches_symbol(row)],
             apply_snapshot=apply_snapshot,
             apply_live_publications=apply_live,
+            apply_drained_publications=apply_drained,
             max_buffered_publications=2000,
             on_open=on_open,
             on_close=on_close,

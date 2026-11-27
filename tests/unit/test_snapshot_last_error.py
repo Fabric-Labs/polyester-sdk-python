@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 
 from polyester.errors import PolyesterRealtimeError
@@ -132,4 +134,48 @@ async def test_consumer_callback_failure_is_observable_and_fail_closed() -> None
     assert errors and errors[-1] is sub.last_error
     sub._on_error = lambda _error: (_ for _ in ()).throw(RuntimeError("error callback bug"))
     sub._report_snapshot_error(PolyesterRealtimeError("reported safely"))
+    await sub.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_drained", [True, False])
+async def test_publications_arriving_during_apply_go_to_apply_drained_publications(
+    with_drained: bool,
+) -> None:
+    """A publication that arrives while the snapshot is being applied goes to
+    ``apply_drained_publications``, before the stream is ready; one arriving
+    once ready goes to ``apply_live_publications``. Without
+    ``apply_drained_publications`` both go to ``apply_live_publications``."""
+    realtime = AsyncRealtimeClient("wss://example.invalid")
+    routed: list[tuple[str, str, bool]] = []
+    holder: dict[str, AsyncSnapshotThenStreamSubscription] = {}
+
+    async def fetch_snapshot() -> str:
+        return "snap"
+
+    def apply_snapshot(_snap: str, _pending: list[str]) -> None:
+        holder["sub"]._handle_publication("during-apply")
+
+    def route(path: str) -> Callable[[list[str]], None]:
+        def callback(publications: list[str]) -> None:
+            for publication in publications:
+                routed.append((path, publication, holder["sub"].is_ready()))
+
+        return callback
+
+    sub = AsyncSnapshotThenStreamSubscription(
+        realtime=realtime,
+        channel="public:test",
+        decode=lambda b: b,
+        fetch_snapshot=fetch_snapshot,
+        read_publication=lambda p: [p],
+        apply_snapshot=apply_snapshot,
+        apply_live_publications=route("live"),
+        apply_drained_publications=route("drained") if with_drained else None,
+    )
+    holder["sub"] = sub
+    assert await sub.refresh_snapshot() is True
+    sub._handle_publication("after-ready")
+    drained_path = "drained" if with_drained else "live"
+    assert routed == [(drained_path, "during-apply", False), ("live", "after-ready", True)]
     await sub.aclose()

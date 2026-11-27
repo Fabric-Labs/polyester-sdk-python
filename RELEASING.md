@@ -23,6 +23,13 @@ Stable releases are cut only when testnet moves.
    `git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`.
 3. The workflow checks that the tag matches both version files and is on
    `main`, runs CI, builds, and publishes to PyPI.
+4. Create the GitHub release with notes that name the backend release:
+   `python3 scripts/devnet_release.py stable-notes --version X.Y.Z --notes notes.md`
+   then `gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file notes.md`.
+   The notes open with `Targets Polyester backend <release>`, read from
+   `manifest.json` `backendRelease` at the tag, then the install line and a
+   link to the version's `CHANGELOG.md` section. The command fails when the tag,
+   that section or the backend release is missing.
 
 ## Devnet pre-releases
 
@@ -46,7 +53,9 @@ Every push to `main` runs the devnet path. When `## Unreleased` has no entries
   stable release.
 - **GitHub release.** One pre-release per target version, tagged
   `v<next>-devnet`, is moved to each new build, with the `## Unreleased` entries
-  as its notes. When they would make the notes longer than 120,000 characters
+  as its notes,
+  after the line `Targets Polyester backend <release>` from `manifest.json`
+  `backendRelease` at the snapshot's commit (a commit without it fails). When they would make the notes longer than 120,000 characters
   (GitHub refuses a release body over 125,000), the notes link `CHANGELOG.md` at
   the snapshot's commit instead; the entries are never cut. It is never marked
   latest. When a target is abandoned (a breaking entry moves `0.34.1` to

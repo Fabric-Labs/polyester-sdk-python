@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import operator
 import time
+from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 
@@ -203,6 +204,10 @@ class AsyncOrderbookService(BaseService):
         close = asyncio.Event()
         stream_holder: dict[str, AsyncSnapshotThenStreamSubscription | None] = {"stream": None}
 
+        # Views built while one is being delivered, such as by a set_bucket() from
+        # on_event, wait their turn: on_event and the iterator see one order.
+        undelivered: deque[OrderbookData] = deque()
+
         def emit() -> None:
             nonlocal last_view_unavailable
             if close.is_set():
@@ -221,6 +226,26 @@ class AsyncOrderbookService(BaseService):
                 ts=book_ts,
                 symbol_id=resolved_symbol_id,
             )
+            undelivered.append(data)
+            if len(undelivered) == 1:
+                deliver()
+
+        def deliver() -> None:
+            # The view at the head is being delivered; it leaves once both
+            # surfaces have it, and the next one, if any, goes after it. A
+            # failing on_event drops the views queued behind it, as it did the
+            # view it failed on, so the next emit delivers again.
+            try:
+                while undelivered:
+                    deliver_one(undelivered[0])
+                    undelivered.popleft()
+            except BaseException:
+                undelivered.clear()
+                raise
+
+        def deliver_one(data: OrderbookData) -> None:
+            if close.is_set():
+                return
             if on_event is not None:
                 on_event(data)
             if close.is_set():

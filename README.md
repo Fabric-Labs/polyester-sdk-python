@@ -2435,6 +2435,22 @@ for candle in page.candles:
     print(candle.ts_sec, candle.close, candle.source)
 ```
 
+`market_overview.list` pages through the market overview rows. `order_by` picks
+the sort key (`"change_24h_bps"`, the absolute 24h change; `"volume_24h_usd"`;
+`"last_price"`; `"date_added"`, the listing time) and `sort` the direction
+(`"asc"` or `"desc"`); unset, the server sorts by descending 24h USD volume.
+`sparkline_intervals` picks the sparklines `include_sparklines=True` returns
+(a list or tuple of `"SPARKLINE_1H"`, `"SPARKLINE_24H"`, `"SPARKLINE_1W"`,
+`"SPARKLINE_1M"`; 24h when unset). An unknown value raises `PolyesterValidationError` before sending. A
+`next_page_token` is bound to the symbols and sort it was issued for: pass it back
+with the same ones.
+
+```python
+newest = await client.market_overview.list(order_by="date_added", sort="desc", limit=10)
+for market in newest.markets:
+    print(market.symbol, market.listed_ts_ns)
+```
+
 Merged market overview stream (snapshot + live updates). The create call waits
 for the WebSocket handshake and initial snapshot. `limit` applies only to the
 snapshot request, as for `market_overview.list`: a positive `limit` asks for at

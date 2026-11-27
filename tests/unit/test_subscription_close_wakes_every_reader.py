@@ -12,14 +12,21 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from typing import Any
+from unittest.mock import patch
 
 import pytest
+from websockets.exceptions import ConnectionClosedError
 
 from polyester import AsyncPolyester
 from polyester.errors import PolyesterRealtimeError
 from polyester.market_overview.subscription import MarketOverviewSubscription
 from polyester.orderbook.subscription import OrderbookSubscription
-from polyester.realtime.client import AsyncSubscription
+from polyester.realtime.client import AsyncRealtimeClient, AsyncSubscription
+from tests.unit.test_realtime_batch_publications import (
+    ACK_CONNECT,
+    ACK_SUBSCRIBE,
+    publication_frame,
+)
 from tests.unit.test_server_unsubscribe import CentrifugoServer
 
 READERS = [1, 2, 3, 10]
@@ -30,22 +37,22 @@ class _Stream:
         return None
 
 
-def _realtime() -> AsyncSubscription[Any]:
-    return AsyncSubscription(queue=asyncio.Queue(maxsize=8), close=asyncio.Event())
+def _realtime(maxsize: int = 8) -> AsyncSubscription[Any]:
+    return AsyncSubscription(queue=asyncio.Queue(maxsize=maxsize), close=asyncio.Event())
 
 
-def _orderbook() -> OrderbookSubscription:
+def _orderbook(maxsize: int = 8) -> OrderbookSubscription:
     return OrderbookSubscription(
-        queue=asyncio.Queue(maxsize=8),
+        queue=asyncio.Queue(maxsize=maxsize),
         close=asyncio.Event(),
         stream=_Stream(),
         set_bucket=lambda _bucket: None,
     )
 
 
-def _market_overview() -> MarketOverviewSubscription:
+def _market_overview(maxsize: int = 8) -> MarketOverviewSubscription:
     return MarketOverviewSubscription(
-        queue=asyncio.Queue(maxsize=8), close=asyncio.Event(), stream=_Stream()
+        queue=asyncio.Queue(maxsize=maxsize), close=asyncio.Event(), stream=_Stream()
     )
 
 
@@ -229,3 +236,101 @@ async def test_a_close_on_a_full_queue_ends_readers_once_it_is_drained(
     outcomes = await asyncio.gather(_read_all(sub, seen), _read_all(sub, seen))
     assert outcomes == ["ended", "ended"]
     assert sorted(seen) == list(range(sub._queue.maxsize))
+
+
+@pytest.mark.parametrize("make", SUBSCRIPTIONS)
+async def test_a_parked_reader_ends_after_another_drains_a_queue_closed_full(
+    make: Callable[[], Any],
+) -> None:
+    # A waits; the queue fills and closes full before A runs; B drains it all.
+    sub = make()
+    waiting = asyncio.create_task(sub.__anext__())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    for index in range(sub._queue.maxsize):
+        sub._queue.put_nowait(index)
+    await sub.aclose()
+    drained: list[Any] = []
+    with pytest.raises(StopAsyncIteration):
+        while True:
+            drained.append(await sub.__anext__())
+    assert drained == list(range(sub._queue.maxsize))
+    await asyncio.wait((waiting,), timeout=1.0)
+    waiting.cancel()
+    assert waiting.done() and not waiting.cancelled(), "the parked reader is still waiting"
+    assert isinstance(waiting.exception(), StopAsyncIteration)
+
+
+@pytest.mark.parametrize("make", SUBSCRIPTIONS)
+async def test_two_parked_readers_of_a_queue_of_one_both_end(make: Callable[..., Any]) -> None:
+    sub = make(maxsize=1)
+    readers = [asyncio.create_task(sub.__anext__()) for _ in range(2)]
+    for _ in range(5):
+        await asyncio.sleep(0)
+    sub._queue.put_nowait("last")
+    await sub.aclose()
+    done, pending = await asyncio.wait(readers, timeout=1.0)
+    for task in pending:
+        task.cancel()
+    assert not pending, "a parked reader was never woken"
+    outcomes = sorted(
+        "last" if t.exception() is None else type(t.exception()).__name__ for t in readers
+    )
+    assert outcomes == ["StopAsyncIteration", "last"]
+
+
+class _EndingWS:
+    """Acks the handshake; once released, serves one publication and then
+    fails at once, without yielding, so the worker ends before any reader runs."""
+
+    subprotocol = "centrifuge-protobuf"
+
+    def __init__(self) -> None:
+        self.handshake = [ACK_CONNECT, ACK_SUBSCRIBE]
+        self.release = asyncio.Event()
+        self.served = False
+
+    async def __aenter__(self) -> _EndingWS:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def send(self, payload: bytes) -> None:
+        return None
+
+    async def recv(self) -> bytes:
+        if self.handshake:
+            return self.handshake.pop(0)
+        if not self.served:
+            await self.release.wait()
+            self.served = True
+            return publication_frame(b"last")
+        raise ConnectionClosedError(None, None)
+
+
+async def test_a_stream_that_ends_with_its_queue_full_ends_every_reader() -> None:
+    # Two readers wait; the stream queues its last update into a queue of one
+    # and ends before either runs, so its end marker finds no room.
+    realtime = AsyncRealtimeClient("wss://api.devnet.polyester.com", max_queue_size=1)
+    ws = _EndingWS()
+    with patch("polyester.realtime.client.websockets.connect", return_value=ws):
+        sub = await realtime.subscribe_proto(
+            "public:test", decode=lambda payload: payload, auto_reconnect=False
+        )
+        readers = [asyncio.create_task(sub.__anext__()) for _ in range(2)]
+        for _ in range(5):
+            await asyncio.sleep(0)
+        ws.release.set()
+        done, pending = await asyncio.wait(readers, timeout=1.0)
+        for task in pending:
+            task.cancel()
+        try:
+            assert not pending, "a reader still waits after the stream ended"
+            results = [t.result() if t.exception() is None else t.exception() for t in readers]
+            assert b"last" in results
+            assert sub.error is not None
+            assert [r for r in results if r != b"last"] == [sub.error]
+            assert sub._close.is_set()
+        finally:
+            await sub.aclose()

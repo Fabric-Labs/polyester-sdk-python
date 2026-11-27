@@ -119,23 +119,27 @@ async def next_update(queue: asyncio.Queue[Any], close: asyncio.Event) -> Any:
 
     Readers share the updates: each one goes to one reader, which takes it from
     the queue itself, so a reader cancelled while it waits loses none. Every
-    ending (a close, a failure, an overflow, the stream stopping) queues the
-    end marker ``None`` behind the updates already queued. The reader that
-    takes it marks the subscription closed and queues it again for the next
-    reader, so every waiting reader, and every later one, raises
-    ``StopAsyncIteration`` in turn. A closed subscription whose marker found
-    the queue full ends each reader once the queue is drained.
+    ending (a close, a failure, an overflow, the stream stopping) sets
+    ``close`` first and then queues the end marker ``None`` behind the updates
+    already queued, if it fits. The reader that takes the marker queues it
+    again for the next reader; a reader that takes the last update of a closed
+    queue queues it in place of one that did not fit. So every waiting reader,
+    and every later one, raises ``StopAsyncIteration`` in turn.
     """
-    if close.is_set() and queue.empty():
-        raise StopAsyncIteration
     item = await queue.get()
     if item is None:
         close.set()
-        # One was just taken, so the queue has room for it.
-        with contextlib.suppress(asyncio.QueueFull):
-            queue.put_nowait(None)
+        _post_end_marker(queue)
         raise StopAsyncIteration
+    if close.is_set() and queue.empty():
+        _post_end_marker(queue)
     return item
+
+
+def _post_end_marker(queue: asyncio.Queue[Any]) -> None:
+    # Called right after a take, so the queue has room for it.
+    with contextlib.suppress(asyncio.QueueFull):
+        queue.put_nowait(None)
 
 
 class AsyncSubscription(Generic[T]):
@@ -542,6 +546,8 @@ class AsyncRealtimeClient:
                     signal_ready(
                         PolyesterRealtimeError("realtime subscription ended before handshake")
                     )
+                # Closed first: the end marker may not fit a full queue.
+                close.set()
                 with contextlib.suppress(Exception):
                     queue.put_nowait(None)
 

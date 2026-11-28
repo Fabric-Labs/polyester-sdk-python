@@ -1908,8 +1908,10 @@ balances:
    (an update was missed), when E's next sequence does not arrive within 2
    seconds after an update whose `complete` is false (Funding updates, repeats
    and dropped epochs do not stop that timer), or when the subscription
-   reports a reconnect: `take_resubscribed()` returns True once per reconnect,
-   and publications missed meanwhile are not replayed. Check it on a timer of
+   reports a reconnect: the next `take_resubscribed()` after a reconnect
+   returns True, then False until another reconnect (several reconnects
+   between two calls give one True, while `resubscribed` counts each), and
+   publications missed meanwhile are not replayed. Check it on a timer of
    its own, not only when an update arrives: an idle account may publish
    nothing more after the reconnect. With the sync client, the handle
    `balances.subscribe_sync(...)` returns has the same `take_resubscribed()`
@@ -2617,9 +2619,11 @@ async with subscription:
   `PrivateOrdersConnected`; a position the server can no longer resume is
   answered with a fresh `PrivateOrdersSnapshot` that replaces local state.
   Outcomes between the two states are not replayed; fills stay readable from
-  trade history. Each such resume counts in the subscription's `resubscribed`
-  and makes `take_resubscribed()` return True once; a consumer's first
-  `PrivateOrdersConnected` does not.
+  trade history. Each such resume adds 1 to the subscription's
+  `resubscribed`, and the next `take_resubscribed()` returns True, then False
+  until another resume: several resumes between two calls give one True,
+  while `resubscribed` counts each. A consumer's first
+  `PrivateOrdersConnected` counts nothing.
 - `PrivateOrdersStale(stale=True)` means the account's live view is
   temporarily behind; it recovers by itself. When only some orders are
   behind, `order_ids` lists them (public IDs, ascending) and the rest of the

@@ -188,7 +188,12 @@ class AsyncSubscription(Generic[T]):
         return self._resubscribed
 
     def take_resubscribed(self) -> bool:
-        """Return True once per reconnect gap since the previous take."""
+        """Return True if a reconnect happened since the previous take.
+
+        The next take after a reconnect returns True, then False until another
+        reconnect: several reconnects between two takes give one True, while
+        ``resubscribed`` counts each.
+        """
         with self._resubscribed_lock:
             if not self._resubscribed_pending:
                 return False

@@ -2617,7 +2617,9 @@ async with subscription:
   `PrivateOrdersConnected`; a position the server can no longer resume is
   answered with a fresh `PrivateOrdersSnapshot` that replaces local state.
   Outcomes between the two states are not replayed; fills stay readable from
-  trade history.
+  trade history. Each such resume counts in the subscription's `resubscribed`
+  and makes `take_resubscribed()` return True once; a consumer's first
+  `PrivateOrdersConnected` does not.
 - `PrivateOrdersStale(stale=True)` means the account's live view is
   temporarily behind; it recovers by itself. When only some orders are
   behind, `order_ids` lists them (public IDs, ascending) and the rest of the

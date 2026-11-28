@@ -71,8 +71,11 @@ class SyncSubscription:
         return count if isinstance(count, int) else 0
 
     def take_resubscribed(self) -> bool:
-        """True once per reconnect since the previous take, as the async
-        subscription's ``take_resubscribed()`` reports it; False before the
+        """True if a reconnect happened since the previous take, as the async
+        subscription's ``take_resubscribed()`` reports it: the next take after
+        a reconnect returns True, then False until another reconnect, so
+        several reconnects between two takes give one True, while
+        ``resubscribed`` counts each. False before the
         subscription is set up and for a stream with no such signal. Callable
         from any thread, a client callback included. ``on_event`` is not
         called for a reconnect, so check this on a timer of its own: an idle

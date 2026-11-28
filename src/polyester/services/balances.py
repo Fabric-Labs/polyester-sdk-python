@@ -153,9 +153,12 @@ class AsyncBalancesService(ScopedSubAccountMixin, BaseService):
         ``funding_revision``, with no position. Amounts are 18-decimal ``U128``
         messages (``(hi << 64) | lo``). The SDK does not
         buffer, reorder or merge them, and a reconnect can miss or repeat
-        updates: ``take_resubscribed()`` on the subscription reports each
-        reconnect. Check it on a timer of its own, not only when an update
-        arrives: an idle account may publish nothing more after a reconnect.
+        updates: ``take_resubscribed()`` on the subscription returns True at
+        the next call after a reconnect, then False until another reconnect
+        (several reconnects between two calls give one True, while
+        ``resubscribed`` counts each). Check it on a timer of its own, not
+        only when an update arrives: an idle account may publish nothing more
+        after a reconnect.
         Keep exact balances with the loop in the README's "Keeping exact
         balances": buffer, :meth:`list`, apply in sequence order, and reload on
         an epoch change, a gap, a stalled incomplete update or a reconnect.

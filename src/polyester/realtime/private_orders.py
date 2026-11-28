@@ -968,6 +968,11 @@ class PrivateOrderStream:
         self._by_sub[sub] = s
         if s.state != "connected":
             s.state = "connected"
+            # A resume after a gap: a consumer that had its first connect counts a
+            # reconnect before it is told, one connected now for the first time does not.
+            for consumer in s.consumers:
+                if consumer.joined:
+                    consumer.subscription._mark_resubscribed()
             self._deliver(s, PrivateOrdersConnected())
         # A new subscription reports Unavailable itself if its view is still behind.
         if s.stale:
